@@ -10,6 +10,7 @@ class HumanoidBouncing(LeggedRobot):
 
     def _init_buffers(self):
         super()._init_buffers()
+        self._resample_high_level()
 
         # * get the body_name to body_index dict
         body_dict = self.gym.get_actor_rigid_body_dict(
@@ -74,6 +75,13 @@ class HumanoidBouncing(LeggedRobot):
                                  dtype=torch.float, device=self.device)
         self.phase_freq = 1.
 
+        # * high level
+        self.hl_impulses = torch.zeros(self.num_envs, 4, 5,
+            dtype=torch.float, device=self.device)
+        self.hl_ix = 0
+        self.hl_commands = torch.zeros(self.num_envs, 6,
+            dtype=torch.float, device=self.device)
+
     def _pre_physics_step(self):
         super()._pre_physics_step()
         self.dof_pos_target[:, :10] += self.dof_pos_target_legs
@@ -81,8 +89,8 @@ class HumanoidBouncing(LeggedRobot):
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
-        if self.cfg.commands.resampling_time == -1:
-            self.commands[env_ids, :] = 0.
+        # if self.cfg.commands.resampling_time == -1:
+        #     self.commands[env_ids, :] = 0.
         self.phase[env_ids, 0] = torch.rand(
             (torch.numel(env_ids),), requires_grad=False, device=self.device)
 
@@ -118,17 +126,37 @@ class HumanoidBouncing(LeggedRobot):
                 self.base_quat,
                 self._rigid_body_ang_vel[:, self.end_effector_ids]
                                         [:, index, :])
+            
+        # * update hl command based on current robot state and time
+        if (self.common_step_counter % 5.0 == 0): # replace magic # w/ config ref
+                self._resample_high_level()
+        self.hl_ix = self.hl_ix + 1 if self.common_step_counter > self.hl_impulses[0, 0,
+                            min(self.hl_ix + 1, self.hl_impulses[0, 0, :].shape[0])] else self.hl_ix
+        delta_t = self.common_step_counter - self.hl_impulses[0, 0, self.hl_ix].item()
+        print(delta_t)
+        self.hl_commands[:, 3:5] = self.hl_commands[:, 3:5] + self.hl_impulses[:, 1:3, self.hl_ix] # update x,y vel
+        self.hl_commands[:, 5] = self.hl_commands[:, 5] - 9.81*delta_t \
+            + self.hl_impulses[:, -1, self.hl_ix] # update z vel (look into gravity const)
+        self.hl_commands[:, 0:2] += delta_t *self.hl_commands[:, 3:5]
+        self.hl_commands[:, 2] += -0.5*9.81*delta_t**2 + delta_t*self.hl_commands[:, -1]
+        print(self.hl_commands[0, :])
 
-    def _resample_commands(self, env_ids):
-        super()._resample_commands(env_ids)
-        select = torch.norm(self.commands[:, 0:2], dim=-1, keepdim=True) < 0.5
-        self.commands[:, 0:2] = torch.where(select,
-                                            0. * self.commands[:, 0:2],
-                                            self.commands[:, 0:2])
-        select = torch.abs(self.commands[:, 2:3]) < 0.5
-        self.commands[:, 2:3] = torch.where(select,
-                                            0. * self.commands[:, 2:3],
-                                            self.commands[:, 2:3])
+
+    # def _resample_commands(self, env_ids):
+    #     self.commands = torch.zeros_like(self.commands)
+        
+    def _resample_high_level(self):
+        # ^ intended to be called at the same rate that HL updates
+        # get impulses approxed as velocities in each direction
+        components = torch.cat((torch.tensor([[1], [0], [5]], device=self.device), 
+                    torch.tensor([[1], [0], [10]], device=self.device).expand(-1, 4)), dim=1)
+        self.hl_impulses = torch.cat((torch.arange(self.common_step_counter, self.common_step_counter + 5,
+                                              device=self.device).view(1, -1),
+                               components), dim=0).expand(self.num_envs, -1, -1)
+        self.hl_ix = 0
+        self.hl_commands = torch.zeros(self.num_envs, 6,
+            dtype=torch.float, device=self.device)
+         
 
     def _check_terminations_and_timeouts(self):
         """ Check if environments need to be reset

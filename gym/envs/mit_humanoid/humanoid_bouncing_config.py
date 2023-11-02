@@ -119,6 +119,9 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
             # lin_vel_x = [3., 3.]    # min max [m/s]
             # lin_vel_y = 0.    # min max [m/s]
             # yaw_vel = 0.      # min max [rad/s]
+   
+    class high_level:
+        inerval = 5.0  # seconds
 
     class push_robots:
         toggle = True
@@ -209,7 +212,8 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
                      "base_lin_vel",
                      "base_ang_vel",
                      "projected_gravity",
-                     "commands",
+                     "hl_commands",
+                     # "commands",
                      "phase_sin",
                      "phase_cos",
                      "dof_pos_legs",
