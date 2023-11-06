@@ -10,7 +10,6 @@ class HumanoidBouncing(LeggedRobot):
 
     def _init_buffers(self):
         super()._init_buffers()
-        self._resample_high_level()
 
         # * get the body_name to body_index dict
         body_dict = self.gym.get_actor_rigid_body_dict(
@@ -78,7 +77,9 @@ class HumanoidBouncing(LeggedRobot):
         # * high level
         self.hl_impulses = torch.zeros(self.num_envs, 4, 5,
             dtype=torch.float, device=self.device)
-        self.hl_ix = 0
+        self.hl_ix = torch.zeros(self.num_envs, 1,
+                                 dtype=torch.int64,
+                                 device=self.device)
         self.hl_commands = torch.zeros(self.num_envs, 6,
             dtype=torch.float, device=self.device)
 
@@ -128,35 +129,70 @@ class HumanoidBouncing(LeggedRobot):
                                         [:, index, :])
             
         # * update hl command based on current robot state and time
-        if (self.common_step_counter % 5.0 == 0): # replace magic # w/ config ref
-                self._resample_high_level()
-        self.hl_ix = self.hl_ix + 1 if self.common_step_counter > self.hl_impulses[0, 0,
-                            min(self.hl_ix + 1, self.hl_impulses[0, 0, :].shape[0])] else self.hl_ix
-        delta_t = self.common_step_counter - self.hl_impulses[0, 0, self.hl_ix].item()
-        print(delta_t)
-        self.hl_commands[:, 3:5] = self.hl_commands[:, 3:5] + self.hl_impulses[:, 1:3, self.hl_ix] # update x,y vel
-        self.hl_commands[:, 5] = self.hl_commands[:, 5] - 9.81*delta_t \
-            + self.hl_impulses[:, -1, self.hl_ix] # update z vel (look into gravity const)
-        self.hl_commands[:, 0:2] += delta_t *self.hl_commands[:, 3:5]
-        self.hl_commands[:, 2] += -0.5*9.81*delta_t**2 + delta_t*self.hl_commands[:, -1]
-        print(self.hl_commands[0, :])
-
-
-    # def _resample_commands(self, env_ids):
-    #     self.commands = torch.zeros_like(self.commands)
+        envs_to_resample = torch.where(self.episode_length_buf % 5 == 0, True, False) # replace magic # w/ config ref
+        if envs_to_resample.any().item():
+            self._resample_high_level(envs_to_resample.nonzero(as_tuple=False).flatten())
+        ix_next_impulse = torch.clamp(self.hl_ix + 1, min = 0, max = self.hl_impulses[0, 0, :].shape[0] - 1)
+        t_next_impulse = torch.gather(self.hl_impulses[:, 0, :], dim=1, index=ix_next_impulse)
+        ix_to_increment = torch.ge(self.episode_length_buf.view(-1, 1), t_next_impulse)
+        self.hl_ix += ix_to_increment
+        delta_t = self.episode_length_buf.view(-1, 1) - torch.gather(self.hl_impulses[:, 0, :], dim=1, index=self.hl_ix)
         
-    def _resample_high_level(self):
-        # ^ intended to be called at the same rate that HL updates
-        # get impulses approxed as velocities in each direction
-        components = torch.cat((torch.tensor([[1], [0], [5]], device=self.device), 
-                    torch.tensor([[1], [0], [10]], device=self.device).expand(-1, 4)), dim=1)
-        self.hl_impulses = torch.cat((torch.arange(self.common_step_counter, self.common_step_counter + 5,
-                                              device=self.device).view(1, -1),
-                               components), dim=0).expand(self.num_envs, -1, -1)
+        
+        hl_vel_xy = self.hl_impulses[:, 1:3, :].gather(dim=2, index=self.hl_ix.expand(-1, 2).unsqueeze(2))
+        self.hl_commands[:, 3:5] = self.hl_commands[:, 3:5] + hl_vel_xy.squeeze(2)
+
+        hl_vel_z = self.hl_impulses[:, -1, :].gather(dim=1, index=self.hl_ix)
+        self.hl_commands[:, 5] = self.hl_commands[:, 5] - 9.81*delta_t.squeeze(1) + hl_vel_z.squeeze(1)
+
+        self.hl_commands[:, 0:2] += delta_t.expand(-1, 2) *self.hl_commands[:, 3:5]
+        print("self.hl_commands shape", self.hl_commands[:, -1].shape)
+        print("delta_t.shape", delta_t.squeeze(1).shape)
+        self.hl_commands[:, 2] += -0.5*9.81*torch.square(delta_t.squeeze(1)) + delta_t.squeeze(1)*self.hl_commands[:, -1]
+        print(self.hl_commands[0, :])
+        
+    def _resample_high_level(self, envs):
+        impulse_mag = torch.cat((torch.tensor([[1], [0], [5]],
+                               device=self.device),
+                               torch.tensor([[1], [0], [10]],
+                               device=self.device).expand(-1, 4)),
+                               dim=1).expand(self.num_envs, -1, -1)
+        
+        print('base height shape', self.base_height.shape)
+        print("base lin vel ", self.base_lin_vel[0, :])
+        
+        delta_t = self.time_to_touchdown(self.base_height, self.base_lin_vel[:, 2].unsqueeze(1), -0.5*9.81)
+        print("delta t shape", delta_t.shape)
+
+        print("delta_t", delta_t)
+        exit()
+        
+        impulse_mag[:, :2, 0] += self.base_lin_vel[:, :2] * delta_t.expand(-1, 2) + self.root_states[:, :2]
+        impulse_mag[:, 2, 0] += -0.5*9.81*torch.square(delta_t) + self.base_lin_vel[:, 2]*delta_t + self.base_height
+
+        self.hl_impulses = torch.cat((torch.arange(delta_t, delta_t + (5.0/self.dt), device=self.device).expand(envs.sum().item(), -1, -1), impulse_mag), dim=2)
+        print(self.hl_impulses.shape)
+        exit()
         self.hl_ix = 0
         self.hl_commands = torch.zeros(self.num_envs, 6,
             dtype=torch.float, device=self.device)
-         
+    
+    def time_to_touchdown(self, pos, vel, acc):
+        """ Assumes robot COM in projectile motion to calculate next touchdown
+        """
+        print("pos shape", pos.shape)
+        print("vel shape", vel.shape)
+        determinant = torch.square(vel) + 4*pos*acc
+        print("determinant", determinant)
+        solution = torch.where(determinant <= 0., False, True)
+        print("solution", solution)
+        print("solution any", solution.any())
+        # assert torch.all(solution).item(), "No solution determinant in projectile t_final search" # reconsider assert
+        t1 = (-vel + torch.sqrt(determinant)) / (2*acc)
+        t2 = (-vel - torch.sqrt(determinant)) / (2*acc)
+        print("t1 ", t1)
+        print("t2 ", t2)
+        return torch.where(t2 > t1, t2, t1)
 
     def _check_terminations_and_timeouts(self):
         """ Check if environments need to be reset
