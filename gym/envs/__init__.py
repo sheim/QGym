@@ -62,19 +62,22 @@ task_dict = {
 
 for class_name, class_location in class_dict.items():
     locals()[class_name] = getattr(
-        importlib.import_module(class_location, __name__), class_name)
+        importlib.import_module(class_location, __name__), class_name
+    )
 for config_name, config_location in config_dict.items():
     locals()[config_name] = getattr(
-        importlib.import_module(config_location, __name__), config_name)
+        importlib.import_module(config_location, __name__), config_name
+    )
 for runner_config_name, runner_config_location in runner_config_dict.items():
     locals()[runner_config_name] = getattr(
-        importlib.import_module(
-            runner_config_location, __name__),
-        runner_config_name)
+        importlib.import_module(runner_config_location, __name__),
+        runner_config_name,
+    )
 
 for task_name, class_list in task_dict.items():
     task_registry.register(
         task_name,
         locals()[class_list[0]],
         locals()[class_list[1]](),
-        locals()[class_list[2]]())
+        locals()[class_list[2]](),
+    )
