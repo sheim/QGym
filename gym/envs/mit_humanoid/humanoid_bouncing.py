@@ -96,6 +96,7 @@ class HumanoidBouncing(LeggedRobot):
         #     self.commands[env_ids, :] = 0.
         self.phase[env_ids, 0] = torch.rand(
             (torch.numel(env_ids),), requires_grad=False, device=self.device)
+        self._resample_high_level(env_ids)
 
     def _post_physics_step(self):
         super()._post_physics_step()
@@ -130,35 +131,35 @@ class HumanoidBouncing(LeggedRobot):
                 self._rigid_body_ang_vel[:, self.end_effector_ids]
                                         [:, index, :])
             
-        # * roll forward commands based on current time and latest impulse 
-        delta_t = self.episode_length_buf - torch.gather(self.hl_impulse_buf[:, 0, :], dim=1, index=self.hl_ix).squeeze(1)
+        # * update HL commands
+        # delta_t = self.episode_length_buf - torch.gather(self.hl_impulse_buf[:, 0, :], dim=1, index=self.hl_ix).squeeze(1)
 
-        # hl_vel_z = self.hl_impulse_buf[:, -1, :].gather(dim=1, index=self.hl_ix)
-        # hl_vel_xy = self.hl_impulse_buf[:, 1:3, :].gather(dim=1, index=self.hl_ix)
-        # self.hl_commands[:, 5] = hl_vel_z.squeeze(1) - 9.81*delta_t
-        # self.hl_commands[:, :2] = delta_t.unsqueeze(1).repeat(1, 2) *hl_vel_xy+ self.hl_commands[:, :2]
-        # self.hl_commands[:, 2] = -0.5*9.81*torch.square(delta_t) + delta_t*self.hl_commands[:, 5] + self.hl_commands[:, 2]
+        # update the commanded velocities when new impulse is imparted by high level
+        current_times = self.hl_impulse_buf[:, 0, :].gather(dim=1, index=self.hl_ix)
+        vel_update_envs = torch.where(current_times == self.episode_length_buf, True, False).nonzero(as_tuple=False).flatten()
+        self.hl_commands[vel_update_envs, 3:] += self.hl_impulse_buf[:, 1:3, 3:].gather(dim=2, index=self.hl_ix[vel_update_envs])
+
+        # roll out next time step HL command
+        self.hl_commands[:, :2] += self.hl_commands[:, 3:5]*self.dt
+        self.hl_commands[:, 2] += -0.5*9.81*self.dt**2 + self.hl_commands[:, 5]*self.dt
             
         # * resample HL and update indices for next post physics call
-        envs_to_resample = torch.where(self.episode_length_buf % 5 == 0, True, False) # replace magic # w/ config ref
-        print("envs to resample", envs_to_resample)
+        envs_to_resample = torch.where(self.episode_length_buf % 5 == 0, True, False) # ! this does not catch resets
         if envs_to_resample.any().item():
             self._resample_high_level(envs_to_resample.nonzero(as_tuple=False).flatten())
-        ix_next_impulse = torch.clamp(self.hl_ix + 1, min = torch.zeros_like(self.hl_ix), max = (self.hl_impulse_buf[0, 0, :].shape[0] - 1)*torch.ones_like(self.hl_ix))
+        ix_next_impulse = torch.clamp(self.hl_ix + 1, min=0., max=(self.hl_impulse_buf.shape[2] - 1))
         t_next_impulse = torch.gather(self.hl_impulse_buf[:, 0, :], dim=1, index=ix_next_impulse)
         ix_to_increment = torch.ge(self.episode_length_buf.view(-1, 1), t_next_impulse)
-        self.hl_ix += ix_to_increment
+        self.hl_ix = torch.clamp(ix_to_increment + self.hl_ix, min=0., max=(self.hl_impulse_buf.shape[2] - 1)) # ! issue with edge case where clamping allows the delta_touchdown = 0 envs to get zero impulse until they're next reset
         
     def _resample_high_level(self, envs):
         """
         Updates impulse sequences for envs its passed s.t. the first impulse compensates for
-        tracking error and the rest enforce the same bouncing ball trajectory on the COM 
+        tracking error and the rest enforce the same bouncing ball trajectory on the COM
         """
-        print("HL resampled!")
-        print("envs shape", envs.shape)
-        impulse_mag = torch.zeros(envs.shape[0], 3, 6)
-        time_rollout = torch.zeros(envs.shape[0], 1, 6)
-        impulse_mag[:, :, :-1] = torch.cat((torch.tensor([[1], [0], [5]],
+        impulse_mag_buf = torch.zeros(envs.shape[0], 3, 6, device=self.device)
+        time_rollout = torch.zeros(envs.shape[0], 1, 6, device=self.device)
+        impulse_mag_buf[:, :, :-1] = torch.cat((torch.tensor([[1], [0], [5]],
                                device=self.device),
                                torch.tensor([[0], [0], [10]],
                                device=self.device).repeat(1, 4)),
@@ -166,8 +167,12 @@ class HumanoidBouncing(LeggedRobot):
         
         delta_touchdown = self.time_to_touchdown(self.base_height[envs, :] - self.cfg.reward_settings.base_height_target,
                                          self.base_lin_vel[envs, 2].unsqueeze(1), -0.5*9.81)
-        delta_envs = torch.where(delta_touchdown > 0., True, False).nonzero(as_tuple=False).flatten()
-        no_delta_envs = torch.where(delta_touchdown == 0., True, False).nonzero(as_tuple=False).flatten()
+        delta_envs = torch.where(delta_touchdown.squeeze(1) > 0., True, False).nonzero(as_tuple=False).flatten()
+        no_delta_envs = torch.where(delta_touchdown.squeeze(1) == 0., True, False).nonzero(as_tuple=False).flatten()
+        
+        # ! check that base lin vel is actual vel and not speed to verify that negation is necessary
+        impulse_mag_buf[:, :2, 0] = -(self.base_lin_vel[envs, :2] * delta_touchdown.repeat(1, 2))
+        impulse_mag_buf[:, 2, 0] = -(self.base_lin_vel[envs, 2] -0.5*9.81*delta_touchdown.squeeze(1))
 
         if no_delta_envs.shape[0] != 0:
             no_delta_ones = torch.ones_like(delta_touchdown[no_delta_envs, :], device=self.device)
@@ -177,38 +182,30 @@ class HumanoidBouncing(LeggedRobot):
                                   no_delta_ones*(4.0/self.dt)), dim=1).unsqueeze(1)
         
         if delta_envs.shape[0] != 0:
-            impulse_mag[delta_envs, :, :] = torch.roll(impulse_mag[delta_envs, :, :], shifts=(1,), dims=(2,))
-            time_rollout[delta_envs, :, :] = torch.cat((torch.zeros_like(delta_touchdown[delta_envs, :], device=self.device),
-                                  delta_touchdown[delta_envs, :],
+            impulse_mag_buf[delta_envs, :, :] = torch.roll(impulse_mag_buf[delta_envs, :, :], shifts=(1,), dims=(2,))
+            time_rollout[delta_envs, :, 1:] = torch.cat((delta_touchdown[delta_envs, :],
                                   delta_touchdown[delta_envs, :] + (1.0/self.dt),
                                   delta_touchdown[delta_envs, :] + (2.0/self.dt),
                                   delta_touchdown[delta_envs, :] + (3.0/self.dt),
                                   delta_touchdown[delta_envs, :] + (4.0/self.dt)), dim=1).unsqueeze(1)
-        
-        impulse_mag[:, :2, 0] = self.base_lin_vel[envs, :2] * delta_touchdown.repeat(1, 2) + self.root_states[envs, :2]
-        impulse_mag[:, 2, 0] = -0.5*9.81*torch.square(delta_touchdown).squeeze(1) + \
-            self.base_lin_vel[envs, 2]*delta_touchdown.squeeze(1) + self.base_height[envs, :].squeeze(1)
 
-        self.hl_impulse_buf[envs] = torch.cat((time_rollout, impulse_mag), dim=1)
+        self.hl_impulse_buf[envs] = torch.cat((time_rollout, impulse_mag_buf), dim=1)
         self.hl_ix[envs] = 0
 
-        print("impulse mag shape", impulse_mag.shape)
-        print("time rollout shape", time_rollout.shape)
-        exit()
+        # reverse the rolls for the environments that are mid-air to remove padding on hl impulse until touchdown for obs
+        time_rollout[delta_envs, :, :] = torch.roll(time_rollout[delta_envs, :, :], shifts=(5,), dims=(2,))
+        impulse_mag_buf[delta_envs, :, :] = torch.roll(impulse_mag_buf[delta_envs, :, :], shifts=(5,), dims=(2,))
+        self.hl_impulses[envs] = torch.cat((time_rollout[:, :, :5], impulse_mag_buf[:, :, :5]), dim=1)
 
-        # update command for next physics step
-        hl_vel_xy = self.hl_impulses[envs, 1:3, :].gather(dim=2, index=self.hl_ix[envs, :].repeat(1, 2).unsqueeze(2))
-        self.hl_commands[envs, 3:5] = self.base_lin_vel[envs, :2] + hl_vel_xy.squeeze(2)
+        # seed the root states for roll out via post physics
+        self.hl_commands[envs, :3] = self.base_pos[envs, :]
+        self.hl_commands[envs, 3:] = self.hl_impulse_buf[envs, 1:, 0]
 
-        hl_vel_z = self.hl_impulses[envs, -1, :].gather(dim=1, index=self.hl_ix[envs, :])
-        self.hl_commands[envs, 5] = self.base_lin_vel[envs, 2] + hl_vel_z.squeeze(1) - 9.81*delta_touchdown[envs, :].squeeze(1) # ! revisit whether it's possible/good to do this here and at this point
 
     def time_to_touchdown(self, pos, vel, acc):
-        """ 
+        """
         Assumes robot COM in projectile motion to calculate next touchdown
         """
-        print("shape of vel", vel.shape)
-        print("shape of pos", pos.shape)
         determinant = torch.square(vel) - 4*pos*acc
         solution = torch.where(determinant < 0., False, True)
         no_solution = (solution == False).nonzero(as_tuple=True)
