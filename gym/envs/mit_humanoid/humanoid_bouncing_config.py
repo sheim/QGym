@@ -212,7 +212,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
                      "base_lin_vel",
                      "base_ang_vel",
                      "projected_gravity",
-                     # "hl_impulses",
+                     "hl_impulses_flat",
                      # "commands",
                      "phase_sin",
                      "phase_cos",

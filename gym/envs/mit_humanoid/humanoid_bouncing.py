@@ -77,6 +77,7 @@ class HumanoidBouncing(LeggedRobot):
         # * high level
         self.hl_impulses = torch.zeros(self.num_envs, 4, 5,
             dtype=torch.float, device=self.device)
+        self.hl_impulses_flat = self.hl_impulses.flatten(start_dim=1)
         self.hl_impulse_buf = torch.zeros(self.num_envs, 4, 5+1, # +1 here allows a buffer for cases where we need to pad impulse with 0 bc touchdown_delta > 0
             dtype=torch.float, device=self.device)
         self.hl_ix = torch.zeros(self.num_envs, 1,
@@ -135,6 +136,7 @@ class HumanoidBouncing(LeggedRobot):
         # delta_t = self.episode_length_buf - torch.gather(self.hl_impulse_buf[:, 0, :], dim=1, index=self.hl_ix).squeeze(1)
 
         # update the commanded velocities when new impulse is imparted by high level
+        self.hl_impulses_flat = self.hl_impulses.flatten(start_dim=1)
         current_times = self.hl_impulse_buf[:, 0, :].gather(dim=1, index=self.hl_ix)
         vel_update_envs = torch.where(current_times == self.episode_length_buf, True, False).nonzero(as_tuple=False).flatten()
         self.hl_commands[vel_update_envs, 3:] += self.hl_impulse_buf[:, 1:3, 3:].gather(dim=2, index=self.hl_ix[vel_update_envs])
