@@ -13,99 +13,128 @@ class HumanoidBouncing(LeggedRobot):
 
         # * get the body_name to body_index dict
         body_dict = self.gym.get_actor_rigid_body_dict(
-            self.envs[0], self.actor_handles[0])
+            self.envs[0], self.actor_handles[0]
+        )
         # * extract a list of body_names where the index is the id number
-        body_names = [body_tuple[0] for body_tuple in
-                      sorted(body_dict.items(),
-                             key=lambda body_tuple: body_tuple[1])]
+        body_names = [
+            body_tuple[0]
+            for body_tuple in sorted(
+                body_dict.items(), key=lambda body_tuple: body_tuple[1]
+            )
+        ]
         # * construct a list of id numbers corresponding to end_effectors
         self.end_effector_ids = []
         for end_effector_name in self.cfg.asset.end_effector_names:
-            self.end_effector_ids.extend([
-                body_names.index(body_name)
-                for body_name in body_names
-                if end_effector_name in body_name])
+            self.end_effector_ids.extend(
+                [
+                    body_names.index(body_name)
+                    for body_name in body_names
+                    if end_effector_name in body_name
+                ]
+            )
 
         # * end_effector_pos is world-frame and converted to env_origin
-        self.end_effector_pos = (
-            self._rigid_body_pos[:, self.end_effector_ids]
-            - self.env_origins.unsqueeze(dim=1).expand(
-                self.num_envs, len(self.end_effector_ids), 3))
-        self.end_effector_quat = \
-            self._rigid_body_quat[:, self.end_effector_ids]
+        self.end_effector_pos = self._rigid_body_pos[
+            :, self.end_effector_ids
+        ] - self.env_origins.unsqueeze(dim=1).expand(
+            self.num_envs, len(self.end_effector_ids), 3
+        )
+        self.end_effector_quat = self._rigid_body_quat[:, self.end_effector_ids]
 
         self.end_effector_lin_vel = torch.zeros(
-            self.num_envs, len(self.end_effector_ids), 3,
-            dtype=torch.float, device=self.device)
+            self.num_envs,
+            len(self.end_effector_ids),
+            3,
+            dtype=torch.float,
+            device=self.device,
+        )
         self.end_effector_ang_vel = torch.zeros(
-            self.num_envs, len(self.end_effector_ids), 3,
-            dtype=torch.float, device=self.device)
+            self.num_envs,
+            len(self.end_effector_ids),
+            3,
+            dtype=torch.float,
+            device=self.device,
+        )
 
         # * end_effector vels are body-relative like body vels above
         for index in range(len(self.end_effector_ids)):
             self.end_effector_lin_vel[:, index, :] = quat_rotate_inverse(
                 self.base_quat,
-                self._rigid_body_lin_vel[:, self.end_effector_ids]
-                                        [:, index, :])
+                self._rigid_body_lin_vel[:, self.end_effector_ids][:, index, :],
+            )
             self.end_effector_ang_vel[:, index, :] = quat_rotate_inverse(
                 self.base_quat,
-                self._rigid_body_ang_vel[:, self.end_effector_ids]
-                                        [:, index, :])
+                self._rigid_body_ang_vel[:, self.end_effector_ids][:, index, :],
+            )
 
         # * separate legs and arms
-        self.dof_pos_target_legs = torch.zeros(self.num_envs, 10,
-                                               dtype=torch.float,
-                                               device=self.device)
-        self.dof_pos_target_arms = torch.zeros(self.num_envs, 8,
-                                               dtype=torch.float,
-                                               device=self.device)
-        self.dof_pos_legs = torch.zeros(self.num_envs, 10,
-                                        dtype=torch.float, device=self.device)
-        self.dof_pos_arms = torch.zeros(self.num_envs, 8,
-                                        dtype=torch.float, device=self.device)
-        self.dof_vel_legs = torch.zeros(self.num_envs, 10,
-                                        dtype=torch.float, device=self.device)
-        self.dof_vel_arms = torch.zeros(self.num_envs, 8,
-                                        dtype=torch.float, device=self.device)
+        self.dof_pos_target_legs = torch.zeros(
+            self.num_envs, 10, dtype=torch.float, device=self.device
+        )
+        self.dof_pos_target_arms = torch.zeros(
+            self.num_envs, 8, dtype=torch.float, device=self.device
+        )
+        self.dof_pos_legs = torch.zeros(
+            self.num_envs, 10, dtype=torch.float, device=self.device
+        )
+        self.dof_pos_arms = torch.zeros(
+            self.num_envs, 8, dtype=torch.float, device=self.device
+        )
+        self.dof_vel_legs = torch.zeros(
+            self.num_envs, 10, dtype=torch.float, device=self.device
+        )
+        self.dof_vel_arms = torch.zeros(
+            self.num_envs, 8, dtype=torch.float, device=self.device
+        )
 
         # * other
         self.base_pos = self.root_states[:, 0:3]
-        self.phase = torch.zeros(self.num_envs, 1,
-                                 dtype=torch.float, device=self.device)
-        self.phase_freq = 1.
+        self.phase = torch.zeros(
+            self.num_envs, 1, dtype=torch.float, device=self.device
+        )
+        self.phase_freq = 1.0
 
         # * high level
-        self.hl_impulses = torch.zeros(self.num_envs, 4, 5,
-            dtype=torch.float, device=self.device)
+        self.hl_impulses = torch.zeros(
+            self.num_envs, 4, 5, dtype=torch.float, device=self.device
+        )
         self.hl_impulses_flat = self.hl_impulses.flatten(start_dim=1)
-        self.hl_impulse_buf = torch.zeros(self.num_envs, 4, 5+1, # +1 here allows a buffer for cases where we need to pad impulse with 0 bc touchdown_delta > 0
-            dtype=torch.float, device=self.device)
-        self.hl_ix = torch.zeros(self.num_envs, 1,
-                                 dtype=torch.int64,
-                                 device=self.device)
-        self.hl_commands = torch.zeros(self.num_envs, 6,
-            dtype=torch.float, device=self.device)
+        self.hl_ix = torch.zeros(
+            self.num_envs, 1, dtype=torch.int64, device=self.device
+        )
+        self.hl_commands = torch.zeros(
+            self.num_envs, 6, dtype=torch.float, device=self.device
+        )
 
     def _pre_physics_step(self):
         super()._pre_physics_step()
         self.dof_pos_target[:, :10] += self.dof_pos_target_legs
         self.dof_pos_target[:, 10:] += self.dof_pos_target_arms
 
+        envs_to_resample = torch.where(self.episode_length_buf % 5 == 0, True, False)
+        if envs_to_resample.any().item():
+            self._resample_high_level(
+                envs_to_resample.nonzero(as_tuple=False).flatten()
+            )
+
+        self.hl_impulses_flat = self.hl_impulses.flatten(start_dim=1)
+
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
         # if self.cfg.commands.resampling_time == -1:
         #     self.commands[env_ids, :] = 0.
         self.phase[env_ids, 0] = torch.rand(
-            (torch.numel(env_ids),), requires_grad=False, device=self.device)
+            (torch.numel(env_ids),), requires_grad=False, device=self.device
+        )
         self._resample_high_level(env_ids)
+        self.hl_impulses_flat = self.hl_impulses.flatten(start_dim=1)
 
     def _post_physics_step(self):
         super()._post_physics_step()
         self.phase_sin = torch.sin(2 * torch.pi * self.phase)
         self.phase_cos = torch.cos(2 * torch.pi * self.phase)
 
-        self.in_contact = \
-            self.contact_forces[:, self.end_effector_ids, 2].gt(0.)
+        self.in_contact = self.contact_forces[:, self.end_effector_ids, 2].gt(0.0)
         self.phase = torch.fmod(self.phase + self.dt, 1.0)
 
         self.dof_pos_legs = self.dof_pos[:, :10]
@@ -114,138 +143,162 @@ class HumanoidBouncing(LeggedRobot):
         self.dof_vel_arms = self.dof_vel[:, 10:]
 
         # * end_effector_pos is world-frame and converted to env_origin
-        self.end_effector_pos = (
-            self._rigid_body_pos[:, self.end_effector_ids]
-            - self.env_origins.unsqueeze(dim=1).expand(
-                self.num_envs, len(self.end_effector_ids), 3))
-        self.end_effector_quat = \
-            self._rigid_body_quat[:, self.end_effector_ids]
+        self.end_effector_pos = self._rigid_body_pos[
+            :, self.end_effector_ids
+        ] - self.env_origins.unsqueeze(dim=1).expand(
+            self.num_envs, len(self.end_effector_ids), 3
+        )
+        self.end_effector_quat = self._rigid_body_quat[:, self.end_effector_ids]
 
         # * end_effector vels are body-relative like body vels above
         for index in range(len(self.end_effector_ids)):
             self.end_effector_lin_vel[:, index, :] = quat_rotate_inverse(
                 self.base_quat,
-                self._rigid_body_lin_vel[:, self.end_effector_ids]
-                                        [:, index, :])
+                self._rigid_body_lin_vel[:, self.end_effector_ids][:, index, :],
+            )
             self.end_effector_ang_vel[:, index, :] = quat_rotate_inverse(
                 self.base_quat,
-                self._rigid_body_ang_vel[:, self.end_effector_ids]
-                                        [:, index, :])
-            
+                self._rigid_body_ang_vel[:, self.end_effector_ids][:, index, :],
+            )
+
         # * update HL commands
-        # delta_t = self.episode_length_buf - torch.gather(self.hl_impulse_buf[:, 0, :], dim=1, index=self.hl_ix).squeeze(1)
+        self.hl_ix = torch.argmin(
+            torch.abs(
+                self.hl_impulses[:, 0, :]
+                - self.episode_length_buf.view(self.num_envs, 1).expand(
+                    self.num_envs, 5
+                )
+            ),
+            dim=1,
+        ).unsqueeze(1)
 
         # update the commanded velocities when new impulse is imparted by high level
-        self.hl_impulses_flat = self.hl_impulses.flatten(start_dim=1)
-        current_times = self.hl_impulse_buf[:, 0, :].gather(dim=1, index=self.hl_ix)
-        vel_update_envs = torch.where(current_times == self.episode_length_buf, True, False).nonzero(as_tuple=False).flatten()
-        self.hl_commands[vel_update_envs, 3:] += self.hl_impulse_buf[:, 1:3, 3:].gather(dim=2, index=self.hl_ix[vel_update_envs])
+        current_times = self.hl_impulses[:, 0, :].gather(dim=1, index=self.hl_ix)
+        vel_update_envs = (
+            torch.eq(current_times, self.episode_length_buf.unsqueeze(1))
+            .nonzero(as_tuple=True)[0]
+            .flatten()
+        )
+        # ! figure out torch gather oddity when dim=1 is >1 to clean this up
+        self.hl_commands[vel_update_envs, 3] += (
+            self.hl_impulses[vel_update_envs, 1, :]
+            .gather(dim=1, index=self.hl_ix[vel_update_envs])
+            .squeeze(1)
+        )
+        self.hl_commands[vel_update_envs, 4] += (
+            self.hl_impulses[vel_update_envs, 2, :]
+            .gather(dim=1, index=self.hl_ix[vel_update_envs])
+            .squeeze(1)
+        )
+        self.hl_commands[vel_update_envs, 5] += (
+            self.hl_impulses[vel_update_envs, 3, :]
+            .gather(dim=1, index=self.hl_ix[vel_update_envs])
+            .squeeze(1)
+        )
 
         # roll out next time step HL command
-        self.hl_commands[:, :2] += self.hl_commands[:, 3:5]*self.dt
-        self.hl_commands[:, 2] += -0.5*9.81*self.dt**2 + self.hl_commands[:, 5]*self.dt
-            
-        # * resample HL and update indices for next post physics call
-        envs_to_resample = torch.where(self.episode_length_buf % 5 == 0, True, False) # ! this does not catch resets
-        if envs_to_resample.any().item():
-            self._resample_high_level(envs_to_resample.nonzero(as_tuple=False).flatten())
-        ix_next_impulse = torch.clamp(self.hl_ix + 1, min=0., max=(self.hl_impulse_buf.shape[2] - 1))
-        t_next_impulse = torch.gather(self.hl_impulse_buf[:, 0, :], dim=1, index=ix_next_impulse)
-        ix_to_increment = torch.ge(self.episode_length_buf.view(-1, 1), t_next_impulse)
-        self.hl_ix = torch.clamp(ix_to_increment + self.hl_ix, min=0., max=(self.hl_impulse_buf.shape[2] - 1)) # ! issue with edge case where clamping allows the delta_touchdown = 0 envs to get zero impulse until they're next reset
-        
+        self.hl_commands[:, :2] += self.hl_commands[:, 3:5] * self.dt
+        self.hl_commands[:, 2] += (
+            -0.5 * 9.81 * self.dt**2 + self.hl_commands[:, 5] * self.dt
+        )
+
     def _resample_high_level(self, envs):
         """
         Updates impulse sequences for envs its passed s.t. the first impulse compensates for
         tracking error and the rest enforce the same bouncing ball trajectory on the COM
         """
-        impulse_mag_buf = torch.zeros(envs.shape[0], 3, 6, device=self.device)
-        time_rollout = torch.zeros(envs.shape[0], 1, 6, device=self.device)
-        impulse_mag_buf[:, :, :-1] = torch.cat((torch.tensor([[1], [0], [5]],
-                               device=self.device),
-                               torch.tensor([[0], [0], [10]],
-                               device=self.device).repeat(1, 4)),
-                               dim=1).unsqueeze(0).repeat(envs.shape[0], 1, 1)
-        
-        delta_touchdown = self.time_to_touchdown(self.base_height[envs, :] - self.cfg.reward_settings.base_height_target,
-                                         self.base_lin_vel[envs, 2].unsqueeze(1), -0.5*9.81)
-        delta_envs = torch.where(delta_touchdown.squeeze(1) > 0., True, False).nonzero(as_tuple=False).flatten()
-        no_delta_envs = torch.where(delta_touchdown.squeeze(1) == 0., True, False).nonzero(as_tuple=False).flatten()
-        
-        # ! check that base lin vel is actual vel and not speed to verify that negation is necessary
-        impulse_mag_buf[:, :2, 0] = -(self.base_lin_vel[envs, :2] * delta_touchdown.repeat(1, 2))
-        impulse_mag_buf[:, 2, 0] = -(self.base_lin_vel[envs, 2] -0.5*9.81*delta_touchdown.squeeze(1))
+        impulse_mag_buf = (
+            torch.cat(
+                (
+                    torch.tensor([[1], [0], [5]], device=self.device),
+                    torch.tensor([[0], [0], [10]], device=self.device).repeat(1, 4),
+                ),
+                dim=1,
+            )
+            .unsqueeze(0)
+            .repeat(envs.shape[0], 1, 1)
+        )
 
-        if no_delta_envs.shape[0] != 0:
-            no_delta_ones = torch.ones_like(delta_touchdown[no_delta_envs, :], device=self.device)
-            time_rollout[no_delta_envs, :, 1:] = torch.cat((no_delta_ones*(1.0/self.dt),
-                                  no_delta_ones*(2.0/self.dt),
-                                  no_delta_ones*(3.0/self.dt),
-                                  no_delta_ones*(4.0/self.dt)), dim=1).unsqueeze(1)
-        
-        if delta_envs.shape[0] != 0:
-            impulse_mag_buf[delta_envs, :, :] = torch.roll(impulse_mag_buf[delta_envs, :, :], shifts=(1,), dims=(2,))
-            time_rollout[delta_envs, :, 1:] = torch.cat((delta_touchdown[delta_envs, :],
-                                  delta_touchdown[delta_envs, :] + (1.0/self.dt),
-                                  delta_touchdown[delta_envs, :] + (2.0/self.dt),
-                                  delta_touchdown[delta_envs, :] + (3.0/self.dt),
-                                  delta_touchdown[delta_envs, :] + (4.0/self.dt)), dim=1).unsqueeze(1)
+        delta_touchdown = self.time_to_touchdown(
+            self.base_height[envs, :] - self.cfg.reward_settings.base_height_target,
+            self.base_lin_vel[envs, 2].unsqueeze(1),
+            -0.5 * 9.81,
+        )
 
-        self.hl_impulse_buf[envs] = torch.cat((time_rollout, impulse_mag_buf), dim=1)
+        impulse_mag_buf[:, :2, 0] = -(
+            self.base_lin_vel[envs, :2] * delta_touchdown.repeat(1, 2)
+        )
+        impulse_mag_buf[:, 2, 0] = -(
+            self.base_lin_vel[envs, 2] - 0.5 * 9.81 * delta_touchdown.squeeze(1)
+        )
+
+        time_rollout = torch.cat(
+            (
+                delta_touchdown,
+                delta_touchdown + (1.0 / self.dt),
+                delta_touchdown + (2.0 / self.dt),
+                delta_touchdown + (3.0 / self.dt),
+                delta_touchdown + (4.0 / self.dt),
+            ),
+            dim=1,
+        ).unsqueeze(1)
+
+        self.hl_impulses[envs] = torch.cat((time_rollout, impulse_mag_buf), dim=1)
         self.hl_ix[envs] = 0
-
-        # reverse the rolls for the environments that are mid-air to remove padding on hl impulse until touchdown for obs
-        time_rollout[delta_envs, :, :] = torch.roll(time_rollout[delta_envs, :, :], shifts=(5,), dims=(2,))
-        impulse_mag_buf[delta_envs, :, :] = torch.roll(impulse_mag_buf[delta_envs, :, :], shifts=(5,), dims=(2,))
-        self.hl_impulses[envs] = torch.cat((time_rollout[:, :, :5], impulse_mag_buf[:, :, :5]), dim=1)
 
         # seed the root states for roll out via post physics
         self.hl_commands[envs, :3] = self.base_pos[envs, :]
-        self.hl_commands[envs, 3:] = self.hl_impulse_buf[envs, 1:, 0]
-
+        self.hl_commands[envs, 3:] = self.hl_impulses[envs, 1:, 0]
 
     def time_to_touchdown(self, pos, vel, acc):
         """
         Assumes robot COM in projectile motion to calculate next touchdown
         """
-        determinant = torch.square(vel) - 4*pos*acc
-        solution = torch.where(determinant < 0., False, True)
-        no_solution = (solution == False).nonzero(as_tuple=True)
-        t1 = (-vel + torch.sqrt(determinant)) / (2*acc)
-        t2 = (-vel - torch.sqrt(determinant)) / (2*acc)
+        determinant = torch.square(vel) - 4 * pos * acc
+        solution = torch.where(determinant < 0.0, False, True)
+        no_solution = torch.eq(solution, False).nonzero(as_tuple=True)[0]
+        t1 = (-vel + torch.sqrt(determinant)) / (2 * acc)
+        t2 = (-vel - torch.sqrt(determinant)) / (2 * acc)
         result = torch.where(t2 > t1, t2, t1)
-        result[no_solution] = 0.
-        return result
+        result[no_solution] = 0.0
+        return torch.floor(result)
 
     def _check_terminations_and_timeouts(self):
-        """ Check if environments need to be reset
-        """
+        """Check if environments need to be reset"""
         super()._check_terminations_and_timeouts()
 
         # * Termination for velocities, orientation, and low height
-        self.terminated |= \
-            (self.base_lin_vel.norm(dim=-1, keepdim=True) > 10).any(dim=1)
-        self.terminated |= \
-            (self.base_ang_vel.norm(dim=-1, keepdim=True) > 5).any(dim=1)
-        self.terminated |= \
-            (self.projected_gravity[:, 0:1].abs() > 0.7).any(dim=1)
-        self.terminated |= \
-            (self.projected_gravity[:, 1:2].abs() > 0.7).any(dim=1)
+        self.terminated |= (self.base_lin_vel.norm(dim=-1, keepdim=True) > 10).any(
+            dim=1
+        )
+        self.terminated |= (self.base_ang_vel.norm(dim=-1, keepdim=True) > 5).any(dim=1)
+        self.terminated |= (self.projected_gravity[:, 0:1].abs() > 0.7).any(dim=1)
+        self.terminated |= (self.projected_gravity[:, 1:2].abs() > 0.7).any(dim=1)
         self.terminated |= (self.base_pos[:, 2:3] < 0.3).any(dim=1)
 
         self.to_be_reset = self.timed_out | self.terminated
 
-# ########################## REWARDS ######################## #
+    # ########################## REWARDS ######################## #
 
     # * Task rewards * #
 
-    def _reward_tracking_lin_vel(self):
-        error = self.commands[:, :2] - self.base_lin_vel[:, :2]
-        error *= 2. / (1. + torch.abs(self.commands[:, :2]))
+    # def _reward_tracking_lin_vel(self):
+    #     error = self.commands[:, :2] - self.base_lin_vel[:, :2]
+    #     error *= 2.0 / (1.0 + torch.abs(self.commands[:, :2]))
+    #     return self._sqrdexp(error).sum(dim=1)
+
+    def _reward_tracking_hl_pos(self):
+        error = self.hl_commands[:, :3] - self.base_pos
+        error *= 2.0 / (1.0 + torch.abs(self.hl_commands[:, :3]))
+        return self._sqrdexp(error).sum(dim=1)
+
+    def _reward_tracking_hl_vel(self):
+        error = self.hl_commands[:, 3:] - self.base_lin_vel
+        error *= 2.0 / (1.0 + torch.abs(self.hl_commands[:, 3:]))
         return self._sqrdexp(error).sum(dim=1)
 
     def _reward_tracking_ang_vel(self):
-        ang_vel_error = (self.commands[:, 2] - self.base_ang_vel[:, 2])
+        ang_vel_error = 0.0 - self.base_ang_vel[:, 2]
         ang_vel_error /= self.scales["base_ang_vel"]
         return self._sqrdexp(ang_vel_error / torch.pi)
 
@@ -253,7 +306,7 @@ class HumanoidBouncing(LeggedRobot):
 
     def _reward_base_height(self):
         error = self.base_height - self.cfg.reward_settings.base_height_target
-        error /= self.scales['base_height']
+        error /= self.scales["base_height"]
         error = error.flatten()
         return self._sqrdexp(error)
 
@@ -265,23 +318,27 @@ class HumanoidBouncing(LeggedRobot):
         reward = self._reward_hip_yaw_zero()
         reward += self._reward_hip_abad_symmetry()
         reward += self._reward_hip_pitch_symmetry()
-        return reward / 3.
+        return reward / 3.0
 
     def _reward_hip_yaw_zero(self):
         error = self.dof_pos[:, 0] - self.default_dof_pos[:, 0]
-        reward = self._sqrdexp(error / self.scales['dof_pos'][0]) / 2.
+        reward = self._sqrdexp(error / self.scales["dof_pos"][0]) / 2.0
         error = self.dof_pos[:, 5] - self.default_dof_pos[:, 5]
-        reward += self._sqrdexp(error / self.scales['dof_pos'][5]) / 2.
+        reward += self._sqrdexp(error / self.scales["dof_pos"][5]) / 2.0
         return reward
 
     def _reward_hip_abad_symmetry(self):
-        error = (self.dof_pos[:, 1] / self.scales['dof_pos'][1]
-                 - self.dof_pos[:, 6] / self.scales['dof_pos'][6])
+        error = (
+            self.dof_pos[:, 1] / self.scales["dof_pos"][1]
+            - self.dof_pos[:, 6] / self.scales["dof_pos"][6]
+        )
         return self._sqrdexp(error)
 
     def _reward_hip_pitch_symmetry(self):
-        error = (self.dof_pos[:, 2] / self.scales['dof_pos'][2]
-                 + self.dof_pos[:, 7] / self.scales['dof_pos'][7])
+        error = (
+            self.dof_pos[:, 2] / self.scales["dof_pos"][2]
+            + self.dof_pos[:, 7] / self.scales["dof_pos"][7]
+        )
         return self._sqrdexp(error)
 
     def _reward_joint_regularization_arms(self):
@@ -293,52 +350,60 @@ class HumanoidBouncing(LeggedRobot):
         reward += self._reward_arm_pitch_symmetry()
         reward += self._reward_arm_pitch_zero()
         reward += self._reward_elbow_zero()
-        return reward / 6.
+        return reward / 6.0
 
     def _reward_arm_pitch_symmetry(self):
-        error = (self.dof_pos[:, 10] / self.scales['dof_pos'][10]
-                 + self.dof_pos[:, 14] / self.scales['dof_pos'][14])
+        error = (
+            self.dof_pos[:, 10] / self.scales["dof_pos"][10]
+            + self.dof_pos[:, 14] / self.scales["dof_pos"][14]
+        )
         return self._sqrdexp(error)
 
     def _reward_arm_pitch_zero(self):
         error = self.dof_pos[:, 10] - self.default_dof_pos[:, 10]
-        reward = self._sqrdexp(error / self.scales['dof_pos'][10])
+        reward = self._sqrdexp(error / self.scales["dof_pos"][10])
         error = self.dof_pos[:, 14] - self.default_dof_pos[:, 14]
-        reward += self._sqrdexp(error / self.scales['dof_pos'][14])
-        return reward / 2.
+        reward += self._sqrdexp(error / self.scales["dof_pos"][14])
+        return reward / 2.0
 
     def _reward_elbow_symmetry(self):
-        error = (self.dof_pos[:, 13] / self.scales['dof_pos'][13]
-                 + self.dof_pos[:, 17] / self.scales['dof_pos'][17])
+        error = (
+            self.dof_pos[:, 13] / self.scales["dof_pos"][13]
+            + self.dof_pos[:, 17] / self.scales["dof_pos"][17]
+        )
         return self._sqrdexp(error)
 
     def _reward_elbow_zero(self):
         error = self.dof_pos[:, 13] - self.default_dof_pos[:, 13]
-        reward = self._sqrdexp(error / self.scales['dof_pos'][13])
+        reward = self._sqrdexp(error / self.scales["dof_pos"][13])
         error = self.dof_pos[:, 17] - self.default_dof_pos[:, 17]
-        reward += self._sqrdexp(error / self.scales['dof_pos'][17])
-        return reward / 2.
+        reward += self._sqrdexp(error / self.scales["dof_pos"][17])
+        return reward / 2.0
 
     def _reward_arm_yaw_symmetry(self):
-        error = (self.dof_pos[:, 12] / self.scales['dof_pos'][12]
-                 - self.dof_pos[:, 16] / self.scales['dof_pos'][16])
+        error = (
+            self.dof_pos[:, 12] / self.scales["dof_pos"][12]
+            - self.dof_pos[:, 16] / self.scales["dof_pos"][16]
+        )
         return self._sqrdexp(error)
 
     def _reward_arm_yaw_zero(self):
         error = self.dof_pos[:, 12] - self.default_dof_pos[:, 12]
-        reward = self._sqrdexp(error / self.scales['dof_pos'][12])
+        reward = self._sqrdexp(error / self.scales["dof_pos"][12])
         error = self.dof_pos[:, 16] - self.default_dof_pos[:, 16]
-        reward += self._sqrdexp(error / self.scales['dof_pos'][16])
-        return reward / 2.
+        reward += self._sqrdexp(error / self.scales["dof_pos"][16])
+        return reward / 2.0
 
     def _reward_arm_abad_symmetry(self):
-        error = (self.dof_pos[:, 11] / self.scales['dof_pos'][11]
-                 - self.dof_pos[:, 15] / self.scales['dof_pos'][15])
+        error = (
+            self.dof_pos[:, 11] / self.scales["dof_pos"][11]
+            - self.dof_pos[:, 15] / self.scales["dof_pos"][15]
+        )
         return self._sqrdexp(error)
 
     def _reward_arm_abad_zero(self):
         error = self.dof_pos[:, 11] - self.default_dof_pos[:, 11]
-        reward = self._sqrdexp(error / self.scales['dof_pos'][11])
+        reward = self._sqrdexp(error / self.scales["dof_pos"][11])
         error = self.dof_pos[:, 15] - self.default_dof_pos[:, 15]
-        reward += self._sqrdexp(error / self.scales['dof_pos'][15])
-        return reward / 2.
+        reward += self._sqrdexp(error / self.scales["dof_pos"][15])
+        return reward / 2.0
