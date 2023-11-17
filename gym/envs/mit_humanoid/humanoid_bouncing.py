@@ -207,17 +207,6 @@ class HumanoidBouncing(LeggedRobot):
         Updates impulse sequences for envs its passed s.t. the first impulse compensates for
         tracking error and the rest enforce the same bouncing ball trajectory on the COM
         """
-        impulse_mag_buf = (
-            torch.cat(
-                (
-                    torch.tensor([[1], [0], [5]], device=self.device),
-                    torch.tensor([[0], [0], [10]], device=self.device).repeat(1, 4),
-                ),
-                dim=1,
-            )
-            .unsqueeze(0)
-            .repeat(envs.shape[0], 1, 1)
-        )
 
         delta_touchdown = self.time_to_touchdown(
             self.base_height[envs, :] - self.cfg.reward_settings.base_height_target,
@@ -225,12 +214,21 @@ class HumanoidBouncing(LeggedRobot):
             -0.5 * 9.81,
         )
 
-        impulse_mag_buf[:, :2, 0] = -(
+        first_xy = torch.tensor(
+            [[[1], [0]]], dtype=torch.float, device=self.device
+        ).repeat(envs.shape[0], 1, 1) - (
             self.base_lin_vel[envs, :2] * delta_touchdown.repeat(1, 2)
+        ).unsqueeze(2)
+        first_z = torch.tensor([[[5]]], dtype=torch.float, device=self.device).repeat(
+            envs.shape[0], 1, 1
+        ) - (self.base_lin_vel[envs, 2] - 0.5 * 9.81 * delta_touchdown.squeeze(1)).view(
+            envs.shape[0], 1, 1
         )
-        impulse_mag_buf[:, 2, 0] = -(
-            self.base_lin_vel[envs, 2] - 0.5 * 9.81 * delta_touchdown.squeeze(1)
-        )
+        first_impulse = torch.cat((first_xy, first_z), dim=1)
+        remaining_impulses = torch.tensor(
+            [[0], [0], [10]], dtype=torch.float, device=self.device
+        ).repeat(envs.shape[0], 1, 4)
+        impulse_mag_buf = torch.cat((first_impulse, remaining_impulses), dim=2)
 
         time_rollout = torch.cat(
             (

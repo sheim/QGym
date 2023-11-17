@@ -282,7 +282,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO"
         num_steps_per_env = 24
-        max_iterations = 1000
+        max_iterations = 5000
         run_name = ""
         experiment_name = "HumanoidTrajectoryTracking"
         save_interval = 50
