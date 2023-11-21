@@ -191,7 +191,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
     class scaling(LeggedRobotCfg.scaling):
         base_height = 0.6565
         base_lin_vel = 1.0
-        base_ang_vel = 1.0
+        base_ang_vel = torch.pi
         dof_pos = 2 * [0.5, 1, 3, 2, 2] + 2 * [2, 1, 0.5, 2.0]
         dof_vel = 1.0
         dof_pos_target = dof_pos
@@ -278,9 +278,9 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO"
-        num_steps_per_env = 24
+        num_steps_per_env = 32
         max_iterations = 1000
-        run_name = "ICRA2023"
+        run_name = "HumanoidRunning"
         experiment_name = "HumanoidLocomotion"
         save_interval = 50
         plot_input_gradients = False

@@ -122,7 +122,7 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
             # yaw_vel = 0.      # min max [rad/s]
 
     class high_level:
-        inerval = 5.0  # seconds
+        interval = 5.0  # seconds
 
     class push_robots:
         toggle = True
@@ -165,7 +165,7 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
 
         fix_base_link = False
         disable_gravity = False
-        disable_actions = False
+
         disable_motors = False
 
         # (1: disable, 0: enable...bitwise filter)
@@ -189,9 +189,11 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
         tracking_sigma = 0.5
 
     class scaling(LeggedRobotCfg.scaling):
+        hl_pos = 0.3  # maximum altitude for current bouncing ball param
+        hl_vel = 4.905  # max impulse imparted by HL
         base_height = 0.6565
         base_lin_vel = 1.0
-        base_ang_vel = 1.0
+        base_ang_vel = torch.pi
         dof_pos = 2 * [0.5, 1, 3, 2, 2] + 2 * [2, 1, 0.5, 2.0]
         dof_vel = 1.0
         dof_pos_target = dof_pos
@@ -217,8 +219,9 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
             "projected_gravity",
             "hl_impulses_flat",
             # "commands",
-            "phase_sin",
-            "phase_cos",
+            # "phase_sin",
+            # "phase_cos",
+            "time_since_hl_query",
             "dof_pos_legs",
             "dof_vel_legs",
             "in_contact",
@@ -227,6 +230,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
         critic_obs = actor_obs
 
         actions = ["dof_pos_target_legs"]
+        disable_actions = False
 
         add_noise = True
         noise_level = 1.0  # scales other values
@@ -281,7 +285,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO"
-        num_steps_per_env = 24
+        num_steps_per_env = 32
         max_iterations = 5000
         run_name = ""
         experiment_name = "HumanoidTrajectoryTracking"

@@ -96,8 +96,8 @@ class HumanoidRunning(LeggedRobot):
 
     def _pre_physics_step(self):
         super()._pre_physics_step()
-        self.dof_pos_target[:, :10] += self.dof_pos_target_legs
-        self.dof_pos_target[:, 10:] += self.dof_pos_target_arms
+        self.dof_pos_target[:, :10] = self.dof_pos_target_legs
+        self.dof_pos_target[:, 10:] = self.dof_pos_target_arms
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
@@ -177,7 +177,7 @@ class HumanoidRunning(LeggedRobot):
     def _reward_tracking_ang_vel(self):
         ang_vel_error = self.commands[:, 2] - self.base_ang_vel[:, 2]
         ang_vel_error /= self.scales["base_ang_vel"]
-        return self._sqrdexp(ang_vel_error / torch.pi)
+        return self._sqrdexp(ang_vel_error)
 
     # * Shaping rewards * #
 
