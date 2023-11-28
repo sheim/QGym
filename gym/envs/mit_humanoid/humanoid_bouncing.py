@@ -296,7 +296,8 @@ class HumanoidBouncing(LeggedRobot):
     def _reward_tracking_hl_pos(self):
         error = self.hl_commands[:, 2] - self.base_pos[:, 2]
         error /= self.scales["hl_pos"]
-        return self._sqrdexp(error).sum(dim=1)
+        error = error.flatten()
+        return self._sqrdexp(error)
 
     def _reward_tracking_hl_vel(self):
         error = self.hl_commands[:, 3:] - self.base_lin_vel

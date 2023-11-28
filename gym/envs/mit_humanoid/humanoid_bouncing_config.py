@@ -122,7 +122,8 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
             # yaw_vel = 0.      # min max [rad/s]
 
     class high_level:
-        interval = 5.0  # seconds
+        sec_per_gait = 0.5
+        interval = sec_per_gait * (5.0 / 2.0)  # seconds
 
     class push_robots:
         toggle = True
@@ -286,7 +287,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO"
         num_steps_per_env = 32
-        max_iterations = 5000
+        max_iterations = 1500
         run_name = ""
         experiment_name = "HumanoidTrajectoryTracking"
         save_interval = 50
