@@ -203,14 +203,22 @@ class HumanoidBouncing(LeggedRobot):
         ).repeat(env_ids.shape[0], 1, 1) - (
             self.base_lin_vel[env_ids, :2] * delta_touchdown.repeat(1, 2)
         ).unsqueeze(2)
-        first_z = torch.tensor(
-            [[[2.4525]]], dtype=torch.float, device=self.device
-        ).repeat(env_ids.shape[0], 1, 1) - (
+        # first_z = torch.tensor(
+        #     [[[2.4525]]], dtype=torch.float, device=self.device
+        # ).repeat(env_ids.shape[0], 1, 1) - (
+        #     self.base_lin_vel[env_ids, 2] - 0.5 * 9.81 * delta_touchdown.squeeze(1)
+        # ).view(env_ids.shape[0], 1, 1)
+        first_z = torch.tensor([[[1.0]]], dtype=torch.float, device=self.device).repeat(
+            env_ids.shape[0], 1, 1
+        ) - (
             self.base_lin_vel[env_ids, 2] - 0.5 * 9.81 * delta_touchdown.squeeze(1)
         ).view(env_ids.shape[0], 1, 1)
         first_impulse = torch.cat((first_xy, first_z), dim=1)
+        # remaining_impulses = torch.tensor(
+        #     [[0], [0], [4.905]], dtype=torch.float, device=self.device
+        # ).repeat(env_ids.shape[0], 1, 4)
         remaining_impulses = torch.tensor(
-            [[0], [0], [4.905]], dtype=torch.float, device=self.device
+            [[0], [0], [2.0]], dtype=torch.float, device=self.device
         ).repeat(env_ids.shape[0], 1, 4)
         impulse_mag_buf = torch.cat((first_impulse, remaining_impulses), dim=2)
 

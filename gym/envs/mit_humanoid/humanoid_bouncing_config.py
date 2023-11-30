@@ -186,12 +186,12 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
 
         # negative total rewards clipped at zero (avoids early termination)
         only_positive_rewards = False  # ! zap?
-        base_height_target = 0.62
+        base_height_target = 0.6565
         tracking_sigma = 0.5
 
     class scaling(LeggedRobotCfg.scaling):
-        hl_pos = 0.3  # maximum altitude for current bouncing ball param
-        hl_vel = 4.905  # max impulse imparted by HL
+        hl_pos = 0.05  # 0.3  # maximum altitude for current bouncing ball param
+        hl_vel = 2.0  # 4.905  # max impulse imparted by HL
         base_height = 0.6565
         base_lin_vel = 1.0
         base_ang_vel = torch.pi
