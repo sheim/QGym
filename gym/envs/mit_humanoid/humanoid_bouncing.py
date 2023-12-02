@@ -193,9 +193,12 @@ class HumanoidBouncing(LeggedRobot):
         """
         self.time_since_hl_query[env_ids] = 0.0
         delta_touchdown = self._time_to_touchdown(
-            self.base_height[env_ids, :] - self.cfg.reward_settings.base_height_target,
+            -(
+                self.root_states[env_ids, 2:3]
+                - self.cfg.reward_settings.base_height_target
+            ),
             self.base_lin_vel[env_ids, 2].unsqueeze(1),
-            -0.5 * 9.81,
+            -9.81,
         )
 
         first_xy = torch.tensor(
@@ -244,14 +247,14 @@ class HumanoidBouncing(LeggedRobot):
         """
         Assumes robot COM in projectile motion to calculate next touchdown
         """
-        determinant = torch.square(vel) - 4 * pos * acc
+        determinant = torch.square(vel) - 4 * pos * 0.5 * acc
         solution = torch.where(determinant < 0.0, False, True)
         no_solution = torch.eq(solution, False).nonzero(as_tuple=True)[0]
-        t1 = (-vel + torch.sqrt(determinant)) / (2 * acc)
-        t2 = (-vel - torch.sqrt(determinant)) / (2 * acc)
+        t1 = (-vel + torch.sqrt(determinant)) / (2 * 0.5 * acc)
+        t2 = (-vel - torch.sqrt(determinant)) / (2 * 0.5 * acc)
         result = torch.where(t2 > t1, t2, t1)
         result[no_solution] = 0.0
-        return torch.floor(result)
+        return result
 
     def _update_hl_commands(self):
         """
