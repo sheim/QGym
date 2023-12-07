@@ -2,6 +2,8 @@ import torch
 
 from isaacgym.torch_utils import quat_rotate_inverse
 from gym.envs import LeggedRobot
+from isaacgym import gymutil
+from isaacgym import gymapi
 
 
 class HumanoidBouncing(LeggedRobot):
@@ -115,7 +117,11 @@ class HumanoidBouncing(LeggedRobot):
         self.dof_pos_target[:, 10:] = self.dof_pos_target_arms
 
         envs_to_resample = torch.where(
-            self.episode_length_buf % self.cfg.high_level.interval == 0, True, False
+            self.episode_length_buf
+            % (self.cfg.high_level.interval * self.cfg.control.ctrl_frequency)
+            == 0,
+            True,
+            False,
         )
         if envs_to_resample.any().item():
             self._resample_high_level(
@@ -225,16 +231,20 @@ class HumanoidBouncing(LeggedRobot):
         ).repeat(env_ids.shape[0], 1, 4)
         impulse_mag_buf = torch.cat((first_impulse, remaining_impulses), dim=2)
 
+        step_time = 0.5
+
         time_rollout = torch.cat(
             (
                 delta_touchdown,
-                delta_touchdown + (1.0 / self.dt),
-                delta_touchdown + (2.0 / self.dt),
-                delta_touchdown + (3.0 / self.dt),
-                delta_touchdown + (4.0 / self.dt),
+                delta_touchdown + (1.0 * step_time),
+                delta_touchdown + (2.0 * step_time),
+                delta_touchdown + (3.0 * step_time),
+                delta_touchdown + (4.0 * step_time),
             ),
             dim=1,
         ).unsqueeze(1)
+
+        time_rollout = time_rollout / self.dt
 
         self.hl_impulses[env_ids] = torch.cat((time_rollout, impulse_mag_buf), dim=1)
         self.hl_ix[env_ids] = 0
@@ -242,6 +252,31 @@ class HumanoidBouncing(LeggedRobot):
         # seed the root states for roll out via post physics
         self.hl_commands[env_ids, :3] = self.base_pos[env_ids, :]
         self.hl_commands[env_ids, 3:] = self.hl_impulses[env_ids, 1:, 0]
+
+        if self.cfg.viewer.record:
+            # draw new high level target trajectories
+            self.gym.clear_lines(self.viewer)
+            sphere_geom = gymutil.WireframeSphereGeometry(
+                0.1, 64, 64, None, color=(1, 1, 0)
+            )
+
+            for i in range(self.num_envs):
+                base_pos = (self.root_states[i, :3]).cpu().numpy()
+                sphere_pose = gymapi.Transform(
+                    gymapi.Vec3(base_pos[0], base_pos[1], base_pos[2]), r=None
+                )
+                gymutil.draw_lines(
+                    sphere_geom, self.gym, self.viewer, self.envs[i], sphere_pose
+                )
+                line = [
+                    base_pos[0],
+                    base_pos[1],
+                    self.cfg.reward_settings.base_height_target,
+                    base_pos[0] + 100,
+                    base_pos[1],
+                    self.cfg.reward_settings.base_height_target,
+                ]
+                self.gym.add_lines(self.viewer, self.envs[i], 1, line, [0.85, 0.1, 0.1])
 
     def _time_to_touchdown(self, pos, vel, acc):
         """

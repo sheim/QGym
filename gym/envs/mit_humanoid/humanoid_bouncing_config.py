@@ -251,7 +251,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
                 action_rate = 1.0e-3
                 action_rate2 = 1.0e-4
                 # tracking_lin_vel = 5.0
-                tracking_hl_pos = 5.0
+                tracking_hl_pos = 15.0
                 tracking_hl_vel = 5.0
                 tracking_ang_vel = 5.0
                 torques = 1e-4
@@ -260,7 +260,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
                 dof_vel = 1e-4
 
                 # * Shaping rewards * #
-                base_height = 0.1
+                base_height = 0  # 0.1
                 orientation = 1.0
                 hip_yaw_zero = 2.0
                 hip_abad_symmetry = 0.2
