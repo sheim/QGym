@@ -117,9 +117,7 @@ class HumanoidBouncing(LeggedRobot):
         self.dof_pos_target[:, 10:] = self.dof_pos_target_arms
 
         envs_to_resample = torch.where(
-            self.episode_length_buf
-            % (self.cfg.high_level.interval * self.cfg.control.ctrl_frequency)
-            == 0,
+            self.time_since_hl_query == self.cfg.high_level.interval,
             True,
             False,
         )
@@ -142,7 +140,7 @@ class HumanoidBouncing(LeggedRobot):
 
     def _post_physics_step(self):
         super()._post_physics_step()
-        self.time_since_hl_query += self.dt
+        self.time_since_hl_query += 1  # self.dt
         self.phase_sin = torch.sin(2 * torch.pi * self.phase)
         self.phase_cos = torch.cos(2 * torch.pi * self.phase)
 
@@ -174,7 +172,7 @@ class HumanoidBouncing(LeggedRobot):
             )
 
         # * update HL indices
-        delta_hl_now = self.hl_impulses[:, 0, :] - self.episode_length_buf.view(
+        delta_hl_now = self.hl_impulses[:, 0, :] - self.time_since_hl_query.view(
             self.num_envs, 1
         ).expand(self.num_envs, 5)
         self.hl_ix = torch.argmin(
@@ -187,10 +185,8 @@ class HumanoidBouncing(LeggedRobot):
         ).unsqueeze(1)
         self._update_hl_commands()
         # roll out next time step HL command
-        self.hl_commands[:, :2] += self.hl_commands[:, 3:5] * self.dt
-        self.hl_commands[:, 2] += (
-            -0.5 * 9.81 * self.dt**2 + self.hl_commands[:, 5] * self.dt
-        )
+        self.hl_commands[:, :3] += self.hl_commands[:, 3:] * self.dt
+        self.hl_commands[:, 5] -= 9.81 * self.dt
 
     def _resample_high_level(self, env_ids):
         """
@@ -199,7 +195,7 @@ class HumanoidBouncing(LeggedRobot):
         """
         self.time_since_hl_query[env_ids] = 0.0
         delta_touchdown = self._time_to_touchdown(
-            -(
+            (
                 self.root_states[env_ids, 2:3]
                 - self.cfg.reward_settings.base_height_target
             ),
@@ -207,31 +203,23 @@ class HumanoidBouncing(LeggedRobot):
             -9.81,
         )
 
+        step_time = self.cfg.high_level.sec_per_gait
+
         first_xy = torch.tensor(
             [[[1], [0]]], dtype=torch.float, device=self.device
         ).repeat(env_ids.shape[0], 1, 1) - (
             self.base_lin_vel[env_ids, :2] * delta_touchdown.repeat(1, 2)
         ).unsqueeze(2)
-        # first_z = torch.tensor(
-        #     [[[2.4525]]], dtype=torch.float, device=self.device
-        # ).repeat(env_ids.shape[0], 1, 1) - (
-        #     self.base_lin_vel[env_ids, 2] - 0.5 * 9.81 * delta_touchdown.squeeze(1)
-        # ).view(env_ids.shape[0], 1, 1)
-        first_z = torch.tensor([[[1.0]]], dtype=torch.float, device=self.device).repeat(
-            env_ids.shape[0], 1, 1
-        ) - (
-            self.base_lin_vel[env_ids, 2] - 0.5 * 9.81 * delta_touchdown.squeeze(1)
+        first_z = torch.tensor(
+            [[[step_time * 9.81 / 2]]], dtype=torch.float, device=self.device
+        ).repeat(env_ids.shape[0], 1, 1) - (
+            self.base_lin_vel[env_ids, 2] - 9.81 * delta_touchdown.squeeze(1)
         ).view(env_ids.shape[0], 1, 1)
         first_impulse = torch.cat((first_xy, first_z), dim=1)
-        # remaining_impulses = torch.tensor(
-        #     [[0], [0], [4.905]], dtype=torch.float, device=self.device
-        # ).repeat(env_ids.shape[0], 1, 4)
         remaining_impulses = torch.tensor(
-            [[0], [0], [2.0]], dtype=torch.float, device=self.device
+            [[0], [0], [step_time * 9.81]], dtype=torch.float, device=self.device
         ).repeat(env_ids.shape[0], 1, 4)
         impulse_mag_buf = torch.cat((first_impulse, remaining_impulses), dim=2)
-
-        step_time = 0.5
 
         time_rollout = torch.cat(
             (
@@ -245,13 +233,14 @@ class HumanoidBouncing(LeggedRobot):
         ).unsqueeze(1)
 
         time_rollout = time_rollout / self.dt
+        time_rollout = time_rollout.round().int()
 
         self.hl_impulses[env_ids] = torch.cat((time_rollout, impulse_mag_buf), dim=1)
         self.hl_ix[env_ids] = 0
 
         # seed the root states for roll out via post physics
         self.hl_commands[env_ids, :3] = self.base_pos[env_ids, :]
-        self.hl_commands[env_ids, 3:] = self.hl_impulses[env_ids, 1:, 0]
+        self.hl_commands[env_ids, 3:] = self.base_lin_vel[env_ids, :]
 
         if self.cfg.viewer.record:
             # draw new high level target trajectories
@@ -296,29 +285,18 @@ class HumanoidBouncing(LeggedRobot):
         Checks which environments should have an impulse imparted on them and
         updates HL command per-step rollout's velocities accordingly
         """
-        # update the commanded velocities when new impulse is imparted by high level
-        current_times = self.hl_impulses[:, 0, :].gather(dim=1, index=self.hl_ix)
-        vel_update_envs = (
-            torch.eq(current_times, self.episode_length_buf.unsqueeze(1))
-            .nonzero(as_tuple=True)[0]
-            .flatten()
-        )
-
-        self.hl_commands[vel_update_envs, 3] += (
-            self.hl_impulses[vel_update_envs, 1, :]
-            .gather(dim=1, index=self.hl_ix[vel_update_envs])
-            .squeeze(1)
-        )
-        self.hl_commands[vel_update_envs, 4] += (
-            self.hl_impulses[vel_update_envs, 2, :]
-            .gather(dim=1, index=self.hl_ix[vel_update_envs])
-            .squeeze(1)
-        )
-        self.hl_commands[vel_update_envs, 5] += (
-            self.hl_impulses[vel_update_envs, 3, :]
-            .gather(dim=1, index=self.hl_ix[vel_update_envs])
-            .squeeze(1)
-        )
+        vel_update_indices = torch.argmax(
+            (self.hl_impulses[:, 0, :] == self.time_since_hl_query).float(), dim=1
+        ).unsqueeze(1)
+        vel_update_indices[
+            (vel_update_indices == 0)
+            & (self.hl_impulses[:, 0, 0].unsqueeze(1) != self.time_since_hl_query)
+        ] = -1
+        vel_update_indices = vel_update_indices.squeeze(1)
+        vel_update_envs = torch.nonzero(vel_update_indices != -1)
+        self.hl_commands[vel_update_envs, 3:] += self.hl_impulses[
+            vel_update_envs, 1:, vel_update_indices[vel_update_envs]
+        ]
 
     def _check_terminations_and_timeouts(self):
         """Check if environments need to be reset"""
@@ -340,10 +318,13 @@ class HumanoidBouncing(LeggedRobot):
     # * Task rewards * #
 
     def _reward_tracking_hl_pos(self):
-        error = self.hl_commands[:, 2] - self.base_pos[:, 2]
+        # error = self.hl_commands[:, 2] - self.base_pos[:, 2]
+        # error /= self.scales["hl_pos"]
+        # error = error.flatten()
+        # return self._sqrdexp(error)
+        error = self.hl_commands[:, :3] - self.base_pos[:, :3]
         error /= self.scales["hl_pos"]
-        error = error.flatten()
-        return self._sqrdexp(error)
+        return self._sqrdexp(error).sum(dim=1)
 
     def _reward_tracking_hl_vel(self):
         error = self.hl_commands[:, 3:] - self.base_lin_vel

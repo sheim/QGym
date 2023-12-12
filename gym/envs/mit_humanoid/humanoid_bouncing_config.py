@@ -122,8 +122,8 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
             # yaw_vel = 0.      # min max [rad/s]
 
     class high_level:
-        sec_per_gait = 0.5
-        interval = sec_per_gait * (5.0 / 2.0)  # seconds
+        sec_per_gait = 0.25
+        interval = (int)(sec_per_gait * (5.0 / 2.0) * 100)  # time steps
 
     class push_robots:
         toggle = True
@@ -164,8 +164,8 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
             "right_hand",
         ]
 
-        fix_base_link = False
-        disable_gravity = False
+        fix_base_link = True
+        disable_gravity = True
 
         disable_motors = False
 
@@ -231,7 +231,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
         critic_obs = actor_obs
 
         actions = ["dof_pos_target_legs"]
-        disable_actions = False
+        disable_actions = True
 
         add_noise = True
         noise_level = 1.0  # scales other values
@@ -251,7 +251,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
                 action_rate = 1.0e-3
                 action_rate2 = 1.0e-4
                 # tracking_lin_vel = 5.0
-                tracking_hl_pos = 15.0
+                tracking_hl_pos = 5.0
                 tracking_hl_vel = 5.0
                 tracking_ang_vel = 5.0
                 torques = 1e-4
