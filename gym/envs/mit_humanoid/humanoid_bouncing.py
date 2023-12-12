@@ -277,7 +277,7 @@ class HumanoidBouncing(LeggedRobot):
         t1 = (-vel + torch.sqrt(determinant)) / (2 * 0.5 * acc)
         t2 = (-vel - torch.sqrt(determinant)) / (2 * 0.5 * acc)
         result = torch.where(t2 > t1, t2, t1)
-        result[no_solution] = 0.0
+        result[no_solution] = self.dt
         return result
 
     def _update_hl_commands(self):

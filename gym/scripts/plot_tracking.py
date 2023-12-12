@@ -6,7 +6,7 @@ from gym.utils.helpers import get_load_path
 import os
 
 # Read the tracking data from the CSV file
-play_path = get_load_path(name="HumanoidTrajectoryTracking", load_run="Dec08_17-54-28_")
+play_path = get_load_path(name="HumanoidTrajectoryTracking", load_run="Dec12_14-58-50_")
 data = np.genfromtxt(
     os.path.join(os.path.dirname(play_path), "tracking.csv"), delimiter=","
 )

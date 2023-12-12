@@ -164,8 +164,8 @@ class HumanoidBouncingCfg(LeggedRobotCfg):
             "right_hand",
         ]
 
-        fix_base_link = True
-        disable_gravity = True
+        fix_base_link = False
+        disable_gravity = False
 
         disable_motors = False
 
@@ -231,7 +231,7 @@ class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
         critic_obs = actor_obs
 
         actions = ["dof_pos_target_legs"]
-        disable_actions = True
+        disable_actions = False
 
         add_noise = True
         noise_level = 1.0  # scales other values
