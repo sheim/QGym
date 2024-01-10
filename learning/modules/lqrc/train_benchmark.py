@@ -6,6 +6,8 @@ from torch.utils.data import random_split
 from custom_nn import LQRCDataset, QuadraticNetCholesky, CustomCholeskyLoss
 from plotting import plot_pointwise_predictions
 
+DEVICE = "gpu"
+
 
 def generate_1D_quadratic(lb, ub, rand_lb=0.0, rand_ub=10.0, steps=100, noise=False):
     """
@@ -21,10 +23,10 @@ def generate_1D_quadratic(lb, ub, rand_lb=0.0, rand_ub=10.0, steps=100, noise=Fa
             return a * x**2 + b * x + c + random.gauss() * 0.1
         return a * x**2 + b * x + c
 
-    X = torch.linspace(lb, ub, steps).to("cuda").reshape(-1, 1)
+    X = torch.linspace(lb, ub, steps).to(DEVICE).reshape(-1, 1)
     y = (
         torch.tensor([baseline_func(X[i]) for i in range(X.shape[0])])
-        .to("cuda")
+        .to(DEVICE)
         .reshape(-1, 1)
     )
     return baseline_func, X, y
@@ -38,7 +40,7 @@ def generate_2D_quadratic():
 
 
 if __name__ == "__main__":
-    save_model = False
+    save_model = True
     baseline_func, X, y = generate_1D_quadratic(-10.0, 10.0, steps=1000)
     data = LQRCDataset(X, y)
     training_data, testing_data = random_split(
@@ -47,7 +49,7 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(training_data, batch_size=100, shuffle=True)
     test_dataloader = DataLoader(testing_data, batch_size=100, shuffle=True)
 
-    model = QuadraticNetCholesky(1, X.shape[-1]).to("cuda")
+    model = QuadraticNetCholesky(1, X.shape[-1], device=DEVICE).to(DEVICE)
     print(model)
     loss_fn = CustomCholeskyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -69,7 +71,7 @@ if __name__ == "__main__":
             # print(X_batch.grad)
             optimizer.step()
         losses.append(torch.mean(torch.tensor(loss_per_batch)))
-        if epoch % 50 == 0:
+        if epoch % 250 == 0:
             print(f"Finished epoch {epoch}, latest loss {losses[-1]}")
     print(f"Finished training at epoch {epoch}, latest loss {losses[-1]}")
 
@@ -103,6 +105,7 @@ if __name__ == "__main__":
             model.state_dict(),
             "learning/modules/lqrc/" + save_str + "_" + time_str + ".pt",
         )
+    print("About to plot")
     plot_pointwise_predictions(
         torch.vstack(all_inputs),
         torch.vstack(all_predictions).squeeze(2),
