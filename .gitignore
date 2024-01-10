@@ -16,6 +16,8 @@ gym/wandb
 *.npz
 user/wandb_config.json
 *trajectories/
+gym/graphing/data
+learning/modules/lqrc/graphs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
