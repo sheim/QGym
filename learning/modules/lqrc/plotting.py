@@ -1,7 +1,4 @@
-import os
 import matplotlib.pyplot as plt
-
-from learning import LEGGED_GYM_LQRC_DIR
 
 
 def plot_predictions_and_gradients():
@@ -9,19 +6,28 @@ def plot_predictions_and_gradients():
 
 
 def plot_pointwise_predictions(x_actual, y_pred, y_actual, fn):
-    x_actual = x_actual.cpu().numpy()
-    y_pred = y_pred.cpu().numpy()
-    y_actual = y_actual.cpu().numpy()
-    plt.scatter(x_actual, y_pred, label="Predicted")
-    plt.scatter(x_actual, y_actual, label="Actual")
-    plt.ylabel("y")
-    plt.xlabel("x")
-    plt.legend(loc="upper left")
-    plt.title("Pointwise Predictions vs Actual")
-    if not os.path.exists(f"{LEGGED_GYM_LQRC_DIR}/graphs"):
-        path = os.path.join(LEGGED_GYM_LQRC_DIR, "graphs")
-        os.makedirs(path)
-    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "graphs")
-    plt.savefig(f"{save_path}/{fn}.png")
+    x_actual = x_actual.detach().cpu().numpy()
+    y_pred = y_pred.detach().cpu().numpy()
+    y_actual = y_actual.detach().cpu().numpy()
 
-    print("finished")  # using this as a debugger hook, will remove later
+    fig, ax = plt.subplots()
+    ax.scatter(x_actual, y_pred, label="Predicted")
+    ax.scatter(x_actual, y_actual, label="Actual")
+    ax.set_ylim(-10, 250)
+    ax.set_xlim(-15, 15)
+    ax.set_ylabel("y")
+    ax.set_xlabel("x")
+    ax.legend(loc="upper left")
+    ax.set_title("Pointwise Predictions vs Actual")
+    plt.savefig(f"{fn}.png")
+
+
+def plot_loss(loss_arr, fn):
+    fig, ax = plt.subplots()
+    ax.plot(loss_arr)
+    ax.set_ylim(min(0, min(loss_arr) - 1.0), max(loss_arr) + 1.0)
+    ax.set_xlim(0, len(loss_arr))
+    ax.set_ylabel("Average Batch MSE")
+    ax.set_xlabel("Epoch")
+    ax.set_title("Training Loss Across Epochs")
+    plt.savefig(f"{fn}.png")

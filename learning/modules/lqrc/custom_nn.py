@@ -5,19 +5,30 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 
-class QuadraticNetCholesky(nn.Module):
+class BaselineMLP(nn.Module):
     def __init__(self, input_size, output_size, device="cuda"):
-        super(QuadraticNetCholesky, self).__init__()
+        super(BaselineMLP, self).__init__()
         layer_width = 32
         self.connection_1 = nn.Linear(input_size, 4 * layer_width)
         self.activation_1 = nn.ELU()
         self.connection_2 = nn.Linear(4 * layer_width, layer_width)
         self.activation_2 = nn.Softsign()
         self.connection_3 = nn.Linear(layer_width, sum(range(output_size + 1)))
-        self.activation_3 = nn.Softsign()
+        self.activation_3 = nn.Sigmoid()
         self.output_size = output_size  # should equal num of variables in input
         self.device = device
 
+    def forward(self, x):
+        output = self.connection_1(x)
+        output = self.activation_1(output)
+        output = self.connection_2(output)
+        output = self.activation_2(output)
+        output = self.connection_3(output)
+        output = self.activation_3(output)
+        return output
+
+
+class QuadraticNetCholesky(BaselineMLP):
     def create_cholesky(self, x):
         batch_size = x.shape[0]
         L = torch.zeros(
@@ -38,16 +49,15 @@ class QuadraticNetCholesky(nn.Module):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        output = (output + 1) / 2.0  # shift to [0, 1]
         M = self.create_cholesky(output)
-        # * do the whole multiplication here already.
+        # * create symmetric matrix A out of predicted
+        # * Cholesky decomposition
         return M.bmm(M.transpose(1, 2))
 
 
 class CustomCholeskyLoss(nn.Module):
     def __init__(self, diag_L2_loss=0.0, diag_nuclear_loss=0.0):
         super().__init__()
-        self.n_dofs = 5
         self.diag_L2_loss = diag_L2_loss
         self.diag_nuclear_loss = diag_nuclear_loss
 
@@ -77,11 +87,9 @@ class LQRCDataset(Dataset):
         """
         X is data_size by num_variables
         y is data_size by 1
-        Scales y data to be within [0, 1] to match NN output bounds
         """
         self.X = X
         self.y = y
-        # self.y_scaled = (y - min(y)) / (max(y) - min(y))
 
     def __len__(self):
         return len(self.X)
