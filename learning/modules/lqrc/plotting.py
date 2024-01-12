@@ -12,7 +12,7 @@ def plot_pointwise_predictions(x_actual, y_pred, y_actual, fn):
 
     fig, ax = plt.subplots()
     ax.scatter(x_actual, y_pred, label="Predicted")
-    ax.scatter(x_actual, y_actual, label="Actual")
+    ax.scatter(x_actual, y_actual, label="Actual", alpha=0.5)
     ax.set_ylim(-10, 250)
     ax.set_xlim(-15, 15)
     ax.set_ylabel("y")

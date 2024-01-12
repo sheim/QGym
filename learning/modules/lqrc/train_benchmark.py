@@ -12,53 +12,55 @@ from plotting import plot_loss, plot_pointwise_predictions
 DEVICE = "cuda"
 
 
-def generate_1D_quadratic(lb, ub, rand_lb=0.0, rand_ub=10.0, steps=100, noise=False):
+def generate_nD_quadratic(n, lb, ub, steps, rand_scaling=10.0, A=None, noise=False):
     """
-    Generate 1D quadratic of the form ax**2 + bx + c
+    Generate nD quadratic in the form of x.T @ A @ x
     """
-    a = random.uniform(rand_lb, rand_ub)
-    b = 0  # random.uniform(rand_lb, rand_ub)
-    c = random.uniform(rand_lb, rand_ub)
-    print("a", a, "b", b, "c", c)
+    if A is None:
+        A = torch.zeros(n, n, device=DEVICE)
+        vals = torch.rand(int(n * (n + 1) / 2), device=DEVICE) * rand_scaling
+        i, j = torch.triu_indices(n, n)
+        A[i, j] = vals
+        A.T[i, j] = vals
 
-    def baseline_func(x, noise=noise):
-        if noise:
-            return a * x**2 + b * x + c + random.gauss() * 0.1
-        return a * x**2 + b * x + c
-
-    X = torch.linspace(lb, ub, steps).to(DEVICE).reshape(-1, 1)
-    y = (
-        torch.tensor([baseline_func(X[i]) for i in range(X.shape[0])])
-        .to(DEVICE)
-        .reshape(-1, 1)
+    all_linspaces = [torch.linspace(lb, ub, steps, device=DEVICE) for i in range(n)]
+    X = (
+        torch.cartesian_prod(*all_linspaces).unsqueeze(2)
+        if n > 1
+        else torch.cartesian_prod(*all_linspaces).unsqueeze(1).unsqueeze(2)
     )
-    return baseline_func, X, y
+    batch_A = A.repeat(X.shape[0], 1, 1).to(DEVICE)
+    y = (
+        X.transpose(1, 2).bmm(batch_A).bmm(X)
+        + (random.gauss(mu=0, sigma=1) * rand_scaling / 2.0)
+        if noise
+        else X.transpose(1, 2).bmm(batch_A).bmm(X)
+    )
+    return X.squeeze(2), y.squeeze(2)
 
 
-def generate_2D_quadratic():
-    """
-    Generate 2D quadratic
-    """
-    pass
-
-
-def model_switch():
+def model_switch(input_dim):
     model_name = sys.argv[1]
     if model_name == "QuadraticNetCholesky":
-        return QuadraticNetCholesky(1, X.shape[-1], device=DEVICE).to(
+        return QuadraticNetCholesky(input_dim, X.shape[-1], device=DEVICE).to(
             DEVICE
         ), CustomCholeskyLoss()
     else:
-        return BaselineMLP(1, X.shape[-1], device=DEVICE).to(DEVICE), torch.nn.MSELoss(
-            reduction="mean"
-        )
+        return BaselineMLP(input_dim, X.shape[-1], device=DEVICE).to(
+            DEVICE
+        ), torch.nn.MSELoss(reduction="mean")
+
+
+# def grad_output_wrt_input(input, output):
+#     torch.autograd.grad(outputs=output, inputs=input, retain_graph=True)
 
 
 if __name__ == "__main__":
     save_model = False
-    num_epochs = 5000
+    num_epochs = 2000
+    input_dim = 2
 
-    baseline_func, X, y = generate_1D_quadratic(-10.0, 10.0, steps=1000)
+    X, y = generate_nD_quadratic(input_dim, -10.0, 10.0, steps=1000, noise=False)
     data = LQRCDataset(X, y)
     training_data, testing_data = random_split(
         data, data.get_train_test_split_len(0.6, 0.4)
@@ -66,7 +68,7 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(training_data, batch_size=100, shuffle=True)
     test_dataloader = DataLoader(testing_data, batch_size=100, shuffle=True)
 
-    model, loss_fn = model_switch()
+    model, loss_fn = model_switch(input_dim)
     print(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
@@ -103,6 +105,7 @@ if __name__ == "__main__":
     # with torch.no_grad():
     loss_per_batch = []
     for X_batch, y_batch in test_dataloader:
+        X_batch.requires_grad_()
         if isinstance(model, QuadraticNetCholesky):
             A_pred = model(X_batch)
             loss = loss_fn(A_pred, X_batch, y_batch)
