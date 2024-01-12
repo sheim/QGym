@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import torch
-import random
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 from custom_nn import BaselineMLP, LQRCDataset, QuadraticNetCholesky, CustomCholeskyLoss
@@ -15,7 +14,7 @@ from plotting import (
 DEVICE = "cuda"
 
 
-def generate_nD_quadratic(n, lb, ub, steps, rand_scaling=100.0, A=None, noise=False):
+def generate_nD_quadratic(n, lb, ub, steps, rand_scaling=10.0, A=None, noise=None):
     """
     Generate nD quadratic in the form of x.T @ A @ x
     """
@@ -33,13 +32,14 @@ def generate_nD_quadratic(n, lb, ub, steps, rand_scaling=100.0, A=None, noise=Fa
         else torch.cartesian_prod(*all_linspaces).unsqueeze(1).unsqueeze(2)
     )
     batch_A = A.repeat(X.shape[0], 1, 1).to(DEVICE)
-    y = (
-        X.transpose(1, 2).bmm(batch_A).bmm(X)
-        + (random.gauss(mu=0, sigma=1) * rand_scaling / 2.0)
-        if noise
-        else X.transpose(1, 2).bmm(batch_A).bmm(X)
-    )
+    y = X.transpose(1, 2).bmm(batch_A).bmm(X)
     return X.squeeze(2), y.squeeze(2)
+
+
+def generate_cos(lb, ub, steps):
+    X = torch.linspace(lb, ub, steps, device=DEVICE)
+    y = [torch.cos(X[i]).item() for i in range(X.shape[0])]
+    return X.unsqueeze(1), torch.tensor(y, device=DEVICE).unsqueeze(1)
 
 
 def model_switch(input_dim):
@@ -58,8 +58,12 @@ if __name__ == "__main__":
     save_model = False
     num_epochs = 2000
     input_dim = 1
+    save_str = f"{input_dim}D_quadratic" + sys.argv[1]
 
-    X, y = generate_nD_quadratic(input_dim, -10.0, 10.0, steps=100, noise=False)
+    X, y = generate_nD_quadratic(
+        input_dim, -10.0, 10.0, rand_scaling=2.0, steps=100, noise=None
+    )
+    # X, y = generate_cos(-10.0, 10.0, 100)
     data = LQRCDataset(X, y)
     training_data, testing_data = random_split(
         data, data.get_train_test_split_len(0.6, 0.4)
@@ -135,7 +139,6 @@ if __name__ == "__main__":
     print("Loss on test set", torch.mean(torch.tensor(loss_per_batch)).item())
 
     time_str = time.strftime("%Y%m%d_%H%M%S")
-    save_str = "1D_quadratic"
     save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "logs", save_str)
     if not os.path.exists(save_path):
         os.makedirs(save_path)

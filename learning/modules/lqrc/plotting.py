@@ -41,6 +41,7 @@ def plot_predictions_and_gradients(dim, x_actual, y_pred, y_actual, gradients, f
             ax.plot(line_x, line_y, color="green", alpha=0.5)
 
         ax.set_ylim(-10, 250)
+        # ax.set_ylim(-1.5, 1.5)
         ax.set_xlim(-15, 15)
         ax.set_ylabel("y")
         ax.set_xlabel("x")
