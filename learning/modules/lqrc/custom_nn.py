@@ -12,9 +12,11 @@ class BaselineMLP(nn.Module):
         self.connection_1 = nn.Linear(input_size, 4 * layer_width)
         self.activation_1 = nn.ELU()
         self.connection_2 = nn.Linear(4 * layer_width, layer_width)
-        self.activation_2 = nn.Softsign()
+        # self.activation_2 = nn.Softsign()
+        self.activation_2 = nn.ELU()
         self.connection_3 = nn.Linear(layer_width, sum(range(output_size + 1)))
-        self.activation_3 = nn.Sigmoid()
+        # self.activation_3 = nn.Sigmoid()
+        self.activation_3 = nn.Softplus()
         self.output_size = output_size  # should equal num of variables in input
         self.device = device
 
