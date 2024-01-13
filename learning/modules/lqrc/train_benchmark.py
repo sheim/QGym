@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import torch
+from torchviz import make_dot
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 from custom_nn import BaselineMLP, LQRCDataset, QuadraticNetCholesky, CustomCholeskyLoss
@@ -42,6 +43,20 @@ def generate_cos(lb, ub, steps):
     return X.unsqueeze(1), torch.tensor(y, device=DEVICE).unsqueeze(1)
 
 
+def generate_rosenbrock(n, lb, ub, steps):
+    """
+    Generates data based on Rosenbrock function
+    https://en.wikipedia.org/wiki/Test_functions_for_optimization
+    """
+    assert n > 1, "n must be > 1 for Rosenbrock"
+    all_linspaces = [torch.linspace(lb, ub, steps, device=DEVICE) for i in range(n)]
+    X = torch.cartesian_prod(*all_linspaces)
+    term_1 = 100 * torch.square(X[:, 1:] - torch.square(X[:, :-1]))
+    term_2 = torch.square(1 - X[:, :-1])
+    y = torch.sum(term_1 + term_2, axis=1)
+    return X, y.unsqueeze(1)
+
+
 def model_switch(input_dim):
     model_name = sys.argv[1]
     if model_name == "QuadraticNetCholesky":
@@ -56,13 +71,14 @@ def model_switch(input_dim):
 
 if __name__ == "__main__":
     save_model = False
-    num_epochs = 2000
-    input_dim = 1
-    save_str = f"{input_dim}D_quadratic" + sys.argv[1]
+    num_epochs = 20000
+    input_dim = 2
+    save_str = f"{input_dim}D_rosenbrock" + sys.argv[1]
 
-    X, y = generate_nD_quadratic(
-        input_dim, -10.0, 10.0, rand_scaling=2.0, steps=100, noise=None
-    )
+    X, y = generate_rosenbrock(input_dim, -10.0, 10.0, steps=100)
+    # X, y = generate_nD_quadratic(
+    #     input_dim, -10.0, 10.0, rand_scaling=10.0, steps=100, noise=None
+    # )
     # X, y = generate_cos(-10.0, 10.0, 100)
     data = LQRCDataset(X, y)
     training_data, testing_data = random_split(
@@ -125,13 +141,23 @@ if __name__ == "__main__":
         else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, y_batch)
-        all_gradients.append(
-            (
-                X_batch.view(-1),
-                y_pred.view(-1),
-                torch.autograd.grad(y_pred, X_batch)[0].view(-1),
+
+        if sys.argv[1] == "QuadraticNetCholesky":
+            all_gradients.append(
+                (
+                    X_batch.view(-1),
+                    y_pred.view(-1),
+                    (2.0 * A_pred.bmm(X_batch.unsqueeze(2))).view(-1),
+                )
             )
-        )
+        else:
+            all_gradients.append(
+                (
+                    X_batch.view(-1),
+                    y_pred.view(-1),
+                    torch.autograd.grad(y_pred, X_batch)[0].view(-1),
+                )
+            )
         loss_per_batch.append(loss.item())
         all_inputs.append(X_batch)
         all_predictions.append(y_pred)
@@ -147,6 +173,12 @@ if __name__ == "__main__":
             model.state_dict(),
             save_path + f"/model_{time_str}" + ".pt",
         )
+        make_dot(
+            y_pred,
+            params=dict(model.named_parameters()),
+            show_attrs=True,
+            show_saved=True,
+        ).render(f"{LEGGED_GYM_LQRC_DIR}/logs/model_viz", format="png")
 
     plot_predictions_and_gradients(
         input_dim + 1,
@@ -155,6 +187,7 @@ if __name__ == "__main__":
         torch.vstack(all_targets),
         all_gradients,
         f"{save_path}/{time_str}_grad_graph",
+        contour=True,  # ! change to false to see the 3D plot when graphing in nD > 2
     )
 
     plot_loss(training_losses, f"{save_path}/{time_str}_loss")
