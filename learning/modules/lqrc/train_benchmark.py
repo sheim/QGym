@@ -57,6 +57,18 @@ def generate_rosenbrock(n, lb, ub, steps):
     return X, y.unsqueeze(1)
 
 
+def generate_rosenbrock_grad(X):
+    g = torch.zeros_like(X)
+    term_1 = -400.0 * X[:, 1:-1] * (X[:, 2:] - torch.square(X[:, 1:-1])) - 2.0 * (
+        1 - X[:, 1:-1]
+    )
+    term_2 = 200 * (X[:, 1:-1] - torch.square(X[:, :-2]))
+    g[:, 0] = -400.0 * X[:, 0] * (X[:, 1] - torch.square(X[:, 0])) - 2.0 * (1 - X[:, 0])
+    g[:, 1:-1] = term_1 + term_2
+    g[:, -1] = 200 * (X[:, -1] - torch.square(X[:, -2]))
+    return g
+
+
 def model_switch(input_dim):
     model_name = sys.argv[1]
     if model_name == "QuadraticNetCholesky":
@@ -71,21 +83,30 @@ def model_switch(input_dim):
 
 if __name__ == "__main__":
     save_model = False
-    num_epochs = 20000
+    num_epochs = 10000
     input_dim = 2
     save_str = f"{input_dim}D_rosenbrock" + sys.argv[1]
 
+    # * data generation options
     X, y = generate_rosenbrock(input_dim, -10.0, 10.0, steps=100)
     # X, y = generate_nD_quadratic(
     #     input_dim, -10.0, 10.0, rand_scaling=10.0, steps=100, noise=None
     # )
     # X, y = generate_cos(-10.0, 10.0, 100)
+
     data = LQRCDataset(X, y)
+    # * randomized split
     training_data, testing_data = random_split(
-        data, data.get_train_test_split_len(0.6, 0.4)
+        data, data.get_train_test_split_len(0.64, 0.36)
     )
+    # * chunked split
+    # training_data = torch.utils.data.Subset(data, range(data.get_train_test_split_len(0.6, 0.4)[0]))
+    # testing_data = torch.utils.data.Subset(data, range(data.get_train_test_split_len(0.6, 0.4)[1]))
+
     train_dataloader = DataLoader(training_data, batch_size=100, shuffle=True)
-    test_dataloader = DataLoader(testing_data, batch_size=1, shuffle=True)
+    test_dataloader = DataLoader(
+        testing_data, batch_size=1, shuffle=False
+    )  # * put shuffle to False for graphing with contours
 
     model, loss_fn = model_switch(input_dim)
     print(model)
@@ -124,7 +145,13 @@ if __name__ == "__main__":
     all_gradients = []
     # with torch.no_grad():
     loss_per_batch = []
-    for X_batch, y_batch in test_dataloader:
+    # * change back to using test set when not graphing 3D contour
+    # for X_batch, y_batch in test_dataloader:
+    X_graph, y_graph = generate_rosenbrock(input_dim, -5.0, 5.0, 100)
+    graphing_data = torch.hstack((X_graph, y_graph))
+    for sample in graphing_data:
+        X_batch = sample[:-1].view(1, -1)
+        y_batch = sample[-1:].view(-1, 1)
         # give X_batch a grad_fn
         X_batch.requires_grad_()
         X_batch = X_batch + 0
@@ -179,6 +206,7 @@ if __name__ == "__main__":
             show_attrs=True,
             show_saved=True,
         ).render(f"{LEGGED_GYM_LQRC_DIR}/logs/model_viz", format="png")
+        print("Saving to", save_path)
 
     plot_predictions_and_gradients(
         input_dim + 1,
@@ -187,7 +215,8 @@ if __name__ == "__main__":
         torch.vstack(all_targets),
         all_gradients,
         f"{save_path}/{time_str}_grad_graph",
-        contour=True,  # ! change to false to see the 3D plot when graphing in nD > 2
+        contour=True,
+        actual_grad=generate_rosenbrock_grad(torch.vstack(all_inputs)),
     )
 
     plot_loss(training_losses, f"{save_path}/{time_str}_loss")
