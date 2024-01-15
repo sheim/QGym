@@ -5,7 +5,14 @@ import torch
 from torchviz import make_dot
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
-from custom_nn import BaselineMLP, LQRCDataset, QuadraticNetCholesky, CustomCholeskyLoss
+from custom_nn import (
+    BaselineMLP,
+    LQRCDataset,
+    QuadraticNetCholesky,
+    CustomCholeskyLoss,
+    CholeskyPlusConst,
+    CustomCholeskyPlusConstLoss,
+)
 from learning import LEGGED_GYM_LQRC_DIR
 from plotting import (
     plot_loss,
@@ -33,7 +40,7 @@ def generate_nD_quadratic(n, lb, ub, steps, rand_scaling=10.0, A=None, noise=Non
         else torch.cartesian_prod(*all_linspaces).unsqueeze(1).unsqueeze(2)
     )
     batch_A = A.repeat(X.shape[0], 1, 1).to(DEVICE)
-    y = X.transpose(1, 2).bmm(batch_A).bmm(X)
+    y = X.transpose(1, 2).bmm(batch_A).bmm(X) + 100
     return X.squeeze(2), y.squeeze(2)
 
 
@@ -72,9 +79,13 @@ def generate_rosenbrock_grad(X):
 def model_switch(input_dim):
     model_name = sys.argv[1]
     if model_name == "QuadraticNetCholesky":
-        return QuadraticNetCholesky(input_dim, X.shape[-1], device=DEVICE).to(
+        return QuadraticNetCholesky(input_dim, input_dim, device=DEVICE).to(
             DEVICE
         ), CustomCholeskyLoss()
+    elif model_name == "CholeskyPlusConst":
+        return CholeskyPlusConst(input_dim, input_dim, device=DEVICE).to(
+            DEVICE
+        ), CustomCholeskyPlusConstLoss(const_penalty=0.1)
     else:
         return BaselineMLP(input_dim, X.shape[-1], device=DEVICE).to(
             DEVICE
@@ -120,10 +131,11 @@ if __name__ == "__main__":
         for X_batch, y_batch in train_dataloader:
             X_batch.requires_grad_()
             if isinstance(model, QuadraticNetCholesky):
-                A_pred = model(
-                    X_batch
-                )  # A is the symmetric matrix from the predicted Cholesky decomposition
+                A_pred = model(X_batch)
                 loss = loss_fn(A_pred, X_batch, y_batch)
+            elif isinstance(model, CholeskyPlusConst):
+                A_pred, const_pred = model(X_batch)
+                loss = loss_fn(A_pred, const_pred, X_batch, y_batch)
             else:
                 y_pred = model(X_batch)
                 loss = loss_fn(y_pred, y_batch)
@@ -146,10 +158,10 @@ if __name__ == "__main__":
     # with torch.no_grad():
     loss_per_batch = []
     # * change back to using test set when not graphing 3D contour
-    # for X_batch, y_batch in test_dataloader:
     X_graph, y_graph = generate_rosenbrock(input_dim, -5.0, 5.0, 100)
     graphing_data = torch.hstack((X_graph, y_graph))
     for sample in graphing_data:
+        # for X_batch, y_batch in test_dataloader:
         X_batch = sample[:-1].view(1, -1)
         y_batch = sample[-1:].view(-1, 1)
         # give X_batch a grad_fn
@@ -165,6 +177,15 @@ if __name__ == "__main__":
                 .bmm(A_pred)
                 .bmm(X_batch.unsqueeze(2))
             ).squeeze(2)
+        elif isinstance(model, CholeskyPlusConst):
+            A_pred, const_pred = model(X_batch)
+            loss = loss_fn(A_pred, const_pred, X_batch, y_batch)
+            y_pred = (
+                X_batch.unsqueeze(2)
+                .transpose(1, 2)
+                .bmm(A_pred)
+                .bmm(X_batch.unsqueeze(2))
+            ).squeeze(2) + const_pred
         else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, y_batch)
@@ -216,7 +237,9 @@ if __name__ == "__main__":
         all_gradients,
         f"{save_path}/{time_str}_grad_graph",
         contour=True,
-        actual_grad=generate_rosenbrock_grad(torch.vstack(all_inputs)),
+        actual_grad=generate_rosenbrock_grad(
+            torch.vstack(all_inputs)
+        ),  # ! remember to comment out when not using
     )
 
     plot_loss(training_losses, f"{save_path}/{time_str}_loss")

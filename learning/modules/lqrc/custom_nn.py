@@ -5,6 +5,18 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 
+def create_cholesky(x, output_size, device):
+    batch_size = x.shape[0]
+    L = torch.zeros(batch_size, output_size, output_size, device=device)
+    idx = 0
+    for i in range(output_size):
+        for j in range(output_size):
+            if i >= j:
+                L[:, i, j] = x[:, idx]
+                idx += 1
+    return L
+
+
 class BaselineMLP(nn.Module):
     def __init__(self, input_size, output_size, device="cuda"):
         super(BaselineMLP, self).__init__()
@@ -12,10 +24,8 @@ class BaselineMLP(nn.Module):
         self.connection_1 = nn.Linear(input_size, 4 * layer_width)
         self.activation_1 = nn.ELU()
         self.connection_2 = nn.Linear(4 * layer_width, layer_width)
-        # self.activation_2 = nn.Softsign()
         self.activation_2 = nn.ELU()
         self.connection_3 = nn.Linear(layer_width, sum(range(output_size + 1)))
-        # self.activation_3 = nn.Sigmoid()
         self.activation_3 = nn.Softplus()
         self.output_size = output_size  # should equal num of variables in input
         self.device = device
@@ -31,19 +41,6 @@ class BaselineMLP(nn.Module):
 
 
 class QuadraticNetCholesky(BaselineMLP):
-    def create_cholesky(self, x):
-        batch_size = x.shape[0]
-        L = torch.zeros(
-            batch_size, self.output_size, self.output_size, device=self.device
-        )
-        idx = 0
-        for i in range(self.output_size):
-            for j in range(self.output_size):
-                if i >= j:
-                    L[:, i, j] = x[:, idx]
-                    idx += 1
-        return L
-
     def forward(self, x):
         output = self.connection_1(x)
         output = self.activation_1(output)
@@ -51,7 +48,7 @@ class QuadraticNetCholesky(BaselineMLP):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        M = self.create_cholesky(output)
+        M = create_cholesky(output, self.output_size, self.device)
         # * create symmetric matrix A out of predicted
         # * Cholesky decomposition
         return M.bmm(M.transpose(1, 2))
@@ -82,6 +79,53 @@ class CustomCholeskyLoss(nn.Module):
         #     nuclear = torch.linalg.matrix_norm(M, ord="nuc", dim=(-2, -1)).mean()
 
         return loss
+
+
+class CholeskyPlusConst(nn.Module):
+    def __init__(self, input_size, output_size, device="cuda"):
+        super(CholeskyPlusConst, self).__init__()
+        layer_width = 32
+        self.connection_1 = nn.Linear(input_size, 4 * layer_width)
+        self.activation_1 = nn.ELU()
+        self.connection_2 = nn.Linear(4 * layer_width, layer_width)
+        self.activation_2 = nn.ELU()
+        self.connection_3 = nn.Linear(layer_width, 1 + sum(range(output_size + 1)))
+        self.activation_3 = nn.Softplus()
+        self.output_size = (
+            output_size + 1
+        )  # should equal num of variables in input + 1 for const
+        self.device = device
+
+    def forward(self, x):
+        output = self.connection_1(x)
+        output = self.activation_1(output)
+        output = self.connection_2(output)
+        output = self.activation_2(output)
+        output = self.connection_3(output)
+        output = self.activation_3(output)
+        M = create_cholesky(output[:, :-1], self.output_size - 1, self.device)
+        c = output[:, -1]
+        # * create symmetric matrix A out of predicted
+        # * Cholesky decomposition
+        return M.bmm(M.transpose(1, 2)), c
+
+
+class CustomCholeskyPlusConstLoss(nn.Module):
+    def __init__(self, const_penalty=0.0):
+        super().__init__()
+        self.const_penalty = const_penalty
+
+    def forward(self, M, c, x, y):
+        # M is the symmetric matrix created using the predicted
+        # lower-triangular Cholesky decomposition
+        # x is the input data, batch_size x n
+        # y is the target data, batch_size x 1
+        quadratic_form = x.unsqueeze(2).transpose(1, 2).bmm(M).bmm(
+            x.unsqueeze(2)
+        ).squeeze(2) + c.unsqueeze(1)
+        loss = F.mse_loss(quadratic_form, y, reduction="mean")
+        const_loss = self.const_penalty * torch.mean(c)
+        return loss + const_loss
 
 
 class LQRCDataset(Dataset):
