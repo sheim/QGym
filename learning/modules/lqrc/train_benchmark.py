@@ -40,14 +40,17 @@ def generate_nD_quadratic(n, lb, ub, steps, rand_scaling=10.0, A=None, noise=Non
         else torch.cartesian_prod(*all_linspaces).unsqueeze(1).unsqueeze(2)
     )
     batch_A = A.repeat(X.shape[0], 1, 1).to(DEVICE)
-    y = X.transpose(1, 2).bmm(batch_A).bmm(X) + 100
+    y = X.transpose(1, 2).bmm(batch_A).bmm(X)
     return X.squeeze(2), y.squeeze(2)
 
 
-def generate_cos(lb, ub, steps):
-    X = torch.linspace(lb, ub, steps, device=DEVICE)
-    y = [torch.cos(X[i]).item() for i in range(X.shape[0])]
-    return X.unsqueeze(1), torch.tensor(y, device=DEVICE).unsqueeze(1)
+def generate_cos(n, lb, ub, steps):
+    # make X a n-dimensional lin-space
+    X = torch.rand((steps, n), device=DEVICE) * (ub - lb) + lb
+    freqs = torch.rand(n, device=DEVICE) * 2.0 + 0.5
+    offsets = torch.rand(n, device=DEVICE) * 2.0 * torch.pi
+    y = (torch.cos(freqs * X + offsets) + 1.0).sum(axis=1).unsqueeze(1)
+    return X, torch.tensor(y, device=DEVICE)
 
 
 def generate_rosenbrock(n, lb, ub, steps):
@@ -76,6 +79,31 @@ def generate_rosenbrock_grad(X):
     return g
 
 
+def generate_bounded_rosenbrock(n, lb, ub, steps):
+    """
+    Generates data based on Rosenbrock function
+    https://en.wikipedia.org/wiki/Test_functions_for_optimization
+    """
+
+    def smoothly_bounded_function(y):
+        a = 50.0  # Threshold
+        c = 60.0  # Constant to transition to
+        k = 0.1  # Sharpness of transition
+        return y * (1 - 1 / (1 + torch.exp(-k * (y - a)))) + c * (
+            1 / (1 + torch.exp(-k * (y - a)))
+        )
+
+    assert n > 1, "n must be > 1 for Rosenbrock"
+    all_linspaces = [torch.linspace(lb, ub, steps, device=DEVICE) for i in range(n)]
+    X = torch.cartesian_prod(*all_linspaces)
+    term_1 = 100 * torch.square(X[:, 1:] - torch.square(X[:, :-1]))
+    term_2 = torch.square(1 - X[:, :-1])
+    y = torch.sum(term_1 + term_2, axis=1)
+    # over = torch.clamp(y - 100, min=0)
+    y = smoothly_bounded_function(y)
+    return X, y.unsqueeze(1)
+
+
 def model_switch(input_dim):
     model_name = sys.argv[1]
     if model_name == "QuadraticNetCholesky":
@@ -96,10 +124,13 @@ if __name__ == "__main__":
     save_model = False
     num_epochs = 10000
     input_dim = 2
-    save_str = f"{input_dim}D_rosenbrock" + sys.argv[1]
+    save_str = f"{input_dim}D_bounded_rosenbrock" + sys.argv[1]
 
     # * data generation options
-    X, y = generate_rosenbrock(input_dim, -10.0, 10.0, steps=100)
+    # X, y = generate_rosenbrock(input_dim, -10.0, 10.0, steps=100)
+    X, y = generate_bounded_rosenbrock(input_dim, -3.0, 3.0, steps=500)
+    print("min of Rosenbrock data", min(y))
+    print("max of Rosenbrock data", max(y))
     # X, y = generate_nD_quadratic(
     #     input_dim, -10.0, 10.0, rand_scaling=10.0, steps=100, noise=None
     # )
@@ -121,7 +152,7 @@ if __name__ == "__main__":
 
     model, loss_fn = model_switch(input_dim)
     print(model)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.00084, betas=(0.733, 0.915))
 
     # train
     model.train()
@@ -158,7 +189,7 @@ if __name__ == "__main__":
     # with torch.no_grad():
     loss_per_batch = []
     # * change back to using test set when not graphing 3D contour
-    X_graph, y_graph = generate_rosenbrock(input_dim, -5.0, 5.0, 100)
+    X_graph, y_graph = generate_rosenbrock(input_dim, -3.0, 3.0, 100)
     graphing_data = torch.hstack((X_graph, y_graph))
     for sample in graphing_data:
         # for X_batch, y_batch in test_dataloader:
@@ -229,6 +260,7 @@ if __name__ == "__main__":
         ).render(f"{LEGGED_GYM_LQRC_DIR}/logs/model_viz", format="png")
         print("Saving to", save_path)
 
+    rosenbrock_grad = generate_rosenbrock_grad(torch.vstack(all_inputs))
     plot_predictions_and_gradients(
         input_dim + 1,
         torch.vstack(all_inputs),
@@ -236,10 +268,9 @@ if __name__ == "__main__":
         torch.vstack(all_targets),
         all_gradients,
         f"{save_path}/{time_str}_grad_graph",
-        contour=True,
-        actual_grad=generate_rosenbrock_grad(
-            torch.vstack(all_inputs)
-        ),  # ! remember to comment out when not using
+        colormap_diff=True,
+        colormap_values=True,
+        actual_grad=rosenbrock_grad,  # ! remember to comment out when not using
     )
 
     plot_loss(training_losses, f"{save_path}/{time_str}_loss")

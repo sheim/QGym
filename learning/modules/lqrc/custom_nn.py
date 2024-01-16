@@ -18,17 +18,19 @@ def create_cholesky(x, output_size, device):
 
 
 class BaselineMLP(nn.Module):
-    def __init__(self, input_size, output_size, device="cuda"):
+    def __init__(self, input_size, output_size=1, device="cuda"):
         super(BaselineMLP, self).__init__()
         layer_width = 32
         self.connection_1 = nn.Linear(input_size, 4 * layer_width)
         self.activation_1 = nn.ELU()
         self.connection_2 = nn.Linear(4 * layer_width, layer_width)
         self.activation_2 = nn.ELU()
-        self.connection_3 = nn.Linear(layer_width, sum(range(output_size + 1)))
+        self.connection_3 = nn.Linear(layer_width, output_size)
         self.activation_3 = nn.Softplus()
-        self.output_size = output_size  # should equal num of variables in input
+        self.input_size = input_size
+        self.output_size = output_size
         self.device = device
+        self.intermediates = {}
 
     def forward(self, x):
         output = self.connection_1(x)
@@ -39,8 +41,24 @@ class BaselineMLP(nn.Module):
         output = self.activation_3(output)
         return output
 
+    def save_intermediate(self, name):
+        """
+        Forward hook to save a given intermediate value
+        to a class attribute dictionary with the given name
+        """
+
+        def hook(module, input, output):
+            self.intermediates[name] = output
+
+        return hook
+
 
 class QuadraticNetCholesky(BaselineMLP):
+    def __init__(self, input_size, device="cuda"):
+        super(QuadraticNetCholesky, self).__init__(
+            input_size, sum(range(input_size + 1)), device="cuda"
+        )
+
     def forward(self, x):
         output = self.connection_1(x)
         output = self.activation_1(output)
@@ -82,19 +100,11 @@ class CustomCholeskyLoss(nn.Module):
 
 
 class CholeskyPlusConst(nn.Module):
-    def __init__(self, input_size, output_size, device="cuda"):
-        super(CholeskyPlusConst, self).__init__()
-        layer_width = 32
-        self.connection_1 = nn.Linear(input_size, 4 * layer_width)
-        self.activation_1 = nn.ELU()
-        self.connection_2 = nn.Linear(4 * layer_width, layer_width)
-        self.activation_2 = nn.ELU()
-        self.connection_3 = nn.Linear(layer_width, 1 + sum(range(output_size + 1)))
-        self.activation_3 = nn.Softplus()
-        self.output_size = (
-            output_size + 1
-        )  # should equal num of variables in input + 1 for const
-        self.device = device
+    def __init__(self, input_size, device="cuda"):
+        # additional 1 to output_size for +c
+        super(CholeskyPlusConst, self).__init__(
+            input_size, sum(range(input_size + 1)) + 1, device="cuda"
+        )
 
     def forward(self, x):
         output = self.connection_1(x)

@@ -5,7 +5,15 @@ from matplotlib.colors import TwoSlopeNorm
 
 
 def plot_predictions_and_gradients(
-    dim, x_actual, y_pred, y_actual, pred_grad, fn, contour=False, actual_grad=None
+    dim,
+    x_actual,
+    y_pred,
+    y_actual,
+    pred_grad,
+    fn,
+    colormap_diff=False,
+    colormap_values=True,
+    actual_grad=None,
 ):
     if dim > 3:
         print("Dimension greater than 3, cannot graph")
@@ -15,7 +23,7 @@ def plot_predictions_and_gradients(
         y_actual = y_actual.detach().cpu().numpy()
         actual_grad = actual_grad.detach().cpu().numpy()
 
-        if contour:
+        if colormap_diff:
             fig, (ax1, ax2) = plt.subplots(
                 nrows=1, ncols=2, figsize=(16, 8), layout="tight"
             )
@@ -46,7 +54,29 @@ def plot_predictions_and_gradients(
             ax2.set_ylabel("y")
             ax1.set_title("Gradient Error between Predictions and Targets")
             ax2.set_title("Actual Error between Predictions and Targets")
-            plt.savefig(f"{fn}_colormap.png")
+            plt.savefig(f"{fn}_diff_colormap.png")
+        if colormap_values:
+            fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
+            scatter = axes[0].scatter(
+                x_actual[:, 0],
+                x_actual[:, 1],
+                c=y_pred,
+                cmap="viridis",
+                marker="o",
+                edgecolors="k",
+            )
+            scatter = axes[1].scatter(
+                x_actual[:, 0],
+                x_actual[:, 1],
+                c=y_actual,
+                cmap="viridis",
+                marker="^",
+                edgecolors="k",
+            )
+            fig.colorbar(scatter, ax=axes.ravel().tolist(), shrink=0.95, label="f(x)")
+            axes[0].set_title("Pointwise Predictions")
+            axes[1].set_title("Pointwise Targets")
+            plt.savefig(f"{fn}_values_colormap.png")
         else:
             fig = plt.figure(constrained_layout=True)
             ax = fig.add_subplot(projection="3d")
