@@ -56,7 +56,7 @@ class BaselineMLP(nn.Module):
 class QuadraticNetCholesky(BaselineMLP):
     def __init__(self, input_size, device="cuda"):
         super(QuadraticNetCholesky, self).__init__(
-            input_size, sum(range(input_size + 1)), device="cuda"
+            input_size, sum(range(input_size + 1)), device=device
         )
 
     def forward(self, x):
@@ -99,11 +99,11 @@ class CustomCholeskyLoss(nn.Module):
         return loss
 
 
-class CholeskyPlusConst(nn.Module):
+class CholeskyPlusConst(BaselineMLP):
     def __init__(self, input_size, device="cuda"):
         # additional 1 to output_size for +c
         super(CholeskyPlusConst, self).__init__(
-            input_size, sum(range(input_size + 1)) + 1, device="cuda"
+            input_size, sum(range(input_size + 1)) + 1, device=device
         )
 
     def forward(self, x):
