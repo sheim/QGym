@@ -19,6 +19,8 @@ from plotting import (
     plot_predictions_and_gradients,
 )
 
+from learning.utils.logger.TimeKeeper import TimeKeeper
+
 DEVICE = "cuda"
 
 
@@ -125,6 +127,7 @@ def test_case_switch(case_name=None):
 
 
 if __name__ == "__main__":
+    timer = TimeKeeper()
     args = vars(benchmark_args())
     save_model = args["save_model"]
     num_epochs = args["epochs"]
@@ -166,6 +169,8 @@ if __name__ == "__main__":
     # train
     model.train()
     training_losses = []
+    timer.tic("total training")
+    timer.tic("Since last print")
     for epoch in range(num_epochs):
         loss_per_batch = []
         for X_batch, y_batch in train_dataloader:
@@ -187,6 +192,9 @@ if __name__ == "__main__":
         training_losses.append(torch.mean(torch.tensor(loss_per_batch)).item())
         if epoch % 250 == 0:
             print(f"Finished epoch {epoch}, latest loss {training_losses[-1]}")
+            timer.toc("Since last print")
+            print(f"Time since last print: {timer.get_time('Since last print')}")
+            timer.tic("Since last print")
     print(f"Finished training at epoch {epoch}, latest loss {training_losses[-1]}")
 
     # test
@@ -255,6 +263,8 @@ if __name__ == "__main__":
         all_predictions.append(y_pred)
         all_targets.append(y_batch)
     print("Loss on test set", torch.mean(torch.tensor(loss_per_batch)).item())
+    timer.toc("total training")
+    print(f"Total training time: {timer.get_time('total training')}")
 
     time_str = time.strftime("%Y%m%d_%H%M%S")
     save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "logs", save_str)
