@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import torch
 from torchviz import make_dot
@@ -14,6 +13,7 @@ from custom_nn import (
     CustomCholeskyPlusConstLoss,
 )
 from learning import LEGGED_GYM_LQRC_DIR
+from utils import benchmark_args
 from plotting import (
     plot_loss,
     plot_predictions_and_gradients,
@@ -85,7 +85,7 @@ def generate_bounded_rosenbrock(n, lb, ub, steps):
     https://en.wikipedia.org/wiki/Test_functions_for_optimization
     """
 
-    def smoothly_bounded_function(y):
+    def bound_function_smoothly(y):
         a = 50.0  # Threshold
         c = 60.0  # Constant to transition to
         k = 0.1  # Sharpness of transition
@@ -93,66 +93,75 @@ def generate_bounded_rosenbrock(n, lb, ub, steps):
             1 / (1 + torch.exp(-k * (y - a)))
         )
 
-    assert n > 1, "n must be > 1 for Rosenbrock"
-    all_linspaces = [torch.linspace(lb, ub, steps, device=DEVICE) for i in range(n)]
-    X = torch.cartesian_prod(*all_linspaces)
-    term_1 = 100 * torch.square(X[:, 1:] - torch.square(X[:, :-1]))
-    term_2 = torch.square(1 - X[:, :-1])
-    y = torch.sum(term_1 + term_2, axis=1)
-    # over = torch.clamp(y - 100, min=0)
-    y = smoothly_bounded_function(y)
-    return X, y.unsqueeze(1)
+    X, y = generate_rosenbrock(n, lb, ub, steps)
+    y = bound_function_smoothly(y)
+    return X, y
 
 
-def model_switch(input_dim):
-    model_name = sys.argv[1]
+def model_switch(input_dim, model_name=None):
     if model_name == "QuadraticNetCholesky":
-        return QuadraticNetCholesky(input_dim, input_dim, device=DEVICE).to(
+        return QuadraticNetCholesky(input_dim, device=DEVICE).to(
             DEVICE
         ), CustomCholeskyLoss()
     elif model_name == "CholeskyPlusConst":
-        return CholeskyPlusConst(input_dim, input_dim, device=DEVICE).to(
+        return CholeskyPlusConst(input_dim, device=DEVICE).to(
             DEVICE
         ), CustomCholeskyPlusConstLoss(const_penalty=0.1)
     else:
-        return BaselineMLP(input_dim, X.shape[-1], device=DEVICE).to(
-            DEVICE
-        ), torch.nn.MSELoss(reduction="mean")
+        return BaselineMLP(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
+            reduction="mean"
+        )
+
+
+def test_case_switch(case_name=None):
+    if case_name == "rosenbrock":
+        return generate_bounded_rosenbrock
+    elif case_name == "cos":
+        return generate_cos
+    elif case_name == "quadratic":
+        return generate_nD_quadratic
+    else:
+        assert case_name is not None, "Please specify a valid test case when running."
 
 
 if __name__ == "__main__":
-    save_model = False
-    num_epochs = 10000
-    input_dim = 2
-    save_str = f"{input_dim}D_bounded_rosenbrock" + sys.argv[1]
+    args = vars(benchmark_args())
+    save_model = args["save_model"]
+    num_epochs = args["epochs"]
+    input_dim = args["input_dim"]
+    test_case = args["test_case"]
+    model_type = args["model_type"]
+    save_str = f"{input_dim}D_{test_case}" + model_type
 
-    # * data generation options
-    # X, y = generate_rosenbrock(input_dim, -10.0, 10.0, steps=100)
-    X, y = generate_bounded_rosenbrock(input_dim, -3.0, 3.0, steps=500)
-    print("min of Rosenbrock data", min(y))
-    print("max of Rosenbrock data", max(y))
-    # X, y = generate_nD_quadratic(
-    #     input_dim, -10.0, 10.0, rand_scaling=10.0, steps=100, noise=None
-    # )
-    # X, y = generate_cos(-10.0, 10.0, 100)
-
+    generate_data = test_case_switch(test_case)
+    X, y = generate_data(input_dim, -3.0, 3.0, steps=500)
     data = LQRCDataset(X, y)
-    # * randomized split
-    training_data, testing_data = random_split(
-        data, data.get_train_test_split_len(0.64, 0.36)
-    )
-    # * chunked split
-    # training_data = torch.utils.data.Subset(data, range(data.get_train_test_split_len(0.6, 0.4)[0]))
-    # testing_data = torch.utils.data.Subset(data, range(data.get_train_test_split_len(0.6, 0.4)[1]))
-
+    if args["split_chunk"]:
+        training_data = torch.utils.data.Subset(
+            data, range(data.get_train_test_split_len(0.6, 0.4)[0])
+        )
+        testing_data = torch.utils.data.Subset(
+            data, range(data.get_train_test_split_len(0.6, 0.4)[1])
+        )
+    else:
+        training_data, testing_data = random_split(
+            data, data.get_train_test_split_len(0.64, 0.36)
+        )
     train_dataloader = DataLoader(training_data, batch_size=100, shuffle=True)
     test_dataloader = DataLoader(
-        testing_data, batch_size=1, shuffle=False
-    )  # * put shuffle to False for graphing with contours
+        testing_data,
+        batch_size=1,
+        shuffle=False if args["colormap_diff"] or args["colormap_values"] else True,
+    )
 
-    model, loss_fn = model_switch(input_dim)
+    model, loss_fn = model_switch(input_dim, model_type)
     print(model)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00084, betas=(0.733, 0.915))
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=9.869448957882323e-06,
+        betas=(0.75, 0.9),
+        weight_decay=2.074821225483474e-07,
+    )
 
     # train
     model.train()
@@ -161,10 +170,10 @@ if __name__ == "__main__":
         loss_per_batch = []
         for X_batch, y_batch in train_dataloader:
             X_batch.requires_grad_()
-            if isinstance(model, QuadraticNetCholesky):
+            if model_type == "QuadraticNetCholesky":
                 A_pred = model(X_batch)
                 loss = loss_fn(A_pred, X_batch, y_batch)
-            elif isinstance(model, CholeskyPlusConst):
+            elif model_type == "CholeskyPlusConst":
                 A_pred, const_pred = model(X_batch)
                 loss = loss_fn(A_pred, const_pred, X_batch, y_batch)
             else:
@@ -188,17 +197,21 @@ if __name__ == "__main__":
     all_gradients = []
     # with torch.no_grad():
     loss_per_batch = []
-    # * change back to using test set when not graphing 3D contour
-    X_graph, y_graph = generate_rosenbrock(input_dim, -3.0, 3.0, 100)
-    graphing_data = torch.hstack((X_graph, y_graph))
-    for sample in graphing_data:
-        # for X_batch, y_batch in test_dataloader:
-        X_batch = sample[:-1].view(1, -1)
-        y_batch = sample[-1:].view(-1, 1)
+    # * redefine the test_dataloader to contain both test and train to suit
+    # * matplotlib colormap requirements
+    if args["test_case"] == "rosenbrock":
+        graphing_data = LQRCDataset(*generate_data(input_dim, -3.0, 3.0, steps=100))
+        test_dataloader = DataLoader(
+            torch.utils.data.Subset(graphing_data, range(len(graphing_data))),
+            batch_size=1,
+            shuffle=False,
+        )
+
+    for X_batch, y_batch in test_dataloader:
         # give X_batch a grad_fn
         X_batch.requires_grad_()
         X_batch = X_batch + 0
-        if isinstance(model, QuadraticNetCholesky):
+        if model_type == "QuadraticNetCholesky":
             A_pred = model(X_batch)
             loss = loss_fn(A_pred, X_batch, y_batch)
             # turning symmetric matrix into quadratic form for graphing
@@ -208,7 +221,7 @@ if __name__ == "__main__":
                 .bmm(A_pred)
                 .bmm(X_batch.unsqueeze(2))
             ).squeeze(2)
-        elif isinstance(model, CholeskyPlusConst):
+        elif model_type == "CholeskyPlusConst":
             A_pred, const_pred = model(X_batch)
             loss = loss_fn(A_pred, const_pred, X_batch, y_batch)
             y_pred = (
@@ -221,7 +234,7 @@ if __name__ == "__main__":
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, y_batch)
 
-        if sys.argv[1] == "QuadraticNetCholesky":
+        if model_type == "QuadraticNetCholesky":
             all_gradients.append(
                 (
                     X_batch.view(-1),
@@ -260,7 +273,6 @@ if __name__ == "__main__":
         ).render(f"{LEGGED_GYM_LQRC_DIR}/logs/model_viz", format="png")
         print("Saving to", save_path)
 
-    rosenbrock_grad = generate_rosenbrock_grad(torch.vstack(all_inputs))
     plot_predictions_and_gradients(
         input_dim + 1,
         torch.vstack(all_inputs),
@@ -268,9 +280,11 @@ if __name__ == "__main__":
         torch.vstack(all_targets),
         all_gradients,
         f"{save_path}/{time_str}_grad_graph",
-        colormap_diff=True,
-        colormap_values=True,
-        actual_grad=rosenbrock_grad,  # ! remember to comment out when not using
+        colormap_diff=args["colormap_diff"],
+        colormap_values=args["colormap_values"],
+        actual_grad=generate_rosenbrock_grad(torch.vstack(all_inputs))
+        if test_case == "rosenbrock"
+        else None,
     )
 
     plot_loss(training_losses, f"{save_path}/{time_str}_loss")

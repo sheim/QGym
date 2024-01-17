@@ -5,18 +5,6 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 
-def create_cholesky(x, output_size, device):
-    batch_size = x.shape[0]
-    L = torch.zeros(batch_size, output_size, output_size, device=device)
-    idx = 0
-    for i in range(output_size):
-        for j in range(output_size):
-            if i >= j:
-                L[:, i, j] = x[:, idx]
-                idx += 1
-    return L
-
-
 class BaselineMLP(nn.Module):
     def __init__(self, input_size, output_size=1, device="cuda"):
         super(BaselineMLP, self).__init__()
@@ -66,10 +54,23 @@ class QuadraticNetCholesky(BaselineMLP):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        M = create_cholesky(output, self.output_size, self.device)
+        M = self.create_cholesky(output)
         # * create symmetric matrix A out of predicted
         # * Cholesky decomposition
         return M.bmm(M.transpose(1, 2))
+
+    def create_cholesky(self, x):
+        batch_size = x.shape[0]
+        L = torch.zeros(
+            batch_size, self.input_size, self.input_size, device=self.device
+        )
+        idx = 0
+        for i in range(self.input_size):
+            for j in range(self.input_size):
+                if i >= j:
+                    L[:, i, j] = x[:, idx]
+                    idx += 1
+        return L
 
 
 class CustomCholeskyLoss(nn.Module):
@@ -99,10 +100,10 @@ class CustomCholeskyLoss(nn.Module):
         return loss
 
 
-class CholeskyPlusConst(BaselineMLP):
+class CholeskyPlusConst(QuadraticNetCholesky):
     def __init__(self, input_size, device="cuda"):
         # additional 1 to output_size for +c
-        super(CholeskyPlusConst, self).__init__(
+        super(QuadraticNetCholesky, self).__init__(
             input_size, sum(range(input_size + 1)) + 1, device=device
         )
 
@@ -113,7 +114,7 @@ class CholeskyPlusConst(BaselineMLP):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        M = create_cholesky(output[:, :-1], self.output_size - 1, self.device)
+        M = self.create_cholesky(output[:, :-1])
         c = output[:, -1]
         # * create symmetric matrix A out of predicted
         # * Cholesky decomposition
