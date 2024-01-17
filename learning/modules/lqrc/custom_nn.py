@@ -29,23 +29,13 @@ class BaselineMLP(nn.Module):
         output = self.activation_3(output)
         return output
 
-    def save_intermediate(self, name):
-        """
-        Forward hook to save a given intermediate value
-        to a class attribute dictionary with the given name
-        """
-
-        def hook(module, input, output):
-            self.intermediates[name] = output
-
-        return hook
-
 
 class QuadraticNetCholesky(BaselineMLP):
     def __init__(self, input_size, device="cuda"):
         super(QuadraticNetCholesky, self).__init__(
             input_size, sum(range(input_size + 1)), device=device
         )
+        self.activation_3.register_forward_hook(self.save_intermediate())
 
     def forward(self, x):
         output = self.connection_1(x)
@@ -54,10 +44,10 @@ class QuadraticNetCholesky(BaselineMLP):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        M = self.create_cholesky(output)
-        # * create symmetric matrix A out of predicted
-        # * Cholesky decomposition
-        return M.bmm(M.transpose(1, 2))
+        C = self.create_cholesky(output)
+        A = C.bmm(C.transpose(1, 2))
+        y_pred = (x.unsqueeze(2).transpose(1, 2).bmm(A).bmm(x.unsqueeze(2))).squeeze(2)
+        return y_pred
 
     def create_cholesky(self, x):
         batch_size = x.shape[0]
@@ -72,6 +62,18 @@ class QuadraticNetCholesky(BaselineMLP):
                     idx += 1
         return L
 
+    def save_intermediate(self):
+        """
+        Forward hook to save A
+        """
+
+        def hook(module, input, output):
+            C = self.create_cholesky(output)
+            A = C.bmm(C.transpose(1, 2))
+            self.intermediates["A"] = A
+
+        return hook
+
 
 class CustomCholeskyLoss(nn.Module):
     def __init__(self, diag_L2_loss=0.0, diag_nuclear_loss=0.0):
@@ -79,24 +81,10 @@ class CustomCholeskyLoss(nn.Module):
         self.diag_L2_loss = diag_L2_loss
         self.diag_nuclear_loss = diag_nuclear_loss
 
-    def forward(self, M, x, y):
-        # M is the symmetric matrix created using the predicted
-        # lower-triangular Cholesky decomposition
-        # x is the input data, batch_size x n
-        # y is the target data, batch_size x 1
-        quadratic_form = x.unsqueeze(2).transpose(1, 2).bmm(M).bmm(x.unsqueeze(2))
-        loss = F.mse_loss(quadratic_form.squeeze(2), y, reduction="mean")
-
-        # come back to these loss variations
-        # if self.diag_L2_loss > 0:
-        #     diags = torch.diagonal(M, dim1=-2, dim2=-1)
-        #     diagonal_loss = -(
-        #         self.diag_L2_loss * F.mse_loss(diags, torch.zeros_like(diags))
-        #     )
-        #     loss += diagonal_loss
-        # if self.diag_nuclear_loss > 0:
-        #     nuclear = torch.linalg.matrix_norm(M, ord="nuc", dim=(-2, -1)).mean()
-
+    def forward(self, y_pred, y, intermediates=None):
+        loss = F.mse_loss(y_pred, y, reduction="mean")
+        if intermediates:
+            pass  # reconstruct Cholesky and do special matrix losses
         return loss
 
 
@@ -106,6 +94,7 @@ class CholeskyPlusConst(QuadraticNetCholesky):
         super(QuadraticNetCholesky, self).__init__(
             input_size, sum(range(input_size + 1)) + 1, device=device
         )
+        self.activation_3.register_forward_hook(self.save_intermediate())
 
     def forward(self, x):
         output = self.connection_1(x)
@@ -114,11 +103,27 @@ class CholeskyPlusConst(QuadraticNetCholesky):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        M = self.create_cholesky(output[:, :-1])
+        C = self.create_cholesky(output[:, :-1])
+        A = C.bmm(C.transpose(1, 2))
         c = output[:, -1]
-        # * create symmetric matrix A out of predicted
-        # * Cholesky decomposition
-        return M.bmm(M.transpose(1, 2)), c
+        y_pred = (x.unsqueeze(2).transpose(1, 2).bmm(A).bmm(x.unsqueeze(2))).squeeze(
+            2
+        ) + c
+        return y_pred
+
+    def save_intermediate(self):
+        """
+        Forward hook to save A and c
+        """
+
+        def hook(module, input, output):
+            C = self.create_cholesky(output[:, :-1])
+            A = C.bmm(C.transpose(1, 2))
+            c = output[:, -1]
+            self.intermediates["A"] = A
+            self.intermediates["c"] = c
+
+        return hook
 
 
 class CustomCholeskyPlusConstLoss(nn.Module):
@@ -126,16 +131,9 @@ class CustomCholeskyPlusConstLoss(nn.Module):
         super().__init__()
         self.const_penalty = const_penalty
 
-    def forward(self, M, c, x, y):
-        # M is the symmetric matrix created using the predicted
-        # lower-triangular Cholesky decomposition
-        # x is the input data, batch_size x n
-        # y is the target data, batch_size x 1
-        quadratic_form = x.unsqueeze(2).transpose(1, 2).bmm(M).bmm(
-            x.unsqueeze(2)
-        ).squeeze(2) + c.unsqueeze(1)
-        loss = F.mse_loss(quadratic_form, y, reduction="mean")
-        const_loss = self.const_penalty * torch.mean(c)
+    def forward(self, y_pred, y, intermediates=None):
+        loss = F.mse_loss(y_pred, y, reduction="mean")
+        const_loss = self.const_penalty * torch.mean(intermediates["c"])
         return loss + const_loss
 
 

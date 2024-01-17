@@ -175,19 +175,15 @@ if __name__ == "__main__":
         loss_per_batch = []
         for X_batch, y_batch in train_dataloader:
             X_batch.requires_grad_()
-            if model_type == "QuadraticNetCholesky":
-                A_pred = model(X_batch)
-                loss = loss_fn(A_pred, X_batch, y_batch)
-            elif model_type == "CholeskyPlusConst":
-                A_pred, const_pred = model(X_batch)
-                loss = loss_fn(A_pred, const_pred, X_batch, y_batch)
-            else:
-                y_pred = model(X_batch)
-                loss = loss_fn(y_pred, y_batch)
+            y_pred = model(X_batch)
+            loss = (
+                loss_fn(y_pred, y_batch)
+                if model_type == "BaselineMLP"
+                else loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+            )
             loss_per_batch.append(loss.item())
             optimizer.zero_grad()
             loss.backward()
-            # print(X_batch.grad)
             optimizer.step()
         training_losses.append(torch.mean(torch.tensor(loss_per_batch)).item())
         if epoch % 250 == 0:
@@ -219,30 +215,16 @@ if __name__ == "__main__":
         # give X_batch a grad_fn
         X_batch.requires_grad_()
         X_batch = X_batch + 0
-        if model_type == "QuadraticNetCholesky":
-            A_pred = model(X_batch)
-            loss = loss_fn(A_pred, X_batch, y_batch)
-            # turning symmetric matrix into quadratic form for graphing
-            y_pred = (
-                X_batch.unsqueeze(2)
-                .transpose(1, 2)
-                .bmm(A_pred)
-                .bmm(X_batch.unsqueeze(2))
-            ).squeeze(2)
-        elif model_type == "CholeskyPlusConst":
-            A_pred, const_pred = model(X_batch)
-            loss = loss_fn(A_pred, const_pred, X_batch, y_batch)
-            y_pred = (
-                X_batch.unsqueeze(2)
-                .transpose(1, 2)
-                .bmm(A_pred)
-                .bmm(X_batch.unsqueeze(2))
-            ).squeeze(2) + const_pred
-        else:
-            y_pred = model(X_batch)
-            loss = loss_fn(y_pred, y_batch)
+        y_pred = model(X_batch)
+        loss = (
+            loss_fn(y_pred, y_batch)
+            if model_type == "BaselineMLP"
+            else loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+        )
+        # could wrap BaselineMLP in a loss that ignores intermediates to eliminate if/else
 
-        if model_type == "QuadraticNetCholesky":
+        if model_type == "QuadraticNetCholesky":  # ! do we want this anymore?
+            A_pred = model.intermediates["A"]
             all_gradients.append(
                 (
                     X_batch.view(-1),
