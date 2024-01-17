@@ -21,7 +21,8 @@ def plot_predictions_and_gradients(
         x_actual = x_actual.detach().cpu().numpy()
         y_pred = y_pred.detach().cpu().numpy()
         y_actual = y_actual.detach().cpu().numpy()
-        actual_grad = actual_grad.detach().cpu().numpy()
+        if actual_grad is not None:
+            actual_grad = actual_grad.detach().cpu().numpy()
 
         if colormap_diff:
             fig, (ax1, ax2) = plt.subplots(
