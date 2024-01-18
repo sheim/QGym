@@ -23,39 +23,40 @@ def plot_predictions_and_gradients(
         y_actual = y_actual.detach().cpu().numpy()
         if actual_grad is not None:
             actual_grad = actual_grad.detach().cpu().numpy()
-
-        if colormap_diff:
-            fig, (ax1, ax2) = plt.subplots(
-                nrows=1, ncols=2, figsize=(16, 8), layout="tight"
-            )
-            sq_len = int(sqrt(x_actual.shape[0]))
-            img1 = ax1.contourf(
-                x_actual[:, 0].reshape(sq_len, sq_len),
-                x_actual[:, 1].reshape(sq_len, sq_len),
-                np.linalg.norm(
-                    np.vstack([grad[-1].detach().cpu().numpy() for grad in pred_grad])
-                    - actual_grad,
-                    axis=1,
-                ).reshape(sq_len, sq_len),
-                cmap="RdBu_r",
-                norm=TwoSlopeNorm(0),
-            )
-            plt.colorbar(img1, ax=ax1)
-            img2 = ax2.contourf(
-                x_actual[:, 0].reshape(sq_len, sq_len),
-                x_actual[:, 1].reshape(sq_len, sq_len),
-                (y_pred - y_actual).reshape(sq_len, sq_len),
-                cmap="PuOr",
-                norm=TwoSlopeNorm(0),
-            )
-            plt.colorbar(img2, ax=ax2)
-            ax1.set_xlabel("x")
-            ax1.set_ylabel("y")
-            ax2.set_xlabel("x")
-            ax2.set_ylabel("y")
-            ax1.set_title("Gradient Error between Predictions and Targets")
-            ax2.set_title("Actual Error between Predictions and Targets")
-            plt.savefig(f"{fn}_diff_colormap.png")
+            if colormap_diff:
+                fig, (ax1, ax2) = plt.subplots(
+                    nrows=1, ncols=2, figsize=(16, 8), layout="tight"
+                )
+                sq_len = int(sqrt(x_actual.shape[0]))
+                img1 = ax1.contourf(
+                    x_actual[:, 0].reshape(sq_len, sq_len),
+                    x_actual[:, 1].reshape(sq_len, sq_len),
+                    np.linalg.norm(
+                        np.vstack(
+                            [grad[-1].detach().cpu().numpy() for grad in pred_grad]
+                        )
+                        - actual_grad,
+                        axis=1,
+                    ).reshape(sq_len, sq_len),
+                    cmap="RdBu_r",
+                    norm=TwoSlopeNorm(0),
+                )
+                plt.colorbar(img1, ax=ax1)
+                img2 = ax2.contourf(
+                    x_actual[:, 0].reshape(sq_len, sq_len),
+                    x_actual[:, 1].reshape(sq_len, sq_len),
+                    (y_pred - y_actual).reshape(sq_len, sq_len),
+                    cmap="PuOr",
+                    norm=TwoSlopeNorm(0),
+                )
+                plt.colorbar(img2, ax=ax2)
+                ax1.set_xlabel("x")
+                ax1.set_ylabel("y")
+                ax2.set_xlabel("x")
+                ax2.set_ylabel("y")
+                ax1.set_title("Gradient Error between Predictions and Targets")
+                ax2.set_title("Actual Error between Predictions and Targets")
+                plt.savefig(f"{fn}_diff_colormap.png")
         if colormap_values:
             fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
             scatter = axes[0].scatter(
