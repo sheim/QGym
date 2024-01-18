@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
-from .utils import create_MLP
+
+# from .utils import create_MLP
 from .utils import RunningMeanStd
+from .lqrc import CholeskyPlusConst
 
 
 class Critic(nn.Module):
@@ -20,7 +22,8 @@ class Critic(nn.Module):
             )
         super().__init__()
 
-        self.NN = create_MLP(num_obs, 1, hidden_dims, activation)
+        # self.NN = create_MLP(num_obs, 1, hidden_dims, activation)
+        self.NN = CholeskyPlusConst(num_obs)
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
             self.obs_rms = RunningMeanStd(num_obs)

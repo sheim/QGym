@@ -94,7 +94,7 @@ class CholeskyPlusConst(QuadraticNetCholesky):
         super(QuadraticNetCholesky, self).__init__(
             input_size, sum(range(input_size + 1)) + 1, device=device
         )
-        self.activation_3.register_forward_hook(self.save_intermediate())
+        # self.activation_3.register_forward_hook(self.save_intermediate())
 
     def forward(self, x):
         output = self.connection_1(x)
@@ -108,22 +108,22 @@ class CholeskyPlusConst(QuadraticNetCholesky):
         c = output[:, -1]
         y_pred = (x.unsqueeze(2).transpose(1, 2).bmm(A).bmm(x.unsqueeze(2))).squeeze(
             2
-        ) + c
+        ) + c.unsqueeze(1)
         return y_pred
 
-    def save_intermediate(self):
-        """
-        Forward hook to save A and c
-        """
+    # def save_intermediate(self):
+    #     """
+    #     Forward hook to save A and c
+    #     """
 
-        def hook(module, input, output):
-            C = self.create_cholesky(output[:, :-1])
-            A = C.bmm(C.transpose(1, 2))
-            c = output[:, -1]
-            self.intermediates["A"] = A
-            self.intermediates["c"] = c
+    #     def hook(module, input, output):
+    #         C = self.create_cholesky(output[:, :-1])
+    #         A = C.bmm(C.transpose(1, 2))
+    #         c = output[:, -1]
+    #         self.intermediates["A"] = A
+    #         self.intermediates["c"] = c
 
-        return hook
+    #     return hook
 
 
 class CustomCholeskyPlusConstLoss(nn.Module):
