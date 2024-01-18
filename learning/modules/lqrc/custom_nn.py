@@ -61,15 +61,24 @@ class QuadraticNetCholesky(BaselineMLP):
 
     def create_cholesky(self, x):
         batch_size = x.shape[0]
-        L = torch.zeros(
-            batch_size, self.input_size, self.input_size, device=self.device
-        )
-        idx = 0
-        for i in range(self.input_size):
-            for j in range(self.input_size):
-                if i >= j:
-                    L[:, i, j] = x[:, idx]
-                    idx += 1
+        n = self.input_size
+        L = torch.zeros((batch_size, n, n), device=self.device)
+        tril_indices = torch.tril_indices(row=n, col=n, offset=0)
+        rows, cols = tril_indices
+        L[:, rows, cols] = x
+
+        ####
+        # tril_indices = torch.tril_indices(row=n, col=n, offset=0)
+        # rows, cols = tril_indices
+        # for i in range(batch_size):
+        #     L[i, rows, cols] = x[i]
+        ####
+        # idx = 0
+        # for i in range(self.input_size):
+        #     for j in range(self.input_size):
+        #         if i >= j:
+        #             L2[:, i, j] = x[:, idx]
+        #             idx += 1
         return L
 
 
