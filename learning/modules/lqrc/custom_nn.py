@@ -52,23 +52,10 @@ class QuadraticNetCholesky(BaselineMLP):
     def create_cholesky(self, x):
         batch_size = x.shape[0]
         n = self.input_size
-        L = torch.zeros((batch_size, n, n), device=self.device)
+        L = torch.zeros((batch_size, n, n), device=self.device, requires_grad=False)
         tril_indices = torch.tril_indices(row=n, col=n, offset=0)
         rows, cols = tril_indices
         L[:, rows, cols] = x
-
-        ####
-        # tril_indices = torch.tril_indices(row=n, col=n, offset=0)
-        # rows, cols = tril_indices
-        # for i in range(batch_size):
-        #     L[i, rows, cols] = x[i]
-        ####
-        # idx = 0
-        # for i in range(self.input_size):
-        #     for j in range(self.input_size):
-        #         if i >= j:
-        #             L2[:, i, j] = x[:, idx]
-        #             idx += 1
         return L
 
     def save_intermediate(self):
@@ -103,7 +90,7 @@ class CholeskyPlusConst(QuadraticNetCholesky):
         super(QuadraticNetCholesky, self).__init__(
             input_size, sum(range(input_size + 1)) + 1, device=device
         )
-        # self.activation_3.register_forward_hook(self.save_intermediate())
+        self.activation_3.register_forward_hook(self.save_intermediate())
 
     def forward(self, x):
         output = self.connection_1(x)
@@ -120,19 +107,19 @@ class CholeskyPlusConst(QuadraticNetCholesky):
         ) + c.unsqueeze(1)
         return y_pred
 
-    # def save_intermediate(self):
-    #     """
-    #     Forward hook to save A and c
-    #     """
+    def save_intermediate(self):
+        """
+        Forward hook to save A and c
+        """
 
-    #     def hook(module, input, output):
-    #         C = self.create_cholesky(output[:, :-1])
-    #         A = C.bmm(C.transpose(1, 2))
-    #         c = output[:, -1]
-    #         self.intermediates["A"] = A
-    #         self.intermediates["c"] = c
+        def hook(module, input, output):
+            C = self.create_cholesky(output[:, :-1])
+            A = C.bmm(C.transpose(1, 2))
+            c = output[:, -1]
+            self.intermediates["A"] = A
+            self.intermediates["c"] = c
 
-    #     return hook
+        return hook
 
 
 class CustomCholeskyPlusConstLoss(nn.Module):
