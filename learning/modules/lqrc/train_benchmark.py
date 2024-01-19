@@ -137,7 +137,11 @@ if __name__ == "__main__":
     save_str = f"{input_dim}D_{test_case}" + model_type
 
     generate_data = test_case_switch(test_case)
-    X, y = generate_data(input_dim, -3.0, 3.0, steps=500)
+    X, y = (
+        generate_data(input_dim, -3.0, 3.0, steps=500)
+        if test_case == "rosenbrock"
+        else generate_data(input_dim, -10.0, 10.0, steps=500)
+    )
     data = LQRCDataset(X, y)
     if args["split_chunk"]:
         training_data = torch.utils.data.Subset(
@@ -161,7 +165,6 @@ if __name__ == "__main__":
     print(model)
     optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=9.869448957882323e-06,
         betas=(0.75, 0.9),
         weight_decay=2.074821225483474e-07,
     )
