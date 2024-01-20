@@ -1,0 +1,22 @@
+{
+    "method": "random",
+    "metric": {
+        "name": "rewards/total_rewards",
+        "goal": "maximize"
+    },
+    "run_cap": 25,
+    "parameters": {
+        "env_cfg.env.episode_length_s": {
+            "min": 1,
+            "max": 10
+        },
+        "train_cfg.policy.reward.weights.theta":{
+            "min":1.0,
+            "max":1e6
+        },
+        "train_cfg.policy.reward.weights.omega":{
+            "min":1e-6,
+            "max":10.0
+        }
+    }
+}
