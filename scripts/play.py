@@ -8,8 +8,6 @@ from gym.utils import VisualizationRecorder
 
 # torch needs to be imported after isaacgym imports in local source
 import torch
-# import numpy as np
-# from gym.utils.helpers import get_load_path
 
 
 def setup(args):
@@ -42,12 +40,6 @@ def setup(args):
 
 
 def play(env, runner, train_cfg):
-    # tracking = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
-    # play_path = get_load_path(
-    #     name=train_cfg.runner.experiment_name,
-    #     load_run=train_cfg.runner.load_run,
-    #     checkpoint=train_cfg.runner.checkpoint,
-    # )
     # * set up recording
     if env.cfg.viewer.record:
         recorder = VisualizationRecorder(
@@ -64,20 +56,12 @@ def play(env, runner, train_cfg):
             interface.update(env)
         if env.cfg.viewer.record:
             recorder.update(i)
-        runner.set_actions(runner.get_inference_actions())
-        # tracking = np.vstack(
-        #     (
-        #         tracking,
-        #         [i * env.dt]
-        #         + list(env.hl_commands[0, :].cpu())
-        #         + list(env.base_pos[0, :3].cpu()),
-        #     )
-        # )
+        runner.set_actions(
+            runner.policy_cfg["actions"],
+            runner.get_inference_actions(),
+            runner.policy_cfg["disable_actions"],
+        )
         env.step()
-        # if env.exit:
-        #     np.savetxt(
-        #         os.path.dirname(play_path) + "/tracking.csv", tracking, delimiter=","
-        #     )
         env.check_exit()
 
 
