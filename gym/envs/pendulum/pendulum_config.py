@@ -7,7 +7,7 @@ class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
         num_envs = 4096
         num_actuators = 1  # 1 for theta connecting base and pole
-        episode_length_s = 5.0
+        episode_length_s = 10.0
 
     class terrain(FixedRobotCfg.terrain):
         pass
@@ -40,8 +40,10 @@ class PendulumCfg(FixedRobotCfg):
         pass
 
     class scaling(FixedRobotCfg.scaling):
+        theta = 2.0 * torch.pi
+        omega = 100.0
         # * Action scales
-        tau_ff = 10
+        tau_ff = 0.5
 
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
@@ -64,8 +66,10 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
         class reward:
             class weights:
-                theta = 100.0
-                omega = 0.001
+                theta = 10.0
+                omega = 1.0
+                equilibrium = 1.0
+                energy = 1.0
 
             class termination_weight:
                 termination = 0.0
@@ -89,6 +93,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO"
         num_steps_per_env = 32

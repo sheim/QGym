@@ -1,22 +1,22 @@
 {
-    "method": "random",
+    "method": "grid",
     "metric": {
         "name": "rewards/total_rewards",
         "goal": "maximize"
     },
-    "run_cap": 25,
+    "run_cap": 50,
     "parameters": {
-        "env_cfg.env.episode_length_s": {
-            "min": 1,
-            "max": 10
-        },
         "train_cfg.policy.reward.weights.theta":{
-            "min":1.0,
-            "max":1e6
+            "values": [1.0, 10.0]
         },
         "train_cfg.policy.reward.weights.omega":{
-            "min":1e-6,
-            "max":10.0
+            "values": [1.0, 10.0]
+        },
+        "train_cfg.policy.reward.weights.equilibrium":{
+            "values": [1.0, 10.0]
+        },
+        "train_cfg.policy.reward.weights.energy":{
+            "values": [1.0, 10.0]
         }
     }
 }
