@@ -7,7 +7,7 @@ class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
         num_envs = 4096
         num_actuators = 1  # 1 for theta connecting base and pole
-        episode_length_s = 10.0
+        episode_length_s = 1.0
 
     class terrain(FixedRobotCfg.terrain):
         pass
@@ -51,6 +51,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
 
     class policy(FixedRobotCfgPPO.policy):
+        critic_hidden_dims = 128
         actor_obs = [
             "dof_pos",
             "dof_vel",
@@ -84,14 +85,14 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         # * mini batch size = num_envs*nsteps / nminibatches
         num_mini_batches = 4
         learning_rate = 1.0e-3
-        schedule = "adaptive"  # could be adaptive, fixed
+        schedule = "fixed"  # could be adaptive, fixed
         discount_horizon = 1.0  # [s]
         GAE_bootstrap_horizon = 1.0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 
     class runner(FixedRobotCfgPPO.runner):
-        run_name = ""
+        run_name = "CholeskyPlusConst_512_256_128"
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO"

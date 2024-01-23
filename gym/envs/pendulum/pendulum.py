@@ -16,7 +16,7 @@ class Pendulum(FixedRobot):
         return theta_rwd.squeeze(dim=-1)
 
     def _reward_omega(self):
-        omega_rwd = -torch.square(self.dof_vel[:, 0]) / self.scales["omega"]
+        omega_rwd = -torch.square(self.dof_vel[:, 0] / self.scales["omega"])
         return omega_rwd.squeeze(dim=-1)
 
     def _reward_equilibrium(self):

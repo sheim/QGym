@@ -6,15 +6,21 @@ from torch.utils.data import Dataset
 
 
 class BaselineMLP(nn.Module):
-    def __init__(self, input_size, output_size=1, device="cuda"):
+    def __init__(self, input_size, output_size=1, hidden_dims=128, device="cuda"):
         super(BaselineMLP, self).__init__()
-        layer_width = 32
-        self.connection_1 = nn.Linear(input_size, 4 * layer_width)
+        assert hidden_dims % 4 == 0, "Critic hidden dims must be divisible by 4!"
+        self.connection_1 = nn.Linear(input_size, hidden_dims)
         self.activation_1 = nn.ELU()
-        self.connection_2 = nn.Linear(4 * layer_width, layer_width)
+        self.connection_2 = nn.Linear(
+            hidden_dims, hidden_dims // 4
+        )  # nn.Linear(hidden_dims, hidden_dims//2)
         self.activation_2 = nn.ELU()
-        self.connection_3 = nn.Linear(layer_width, output_size)
-        self.activation_3 = nn.Softplus()
+        self.connection_3 = nn.Linear(
+            hidden_dims // 4, output_size
+        )  # nn.Linear(hidden_dims//2, hidden_dims//4)
+        self.activation_3 = nn.Softplus()  # nn.ELU()
+        # self.connection_4 = nn.Linear(hidden_dims//4, output_size)
+        # self.activation_4 = nn.Softplus()
         self.input_size = input_size
         self.output_size = output_size
         self.device = device
@@ -27,13 +33,18 @@ class BaselineMLP(nn.Module):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
+        # output = self.connection_4(output)
+        # output = self.activation_4(output)
         return output
 
 
 class QuadraticNetCholesky(BaselineMLP):
-    def __init__(self, input_size, device="cuda"):
+    def __init__(self, input_size, hidden_dims=128, device="cuda"):
         super(QuadraticNetCholesky, self).__init__(
-            input_size, sum(range(input_size + 1)), device=device
+            input_size,
+            sum(range(input_size + 1)),
+            hidden_dims=hidden_dims,
+            device=device,
         )
         self.activation_3.register_forward_hook(self.save_intermediate())
 
@@ -44,6 +55,8 @@ class QuadraticNetCholesky(BaselineMLP):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
+        # output = self.connection_4(output)
+        # output = self.activation_4(output)
         C = self.create_cholesky(output)
         A = C.bmm(C.transpose(1, 2))
         y_pred = (x.unsqueeze(2).transpose(1, 2).bmm(A).bmm(x.unsqueeze(2))).squeeze(2)
@@ -85,10 +98,13 @@ class CustomCholeskyLoss(nn.Module):
 
 
 class CholeskyPlusConst(QuadraticNetCholesky):
-    def __init__(self, input_size, device="cuda"):
+    def __init__(self, input_size, hidden_dims=128, device="cuda"):
         # additional 1 to output_size for +c
         super(QuadraticNetCholesky, self).__init__(
-            input_size, sum(range(input_size + 1)) + 1, device=device
+            input_size,
+            sum(range(input_size + 1)) + 1,
+            hidden_dims=hidden_dims,
+            device=device,
         )
         self.activation_3.register_forward_hook(self.save_intermediate())
 
@@ -99,6 +115,8 @@ class CholeskyPlusConst(QuadraticNetCholesky):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
+        # output = self.connection_4(output)
+        # output = self.activation_4(output)
         C = self.create_cholesky(output[:, :-1])
         A = C.bmm(C.transpose(1, 2))
         c = output[:, -1]

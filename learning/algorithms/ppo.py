@@ -36,7 +36,7 @@ import torch.optim as optim
 
 from learning.modules import ActorCritic
 from learning.storage import RolloutStorage
-from learning.modules.lqrc import CustomCholeskyPlusConstLoss
+# from learning.modules.lqrc import CustomCholeskyPlusConstLoss
 
 
 class PPO:
@@ -200,21 +200,21 @@ class PPO:
                 value_clipped = target_values_batch + (
                     value_batch - target_values_batch
                 ).clamp(-self.clip_param, self.clip_param)
-                # value_losses = (value_batch - returns_batch).pow(2)
-                value_losses = CustomCholeskyPlusConstLoss(const_penalty=0.1).forward(
-                    value_batch,
-                    returns_batch,
-                    self.actor_critic.critic.NN.intermediates,
-                )
+                value_losses = (value_batch - returns_batch).pow(2)
+                # value_losses = CustomCholeskyPlusConstLoss(const_penalty=0.1).forward(
+                #     value_batch,
+                #     returns_batch,
+                #     self.actor_critic.critic.NN.intermediates,
+                # )
                 value_losses_clipped = (value_clipped - returns_batch).pow(2)
                 value_loss = torch.max(value_losses, value_losses_clipped).mean()
             else:
-                # value_loss = (returns_batch - value_batch).pow(2).mean()
-                value_losses = CustomCholeskyPlusConstLoss(const_penalty=0.1).forward(
-                    value_batch,
-                    returns_batch,
-                    self.actor_critic.critic.NN.intermediates,
-                )
+                value_loss = (returns_batch - value_batch).pow(2).mean()
+                # value_losses = CustomCholeskyPlusConstLoss(const_penalty=0.1).forward(
+                #     value_batch,
+                #     returns_batch,
+                #     self.actor_critic.critic.NN.intermediates,
+                # )
 
             loss = (
                 surrogate_loss

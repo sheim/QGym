@@ -4,6 +4,44 @@ import numpy as np
 from matplotlib.colors import TwoSlopeNorm
 
 
+def plot_critic(x_actual, y_pred, xT_A_x, c_pred, fn):
+    x_actual = x_actual.detach().cpu().numpy()
+    y_pred = y_pred.detach().cpu().numpy()
+    xT_A_x = xT_A_x.detach().cpu().numpy()
+    c_pred = c_pred.detach().cpu().numpy()
+
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15, 6))
+    scatter = axes[0].scatter(
+        x_actual[:, 0],
+        x_actual[:, 1],
+        c=xT_A_x,
+        cmap="viridis",
+        marker="o",
+        edgecolors="k",
+    )
+    scatter = axes[1].scatter(
+        x_actual[:, 0],
+        x_actual[:, 1],
+        c=c_pred,
+        cmap="viridis",
+        marker="^",
+        edgecolors="k",
+    )
+    scatter = axes[2].scatter(
+        x_actual[:, 0],
+        x_actual[:, 1],
+        c=y_pred,
+        cmap="viridis",
+        marker="^",
+        edgecolors="k",
+    )
+    fig.colorbar(scatter, ax=axes.ravel().tolist(), shrink=0.95, label="f(x)", pad=0.1)
+    axes[0].set_title("Predicted A")
+    axes[1].set_title("Predicted c")
+    axes[2].set_title("Predicted y")
+    plt.savefig(f"{fn}_critic_colormap.png", bbox_inches="tight")
+
+
 def plot_predictions_and_gradients(
     dim,
     x_actual,
