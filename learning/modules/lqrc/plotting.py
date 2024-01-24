@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib.colors import TwoSlopeNorm
 
 
-def plot_critic(x_actual, y_pred, xT_A_x, c_pred, fn):
+def plot_custom_critic(x_actual, y_pred, xT_A_x, c_pred, fn):
     x_actual = x_actual.detach().cpu().numpy()
     y_pred = y_pred.detach().cpu().numpy()
     xT_A_x = xT_A_x.detach().cpu().numpy()
@@ -32,14 +32,34 @@ def plot_critic(x_actual, y_pred, xT_A_x, c_pred, fn):
         x_actual[:, 1],
         c=y_pred,
         cmap="viridis",
-        marker="^",
+        marker="*",
         edgecolors="k",
     )
     fig.colorbar(scatter, ax=axes.ravel().tolist(), shrink=0.95, label="f(x)", pad=0.1)
-    axes[0].set_title("Predicted A")
+    axes[0].set_title("Predicted x.T @ A @ x")
     axes[1].set_title("Predicted c")
     axes[2].set_title("Predicted y")
-    plt.savefig(f"{fn}_critic_colormap.png", bbox_inches="tight")
+    plt.savefig(f"{fn}_custom_critic_colormap.png", bbox_inches="tight")
+
+
+def plot_standard_critic(x_actual, y_pred, fn):
+    x_actual = x_actual.detach().cpu().numpy()
+    y_pred = y_pred.detach().cpu().numpy()
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+    scatter = ax.scatter(
+        x_actual[:, 0],
+        x_actual[:, 1],
+        c=y_pred,
+        cmap="viridis",
+        marker="o",
+        edgecolors="k",
+    )
+    fig.colorbar(scatter, ax=ax, shrink=0.95, label="f(x)", pad=0.1)
+    ax.set_title("Predicted y")
+    plt.savefig(
+        f"{fn}_standard_critic_colormap_prediction_only.png", bbox_inches="tight"
+    )
 
 
 def plot_predictions_and_gradients(

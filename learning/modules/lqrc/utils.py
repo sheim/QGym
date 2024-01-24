@@ -54,3 +54,29 @@ def benchmark_args():
     except SystemExit:
         print("Exception occurred! You've likely mispelled a key.")
     return args
+
+
+def critic_eval_args():
+    parser = argparse.ArgumentParser(
+        description="Toggle between critic evaluation settings."
+    )
+    parser.add_argument(
+        "--model_type",
+        action="store",
+        type=str,
+        nargs="?",
+        default="StandardMLP",
+        help="Name of the model type to evaluate",
+    )
+    parser.add_argument(
+        "--load_from",
+        action="store",
+        type=str,
+        nargs="?",
+        help="Name of the directory to load the critic from",
+    )
+    try:
+        args = parser.parse_args()
+    except SystemExit:
+        print("Exception occurred! You've likely mispelled a key.")
+    return args
