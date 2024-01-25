@@ -75,6 +75,18 @@ def critic_eval_args():
         nargs="?",
         help="Name of the directory to load the critic from",
     )
+    parser.add_argument(
+        "--fn",
+        action="store",
+        type=str,
+        nargs="?",
+        help="Filename to use in saving graphs",
+    )
+    parser.add_argument(
+        "--contour",
+        action="store_true",
+        help="Flag to graph contours instead of colormesh.",
+    )
     try:
         args = parser.parse_args()
     except SystemExit:

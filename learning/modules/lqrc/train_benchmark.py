@@ -43,7 +43,7 @@ def generate_nD_quadratic(n, lb, ub, steps, rand_scaling=10.0, A=None, noise=Non
     )
     batch_A = A.repeat(X.shape[0], 1, 1).to(DEVICE)
     y = X.transpose(1, 2).bmm(batch_A).bmm(X)
-    return X.squeeze(2), y.squeeze(2)
+    return X.squeeze(2), y.squeeze(2) + 100.0
 
 
 def generate_cos(n, lb, ub, steps):

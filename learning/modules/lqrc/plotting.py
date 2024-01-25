@@ -1,65 +1,69 @@
 from math import sqrt
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import TwoSlopeNorm
+from matplotlib.colors import CenteredNorm, TwoSlopeNorm
 
 
-def plot_custom_critic(x_actual, y_pred, xT_A_x, c_pred, fn):
+def graph_3D_helper(ax, contour):
+    if contour:
+        return ax.contourf
+    return ax.pcolormesh
+
+
+def plot_custom_critic(x_actual, y_pred, xT_A_x, c_pred, fn, contour):
     x_actual = x_actual.detach().cpu().numpy()
     y_pred = y_pred.detach().cpu().numpy()
     xT_A_x = xT_A_x.detach().cpu().numpy()
     c_pred = c_pred.detach().cpu().numpy()
 
     fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15, 6))
-    scatter = axes[0].scatter(
-        x_actual[:, 0],
-        x_actual[:, 1],
-        c=xT_A_x,
-        cmap="viridis",
-        marker="o",
-        edgecolors="k",
+    sq_len = int(sqrt(x_actual.shape[0]))
+    img = graph_3D_helper(axes[0], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        xT_A_x.reshape(sq_len, sq_len),
+        cmap="RdBu_r",
+        norm=CenteredNorm(),  # TwoSlopeNorm(0),
     )
-    scatter = axes[1].scatter(
-        x_actual[:, 0],
-        x_actual[:, 1],
-        c=c_pred,
-        cmap="viridis",
-        marker="^",
-        edgecolors="k",
+    img = graph_3D_helper(axes[1], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        c_pred.reshape(sq_len, sq_len),
+        cmap="RdBu_r",
+        norm=CenteredNorm(),  # TwoSlopeNorm(0),
     )
-    scatter = axes[2].scatter(
-        x_actual[:, 0],
-        x_actual[:, 1],
-        c=y_pred,
-        cmap="viridis",
-        marker="*",
-        edgecolors="k",
+    img = graph_3D_helper(axes[2], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        y_pred.reshape(sq_len, sq_len),
+        cmap="RdBu_r",
+        norm=CenteredNorm(),  # TwoSlopeNorm(0),
     )
-    fig.colorbar(scatter, ax=axes.ravel().tolist(), shrink=0.95, label="f(x)", pad=0.1)
+    fig.colorbar(img, ax=axes.ravel().tolist(), shrink=0.95, pad=0.1)
     axes[0].set_title("Predicted x.T @ A @ x")
     axes[1].set_title("Predicted c")
     axes[2].set_title("Predicted y")
-    plt.savefig(f"{fn}_custom_critic_colormap.png", bbox_inches="tight")
+    plt.savefig(fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}")
 
 
-def plot_standard_critic(x_actual, y_pred, fn):
+def plot_critic_prediction_only(x_actual, y_pred, fn, contour):
     x_actual = x_actual.detach().cpu().numpy()
     y_pred = y_pred.detach().cpu().numpy()
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
-    scatter = ax.scatter(
-        x_actual[:, 0],
-        x_actual[:, 1],
-        c=y_pred,
-        cmap="viridis",
-        marker="o",
-        edgecolors="k",
+    sq_len = int(sqrt(x_actual.shape[0]))
+    img = graph_3D_helper(ax, contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        y_pred.reshape(sq_len, sq_len),
+        cmap="RdBu_r",
+        norm=CenteredNorm(),  # TwoSlopeNorm(0),
     )
-    fig.colorbar(scatter, ax=ax, shrink=0.95, label="f(x)", pad=0.1)
+    fig.colorbar(img, ax=ax, shrink=0.95, pad=0.1)
     ax.set_title("Predicted y")
-    plt.savefig(
-        f"{fn}_standard_critic_colormap_prediction_only.png", bbox_inches="tight"
-    )
+    plt.savefig(fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}")
 
 
 def plot_predictions_and_gradients(

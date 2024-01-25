@@ -13,11 +13,11 @@ class Pendulum(FixedRobot):
 
     def _reward_theta(self):
         theta_rwd = torch.cos(self.dof_pos[:, 0]) / self.scales["theta"]
-        return theta_rwd.squeeze(dim=-1)
+        return self._sqrdexp(theta_rwd.squeeze(dim=-1))
 
     def _reward_omega(self):
         omega_rwd = -torch.square(self.dof_vel[:, 0] / self.scales["omega"])
-        return omega_rwd.squeeze(dim=-1)
+        return self._sqrdexp(omega_rwd.squeeze(dim=-1))
 
     def _reward_equilibrium(self):
         error = torch.abs(self.dof_state)

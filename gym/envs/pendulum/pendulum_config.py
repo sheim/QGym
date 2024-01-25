@@ -37,7 +37,7 @@ class PendulumCfg(FixedRobotCfg):
         disable_motors = False  # all torques set to 0
 
     class reward_settings(FixedRobotCfg.reward_settings):
-        pass
+        tracking_sigma = 2.0
 
     class scaling(FixedRobotCfg.scaling):
         theta = 2.0 * torch.pi
@@ -51,7 +51,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
 
     class policy(FixedRobotCfgPPO.policy):
-        critic_hidden_dims = 128
         actor_obs = [
             "dof_pos",
             "dof_vel",
@@ -67,10 +66,10 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
         class reward:
             class weights:
-                theta = 10.0
+                theta = 1.0
                 omega = 1.0
                 equilibrium = 1.0
-                energy = 1.0
+                energy = 5.0
 
             class termination_weight:
                 termination = 0.0
@@ -84,7 +83,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         num_learning_epochs = 6
         # * mini batch size = num_envs*nsteps / nminibatches
         num_mini_batches = 4
-        learning_rate = 1.0e-3
+        learning_rate = 1.0e-5
         schedule = "fixed"  # could be adaptive, fixed
         discount_horizon = 1.0  # [s]
         GAE_bootstrap_horizon = 1.0  # [s]
@@ -92,7 +91,9 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         max_grad_norm = 1.0
 
     class runner(FixedRobotCfgPPO.runner):
-        run_name = "CholeskyPlusConst_512_256_128"
+        run_name = (
+            "CholeskyPlusConst_128_32_sqrd_exp_all_lr_1e-5"
+        )  # "StandardMLP_512_256_128_sqrd_exp_all"
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO"
