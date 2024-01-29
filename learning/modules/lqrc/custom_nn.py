@@ -40,7 +40,7 @@ class BaselineMLP(nn.Module):
 
 class QuadraticNetCholesky(BaselineMLP):
     def __init__(self, input_size, hidden_dims=128, device="cuda"):
-        super(QuadraticNetCholesky, self).__init__(
+        super().__init__(
             input_size,
             sum(range(input_size + 1)),
             hidden_dims=hidden_dims,

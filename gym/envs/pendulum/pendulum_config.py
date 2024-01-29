@@ -33,7 +33,7 @@ class PendulumCfg(FixedRobotCfg):
     class asset(FixedRobotCfg.asset):
         # * Things that differ
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "pendulum/urdf/pendulum.urdf"
-        disable_gravity = False  # False
+        disable_gravity = False
         disable_motors = False  # all torques set to 0
 
     class reward_settings(FixedRobotCfg.reward_settings):
@@ -60,6 +60,8 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
         actions = ["tau_ff"]
 
+        standard_critic_nn = False
+
         class noise:
             dof_pos = 0.0
             dof_vel = 0.0
@@ -83,17 +85,18 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         num_learning_epochs = 6
         # * mini batch size = num_envs*nsteps / nminibatches
         num_mini_batches = 4
-        learning_rate = 1.0e-5
+        learning_rate = 1.0e-3
         schedule = "fixed"  # could be adaptive, fixed
         discount_horizon = 1.0  # [s]
         GAE_bootstrap_horizon = 1.0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
+        lam = 0.95
+        standard_loss = False
+        plus_c_penalty = 0.0
 
     class runner(FixedRobotCfgPPO.runner):
-        run_name = (
-            "CholeskyPlusConst_128_32_sqrd_exp_all_lr_1e-5"
-        )  # "StandardMLP_512_256_128_sqrd_exp_all"
+        run_name = ""
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO"

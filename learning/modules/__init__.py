@@ -30,7 +30,7 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-from .actor_critic import ActorCritic, ActorDoubleCritic
+from .actor_critic import ActorCritic
 from .state_estimator import StateEstimatorNN
 from .actor import Actor
-from .critic import Critic #, DoubleCritic
+from .critic import Critic

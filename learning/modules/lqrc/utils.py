@@ -1,4 +1,6 @@
 import argparse
+import os
+from gym import LEGGED_GYM_ROOT_DIR
 
 
 def benchmark_args():
@@ -69,11 +71,11 @@ def critic_eval_args():
         help="Name of the model type to evaluate",
     )
     parser.add_argument(
-        "--load_from",
+        "--experiment_name",
         action="store",
         type=str,
         nargs="?",
-        help="Name of the directory to load the critic from",
+        help="The experiment name used when training the policy to load",
     )
     parser.add_argument(
         "--fn",
@@ -81,6 +83,22 @@ def critic_eval_args():
         type=str,
         nargs="?",
         help="Filename to use in saving graphs",
+    )
+    parser.add_argument(
+        "--load_run",
+        action="store",
+        type=str,
+        default=-1,
+        nargs="?",
+        help="Name of the run to load.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        action="store",
+        type=int,
+        default=-1,
+        nargs="?",
+        help="Save model checkpoint number.",
     )
     parser.add_argument(
         "--contour",
@@ -92,3 +110,42 @@ def critic_eval_args():
     except SystemExit:
         print("Exception occurred! You've likely mispelled a key.")
     return args
+
+
+def get_load_path(name, load_run=-1, checkpoint=-1):
+    root = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", name)
+    run_path = select_run(root, load_run)
+    model_name = select_model(run_path, checkpoint)
+    load_path = os.path.join(run_path, model_name)
+    return load_path
+
+
+def select_run(root, load_run):
+    try:
+        runs = sorted(
+            os.listdir(root),
+            key=lambda x: os.path.getctime(os.path.join(root, x)),
+        )
+        if "exported" in runs:
+            runs.remove("exported")
+        if "videos" in runs:
+            runs.remove("videos")
+        last_run = os.path.join(root, runs[-1])
+    except:  # ! no bare excepts!!!
+        raise ValueError("No runs in this directory: " + root)
+
+    if load_run == -1:
+        load_run = last_run
+    else:
+        load_run = os.path.join(root, load_run)
+    return load_run
+
+
+def select_model(load_run, checkpoint):
+    if checkpoint == -1:
+        models = [file for file in os.listdir(load_run) if "model" in file]
+        models.sort(key=lambda m: "{0:0>15}".format(m))
+        model = models[-1]
+    else:
+        model = "model_{}.pt".format(checkpoint)
+    return model
