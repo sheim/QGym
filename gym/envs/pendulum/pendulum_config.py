@@ -93,7 +93,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         max_grad_norm = 1.0
         lam = 0.95
         standard_loss = False
-        plus_c_penalty = 0.0
+        plus_c_penalty = 0.1
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""

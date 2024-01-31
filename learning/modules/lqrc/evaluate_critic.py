@@ -3,7 +3,10 @@ import os
 from learning import LEGGED_GYM_LQRC_DIR
 
 from utils import critic_eval_args, get_load_path
-from plotting import plot_custom_critic, plot_critic_prediction_only
+from plotting import (
+    plot_custom_critic,
+    plot_critic_prediction_only,
+)
 from learning.modules import Critic
 
 import torch
@@ -39,6 +42,7 @@ def model_switch(args):
 
 if __name__ == "__main__":
     args = vars(critic_eval_args())
+    model_type = args["model_type"]
     path = get_load_path(args["experiment_name"], args["load_run"], args["checkpoint"])
     model = model_switch(args)
 
@@ -60,7 +64,7 @@ if __name__ == "__main__":
     for X_batch in x:
         y_hat = model.evaluate(X_batch.unsqueeze(0))
         y_pred.append(y_hat)
-        if args["model_type"] == "CholeskyPlusConst":
+        if model_type == "CholeskyPlusConst":
             A_pred.append(model.NN.intermediates["A"])
             c_pred.append(model.NN.intermediates["c"])
 
@@ -70,7 +74,7 @@ if __name__ == "__main__":
 
     fn = args["fn"]
 
-    if args["model_type"] == "CholeskyPlusConst":
+    if model_type == "CholeskyPlusConst":
         plot_custom_critic(
             x,
             torch.vstack(y_pred),
@@ -90,32 +94,7 @@ if __name__ == "__main__":
             save_path + f"/{fn}_prediction_only.png",
             contour=args["contour"],
         )
-        plot_custom_critic(
-            x_norm,
-            torch.vstack(y_pred),
-            (
-                x.unsqueeze(2)
-                .transpose(1, 2)
-                .bmm(torch.vstack(A_pred))
-                .bmm(x.unsqueeze(2))
-            ).squeeze(2),
-            torch.vstack(c_pred),
-            save_path + f"/{fn}_normalized.png",
-            contour=args["contour"],
-        )
-        plot_critic_prediction_only(
-            x_norm,
-            torch.vstack(y_pred),
-            save_path + f"/{fn}_prediction_only_normalized.png",
-            contour=args["contour"],
-        )
     else:
         plot_critic_prediction_only(
             x, torch.vstack(y_pred), save_path + f"/{fn}.png", contour=args["contour"]
-        )
-        plot_critic_prediction_only(
-            x_norm,
-            torch.vstack(y_pred),
-            save_path + f"/{fn}_normalized.png",
-            contour=args["contour"],
         )

@@ -10,6 +10,13 @@ def graph_3D_helper(ax, contour):
     return ax.pcolormesh
 
 
+def set_titles_labels(axes, titles=[""], xy_labels=["theta (rad)", "omega (rad/s)"]):
+    for ix, ax in enumerate(axes):
+        ax.set_xlabel(xy_labels[0])
+        ax.set_ylabel(xy_labels[1])
+        ax.set_title(titles[ix])
+
+
 def plot_custom_critic(x_actual, y_pred, xT_A_x, c_pred, fn, contour):
     x_actual = x_actual.detach().cpu().numpy()
     y_pred = y_pred.detach().cpu().numpy()
@@ -23,26 +30,24 @@ def plot_custom_critic(x_actual, y_pred, xT_A_x, c_pred, fn, contour):
         x_actual[:, 1].reshape(sq_len, sq_len),
         xT_A_x.reshape(sq_len, sq_len),
         cmap="RdBu_r",
-        norm=CenteredNorm(),  # TwoSlopeNorm(0),
+        norm=CenteredNorm(),
     )
     img = graph_3D_helper(axes[1], contour)(
         x_actual[:, 0].reshape(sq_len, sq_len),
         x_actual[:, 1].reshape(sq_len, sq_len),
         c_pred.reshape(sq_len, sq_len),
         cmap="RdBu_r",
-        norm=CenteredNorm(),  # TwoSlopeNorm(0),
+        norm=CenteredNorm(),
     )
     img = graph_3D_helper(axes[2], contour)(
         x_actual[:, 0].reshape(sq_len, sq_len),
         x_actual[:, 1].reshape(sq_len, sq_len),
         y_pred.reshape(sq_len, sq_len),
         cmap="RdBu_r",
-        norm=CenteredNorm(),  # TwoSlopeNorm(0),
+        norm=CenteredNorm(),
     )
     fig.colorbar(img, ax=axes.ravel().tolist(), shrink=0.95, pad=0.1)
-    axes[0].set_title("Predicted x.T @ A @ x")
-    axes[1].set_title("Predicted c")
-    axes[2].set_title("Predicted y")
+    set_titles_labels(axes, ["Predicted x.T @ A @ x", "Predicted c", "Predicted y"])
     plt.savefig(fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}")
 
@@ -58,12 +63,32 @@ def plot_critic_prediction_only(x_actual, y_pred, fn, contour):
         x_actual[:, 1].reshape(sq_len, sq_len),
         y_pred.reshape(sq_len, sq_len),
         cmap="RdBu_r",
-        norm=CenteredNorm(),  # TwoSlopeNorm(0),
+        norm=CenteredNorm(),
     )
     fig.colorbar(img, ax=ax, shrink=0.95, pad=0.1)
-    ax.set_title("Predicted y")
+    set_titles_labels([ax], ["Predicted y"])
     plt.savefig(fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}")
+
+
+def plot_training_data_dist(npy_fn, save_fn):
+    data = np.load(npy_fn)
+    gs_kw = dict(width_ratios=[1.8, 1], height_ratios=[1, 1])
+    fig, axd = plt.subplot_mosaic(
+        [["left", "upper right"], ["left", "lower right"]],
+        gridspec_kw=gs_kw,
+        figsize=(15, 6),
+        layout="constrained",
+    )
+    hist = axd["lower right"].hist(data[:, 0], bins=100)
+    hist = axd["upper right"].hist(data[:, 1], bins=100, orientation="horizontal")
+    _, _, _, hist = axd["left"].hist2d(data[:, 0], data[:, 1], bins=100)
+    fig.colorbar(hist, ax=list(axd.values()), shrink=0.95, pad=0.1)
+    set_titles_labels([axd["left"]], ["Training Data Distribution"])
+    set_titles_labels([axd["lower right"]], xy_labels=["theta (rad)", " "])
+    set_titles_labels([axd["upper right"]], xy_labels=[" ", "omega (rad/s)"])
+    plt.savefig(save_fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {save_fn}")
 
 
 def plot_predictions_and_gradients(
@@ -112,12 +137,14 @@ def plot_predictions_and_gradients(
                     norm=TwoSlopeNorm(0),
                 )
                 plt.colorbar(img2, ax=ax2)
-                ax1.set_xlabel("x")
-                ax1.set_ylabel("y")
-                ax2.set_xlabel("x")
-                ax2.set_ylabel("y")
-                ax1.set_title("Gradient Error between Predictions and Targets")
-                ax2.set_title("Actual Error between Predictions and Targets")
+                set_titles_labels(
+                    [ax1, ax2],
+                    [
+                        "Gradient Error between Predictions and Targets",
+                        "Actual Error between Predictions and Targets",
+                    ],
+                    ["x", "y"],
+                )
                 plt.savefig(f"{fn}_diff_colormap.png")
         if colormap_values:
             fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
