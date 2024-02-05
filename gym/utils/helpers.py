@@ -191,7 +191,7 @@ def get_args(custom_parameters=None):
         {
             "name": "--task",
             "type": str,
-            "default": "cartpole",
+            "default": "pendulum",
             "help": "Resume training or start testing from a checkpoint. "
             "Overrides config file if provided.",
         },

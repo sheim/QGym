@@ -591,17 +591,19 @@ class FixedRobot(BaseTask):
 
     # ------------ reward functions----------------
 
-    def _sqrdexp(self, x):
+    def _sqrdexp(self, x, sigma=None):
         """shorthand helper for squared exponential"""
-        return torch.exp(-torch.square(x) / self.cfg.reward_settings.tracking_sigma)
+        if sigma is None:
+            sigma = self.cfg.reward_settings.tracking_sigma
+        return torch.exp(-torch.square(x) / sigma)
 
     def _reward_torques(self):
         """Penalize torques"""
-        return -torch.sum(torch.square(self.torques), dim=1)
+        return -torch.mean(torch.square(self.torques), dim=1)
 
     def _reward_dof_vel(self):
         """Penalize dof velocities"""
-        return -torch.sum(torch.square(self.dof_vel), dim=1)
+        return -torch.mean(torch.square(self.dof_vel), dim=1)
 
     def _reward_action_rate(self):
         """Penalize changes in actions"""
@@ -614,7 +616,7 @@ class FixedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_action_rate2(self):
         """Penalize changes in actions"""
@@ -628,11 +630,11 @@ class FixedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_collision(self):
         """Penalize collisions on selected bodies"""
-        return -torch.sum(
+        return -torch.mean(
             1.0
             * (
                 torch.norm(
@@ -654,11 +656,11 @@ class FixedRobot(BaseTask):
             max=0.0
         )  # lower limit
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)
-        return -torch.sum(out_of_limits, dim=1)
+        return -torch.mean(out_of_limits, dim=1)
 
     def _reward_dof_vel_limits(self):
         """Penalize dof velocities too close to the limit"""
         # * clip to max error = 1 rad/s per joint to avoid huge penalties
         limit = self.cfg.reward_settings.soft_dof_vel_limit
         error = self.dof_vel.abs() - self.dof_vel_limits * limit
-        return -torch.sum(error.clip(min=0.0, max=1.0), dim=1)
+        return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)

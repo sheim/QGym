@@ -99,8 +99,8 @@ class HumanoidRunning(LeggedRobot):
 
     def _pre_decimation_step(self):
         super()._pre_decimation_step()
-        self.dof_pos_target[:, :10] += self.dof_pos_target_legs
-        self.dof_pos_target[:, 10:] += self.dof_pos_target_arms
+        self.dof_pos_target[:, :10] = self.dof_pos_target_legs
+        self.dof_pos_target[:, 10:] = self.dof_pos_target_arms
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)

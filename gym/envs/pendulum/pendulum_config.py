@@ -7,13 +7,13 @@ class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
         num_envs = 4096
         num_actuators = 1  # 1 for theta connecting base and pole
-        episode_length_s = 1.0
+        episode_length_s = 5.0
 
     class terrain(FixedRobotCfg.terrain):
         pass
 
     class init_state(FixedRobotCfg.init_state):
-        default_joint_angles = {"theta": 0.0}
+        default_joint_angles = {"theta": 0.0}  # -torch.pi / 2.0}
 
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
@@ -24,42 +24,45 @@ class PendulumCfg(FixedRobotCfg):
         dof_pos_range = {
             "theta": [-torch.pi, torch.pi],
         }
+        dof_vel_range = {"theta": [-5, 5]}
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 250
-        desired_sim_frequency = 500
+        ctrl_frequency = 100
+        desired_sim_frequency = 200
+        stiffness = {"theta": 0.0}  # [N*m/rad]
+        damping = {"theta": 0.0}  # [N*m*s/rad]
 
     class asset(FixedRobotCfg.asset):
         # * Things that differ
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "pendulum/urdf/pendulum.urdf"
         disable_gravity = False
         disable_motors = False  # all torques set to 0
+        joint_damping = 0.1
 
     class reward_settings(FixedRobotCfg.reward_settings):
-        tracking_sigma = 2.0
+        tracking_sigma = 0.25
 
     class scaling(FixedRobotCfg.scaling):
-        theta = 2.0 * torch.pi
-        omega = 100.0
+        dof_vel = 5.0
+        dof_pos = 2.0 * torch.pi
         # * Action scales
-        tau_ff = 0.5
+        tau_ff = 1.0
 
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
-    # We need random experiments to run
     seed = -1
 
     class policy(FixedRobotCfgPPO.policy):
         actor_obs = [
             "dof_pos",
             "dof_vel",
-        ]  # ! check markov chain
+        ]
 
         critic_obs = actor_obs
 
         actions = ["tau_ff"]
-
+        disable_actions = False
         standard_critic_nn = False
 
         class noise:
@@ -68,10 +71,12 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
         class reward:
             class weights:
-                theta = 1.0
-                omega = 1.0
-                equilibrium = 1.0
-                energy = 5.0
+                theta = 0.1
+                omega = 0.1
+                equilibrium = 5.0
+                energy = 1.0
+                dof_vel = 0.01
+                torques = 0.025
 
             class termination_weight:
                 termination = 0.0
@@ -87,11 +92,11 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         num_mini_batches = 4
         learning_rate = 1.0e-3
         schedule = "fixed"  # could be adaptive, fixed
-        discount_horizon = 1.0  # [s]
-        GAE_bootstrap_horizon = 1.0  # [s]
+        discount_horizon = 2.0  # [s]
+        lam = 0.98
+        # GAE_bootstrap_horizon = .0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
-        lam = 0.95
         standard_loss = False
         plus_c_penalty = 0.1
 
