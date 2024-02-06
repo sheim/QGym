@@ -63,7 +63,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
         actions = ["tau_ff"]
         disable_actions = False
-        standard_critic_nn = False
+        standard_critic_nn = True
 
         class noise:
             dof_pos = 0.0
@@ -97,7 +97,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         # GAE_bootstrap_horizon = .0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
-        standard_loss = False
+        standard_loss = True
         plus_c_penalty = 0.1
 
     class runner(FixedRobotCfgPPO.runner):

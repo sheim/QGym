@@ -181,6 +181,14 @@ def update_cfg_from_args(env_cfg, train_cfg, args):
             train_cfg.runner.checkpoint = args.checkpoint
         if args.rl_device is not None:
             train_cfg.runner.device = args.rl_device
+        if args.task == "pendulum" and args.custom_critic:
+            train_cfg.policy.standard_critic_nn = False
+            train_cfg.algorithm.standard_loss = False
+            train_cfg.runner.experiment_name += "_custom_critic"
+        elif args.task == "pendulum" and not args.custom_critic:
+            train_cfg.policy.standard_critic_nn = True
+            train_cfg.algorithm.standard_loss = True
+            train_cfg.runner.experiment_name += "_standard_critic"
 
 
 def get_args(custom_parameters=None):
@@ -300,6 +308,12 @@ def get_args(custom_parameters=None):
             "action": "store_true",
             "default": False,
             "help": "Use original config file for loaded policy.",
+        },
+        {
+            "name": "--custom_critic",
+            "action": "store_true",
+            "default": False,
+            "help": "Use custom critic in place of standard MLP.",
         },
     ]
     # * parse arguments
