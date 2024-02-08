@@ -1,4 +1,5 @@
 import os
+import time
 
 from gym.envs import __init__  # noqa: F401
 from gym import LEGGED_GYM_ROOT_DIR
@@ -6,7 +7,10 @@ from gym.utils import get_args, task_registry
 from learning import LEGGED_GYM_LQRC_DIR
 from learning.modules import Critic
 from learning.modules.lqrc.utils import get_load_path
-from learning.modules.lqrc.plotting import plot_critic_prediction_only
+from learning.modules.lqrc.plotting import (
+    # plot_critic_prediction_only,
+    plot_value_func_error,
+)
 
 # torch needs to be imported after isaacgym imports in local source
 import torch
@@ -121,7 +125,10 @@ def query_value_function(vf_args):
 
 if __name__ == "__main__":
     EXPORT_POLICY = True
-    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "logs")
+    time_str = time.strftime("%b%d_%H-%M-%S")
+    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, f"logs/{time_str}")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
     args = get_args()
     # get ground truth
     with torch.no_grad():
@@ -143,21 +150,30 @@ if __name__ == "__main__":
     }
     standard_critic_returns = query_value_function(standard_vf_args)
 
-    plot_critic_prediction_only(
+    plot_value_func_error(
         grid,
-        custom_critic_returns - ground_truth_returns,
-        save_path + f"/custom_critic_error_{steps}_steps.png",
+        custom_critic_returns - ground_truth_returns.T,
+        standard_critic_returns - ground_truth_returns.T,
+        ground_truth_returns.T,
+        save_path + f"/value_func_comparison_{steps}_steps.png",
         contour=False,
     )
-    plot_critic_prediction_only(
-        grid,
-        standard_critic_returns - ground_truth_returns,
-        save_path + f"/standard_critic_error_{steps}_steps.png",
-        contour=False,
-    )
-    plot_critic_prediction_only(
-        grid,
-        ground_truth_returns,
-        save_path + f"/ground_truth_{steps}_steps.png",
-        contour=False,
-    )
+
+    # plot_critic_prediction_only(
+    #     grid,
+    #     custom_critic_returns - ground_truth_returns.T,
+    #     save_path + f"/custom_critic_error_{steps}_steps.png",
+    #     contour=False,
+    # )
+    # plot_critic_prediction_only(
+    #     grid,
+    #     standard_critic_returns - ground_truth_returns.T,
+    #     save_path + f"/standard_critic_error_{steps}_steps.png",
+    #     contour=False,
+    # )
+    # plot_critic_prediction_only(
+    #     grid,
+    #     ground_truth_returns.T,
+    #     save_path + f"/ground_truth_{steps}_steps.png",
+    #     contour=False,
+    # )

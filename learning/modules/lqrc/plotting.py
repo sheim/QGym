@@ -71,6 +71,45 @@ def plot_critic_prediction_only(x_actual, y_pred, fn, contour):
     print(f"Saved to {fn}")
 
 
+def plot_value_func_error(
+    x_actual, custom_error, standard_error, ground_truth, fn, contour
+):
+    x_actual = x_actual.detach().cpu().numpy()
+    custom_error = custom_error.detach().cpu().numpy()
+    standard_error = standard_error.detach().cpu().numpy()
+    ground_truth = ground_truth.detach().cpu().numpy()
+
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(25, 6))
+    sq_len = int(sqrt(x_actual.shape[0]))
+    img = graph_3D_helper(axes[0], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        custom_error.reshape(sq_len, sq_len),
+        cmap="RdBu_r",
+        norm=CenteredNorm(),
+    )
+    img = graph_3D_helper(axes[1], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        standard_error.reshape(sq_len, sq_len),
+        cmap="RdBu_r",
+        norm=CenteredNorm(),
+    )
+    img = graph_3D_helper(axes[2], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        ground_truth.reshape(sq_len, sq_len),
+        cmap="RdBu_r",
+        norm=CenteredNorm(),
+    )
+    fig.colorbar(img, ax=axes.ravel().tolist(), shrink=0.95, pad=0.1)
+    set_titles_labels(
+        axes, ["Custom Critic Error", "Standard Critic Error", "Ground Truth"]
+    )
+    plt.savefig(fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}")
+
+
 def plot_training_data_dist(npy_fn, save_fn):
     data = np.load(npy_fn)
     gs_kw = dict(width_ratios=[1.8, 1], height_ratios=[1, 1])
