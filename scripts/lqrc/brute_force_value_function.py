@@ -1,0 +1,197 @@
+import os
+import time
+
+from gym.envs import __init__  # noqa: F401
+from gym import LEGGED_GYM_ROOT_DIR
+from gym.utils import get_args, task_registry
+from learning import LEGGED_GYM_LQRC_DIR
+from learning.modules import Critic
+from learning.modules.lqrc.utils import get_load_path
+from learning.modules.lqrc.plotting import (
+    # plot_critic_prediction_only,
+    plot_value_func_error,
+)
+
+# torch needs to be imported after isaacgym imports in local source
+import torch
+# import numpy as np
+
+
+def model_switch(args):
+    if args["model_type"] == "CholeskyPlusConst":
+        return Critic(2, standard_nn=False).to(DEVICE)
+    elif args["model_type"] == "StandardMLP":
+        return Critic(2, [512, 256, 128], "elu", standard_nn=True).to(DEVICE)
+    else:
+        raise KeyError("Specified model type is not supported for critic evaluation.")
+
+
+def filter_state_dict(state_dict):
+    critic_state_dict = {}
+    for key, val in state_dict.items():
+        if "critic." in key:
+            critic_state_dict[key.replace("critic.", "")] = val.to(DEVICE)
+    return critic_state_dict
+
+
+def setup(args):
+    env_cfg, train_cfg = task_registry.create_cfgs(args)
+    env_cfg.env.num_envs = steps**2
+    train_cfg.runner.num_steps_per_env = round(2.0 / (1.0 - train_cfg.algorithm.gamma))
+    env_cfg.env.episode_length_s = 9999
+    env_cfg.env.num_projectiles = 20
+    task_registry.make_gym_and_sim()
+    env = task_registry.make_env(args.task, env_cfg)
+    env.cfg.init_state.reset_mode = "reset_to_basic"
+    train_cfg.runner.resume = True
+    train_cfg.logging.enable_local_saving = False
+    runner = task_registry.make_alg_runner(env, train_cfg)
+
+    # * switch to evaluation mode (dropout for example)
+    runner.switch_to_eval()
+    if EXPORT_POLICY:
+        path = os.path.join(
+            LEGGED_GYM_ROOT_DIR,
+            "logs",
+            train_cfg.runner.experiment_name,
+            "exported",
+        )
+        runner.export(path)
+    return env, runner, train_cfg
+
+
+def get_ground_truth(env, runner, train_cfg, grid):
+    env.dof_pos = grid[:, 0].unsqueeze(1)
+    env.dof_vel = grid[:, 1].unsqueeze(1)
+    rewards_dict = {}
+    rewards = torch.zeros(runner.num_steps_per_env, runner.env.num_envs, device=DEVICE)
+    for i in range(round(2.0 / (1.0 - train_cfg.algorithm.gamma))):
+        runner.set_actions(
+            runner.policy_cfg["actions"],
+            runner.get_inference_actions(),
+            runner.policy_cfg["disable_actions"],
+        )
+        env.step()
+        # timed_out = runner.get_timed_out()
+        terminated = runner.get_terminated()
+        # dones = timed_out | terminated
+        runner.update_rewards(rewards_dict, terminated)
+        total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
+        rewards[i, :] = total_rewards
+        # runner.alg.process_env_step(total_rewards, dones, timed_out)
+        # critic_obs = runner.get_obs(runner.policy_cfg["critic_obs"])
+        # runner.alg.compute_returns(critic_obs)
+        env.check_exit()
+
+    # storage returns is in the dimensions of [num_transitions_per_env, num_envs]
+    # num_steps_per_env same as num_transitions_per_env
+    # returns_dict = {}
+    # for env_ix in range(runner.env.num_envs):
+    #     returns_dict[str(grid[env_ix, :].tolist())] = runner.alg.storage.returns[0, env_ix].item()
+    discount_factors = train_cfg.algorithm.gamma * torch.ones(
+        1, runner.num_steps_per_env, device=DEVICE
+    )
+    for i in range(runner.num_steps_per_env):
+        discount_factors[0, i] = discount_factors[0, i] ** i
+    returns = torch.matmul(discount_factors, rewards)
+    return returns
+
+
+def query_value_function(vf_args, grid):
+    path = get_load_path(
+        vf_args["experiment_name"], vf_args["load_run"], vf_args["checkpoint"]
+    )
+    model = model_switch(vf_args)
+
+    loaded_dict = torch.load(path)
+    critic_state_dict = filter_state_dict(loaded_dict["model_state_dict"])
+    model.load_state_dict(critic_state_dict)
+    # predicted_returns = {}
+    predicted_returns = torch.zeros(grid.shape[0], 1, device=DEVICE)
+    model.eval()
+    for ix, X_batch in enumerate(grid):
+        pred = model.evaluate(X_batch.unsqueeze(0))
+        # predicted_returns[str(X_batch.tolist())] = pred.item()
+        predicted_returns[ix, :] = pred.item()
+
+    return predicted_returns
+
+
+if __name__ == "__main__":
+    DEVICE = "cuda:0"
+    steps = 50
+
+    EXPORT_POLICY = True
+    time_str = time.strftime("%b%d_%H-%M-%S")
+    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, f"logs/{time_str}")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    args = get_args()
+    # get ground truth
+    with torch.no_grad():
+        env, runner, train_cfg = setup(args)
+
+    rms_mean = runner.alg.actor_critic.actor.obs_rms.running_mean
+    rms_stddev = torch.sqrt(runner.alg.actor_critic.actor.obs_rms.running_var)
+    dof_pos_rng = torch.linspace(
+        rms_mean[0] - 3.0 * rms_stddev[0],
+        rms_mean[0] + 3.0 * rms_stddev[0],
+        steps=steps,
+        device=DEVICE,
+    )
+    dof_vel_rng = torch.linspace(
+        rms_mean[1] - 3.0 * rms_stddev[1],
+        rms_mean[1] + 3.0 * rms_stddev[1],
+        steps=steps,
+        device=DEVICE,
+    )
+    grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
+    # dof_pos_rng = torch.linspace(0.0, 2.0 * np.pi, steps=steps, device=DEVICE)
+    # dof_vel_rng = torch.linspace(-100.0, 100, steps=steps, device=DEVICE)
+    # grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
+
+    ground_truth_returns = get_ground_truth(env, runner, train_cfg, grid)
+
+    # get NN value functions
+    custom_vf_args = {
+        "experiment_name": "pendulum_custom_critic",
+        "load_run": -1,
+        "checkpoint": -1,
+        "model_type": "CholeskyPlusConst",
+    }
+    custom_critic_returns = query_value_function(custom_vf_args, grid)
+    standard_vf_args = {
+        "experiment_name": "pendulum_standard_critic",
+        "load_run": -1,
+        "checkpoint": -1,
+        "model_type": "StandardMLP",
+    }
+    standard_critic_returns = query_value_function(standard_vf_args, grid)
+
+    plot_value_func_error(
+        grid,
+        custom_critic_returns - ground_truth_returns.T,
+        standard_critic_returns - ground_truth_returns.T,
+        ground_truth_returns.T,
+        save_path + f"/value_func_comparison_{steps}_steps.png",
+        contour=False,
+    )
+
+    # plot_critic_prediction_only(
+    #     grid,
+    #     custom_critic_returns - ground_truth_returns.T,
+    #     save_path + f"/custom_critic_error_{steps}_steps.png",
+    #     contour=False,
+    # )
+    # plot_critic_prediction_only(
+    #     grid,
+    #     standard_critic_returns - ground_truth_returns.T,
+    #     save_path + f"/standard_critic_error_{steps}_steps.png",
+    #     contour=False,
+    # )
+    # plot_critic_prediction_only(
+    #     grid,
+    #     ground_truth_returns.T,
+    #     save_path + f"/ground_truth_{steps}_steps.png",
+    #     contour=False,
+    # )

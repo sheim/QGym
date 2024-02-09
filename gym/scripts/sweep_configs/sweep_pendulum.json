@@ -1,0 +1,22 @@
+{
+    "method": "grid",
+    "metric": {
+        "name": "rewards/total_rewards",
+        "goal": "maximize"
+    },
+    "run_cap": 50,
+    "parameters": {
+        "train_cfg.policy.reward.weights.theta":{
+            "values": [1.0, 10.0]
+        },
+        "train_cfg.policy.reward.weights.omega":{
+            "values": [1.0, 10.0]
+        },
+        "train_cfg.policy.reward.weights.equilibrium":{
+            "values": [1.0, 10.0]
+        },
+        "train_cfg.policy.reward.weights.energy":{
+            "values": [1.0, 10.0]
+        }
+    }
+}

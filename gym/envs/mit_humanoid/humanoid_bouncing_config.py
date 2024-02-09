@@ -4,13 +4,10 @@ with potential-based rewards implemented
 """
 
 import torch
-from gym.envs.base.legged_robot_config import (
-    LeggedRobotCfg,
-    LeggedRobotRunnerCfg,
-)
+from gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotRunnerCfg
 
 
-class HumanoidRunningCfg(LeggedRobotCfg):
+class HumanoidBouncingCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_actuators = 18
@@ -85,7 +82,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         }
 
     class control(LeggedRobotCfg.control):
-        gait_freq = 2.0
+        # stiffness and damping for joints
         stiffness = {
             "hip_yaw": 30.0,
             "hip_abad": 30.0,
@@ -123,6 +120,10 @@ class HumanoidRunningCfg(LeggedRobotCfg):
             # lin_vel_x = [3., 3.]    # min max [m/s]
             # lin_vel_y = 0.    # min max [m/s]
             # yaw_vel = 0.      # min max [rad/s]
+
+    class high_level:
+        sec_per_gait = 0.25
+        interval = (int)(sec_per_gait * (5.0 / 2.0) * 100)  # time steps
 
     class push_robots:
         toggle = True
@@ -165,7 +166,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
 
         fix_base_link = False
         disable_gravity = False
-        disable_actions = False
+
         disable_motors = False
 
         # (1: disable, 0: enable...bitwise filter)
@@ -185,19 +186,22 @@ class HumanoidRunningCfg(LeggedRobotCfg):
 
         # negative total rewards clipped at zero (avoids early termination)
         only_positive_rewards = False  # ! zap?
-        base_height_target = 0.62
+        base_height_target = 0.6565
         tracking_sigma = 0.5
 
     class scaling(LeggedRobotCfg.scaling):
+        hl_pos = 0.05  # 0.3  # maximum altitude for current bouncing ball param
+        hl_vel = 2.0  # 4.905  # max impulse imparted by HL
         base_height = 0.6565
         base_lin_vel = 1.0
         base_ang_vel = torch.pi
         dof_pos = 2 * [0.5, 1, 3, 2, 2] + 2 * [2, 1, 0.5, 2.0]
         dof_vel = 1.0
         dof_pos_target = dof_pos
+        clip_actions = 1000.0
 
 
-class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
+class HumanoidBouncingRunnerCfg(LeggedRobotRunnerCfg):
     do_wandb = True
     seed = -1
 
@@ -214,8 +218,12 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
-            "commands",
-            "phase_obs",
+            "hl_commands",
+            # "hl_impulses_flat",
+            # "commands",
+            # "phase_sin",
+            # "phase_cos",
+            # "time_since_hl_query",
             "dof_pos_legs",
             "dof_vel_legs",
             "in_contact",
@@ -224,6 +232,7 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
         critic_obs = actor_obs
 
         actions = ["dof_pos_target_legs"]
+        disable_actions = False
 
         add_noise = True
         noise_level = 1.0  # scales other values
@@ -242,7 +251,9 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
                 # * Behavioral rewards * #
                 action_rate = 1.0e-3
                 action_rate2 = 1.0e-4
-                tracking_lin_vel = 5.0
+                # tracking_lin_vel = 5.0
+                tracking_hl_pos = 5.0
+                tracking_hl_vel = 5.0
                 tracking_ang_vel = 5.0
                 torques = 1e-4
                 # dof_pos_limits = 10
@@ -250,7 +261,7 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
                 dof_vel = 1e-4
 
                 # * Shaping rewards * #
-                base_height = 0.1
+                base_height = 0  # 0.1
                 orientation = 1.0
                 hip_yaw_zero = 2.0
                 hip_abad_symmetry = 0.2
@@ -277,9 +288,9 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO"
         num_steps_per_env = 32
-        max_iterations = 1000
-        run_name = "HumanoidRunning"
-        experiment_name = "HumanoidLocomotion"
+        max_iterations = 1500
+        run_name = ""
+        experiment_name = "HumanoidTrajectoryTracking"
         save_interval = 50
         plot_input_gradients = False
         plot_parameter_gradients = False

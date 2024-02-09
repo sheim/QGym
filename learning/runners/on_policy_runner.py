@@ -1,5 +1,8 @@
 import os
 import torch
+
+# import numpy as np
+# from learning import LEGGED_GYM_LQRC_DIR
 from learning.env import VecEnv
 
 from learning.utils import Logger
@@ -28,6 +31,8 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
         critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
+        # self.all_obs = torch.zeros(4096*(tot_iter - self.it + 1), 2)
+        # self.all_obs[:4096, :] = actor_obs
 
         self.save()
 
@@ -51,6 +56,11 @@ class OnPolicyRunner(BaseRunner):
                         self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
                     )
                     critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+                    # start = (4096*self.it)
+                    # end = (4096*(self.it+1))
+                    # self.all_obs[start:end, :] = actor_obs
+
                     # * get time_outs
                     timed_out = self.get_timed_out()
                     terminated = self.get_terminated()
@@ -79,6 +89,8 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
+        # self.all_obs = self.all_obs.detach().cpu().numpy()
+        # np.save(f"{LEGGED_GYM_LQRC_DIR}/CholeskyPlusConst_fixed_mean_var_all_obs_3.npy", self.all_obs)
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):

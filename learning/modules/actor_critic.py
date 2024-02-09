@@ -15,6 +15,7 @@ class ActorCritic(nn.Module):
         activation="elu",
         init_noise_std=1.0,
         normalize_obs=True,
+        standard_critic_nn=True,
         **kwargs,
     ):
         if kwargs:
@@ -34,7 +35,11 @@ class ActorCritic(nn.Module):
         )
 
         self.critic = Critic(
-            num_critic_obs, critic_hidden_dims, activation, normalize_obs
+            num_critic_obs,
+            critic_hidden_dims,
+            activation,
+            normalize_obs,
+            standard_critic_nn,
         )
 
         print(f"Actor MLP: {self.actor.NN}")

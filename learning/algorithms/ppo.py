@@ -36,6 +36,7 @@ import torch.optim as optim
 
 from learning.modules import ActorCritic
 from learning.storage import RolloutStorage
+from learning.modules.lqrc import CustomCholeskyPlusConstLoss
 
 
 class PPO:
@@ -57,6 +58,8 @@ class PPO:
         schedule="fixed",
         desired_kl=0.01,
         device="cpu",
+        standard_loss=True,
+        plus_c_penalty=0.0,
         **kwargs,
     ):
         self.device = device
@@ -82,6 +85,10 @@ class PPO:
         self.lam = lam
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
+
+        # * custom NN parameters
+        self.standard_loss = standard_loss
+        self.plus_c_penalty = plus_c_penalty
 
     def init_storage(
         self,
@@ -199,11 +206,36 @@ class PPO:
                 value_clipped = target_values_batch + (
                     value_batch - target_values_batch
                 ).clamp(-self.clip_param, self.clip_param)
-                value_losses = (value_batch - returns_batch).pow(2)
-                value_losses_clipped = (value_clipped - returns_batch).pow(2)
+                if self.standard_loss:
+                    value_losses = (value_batch - returns_batch).pow(2)
+                    value_losses_clipped = (value_clipped - returns_batch).pow(2)
+                else:
+                    value_losses = CustomCholeskyPlusConstLoss(
+                        const_penalty=self.plus_c_penalty
+                    ).forward(
+                        value_batch,
+                        returns_batch,
+                        self.actor_critic.critic.NN.intermediates,
+                    )
+                    value_losses_clipped = CustomCholeskyPlusConstLoss(
+                        const_penalty=self.plus_c_penalty
+                    ).forward(
+                        value_clipped,
+                        returns_batch,
+                        self.actor_critic.critic.NN.intermediates,
+                    )
                 value_loss = torch.max(value_losses, value_losses_clipped).mean()
             else:
-                value_loss = (returns_batch - value_batch).pow(2).mean()
+                if self.standard_loss:
+                    value_loss = (returns_batch - value_batch).pow(2).mean()
+                else:
+                    value_losses = CustomCholeskyPlusConstLoss(
+                        const_penalty=self.plus_c_penalty
+                    ).forward(
+                        value_batch,
+                        returns_batch,
+                        self.actor_critic.critic.NN.intermediates,
+                    )
 
             loss = (
                 surrogate_loss
