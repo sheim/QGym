@@ -14,13 +14,7 @@ from learning.modules.lqrc.plotting import (
 
 # torch needs to be imported after isaacgym imports in local source
 import torch
-import numpy as np
-
-DEVICE = "cuda:0"
-steps = 100
-dof_pos_rng = torch.linspace(0.0, 2.0 * np.pi, steps=steps, device=DEVICE)
-dof_vel_rng = torch.linspace(-100.0, 100, steps=steps, device=DEVICE)
-grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
+# import numpy as np
 
 
 def model_switch(args):
@@ -66,7 +60,7 @@ def setup(args):
     return env, runner, train_cfg
 
 
-def get_ground_truth(env, runner, train_cfg):
+def get_ground_truth(env, runner, train_cfg, grid):
     env.dof_pos = grid[:, 0].unsqueeze(1)
     env.dof_vel = grid[:, 1].unsqueeze(1)
     rewards_dict = {}
@@ -103,7 +97,7 @@ def get_ground_truth(env, runner, train_cfg):
     return returns
 
 
-def query_value_function(vf_args):
+def query_value_function(vf_args, grid):
     path = get_load_path(
         vf_args["experiment_name"], vf_args["load_run"], vf_args["checkpoint"]
     )
@@ -124,6 +118,9 @@ def query_value_function(vf_args):
 
 
 if __name__ == "__main__":
+    DEVICE = "cuda:0"
+    steps = 50
+
     EXPORT_POLICY = True
     time_str = time.strftime("%b%d_%H-%M-%S")
     save_path = os.path.join(LEGGED_GYM_LQRC_DIR, f"logs/{time_str}")
@@ -133,7 +130,28 @@ if __name__ == "__main__":
     # get ground truth
     with torch.no_grad():
         env, runner, train_cfg = setup(args)
-        ground_truth_returns = get_ground_truth(env, runner, train_cfg)
+
+    rms_mean = runner.alg.actor_critic.actor.obs_rms.running_mean
+    rms_stddev = torch.sqrt(runner.alg.actor_critic.actor.obs_rms.running_var)
+    dof_pos_rng = torch.linspace(
+        rms_mean[0] - 3.0 * rms_stddev[0],
+        rms_mean[0] + 3.0 * rms_stddev[0],
+        steps=steps,
+        device=DEVICE,
+    )
+    dof_vel_rng = torch.linspace(
+        rms_mean[1] - 3.0 * rms_stddev[1],
+        rms_mean[1] + 3.0 * rms_stddev[1],
+        steps=steps,
+        device=DEVICE,
+    )
+    grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
+    # dof_pos_rng = torch.linspace(0.0, 2.0 * np.pi, steps=steps, device=DEVICE)
+    # dof_vel_rng = torch.linspace(-100.0, 100, steps=steps, device=DEVICE)
+    # grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
+
+    ground_truth_returns = get_ground_truth(env, runner, train_cfg, grid)
+
     # get NN value functions
     custom_vf_args = {
         "experiment_name": "pendulum_custom_critic",
@@ -141,14 +159,14 @@ if __name__ == "__main__":
         "checkpoint": -1,
         "model_type": "CholeskyPlusConst",
     }
-    custom_critic_returns = query_value_function(custom_vf_args)
+    custom_critic_returns = query_value_function(custom_vf_args, grid)
     standard_vf_args = {
         "experiment_name": "pendulum_standard_critic",
         "load_run": -1,
         "checkpoint": -1,
         "model_type": "StandardMLP",
     }
-    standard_critic_returns = query_value_function(standard_vf_args)
+    standard_critic_returns = query_value_function(standard_vf_args, grid)
 
     plot_value_func_error(
         grid,
