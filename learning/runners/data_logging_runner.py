@@ -1,18 +1,16 @@
-import os
 import torch
-
-# import numpy as np
-# from learning import LEGGED_GYM_LQRC_DIR
+import numpy as np
+from learning import LEGGED_GYM_LQRC_DIR
 from learning.env import VecEnv
 
 from learning.utils import Logger
 
-from .BaseRunner import BaseRunner
+from .on_policy_runner import OnPolicyRunner
 
 logger = Logger()
 
 
-class OnPolicyRunner(BaseRunner):
+class DataLoggingRunner(OnPolicyRunner):
     def __init__(self, env: VecEnv, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
@@ -31,6 +29,8 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
         critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
+        self.all_obs = torch.zeros(self.env.num_envs*(tot_iter - self.it + 1), 2)
+        self.all_obs[:self.env.num_envs, :] = actor_obs
 
         self.save()
 
@@ -54,6 +54,10 @@ class OnPolicyRunner(BaseRunner):
                         self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
                     )
                     critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+                    start = (self.env.num_envs*self.it)
+                    end = (self.env.num_envs*(self.it+1))
+                    self.all_obs[start:end, :] = actor_obs
 
                     # * get time_outs
                     timed_out = self.get_timed_out()
@@ -83,7 +87,9 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-
+        self.all_obs = self.all_obs.detach().cpu().numpy()
+        save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy" if self.policy_cfg["standard_critic_nn"] else f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy"
+        np.save(save_path, self.all_obs)
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):
@@ -112,47 +118,4 @@ class OnPolicyRunner(BaseRunner):
 
         logger.attach_torch_obj_to_wandb(
             (self.alg.actor_critic.actor, self.alg.actor_critic.critic)
-        )
-
-    def save(self):
-        os.makedirs(self.log_dir, exist_ok=True)
-        path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
-        torch.save(
-            {
-                "actor_state_dict": self.alg.actor_critic.actor.state_dict(),
-                "critic_state_dict": self.alg.actor_critic.critic.state_dict(),
-                "optimizer_state_dict": self.alg.optimizer.state_dict(),
-                "iter": self.it,
-            },
-            path,
-        )
-
-    def load(self, path, load_optimizer=True):
-        loaded_dict = torch.load(path)
-        self.alg.actor_critic.actor.load_state_dict(loaded_dict["actor_state_dict"])
-        self.alg.actor_critic.critic.load_state_dict(loaded_dict["critic_state_dict"])
-        if load_optimizer:
-            self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
-        self.it = loaded_dict["iter"]
-
-    def switch_to_eval(self):
-        self.alg.actor_critic.eval()
-
-    def get_inference_actions(self):
-        obs = self.get_noisy_obs(self.policy_cfg["actor_obs"], self.policy_cfg["noise"])
-        return self.alg.actor_critic.actor.act_inference(obs)
-
-    def export(self, path):
-        self.alg.actor_critic.export_policy(path)
-
-    def init_storage(self):
-        num_actor_obs = self.get_obs_size(self.policy_cfg["actor_obs"])
-        num_critic_obs = self.get_obs_size(self.policy_cfg["critic_obs"])
-        num_actions = self.get_action_size(self.policy_cfg["actions"])
-        self.alg.init_storage(
-            self.env.num_envs,
-            self.num_steps_per_env,
-            actor_obs_shape=[num_actor_obs],
-            critic_obs_shape=[num_critic_obs],
-            action_shape=[num_actions],
         )

@@ -185,10 +185,12 @@ def update_cfg_from_args(env_cfg, train_cfg, args):
             train_cfg.policy.standard_critic_nn = False
             train_cfg.algorithm.standard_loss = False
             train_cfg.runner.experiment_name += "_custom_critic"
+            train_cfg.runner.run_name += "custom_critic"
         elif args.task == "pendulum" and not args.custom_critic:
             train_cfg.policy.standard_critic_nn = True
             train_cfg.algorithm.standard_loss = True
             train_cfg.runner.experiment_name += "_standard_critic"
+            train_cfg.runner.run_name += "standard_critic"
 
 
 def get_args(custom_parameters=None):

@@ -79,7 +79,7 @@ def plot_value_func_error(
     standard_error = standard_error.detach().cpu().numpy()
     ground_truth = ground_truth.detach().cpu().numpy()
 
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(25, 6))
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(25, 6))
     sq_len = int(sqrt(x_actual.shape[0]))
     img = graph_3D_helper(axes[0], contour)(
         x_actual[:, 0].reshape(sq_len, sq_len),
@@ -95,16 +95,48 @@ def plot_value_func_error(
         cmap="RdBu_r",
         norm=CenteredNorm(),
     )
+    fig.colorbar(img, ax=axes.ravel().tolist(), shrink=0.95, pad=0.1)
+    set_titles_labels(
+        axes, ["Custom Critic Error", "Standard Critic Error"]
+    )
+    plt.savefig(fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}")
+
+
+def plot_value_func(
+    x_actual, custom, standard, ground_truth, fn, contour
+):
+    x_actual = x_actual.detach().cpu().numpy()
+    custom = custom.detach().cpu().numpy()
+    standard = standard.detach().cpu().numpy()
+    ground_truth = ground_truth.detach().cpu().numpy()
+
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(25, 6))
+    sq_len = int(sqrt(x_actual.shape[0]))
+    img = graph_3D_helper(axes[0], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        custom.reshape(sq_len, sq_len),
+        cmap="PiYG",
+        norm=CenteredNorm(),
+    )
+    img = graph_3D_helper(axes[1], contour)(
+        x_actual[:, 0].reshape(sq_len, sq_len),
+        x_actual[:, 1].reshape(sq_len, sq_len),
+        standard.reshape(sq_len, sq_len),
+        cmap="PiYG",
+        norm=CenteredNorm(),
+    )
     img = graph_3D_helper(axes[2], contour)(
         x_actual[:, 0].reshape(sq_len, sq_len),
         x_actual[:, 1].reshape(sq_len, sq_len),
         ground_truth.reshape(sq_len, sq_len),
-        cmap="RdBu_r",
+        cmap="PiYG",
         norm=CenteredNorm(),
     )
     fig.colorbar(img, ax=axes.ravel().tolist(), shrink=0.95, pad=0.1)
     set_titles_labels(
-        axes, ["Custom Critic Error", "Standard Critic Error", "Ground Truth"]
+        axes, ["Custom Critic", "Standard Critic", "Ground Truth"]
     )
     plt.savefig(fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}")
@@ -121,11 +153,20 @@ def plot_training_data_dist(npy_fn, save_fn):
     )
     hist = axd["lower right"].hist(data[:, 0], bins=100)
     hist = axd["upper right"].hist(data[:, 1], bins=100, orientation="horizontal")
-    _, _, _, hist = axd["left"].hist2d(data[:, 0], data[:, 1], bins=100)
+    _, _, _, hist = axd["left"].hist2d(data[:, 0], data[:, 1], bins=100, cmap="BrBG")
     fig.colorbar(hist, ax=list(axd.values()), shrink=0.95, pad=0.1)
     set_titles_labels([axd["left"]], ["Training Data Distribution"])
     set_titles_labels([axd["lower right"]], xy_labels=["theta (rad)", " "])
     set_titles_labels([axd["upper right"]], xy_labels=[" ", "omega (rad/s)"])
+    plt.savefig(save_fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {save_fn}")
+
+
+def plot_theta_omega_polar(theta, omega, save_fn):
+    r = np.ones_like(theta)
+    ax = plt.subplot(111, projection='polar')
+    c = ax.scatter(theta, r, c=omega, cmap='hsv', alpha=0.75)
+    ax.set_title("Pos, Vel of High Return Initial Conditions")
     plt.savefig(save_fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {save_fn}")
 

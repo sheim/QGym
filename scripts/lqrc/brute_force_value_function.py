@@ -8,13 +8,14 @@ from learning import LEGGED_GYM_LQRC_DIR
 from learning.modules import Critic
 from learning.modules.lqrc.utils import get_load_path
 from learning.modules.lqrc.plotting import (
-    # plot_critic_prediction_only,
+    plot_value_func,
     plot_value_func_error,
+    plot_training_data_dist
 )
 
 # torch needs to be imported after isaacgym imports in local source
 import torch
-# import numpy as np
+import numpy as np
 
 
 def model_switch(args):
@@ -104,7 +105,7 @@ def query_value_function(vf_args, grid):
     model = model_switch(vf_args)
 
     loaded_dict = torch.load(path)
-    critic_state_dict = filter_state_dict(loaded_dict["model_state_dict"])
+    critic_state_dict = loaded_dict["critic_state_dict"]  # filter_state_dict(loaded_dict["model_state_dict"])
     model.load_state_dict(critic_state_dict)
     # predicted_returns = {}
     predicted_returns = torch.zeros(grid.shape[0], 1, device=DEVICE)
@@ -118,39 +119,36 @@ def query_value_function(vf_args, grid):
 
 
 if __name__ == "__main__":
+    args = get_args()
+
     DEVICE = "cuda:0"
     steps = 50
+    npy_fn = f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy" if args.custom_critic else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
+    data = np.load(npy_fn)
+    dof_pos_rng = torch.linspace(min(data[:, 0]), max(data[:, 0]),
+                                 steps=steps, device=DEVICE)
+    dof_vel_rng = torch.linspace(min(data[:, 1]), max(data[:, 1]),
+                                 steps=steps, device=DEVICE)
+    grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
 
     EXPORT_POLICY = True
     time_str = time.strftime("%b%d_%H-%M-%S")
     save_path = os.path.join(LEGGED_GYM_LQRC_DIR, f"logs/{time_str}")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    args = get_args()
     # get ground truth
     with torch.no_grad():
         env, runner, train_cfg = setup(args)
 
-    rms_mean = runner.alg.actor_critic.actor.obs_rms.running_mean
-    rms_stddev = torch.sqrt(runner.alg.actor_critic.actor.obs_rms.running_var)
-    dof_pos_rng = torch.linspace(
-        rms_mean[0] - 3.0 * rms_stddev[0],
-        rms_mean[0] + 3.0 * rms_stddev[0],
-        steps=steps,
-        device=DEVICE,
-    )
-    dof_vel_rng = torch.linspace(
-        rms_mean[1] - 3.0 * rms_stddev[1],
-        rms_mean[1] + 3.0 * rms_stddev[1],
-        steps=steps,
-        device=DEVICE,
-    )
-    grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
-    # dof_pos_rng = torch.linspace(0.0, 2.0 * np.pi, steps=steps, device=DEVICE)
-    # dof_vel_rng = torch.linspace(-100.0, 100, steps=steps, device=DEVICE)
-    # grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
-
     ground_truth_returns = get_ground_truth(env, runner, train_cfg, grid)
+    high_gt_returns = []
+    for i in range(ground_truth_returns.shape[1]):
+        if ground_truth_returns[0, i].item() > 3.5:
+            high_gt_returns.append(grid[i, :].detach().cpu().numpy())
+    high_gt_returns = np.array(high_gt_returns)
+    returns_save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy" if args.custom_critic else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+    np.save(returns_save_path, high_gt_returns)
+    print("Saved high returns to", returns_save_path)
 
     # get NN value functions
     custom_vf_args = {
@@ -173,25 +171,19 @@ if __name__ == "__main__":
         custom_critic_returns - ground_truth_returns.T,
         standard_critic_returns - ground_truth_returns.T,
         ground_truth_returns.T,
-        save_path + f"/value_func_comparison_{steps}_steps.png",
+        save_path + f"/value_func_error_{steps}_steps.png",
         contour=False,
     )
 
-    # plot_critic_prediction_only(
-    #     grid,
-    #     custom_critic_returns - ground_truth_returns.T,
-    #     save_path + f"/custom_critic_error_{steps}_steps.png",
-    #     contour=False,
-    # )
-    # plot_critic_prediction_only(
-    #     grid,
-    #     standard_critic_returns - ground_truth_returns.T,
-    #     save_path + f"/standard_critic_error_{steps}_steps.png",
-    #     contour=False,
-    # )
-    # plot_critic_prediction_only(
-    #     grid,
-    #     ground_truth_returns.T,
-    #     save_path + f"/ground_truth_{steps}_steps.png",
-    #     contour=False,
-    # )
+    plot_value_func(
+        grid,
+        custom_critic_returns,
+        standard_critic_returns,
+        ground_truth_returns.T,
+        save_path + f"/value_func_{steps}_steps.png",
+        contour=False,
+    )
+
+    plot_training_data_dist(npy_fn,
+                            save_path + f"/data_distribution.png")
+

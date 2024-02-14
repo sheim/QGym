@@ -32,3 +32,4 @@
 
 from .on_policy_runner import OnPolicyRunner
 from .my_runner import MyRunner
+from .data_logging_runner import DataLoggingRunner
