@@ -2,7 +2,7 @@ name: gpuGym Regression Testing
 run-name: PR Regression Testing
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
 
 jobs:
   Self-hosted-unit-testing:
