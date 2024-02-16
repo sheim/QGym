@@ -65,7 +65,8 @@ def get_ground_truth(env, runner, train_cfg, grid):
     env.dof_pos = grid[:, 0].unsqueeze(1)
     env.dof_vel = grid[:, 1].unsqueeze(1)
     rewards_dict = {}
-    rewards = torch.zeros(runner.num_steps_per_env, runner.env.num_envs, device=DEVICE)
+    # rewards = torch.zeros(runner.num_steps_per_env, runner.env.num_envs, device=DEVICE)
+    rewards = np.zeros((runner.num_steps_per_env, runner.env.num_envs))
     for i in range(round(2.0 / (1.0 - train_cfg.algorithm.gamma))):
         runner.set_actions(
             runner.policy_cfg["actions"],
@@ -78,7 +79,7 @@ def get_ground_truth(env, runner, train_cfg, grid):
         # dones = timed_out | terminated
         runner.update_rewards(rewards_dict, terminated)
         total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
-        rewards[i, :] = total_rewards
+        rewards[i, :] = total_rewards.detach().cpu().numpy()
         # runner.alg.process_env_step(total_rewards, dones, timed_out)
         # critic_obs = runner.get_obs(runner.policy_cfg["critic_obs"])
         # runner.alg.compute_returns(critic_obs)
@@ -89,12 +90,10 @@ def get_ground_truth(env, runner, train_cfg, grid):
     # returns_dict = {}
     # for env_ix in range(runner.env.num_envs):
     #     returns_dict[str(grid[env_ix, :].tolist())] = runner.alg.storage.returns[0, env_ix].item()
-    discount_factors = train_cfg.algorithm.gamma * torch.ones(
-        1, runner.num_steps_per_env, device=DEVICE
-    )
+    discount_factors = train_cfg.algorithm.gamma * np.ones((1, runner.num_steps_per_env))
     for i in range(runner.num_steps_per_env):
         discount_factors[0, i] = discount_factors[0, i] ** i
-    returns = torch.matmul(discount_factors, rewards)
+    returns = np.matmul(discount_factors, rewards)
     return returns
 
 
@@ -108,7 +107,8 @@ def query_value_function(vf_args, grid):
     critic_state_dict = loaded_dict["critic_state_dict"]  # filter_state_dict(loaded_dict["model_state_dict"])
     model.load_state_dict(critic_state_dict)
     # predicted_returns = {}
-    predicted_returns = torch.zeros(grid.shape[0], 1, device=DEVICE)
+    # predicted_returns = torch.zeros(grid.shape[0], 1, device=DEVICE)
+    predicted_returns = np.zeros((grid.shape[0], 1))
     model.eval()
     for ix, X_batch in enumerate(grid):
         pred = model.evaluate(X_batch.unsqueeze(0))
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     args = get_args()
 
     DEVICE = "cuda:0"
-    steps = 50
+    steps = 100
     npy_fn = f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy" if args.custom_critic else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
     data = np.load(npy_fn)
     dof_pos_rng = torch.linspace(min(data[:, 0]), max(data[:, 0]),
@@ -142,9 +142,9 @@ if __name__ == "__main__":
 
     ground_truth_returns = get_ground_truth(env, runner, train_cfg, grid)
     high_gt_returns = []
-    for i in range(ground_truth_returns.shape[1]):
-        if ground_truth_returns[0, i].item() > 3.5:
-            high_gt_returns.append(grid[i, :].detach().cpu().numpy())
+    for i in range(ground_truth_returns.shape[1] - 1):
+        if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i+1] < 2.0:
+            high_gt_returns.append(torch.hstack((grid[i, :], grid[i+1, :])).detach().cpu().numpy())
     high_gt_returns = np.array(high_gt_returns)
     returns_save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy" if args.custom_critic else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
     np.save(returns_save_path, high_gt_returns)
@@ -166,8 +166,10 @@ if __name__ == "__main__":
     }
     standard_critic_returns = query_value_function(standard_vf_args, grid)
 
+    # ! change the plotters to not do the numpy detach a second time
+
     plot_value_func_error(
-        grid,
+        grid.detach().cpu().numpy(),
         custom_critic_returns - ground_truth_returns.T,
         standard_critic_returns - ground_truth_returns.T,
         ground_truth_returns.T,
@@ -176,7 +178,7 @@ if __name__ == "__main__":
     )
 
     plot_value_func(
-        grid,
+        grid.detach().cpu().numpy(),
         custom_critic_returns,
         standard_critic_returns,
         ground_truth_returns.T,
@@ -185,5 +187,4 @@ if __name__ == "__main__":
     )
 
     plot_training_data_dist(npy_fn,
-                            save_path + f"/data_distribution.png")
-
+                            save_path + "/data_distribution.png")

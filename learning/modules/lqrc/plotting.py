@@ -74,10 +74,10 @@ def plot_critic_prediction_only(x_actual, y_pred, fn, contour):
 def plot_value_func_error(
     x_actual, custom_error, standard_error, ground_truth, fn, contour
 ):
-    x_actual = x_actual.detach().cpu().numpy()
-    custom_error = custom_error.detach().cpu().numpy()
-    standard_error = standard_error.detach().cpu().numpy()
-    ground_truth = ground_truth.detach().cpu().numpy()
+    # x_actual = x_actual.detach().cpu().numpy()
+    # custom_error = custom_error.detach().cpu().numpy()
+    # standard_error = standard_error.detach().cpu().numpy()
+    # ground_truth = ground_truth.detach().cpu().numpy()
 
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(25, 6))
     sq_len = int(sqrt(x_actual.shape[0]))
@@ -106,10 +106,10 @@ def plot_value_func_error(
 def plot_value_func(
     x_actual, custom, standard, ground_truth, fn, contour
 ):
-    x_actual = x_actual.detach().cpu().numpy()
-    custom = custom.detach().cpu().numpy()
-    standard = standard.detach().cpu().numpy()
-    ground_truth = ground_truth.detach().cpu().numpy()
+    # x_actual = x_actual.detach().cpu().numpy()
+    # custom = custom.detach().cpu().numpy()
+    # standard = standard.detach().cpu().numpy()
+    # ground_truth = ground_truth.detach().cpu().numpy()
 
     fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(25, 6))
     sq_len = int(sqrt(x_actual.shape[0]))
@@ -165,7 +165,8 @@ def plot_training_data_dist(npy_fn, save_fn):
 def plot_theta_omega_polar(theta, omega, save_fn):
     r = np.ones_like(theta)
     ax = plt.subplot(111, projection='polar')
-    c = ax.scatter(theta, r, c=omega, cmap='hsv', alpha=0.75)
+    c = ax.scatter(theta, r, c=omega, cmap='RdYlGn', alpha=0.75)
+    plt.colorbar(c)
     ax.set_title("Pos, Vel of High Return Initial Conditions")
     plt.savefig(save_fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {save_fn}")

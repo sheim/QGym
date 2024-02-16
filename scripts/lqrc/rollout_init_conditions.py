@@ -33,15 +33,18 @@ def setup(args, num_init_conditions):
 
 
 def play(env, runner, train_cfg, init_conditions):
-    env.dof_pos = torch.from_numpy(init_conditions[:, 0]).to(DEVICE).unsqueeze(1)
-    env.dof_vel = torch.from_numpy(init_conditions[:, 1]).to(DEVICE).unsqueeze(1)
+    env.dof_pos = torch.from_numpy(np.hstack((init_conditions[0, 0],
+                                             init_conditions[0, 2])).reshape(-1, 1)).to(DEVICE)
+    env.dof_vel = torch.from_numpy(np.hstack((init_conditions[0, 1],
+                                             init_conditions[0, 3])).reshape(-1, 1)).to(DEVICE)
     # * set up recording
     if env.cfg.viewer.record:
         recorder = VisualizationRecorder(
             env, train_cfg.runner.experiment_name, train_cfg.runner.load_run
         )
 
-    for i in range(round(2.0 / (1.0 - 0.99))):
+    for i in range(round(10.0 / (1.0 - 0.99))):
+    # for i in range(100**2):
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
@@ -52,13 +55,15 @@ def play(env, runner, train_cfg, init_conditions):
         env.step()
         env.check_exit()
 
+    recorder.save()
+
 
 if __name__ == "__main__":
     args = get_args()
     DEVICE = "cuda:0"
     npy_fn = f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy" if args.custom_critic else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
     init_conditions = np.load(npy_fn)
-    num_init_conditions = init_conditions.shape[0]
+    num_init_conditions = 2
     with torch.no_grad():
         env, runner, train_cfg = setup(args, num_init_conditions)
         play(env, runner, train_cfg, init_conditions)
