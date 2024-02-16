@@ -1,5 +1,5 @@
 import torch
-from learning.algorithms import PPO
+from learning.algorithms import *  # noqa
 from learning.modules import ActorCritic
 from learning.env import VecEnv
 from learning.utils import remove_zero_weighted_rewards

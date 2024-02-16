@@ -31,4 +31,5 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
 from .ppo import PPO
+from .ppo2 import PPO2
 from .SE import StateEstimator
