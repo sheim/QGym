@@ -69,7 +69,12 @@ class PPO:
         self.actor_critic = actor_critic
         self.actor_critic.to(self.device)
         self.storage = None  # initialized later
-        self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=learning_rate)
+        self.optimizer = optim.Adam(
+            self.actor_critic.actor.parameters(), lr=learning_rate
+        )
+        self.crit_optimizer = optim.Adam(
+            self.actor_critic.critic.parameters(), lr=learning_rate
+        )
         self.transition = RolloutStorage.Transition()
 
         # * PPO parameters
@@ -156,7 +161,6 @@ class PPO:
             actions_log_prob_batch = self.actor_critic.get_actions_log_prob(
                 actions_batch
             )
-            value_batch = self.actor_critic.evaluate(critic_obs_batch)
             mu_batch = self.actor_critic.action_mean
             sigma_batch = self.actor_critic.action_std
             entropy_batch = self.actor_critic.entropy
@@ -195,6 +199,7 @@ class PPO:
             surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
             # * Value function loss
+            value_batch = self.actor_critic.evaluate(critic_obs_batch)
             if self.use_clipped_value_loss:
                 value_clipped = target_values_batch + (
                     value_batch - target_values_batch
@@ -207,15 +212,24 @@ class PPO:
 
             loss = (
                 surrogate_loss
-                + self.value_loss_coef * value_loss
+                # + self.value_loss_coef * value_loss
                 - self.entropy_coef * entropy_batch.mean()
             )
 
             # * Gradient step
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
+            nn.utils.clip_grad_norm_(
+                self.actor_critic.actor.parameters(), self.max_grad_norm
+            )
             self.optimizer.step()
+
+            self.crit_optimizer.zero_grad()
+            value_loss.backward()
+            nn.utils.clip_grad_norm_(
+                self.actor_critic.critic.parameters(), self.max_grad_norm
+            )
+            self.crit_optimizer.step()
 
             self.mean_value_loss += value_loss.item()
             self.mean_surrogate_loss += surrogate_loss.item()

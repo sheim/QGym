@@ -196,7 +196,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         learning_rate = 1.0e-5
         schedule = "adaptive"  # can be adaptive or fixed
         discount_horizon = 1.0  # [s]
-        GAE_bootstrap_horizon = 2.0  # [s]
+        # GAE_bootstrap_horizon = 2.0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 

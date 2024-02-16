@@ -145,7 +145,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         learning_rate = 5.0e-5
         schedule = "adaptive"  # can be adaptive, fixed
         discount_horizon = 1.0  # [s]
-        GAE_bootstrap_horizon = 1.0  # [s]
+        lam = 0.95
+        # GAE_bootstrap_horizon = 1.0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 
@@ -153,5 +154,5 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32
