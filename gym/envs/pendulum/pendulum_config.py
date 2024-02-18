@@ -14,8 +14,8 @@ class PendulumCfg(FixedRobotCfg):
 
     class viewer:
         ref_env = 0
-        pos = [-2.0, 3, 2]  # [m]
-        lookat = [0.0, 1.0, 0.5]  # [m]
+        pos = [10., 5., 10.]  # [m]
+        lookat = [0.0, 0.0, 0.0]  # [m]
 
     class init_state(FixedRobotCfg.init_state):
         default_joint_angles = {"theta": 0.0}  # -torch.pi / 2.0}
@@ -33,8 +33,8 @@ class PendulumCfg(FixedRobotCfg):
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 1000
-        desired_sim_frequency = 1000
+        ctrl_frequency = 100
+        desired_sim_frequency = 200
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
 

@@ -74,11 +74,6 @@ def plot_critic_prediction_only(x_actual, y_pred, fn, contour):
 def plot_value_func_error(
     x_actual, custom_error, standard_error, ground_truth, fn, contour
 ):
-    # x_actual = x_actual.detach().cpu().numpy()
-    # custom_error = custom_error.detach().cpu().numpy()
-    # standard_error = standard_error.detach().cpu().numpy()
-    # ground_truth = ground_truth.detach().cpu().numpy()
-
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(25, 6))
     sq_len = int(sqrt(x_actual.shape[0]))
     img = graph_3D_helper(axes[0], contour)(
@@ -106,11 +101,6 @@ def plot_value_func_error(
 def plot_value_func(
     x_actual, custom, standard, ground_truth, fn, contour
 ):
-    # x_actual = x_actual.detach().cpu().numpy()
-    # custom = custom.detach().cpu().numpy()
-    # standard = standard.detach().cpu().numpy()
-    # ground_truth = ground_truth.detach().cpu().numpy()
-
     fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(25, 6))
     sq_len = int(sqrt(x_actual.shape[0]))
     img = graph_3D_helper(axes[0], contour)(
@@ -170,6 +160,30 @@ def plot_theta_omega_polar(theta, omega, save_fn):
     ax.set_title("Pos, Vel of High Return Initial Conditions")
     plt.savefig(save_fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {save_fn}")
+
+
+def plot_trajectories(pos, vel, torques, rewards, fn, title=""):
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15, 10))
+    hr_pos, = axes[0, 0].plot(pos[:, :1], label="High Return", color="red", alpha=0.7)
+    lr_pos, = axes[0, 0].plot(pos[:, 1:], label="Low Return", color="blue", alpha=0.7)
+    set_titles_labels([axes[0, 0]], xy_labels=["Steps", "Theta (rad)"])
+    axes[0, 0].legend(handles=[hr_pos, lr_pos])
+    hr_vel, = axes[0, 1].plot(vel[:, :1], label="High Return", color="red")
+    lr_vel, = axes[0, 1].plot(vel[:, 1:], label="High Return", color="blue")
+    set_titles_labels([axes[0, 1]], xy_labels=["Steps", "Omega (rad/s)"])
+    axes[0, 1].legend(handles=[hr_vel, lr_vel])
+    hr_torque, = axes[1, 0].plot(torques[:, :1], label="High Return", color="red")
+    lr_torque, = axes[1, 0].plot(torques[:, 1:], label="Low Return", color="blue")
+    set_titles_labels([axes[1, 0]], xy_labels=["Steps", "Torque (Nm)"])
+    axes[1, 0].legend(handles=[hr_torque, lr_torque])
+    hr_rewards, = axes[1, 1].plot(rewards[:, :1], label="High Return", color="red")
+    lr_rewards, = axes[1, 1].plot(rewards[:, 1:], label="Low Return", color="blue")
+    set_titles_labels([axes[1, 1]], xy_labels=["Steps", "Reward"])
+    axes[1, 1].legend(handles=[hr_rewards, lr_rewards])
+    fig.suptitle(title)
+
+    plt.savefig(fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}")
 
 
 def plot_predictions_and_gradients(

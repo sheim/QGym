@@ -3,12 +3,13 @@ from gym.envs import __init__  # noqa: F401
 from gym.utils import get_args, task_registry
 from gym.utils import KeyboardInterface
 from gym.utils import VisualizationRecorder
+from isaacgym import gymtorch
 
 # torch needs to be imported after isaacgym imports in local source
 import torch
 
 from learning import LEGGED_GYM_LQRC_DIR
-from learning.modules.lqrc.plotting import plot_theta_omega_polar
+from learning.modules.lqrc.plotting import plot_theta_omega_polar, plot_trajectories
 
 
 def setup(args, num_init_conditions):
@@ -33,18 +34,33 @@ def setup(args, num_init_conditions):
 
 
 def play(env, runner, train_cfg, init_conditions):
+    num_env_steps = 2000  # round(10.0 / (1.0 - 0.99))
+    pos_traj = np.zeros((num_env_steps, env.num_envs))
+    vel_traj = np.zeros((num_env_steps, env.num_envs))
+    torques = np.zeros((num_env_steps, env.num_envs))
+    rewards = np.zeros((num_env_steps, env.num_envs))
+    rewards_dict = {}
+
     env.dof_pos = torch.from_numpy(np.hstack((init_conditions[0, 0],
-                                             init_conditions[0, 2])).reshape(-1, 1)).to(DEVICE)
+                                        init_conditions[0, 2])).reshape(-1, 1)).to(DEVICE)
     env.dof_vel = torch.from_numpy(np.hstack((init_conditions[0, 1],
-                                             init_conditions[0, 3])).reshape(-1, 1)).to(DEVICE)
+                                        init_conditions[0, 3])).reshape(-1, 1)).to(DEVICE)
+
+    env_ids_int32 = torch.arange(env.num_envs, device=env.device).to(dtype=torch.int32)
+    env.gym.set_dof_state_tensor_indexed(
+            env.sim,
+            gymtorch.unwrap_tensor(env.dof_state),
+            gymtorch.unwrap_tensor(env_ids_int32),
+            len(env_ids_int32),
+    )
+
     # * set up recording
     if env.cfg.viewer.record:
         recorder = VisualizationRecorder(
             env, train_cfg.runner.experiment_name, train_cfg.runner.load_run
         )
 
-    for i in range(round(10.0 / (1.0 - 0.99))):
-    # for i in range(100**2):
+    for i in range(num_env_steps):
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
@@ -53,9 +69,19 @@ def play(env, runner, train_cfg, init_conditions):
             runner.policy_cfg["disable_actions"],
         )
         env.step()
+        pos_traj[i, :] = env.dof_pos.detach().cpu().numpy().squeeze()
+        vel_traj[i, :] = env.dof_vel.detach().cpu().numpy().squeeze()
+        torques[i, :] = env.tau_ff.detach().cpu().numpy().squeeze()
+        terminated = runner.get_terminated()
+        runner.update_rewards(rewards_dict, terminated)
+        total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
+        rewards[i, :] = total_rewards.detach().cpu().numpy()
         env.check_exit()
 
-    recorder.save()
+    if env.cfg.viewer.record:
+        recorder.save()
+
+    return pos_traj, vel_traj, torques, rewards
 
 
 if __name__ == "__main__":
@@ -66,5 +92,7 @@ if __name__ == "__main__":
     num_init_conditions = 2
     with torch.no_grad():
         env, runner, train_cfg = setup(args, num_init_conditions)
-        play(env, runner, train_cfg, init_conditions)
-    plot_theta_omega_polar(init_conditions[:, 0], init_conditions[:, 1], npy_fn[:-4] + ".png")
+        pos_traj, vel_traj, torques, rewards = play(env, runner, train_cfg, init_conditions)
+    plot_trajectories(pos_traj, vel_traj, torques, rewards, f"{LEGGED_GYM_LQRC_DIR}/logs/trajectories.png", title=f"Init Conditions {init_conditions[0, :]}")
+    # plot_theta_omega_polar(np.vstack((init_conditions[:, 0], init_conditions[:, 2])), np.vstack((init_conditions[:, 1], init_conditions[:, 3])), npy_fn[:-4] + ".png")
+    # print(init_conditions[0, :])

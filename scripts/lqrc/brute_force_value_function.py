@@ -12,6 +12,7 @@ from learning.modules.lqrc.plotting import (
     plot_value_func_error,
     plot_training_data_dist
 )
+from isaacgym import gymtorch
 
 # torch needs to be imported after isaacgym imports in local source
 import torch
@@ -64,9 +65,17 @@ def setup(args):
 def get_ground_truth(env, runner, train_cfg, grid):
     env.dof_pos = grid[:, 0].unsqueeze(1)
     env.dof_vel = grid[:, 1].unsqueeze(1)
+    env.dof_state[:, 0] = env.dof_pos.squeeze(1)
+    env.dof_state[:, 1] = env.dof_vel.squeeze(1)
+    env_ids_int32 = torch.arange(env.num_envs, device=env.device).to(dtype=torch.int32)
+    env.gym.set_dof_state_tensor_indexed(
+            env.sim,
+            gymtorch.unwrap_tensor(env.dof_state),
+            gymtorch.unwrap_tensor(env_ids_int32),
+            len(env_ids_int32),
+    )
     rewards_dict = {}
-    # rewards = torch.zeros(runner.num_steps_per_env, runner.env.num_envs, device=DEVICE)
-    rewards = np.zeros((runner.num_steps_per_env, runner.env.num_envs))
+    rewards = np.zeros((runner.num_steps_per_env, env.num_envs))
     for i in range(round(2.0 / (1.0 - train_cfg.algorithm.gamma))):
         runner.set_actions(
             runner.policy_cfg["actions"],
@@ -74,22 +83,12 @@ def get_ground_truth(env, runner, train_cfg, grid):
             runner.policy_cfg["disable_actions"],
         )
         env.step()
-        # timed_out = runner.get_timed_out()
         terminated = runner.get_terminated()
-        # dones = timed_out | terminated
         runner.update_rewards(rewards_dict, terminated)
         total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
         rewards[i, :] = total_rewards.detach().cpu().numpy()
-        # runner.alg.process_env_step(total_rewards, dones, timed_out)
-        # critic_obs = runner.get_obs(runner.policy_cfg["critic_obs"])
-        # runner.alg.compute_returns(critic_obs)
         env.check_exit()
 
-    # storage returns is in the dimensions of [num_transitions_per_env, num_envs]
-    # num_steps_per_env same as num_transitions_per_env
-    # returns_dict = {}
-    # for env_ix in range(runner.env.num_envs):
-    #     returns_dict[str(grid[env_ix, :].tolist())] = runner.alg.storage.returns[0, env_ix].item()
     discount_factors = train_cfg.algorithm.gamma * np.ones((1, runner.num_steps_per_env))
     for i in range(runner.num_steps_per_env):
         discount_factors[0, i] = discount_factors[0, i] ** i
@@ -104,15 +103,12 @@ def query_value_function(vf_args, grid):
     model = model_switch(vf_args)
 
     loaded_dict = torch.load(path)
-    critic_state_dict = loaded_dict["critic_state_dict"]  # filter_state_dict(loaded_dict["model_state_dict"])
+    critic_state_dict = loaded_dict["critic_state_dict"]
     model.load_state_dict(critic_state_dict)
-    # predicted_returns = {}
-    # predicted_returns = torch.zeros(grid.shape[0], 1, device=DEVICE)
     predicted_returns = np.zeros((grid.shape[0], 1))
     model.eval()
     for ix, X_batch in enumerate(grid):
         pred = model.evaluate(X_batch.unsqueeze(0))
-        # predicted_returns[str(X_batch.tolist())] = pred.item()
         predicted_returns[ix, :] = pred.item()
 
     return predicted_returns
@@ -153,20 +149,18 @@ if __name__ == "__main__":
     # get NN value functions
     custom_vf_args = {
         "experiment_name": "pendulum_custom_critic",
-        "load_run": -1,
-        "checkpoint": -1,
+        "load_run": "Feb18_12-59-44_custom_critic",
+        "checkpoint": 350,
         "model_type": "CholeskyPlusConst",
     }
     custom_critic_returns = query_value_function(custom_vf_args, grid)
     standard_vf_args = {
         "experiment_name": "pendulum_standard_critic",
-        "load_run": -1,
+        "load_run": "Feb14_17-11-32__standard_critic",
         "checkpoint": -1,
         "model_type": "StandardMLP",
     }
     standard_critic_returns = query_value_function(standard_vf_args, grid)
-
-    # ! change the plotters to not do the numpy detach a second time
 
     plot_value_func_error(
         grid.detach().cpu().numpy(),
@@ -186,5 +180,6 @@ if __name__ == "__main__":
         contour=False,
     )
 
-    plot_training_data_dist(npy_fn,
-                            save_path + "/data_distribution.png")
+    # ! store data dist with model logs to ensure they're paired properly
+    # plot_training_data_dist(npy_fn,
+    #                         save_path + "/data_distribution.png")
