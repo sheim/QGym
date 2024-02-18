@@ -111,4 +111,4 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO"
-        num_steps_per_env = round(2.0 / (1.0 - 0.99))  # 32
+        num_steps_per_env = round(5.0 / (1.0 - 0.99))  # 32

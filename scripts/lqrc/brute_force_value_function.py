@@ -39,7 +39,7 @@ def filter_state_dict(state_dict):
 def setup(args):
     env_cfg, train_cfg = task_registry.create_cfgs(args)
     env_cfg.env.num_envs = steps**2
-    train_cfg.runner.num_steps_per_env = round(2.0 / (1.0 - train_cfg.algorithm.gamma))
+    train_cfg.runner.num_steps_per_env = round(5.0 / (1.0 - train_cfg.algorithm.gamma))
     env_cfg.env.episode_length_s = 9999
     env_cfg.env.num_projectiles = 20
     task_registry.make_gym_and_sim()
@@ -63,10 +63,8 @@ def setup(args):
 
 
 def get_ground_truth(env, runner, train_cfg, grid):
-    env.dof_pos = grid[:, 0].unsqueeze(1)
-    env.dof_vel = grid[:, 1].unsqueeze(1)
-    env.dof_state[:, 0] = env.dof_pos.squeeze(1)
-    env.dof_state[:, 1] = env.dof_vel.squeeze(1)
+    env.dof_state[:, 0] = grid[:, 0]
+    env.dof_state[:, 1] =  grid[:, 1]
     env_ids_int32 = torch.arange(env.num_envs, device=env.device).to(dtype=torch.int32)
     env.gym.set_dof_state_tensor_indexed(
             env.sim,
@@ -76,7 +74,7 @@ def get_ground_truth(env, runner, train_cfg, grid):
     )
     rewards_dict = {}
     rewards = np.zeros((runner.num_steps_per_env, env.num_envs))
-    for i in range(round(2.0 / (1.0 - train_cfg.algorithm.gamma))):
+    for i in range(runner.num_steps_per_env):
         runner.set_actions(
             runner.policy_cfg["actions"],
             runner.get_inference_actions(),
