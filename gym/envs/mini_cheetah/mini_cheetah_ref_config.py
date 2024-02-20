@@ -135,7 +135,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # training params
-        value_loss_coef = 1.0
+        value_loss_coef = 1.0  # deprecate for PPO2
         use_clipped_value_loss = True
         clip_param = 0.2
         entropy_coef = 0.01
@@ -146,7 +146,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         schedule = "adaptive"  # can be adaptive, fixed
         discount_horizon = 1.0  # [s]
         lam = 0.95
-        # GAE_bootstrap_horizon = 1.0  # [s]
+        GAE_bootstrap_horizon = 2.0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 

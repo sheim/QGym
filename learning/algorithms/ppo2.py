@@ -49,7 +49,6 @@ class PPO2:
         clip_param=0.2,
         gamma=0.998,
         lam=0.95,
-        value_loss_coef=1.0,
         entropy_coef=0.0,
         learning_rate=1e-3,
         max_grad_norm=1.0,
@@ -80,7 +79,6 @@ class PPO2:
         self.clip_param = clip_param
         self.num_learning_epochs = num_learning_epochs
         self.num_mini_batches = num_mini_batches
-        self.value_loss_coef = value_loss_coef
         self.entropy_coef = entropy_coef
         self.gamma = gamma
         self.lam = lam
@@ -146,24 +144,65 @@ class PPO2:
         self.mean_surrogate_loss = 0
 
         self.update_critic()
+        self.update_actor()
+        self.storage.clear()
 
+    def update_critic(self):
+        self.mean_value_loss = 0
+        counter = 0
+        generator = self.storage.mini_batch_generator(
+            self.num_mini_batches, self.num_learning_epochs
+        )
+        for (
+            _,
+            critic_obs_batch,
+            _,
+            target_values_batch,
+            _,
+            returns_batch,
+            _,
+            _,
+            _,
+        ) in generator:
+            value_batch = self.critic.evaluate(critic_obs_batch)
+            if self.use_clipped_value_loss:
+                value_clipped = target_values_batch + (
+                    value_batch - target_values_batch
+                ).clamp(-self.clip_param, self.clip_param)
+                value_losses = (value_batch - returns_batch).pow(2)
+                value_losses_clipped = (value_clipped - returns_batch).pow(2)
+                value_loss = torch.max(value_losses, value_losses_clipped).mean()
+            else:
+                value_loss = (returns_batch - value_batch).pow(2).mean()
+
+            # * Gradient Step
+            self.critic_optimizer.zero_grad()
+            value_loss.backward()
+            nn.utils.clip_grad_norm(self.critic.parameters(), self.max_grad_norm)
+            self.critic_optimizer.step()
+            self.mean_value_loss += value_loss.item()
+            counter += 1
+        self.mean_value_loss /= counter
+
+    def update_actor(self):
+        self.mean_surrogate_loss = 0
+        counter = 0
         generator = self.storage.mini_batch_generator(
             self.num_mini_batches, self.num_learning_epochs
         )
         for (
             obs_batch,
-            critic_obs_batch,
+            _,
             actions_batch,
-            target_values_batch,
+            _,
             advantages_batch,
-            returns_batch,
+            _,
             old_actions_log_prob_batch,
             old_mu_batch,
             old_sigma_batch,
         ) in generator:
             self.actor.act(obs_batch)
             actions_log_prob_batch = self.actor.get_actions_log_prob(actions_batch)
-            # value_batch = self.critic.evaluate(critic_obs_batch)
             mu_batch = self.actor.action_mean
             sigma_batch = self.actor.action_std
             entropy_batch = self.actor.entropy
@@ -201,22 +240,7 @@ class PPO2:
             )
             surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
-            # * Value function loss
-            # if self.use_clipped_value_loss:
-            #     value_clipped = target_values_batch + (
-            #         value_batch - target_values_batch
-            #     ).clamp(-self.clip_param, self.clip_param)
-            #     value_losses = (value_batch - returns_batch).pow(2)
-            #     value_losses_clipped = (value_clipped - returns_batch).pow(2)
-            #     value_loss = torch.max(value_losses, value_losses_clipped).mean()
-            # else:
-            #     value_loss = (returns_batch - value_batch).pow(2).mean()
-
-            loss = (
-                surrogate_loss
-                # + self.value_loss_coef * value_loss
-                - self.entropy_coef * entropy_batch.mean()
-            )
+            loss = surrogate_loss - self.entropy_coef * entropy_batch.mean()
 
             # * Gradient step
             self.optimizer.zero_grad()
@@ -226,51 +250,6 @@ class PPO2:
                 self.max_grad_norm,
             )
             self.optimizer.step()
-
-            # self.mean_value_loss += value_loss.item()
             self.mean_surrogate_loss += surrogate_loss.item()
-
-        num_updates = self.num_learning_epochs * self.num_mini_batches
-        # self.mean_value_loss /= num_updates
-        self.mean_surrogate_loss /= num_updates
-        self.storage.clear()
-
-    def update_critic(self):
-        self.mean_value_loss = 0
-        counter = 0
-        generator = self.storage.mini_batch_generator(
-            self.num_mini_batches, self.num_learning_epochs
-        )
-        for (
-            obs_batch,
-            critic_obs_batch,
-            actions_batch,
-            target_values_batch,
-            advantages_batch,
-            returns_batch,
-            old_actions_log_prob_batch,
-            old_mu_batch,
-            old_sigma_batch,
-        ) in generator:
-            value_batch = self.critic.evaluate(critic_obs_batch)
-            if self.use_clipped_value_loss:
-                value_clipped = target_values_batch + (
-                    value_batch - target_values_batch
-                ).clamp(-self.clip_param, self.clip_param)
-                value_losses = (value_batch - returns_batch).pow(2)
-                value_losses_clipped = (value_clipped - returns_batch).pow(2)
-                value_loss = torch.max(value_losses, value_losses_clipped).mean()
-            else:
-                value_loss = (returns_batch - value_batch).pow(2).mean()
-
-            # * Gradient Step
-            self.critic_optimizer.zero_grad()
-            value_loss.backward()
-            nn.utils.clip_grad_norm(self.critic.parameters(), self.max_grad_norm)
-            self.critic_optimizer.step()
-            self.mean_value_loss += value_loss.item()
             counter += 1
-        self.mean_value_loss /= counter
-
-    def update_policy(self):
-        pass
+        self.mean_surrogate_loss /= counter
