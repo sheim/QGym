@@ -5,6 +5,7 @@ from learning.env import VecEnv
 from learning.utils import Logger
 from learning.utils import PotentialBasedRewardShaping
 from learning.utils import remove_zero_weighted_rewards
+# from learning.utils import compute_MC_returns, compute_generalized_advantages
 
 from .on_policy_runner import OnPolicyRunner
 
@@ -46,6 +47,7 @@ class MyRunner(OnPolicyRunner):
         transition.update(
             {
                 "actor_obs": actor_obs,
+                "actions": self.alg.act(actor_obs, critic_obs),
                 "critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
                 "dones": self.get_timed_out(),
@@ -86,19 +88,26 @@ class MyRunner(OnPolicyRunner):
                     transition.update(
                         {
                             "actor_obs": actor_obs,
+                            "actions": actions,
                             "critic_obs": critic_obs,
                             "rewards": total_rewards,
                             "dones": dones,
                         }
                     )
-                    storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
                     logger.finish_step(dones)
 
                     self.alg.process_env_step(total_rewards, dones, timed_out)
+                    storage.add_transitions(transition)
+
                 self.alg.compute_returns(critic_obs)
+                # compute_MC_returns(storage.data, self.alg.gamma)
+                # compute_MC_returns(storage.data, self.alg.gamma, self.alg.critic.eval)
+                # compute_generalized_advantages(
+                #     storage.data, self.alg.gamma, self.alg.lam, self.alg.critic.eval
+                # )
             logger.toc("collection")
 
             logger.tic("learning")

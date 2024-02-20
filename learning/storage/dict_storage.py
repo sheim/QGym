@@ -17,25 +17,25 @@ class DictStorage:
         self.num_envs = num_envs
         max_length = max_storage // num_envs
         self.max_length = max_length
-        self.storage = TensorDict({}, batch_size=(num_envs, max_length), device=device)
+        self.data = TensorDict({}, batch_size=(max_length, num_envs), device=device)
         self.fill_count = 0
 
         for key in dummy_dict.keys():
-            if dummy_dict[key].dim() == 1:
-                self.storage[key] = torch.zeros(
-                    (self.num_envs, self.max_length),
+            if dummy_dict[key].dim() == 1:  # if scalar
+                self.data[key] = torch.zeros(
+                    (max_length, num_envs),
                     device=self.device,
                 )
             else:
-                self.storage[key] = torch.zeros(
-                    (self.num_envs, self.max_length, dummy_dict[key].shape[1]),
+                self.data[key] = torch.zeros(
+                    (max_length, num_envs, dummy_dict[key].shape[1]),
                     device=self.device,
                 )
 
     def add_transitions(self, transition: TensorDict):
         if self.fill_count >= self.max_length:
             raise AssertionError("Rollout buffer overflow")
-        self.storage[:, self.fill_count] = transition
+        self.data[self.fill_count] = transition
         self.fill_count += 1
 
     def clear(self):
