@@ -74,7 +74,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-
+        normalize_obs = False
         actor_obs = [
             "base_ang_vel",
             "projected_gravity",
@@ -142,6 +142,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         num_learning_epochs = 6
         # mini batch size = num_envs*nsteps/nminibatches
         num_mini_batches = 4
+        storage_size = 2**17  # new
+        mini_batch_size = 2**15  #  new
         learning_rate = 5.0e-5
         schedule = "adaptive"  # can be adaptive, fixed
         discount_horizon = 1.0  # [s]

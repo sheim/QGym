@@ -153,13 +153,16 @@ class PPO2:
         generator = self.storage.mini_batch_generator(
             self.num_mini_batches, self.num_learning_epochs
         )
+
+        # update storage with values evaluated now
+
         for (
             _,
             critic_obs_batch,
             _,
-            target_values_batch,
+            target_values_batch,  # ! eval
             _,
-            returns_batch,
+            returns_batch,  # ! calc
             _,
             _,
             _,
@@ -195,11 +198,11 @@ class PPO2:
             _,
             actions_batch,
             _,
-            advantages_batch,
+            advantages_batch,  # calc + eval
             _,
-            old_actions_log_prob_batch,
-            old_mu_batch,
-            old_sigma_batch,
+            old_actions_log_prob_batch,  # eval?
+            old_mu_batch,  # eval?
+            old_sigma_batch,  # eval?
         ) in generator:
             self.actor.act(obs_batch)
             actions_log_prob_batch = self.actor.get_actions_log_prob(actions_batch)

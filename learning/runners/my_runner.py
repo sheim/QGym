@@ -1,4 +1,5 @@
 import torch
+from tensordict import TensorDict
 from learning.env import VecEnv
 
 from learning.utils import Logger
@@ -7,7 +8,10 @@ from learning.utils import remove_zero_weighted_rewards
 
 from .on_policy_runner import OnPolicyRunner
 
+from learning.storage import DictStorage
+
 logger = Logger()
+storage = DictStorage()
 
 
 class MyRunner(OnPolicyRunner):
@@ -34,8 +38,20 @@ class MyRunner(OnPolicyRunner):
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
         critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
-
+        rewards_dict
         self.save()
+
+        # * start up storage
+        transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
+        transition.update(
+            {
+                "actor_obs": actor_obs,
+                "critic_obs": critic_obs,
+                "rewards": self.get_rewards({"termination": 0.0})["termination"],
+                "dones": self.get_timed_out(),
+            }
+        )
+        storage.initialize(transition)
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
@@ -66,6 +82,16 @@ class MyRunner(OnPolicyRunner):
                     self.update_rewards(rewards_dict, terminated)
                     rewards_dict.update(PBRS.post_step(self.env, dones))
                     total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
+
+                    transition.update(
+                        {
+                            "actor_obs": actor_obs,
+                            "critic_obs": critic_obs,
+                            "rewards": total_rewards,
+                            "dones": dones,
+                        }
+                    )
+                    storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
