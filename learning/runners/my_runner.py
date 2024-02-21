@@ -105,6 +105,7 @@ class MyRunner(OnPolicyRunner):
                     logger.finish_step(dones)
 
                     self.alg.process_env_step(total_rewards, dones, timed_out)
+                    # doesn't need detach becuase we have no_inference
                     storage.add_transitions(transition)
 
                 self.alg.compute_returns(critic_obs)
@@ -126,6 +127,7 @@ class MyRunner(OnPolicyRunner):
             logger.toc("collection")
 
             logger.tic("learning")
+            self.alg.update_critic2(storage.data)
             self.alg.update()
             logger.toc("learning")
             logger.log_category()
@@ -137,6 +139,7 @@ class MyRunner(OnPolicyRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
+            storage.clear()
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):

@@ -4,6 +4,7 @@ import torch.optim as optim
 
 # from learning.modules import ActorCritic
 from learning.storage import RolloutStorage
+from learning.utils import create_uniform_generator, compute_MC_returns
 
 
 class PPO2:
@@ -114,6 +115,34 @@ class PPO2:
         self.update_critic()
         self.update_actor()
         self.storage.clear()
+
+    def update_critic2(self, data):
+        self.mean_value_loss = 0
+        counter = 0
+        compute_MC_returns(data, self.gamma, self.critic)
+        generator = create_uniform_generator(data, 500, self.num_learning_epochs)
+        # with torch.inference_mode():
+        #     target_values = self.critic.evaluate(data["critic_obs"]).detach()
+        for batch in generator:
+            value_batch = self.critic.evaluate(batch["critic_obs"])
+            if self.use_clipped_value_loss:
+                target_value_batch = batch["values"]
+                value_clipped = target_value_batch + (
+                    value_batch - target_value_batch
+                ).clamp(-self.clip_param, self.clip_param)
+                value_losses = (value_batch - target_value_batch).pow(2)
+                value_losses_clipped = (value_clipped - batch["returns"]).pow(2)
+                value_loss = torch.max(value_losses, value_losses_clipped).mean()
+            else:
+                value_loss = (batch["returns"] - value_batch).pow(2).mean()
+
+            self.critic_optimizer.zero_grad()
+            value_loss.backward()
+            nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+            self.critic_optimizer.step()
+            self.mean_value_loss += value_loss.item()
+            counter += 1
+        self.mean_value_loss /= counter
 
     def update_critic(self):
         self.mean_value_loss = 0

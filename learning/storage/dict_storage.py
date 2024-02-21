@@ -34,6 +34,7 @@ class DictStorage:
                     device=self.device,
                 )
 
+    @torch.inference_mode
     def add_transitions(self, transition: TensorDict):
         if self.fill_count >= self.max_length:
             raise AssertionError("Rollout buffer overflow")
@@ -42,6 +43,3 @@ class DictStorage:
 
     def clear(self):
         self.fill_count = 0
-
-    def mini_batch_generator(self, keys, mini_batch_size, num_epochs):
-        pass
