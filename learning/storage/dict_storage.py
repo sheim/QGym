@@ -24,11 +24,13 @@ class DictStorage:
             if dummy_dict[key].dim() == 1:  # if scalar
                 self.data[key] = torch.zeros(
                     (max_length, num_envs),
+                    dtype=dummy_dict[key].dtype,
                     device=self.device,
                 )
             else:
                 self.data[key] = torch.zeros(
                     (max_length, num_envs, dummy_dict[key].shape[1]),
+                    dtype=dummy_dict[key].dtype,
                     device=self.device,
                 )
 
