@@ -108,13 +108,13 @@ class PPO:
 
     def act(self, obs, critic_obs):
         # * Compute the actions and values
-        self.transition.actions = self.actor_critic.act(obs).detach()
-        self.transition.values = self.actor_critic.evaluate(critic_obs).detach()
+        self.transition.actions = self.actor_critic.act(obs)
+        self.transition.values = self.actor_critic.evaluate(critic_obs)
         self.transition.actions_log_prob = self.actor_critic.get_actions_log_prob(
             self.transition.actions
-        ).detach()
-        self.transition.action_mean = self.actor_critic.action_mean.detach()
-        self.transition.action_sigma = self.actor_critic.action_std.detach()
+        )
+        self.transition.action_mean = self.actor_critic.action_mean
+        self.transition.action_sigma = self.actor_critic.action_std
         # * need to record obs and critic_obs before env.step()
         self.transition.observations = obs
         self.transition.critic_observations = critic_obs
@@ -132,7 +132,7 @@ class PPO:
         self.transition.clear()
 
     def compute_returns(self, last_critic_obs):
-        last_values = self.actor_critic.evaluate(last_critic_obs).detach()
+        last_values = self.actor_critic.evaluate(last_critic_obs)
         self.storage.compute_returns(last_values, self.gamma, self.lam)
 
     def update(self):

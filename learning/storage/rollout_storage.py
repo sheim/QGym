@@ -128,20 +128,18 @@ class RolloutStorage(BaseStorage):
     def add_transitions(self, transition: Transition):
         if self.fill_count >= self.num_transitions_per_env:
             raise AssertionError("Rollout buffer overflow")
-        self.observations[self.fill_count].copy_(transition.observations)
+        self.observations[self.fill_count] = transition.observations
         if self.privileged_observations is not None:
-            self.privileged_observations[self.fill_count].copy_(
-                transition.critic_observations
-            )
-        self.actions[self.fill_count].copy_(transition.actions)
-        self.rewards[self.fill_count].copy_(transition.rewards)
-        self.dones[self.fill_count].copy_(transition.dones)
-        self.values[self.fill_count].copy_(transition.values)
-        self.actions_log_prob[self.fill_count].copy_(
-            transition.actions_log_prob.view(-1, 1)
-        )
-        self.mu[self.fill_count].copy_(transition.action_mean)
-        self.sigma[self.fill_count].copy_(transition.action_sigma)
+            self.privileged_observations[
+                self.fill_count
+            ] = transition.critic_observations
+        self.actions[self.fill_count] = transition.actions
+        self.rewards[self.fill_count] = transition.rewards
+        self.dones[self.fill_count] = transition.dones
+        self.values[self.fill_count] = transition.values
+        self.actions_log_prob[self.fill_count] = transition.actions_log_prob.view(-1, 1)
+        self.mu[self.fill_count] = transition.action_mean
+        self.sigma[self.fill_count] = transition.action_sigma
         self.fill_count += 1
 
     def clear(self):
