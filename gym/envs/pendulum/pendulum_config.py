@@ -14,7 +14,7 @@ class PendulumCfg(FixedRobotCfg):
 
     class viewer:
         ref_env = 0
-        pos = [10., 5., 10.]  # [m]
+        pos = [10.0, 5.0, 10.0]  # [m]
         lookat = [0.0, 0.0, 0.0]  # [m]
 
     class init_state(FixedRobotCfg.init_state):

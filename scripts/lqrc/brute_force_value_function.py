@@ -10,7 +10,6 @@ from learning.modules.lqrc.utils import get_load_path
 from learning.modules.lqrc.plotting import (
     plot_value_func,
     plot_value_func_error,
-    plot_training_data_dist
 )
 from isaacgym import gymtorch
 
@@ -64,13 +63,13 @@ def setup(args):
 
 def get_ground_truth(env, runner, train_cfg, grid):
     env.dof_state[:, 0] = grid[:, 0]
-    env.dof_state[:, 1] =  grid[:, 1]
+    env.dof_state[:, 1] = grid[:, 1]
     env_ids_int32 = torch.arange(env.num_envs, device=env.device).to(dtype=torch.int32)
     env.gym.set_dof_state_tensor_indexed(
-            env.sim,
-            gymtorch.unwrap_tensor(env.dof_state),
-            gymtorch.unwrap_tensor(env_ids_int32),
-            len(env_ids_int32),
+        env.sim,
+        gymtorch.unwrap_tensor(env.dof_state),
+        gymtorch.unwrap_tensor(env_ids_int32),
+        len(env_ids_int32),
     )
     rewards_dict = {}
     rewards = np.zeros((runner.num_steps_per_env, env.num_envs))
@@ -87,7 +86,9 @@ def get_ground_truth(env, runner, train_cfg, grid):
         rewards[i, :] = total_rewards.detach().cpu().numpy()
         env.check_exit()
 
-    discount_factors = train_cfg.algorithm.gamma * np.ones((1, runner.num_steps_per_env))
+    discount_factors = train_cfg.algorithm.gamma * np.ones(
+        (1, runner.num_steps_per_env)
+    )
     for i in range(runner.num_steps_per_env):
         discount_factors[0, i] = discount_factors[0, i] ** i
     returns = np.matmul(discount_factors, rewards)
@@ -117,12 +118,18 @@ if __name__ == "__main__":
 
     DEVICE = "cuda:0"
     steps = 100
-    npy_fn = f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy" if args.custom_critic else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
+    npy_fn = (
+        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy"
+        if args.custom_critic
+        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
+    )
     data = np.load(npy_fn)
-    dof_pos_rng = torch.linspace(min(data[:, 0]), max(data[:, 0]),
-                                 steps=steps, device=DEVICE)
-    dof_vel_rng = torch.linspace(min(data[:, 1]), max(data[:, 1]),
-                                 steps=steps, device=DEVICE)
+    dof_pos_rng = torch.linspace(
+        min(data[:, 0]), max(data[:, 0]), steps=steps, device=DEVICE
+    )
+    dof_vel_rng = torch.linspace(
+        min(data[:, 1]), max(data[:, 1]), steps=steps, device=DEVICE
+    )
     grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
 
     EXPORT_POLICY = True
@@ -137,10 +144,16 @@ if __name__ == "__main__":
     ground_truth_returns = get_ground_truth(env, runner, train_cfg, grid)
     high_gt_returns = []
     for i in range(ground_truth_returns.shape[1] - 1):
-        if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i+1] < 2.0:
-            high_gt_returns.append(torch.hstack((grid[i, :], grid[i+1, :])).detach().cpu().numpy())
+        if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
+            high_gt_returns.append(
+                torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
+            )
     high_gt_returns = np.array(high_gt_returns)
-    returns_save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy" if args.custom_critic else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+    returns_save_path = (
+        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
+        if args.custom_critic
+        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+    )
     np.save(returns_save_path, high_gt_returns)
     print("Saved high returns to", returns_save_path)
 

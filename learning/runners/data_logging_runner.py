@@ -29,8 +29,8 @@ class DataLoggingRunner(OnPolicyRunner):
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
         critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
-        self.all_obs = torch.zeros(self.env.num_envs*(tot_iter - self.it + 1), 2)
-        self.all_obs[:self.env.num_envs, :] = actor_obs
+        self.all_obs = torch.zeros(self.env.num_envs * (tot_iter - self.it + 1), 2)
+        self.all_obs[: self.env.num_envs, :] = actor_obs
 
         self.save()
 
@@ -55,8 +55,8 @@ class DataLoggingRunner(OnPolicyRunner):
                     )
                     critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
 
-                    start = (self.env.num_envs*self.it)
-                    end = (self.env.num_envs*(self.it+1))
+                    start = self.env.num_envs * self.it
+                    end = self.env.num_envs * (self.it + 1)
                     self.all_obs[start:end, :] = actor_obs
 
                     # * get time_outs
@@ -88,7 +88,11 @@ class DataLoggingRunner(OnPolicyRunner):
             if self.it % self.save_interval == 0:
                 self.save()
         self.all_obs = self.all_obs.detach().cpu().numpy()
-        save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy" if self.policy_cfg["standard_critic_nn"] else f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy"
+        save_path = (
+            f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
+            if self.policy_cfg["standard_critic_nn"]
+            else f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy"
+        )
         np.save(save_path, self.all_obs)
         self.save()
 
