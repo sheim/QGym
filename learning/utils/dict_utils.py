@@ -16,25 +16,26 @@ def compute_MC_returns(data: TensorDict, gamma, critic=None):
         data["returns"][k] = (
             data["rewards"][k] + gamma * data["returns"][k + 1] * not_done
         )
+    data["returns"] = (data["returns"] - data["returns"].mean()) / (
+        data["returns"].std() + 1e-8
+    )
     return
 
 
 @torch.no_grad
 def compute_generalized_advantages(data, gamma, lam, critic, last_values=None):
-    if "values" not in data.keys():
-        data.update({"values": critic.evaluate(data["critic_obs"])})
+    data.update({"values": critic.evaluate(data["critic_obs"])})
 
-    if "advantages" not in data.keys():
-        data.update({"advantages": torch.zeros_like(data["values"])})
-    else:
-        data["advantages"].zero_()
+    data.update({"advantages": torch.zeros_like(data["values"])})
 
     if last_values is not None:
         # todo check this
         # since we don't have observations for the last step, need last value plugged in
+        not_done = ~data["dones"][-1]
         data["advantages"][-1] = (
             data["rewards"][-1]
-            + gamma * last_values * ~data["dones"][-1]
+            + gamma * data["values"][-1] * data["timed_out"][-1]
+            + gamma * last_values * not_done
             - data["values"][-1]
         )
 
@@ -42,13 +43,16 @@ def compute_generalized_advantages(data, gamma, lam, critic, last_values=None):
         not_done = ~data["dones"][k]
         td_error = (
             data["rewards"][k]
+            + gamma * data["values"][k] * data["timed_out"][k]
             + gamma * data["values"][k + 1] * not_done
             - data["values"][k]
         )
         data["advantages"][k] = (
             td_error + gamma * lam * not_done * data["advantages"][k + 1]
         )
-    # data["returns"] = data["advantages"] + data["values"]
+
+    data["returns"] = data["advantages"] + data["values"]
+
     data["advantages"] = (data["advantages"] - data["advantages"].mean()) / (
         data["advantages"].std() + 1e-8
     )

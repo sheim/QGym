@@ -4,7 +4,10 @@ import torch.optim as optim
 
 # from learning.modules import ActorCritic
 from learning.storage import RolloutStorage
-from learning.utils import create_uniform_generator, compute_MC_returns
+from learning.utils import (
+    create_uniform_generator,
+    compute_generalized_advantages,
+)
 
 
 class PPO2:
@@ -109,18 +112,28 @@ class PPO2:
         self.storage.compute_returns(last_values, self.gamma, self.lam)
 
     def update(self):
-        self.mean_value_loss = 0
-        self.mean_surrogate_loss = 0
-
-        self.update_critic()
+        # self.update_critic()
         self.update_actor()
         self.storage.clear()
 
-    def update_critic2(self, data):
+    def update_critic2(self, data, last_obs=None):
         self.mean_value_loss = 0
         counter = 0
-        compute_MC_returns(data, self.gamma, self.critic)
-        generator = create_uniform_generator(data, 500, self.num_learning_epochs)
+
+        if last_obs is not None:
+            with torch.no_grad():
+                last_values = self.critic.evaluate(last_obs).detach()
+        else:
+            last_values = None
+        # compute_MC_returns(data, self.gamma, self.critic)
+        compute_generalized_advantages(
+            data, self.gamma, self.lam, self.critic, last_values
+        )
+        # ! temp hack
+        n, m = data.shape
+        total_data = n * m
+        batch_size = total_data // self.num_mini_batches
+        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
         # with torch.inference_mode():
         #     target_values = self.critic.evaluate(data["critic_obs"]).detach()
         for batch in generator:
