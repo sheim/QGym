@@ -5,7 +5,7 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 4096
+        num_envs = 2**13
         num_actuators = 1  # 1 for theta connecting base and pole
         episode_length_s = 5.0
 
@@ -60,6 +60,11 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     runner_class_name = "DataLoggingRunner"
 
     class policy(FixedRobotCfgPPO.policy):
+        actor_hidden_dims = [128, 64, 32]
+        critic_hidden_dims = [128, 64, 32]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "tanh"
+
         actor_obs = [
             "dof_pos",
             "dof_vel",
@@ -77,11 +82,11 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
         class reward:
             class weights:
-                theta = 0.1
-                omega = 0.1
-                equilibrium = 5.0
-                energy = 1.0
-                dof_vel = 0.01
+                theta = 0.0
+                omega = 0.0
+                equilibrium = 1.0
+                energy = 0.0
+                dof_vel = 0.0
                 torques = 0.025
 
             class termination_weight:
@@ -111,4 +116,4 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO"
-        num_steps_per_env = round(5.0 / (1.0 - 0.99))  # 32
+        num_steps_per_env = 32
