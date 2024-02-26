@@ -27,9 +27,6 @@ class Critic(nn.Module):
 
     def evaluate(self, critic_observations):
         if self._normalize_obs:
-            critic_observations = self.normalize(critic_observations)
+            with torch.no_grad():
+                critic_observations = self.obs_rms(critic_observations)
         return self.NN(critic_observations).squeeze()
-
-    def normalize(self, observation):
-        with torch.no_grad():
-            return self.obs_rms(observation)
