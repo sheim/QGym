@@ -14,7 +14,7 @@ class PendulumCfg(FixedRobotCfg):
 
     class viewer:
         ref_env = 0
-        pos = [10., 5., 10.]  # [m]
+        pos = [10.0, 5.0, 10.0]  # [m]
         lookat = [0.0, 0.0, 0.0]  # [m]
 
     class init_state(FixedRobotCfg.init_state):
@@ -110,5 +110,5 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPOCriticOnly"
         num_steps_per_env = round(5.0 / (1.0 - 0.99))  # 32

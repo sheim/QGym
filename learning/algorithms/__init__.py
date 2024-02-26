@@ -32,3 +32,4 @@
 
 from .ppo import PPO
 from .SE import StateEstimator
+from .ppo_critic_only import PPOCriticOnly
