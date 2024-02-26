@@ -87,9 +87,7 @@ class PPO2:
         batch_size = total_data // self.num_mini_batches
         generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
         for batch in generator:
-            with torch.inference_mode():
-                value_batch = self.critic.evaluate(batch["critic_obs"])
-
+            value_batch = self.critic.evaluate(batch["critic_obs"])
             if self.use_clipped_value_loss:
                 target_value_batch = batch["values"]
                 value_clipped = target_value_batch + (

@@ -7,10 +7,9 @@ class RunningMeanStd(nn.Module):
     Keeps a running mean to normalize tensor of choice.
     """
 
-    def __init__(self, num_items, axis=0, epsilon=1e-05):
+    def __init__(self, num_items, epsilon=1e-05):
         super(RunningMeanStd, self).__init__()
         self.num_items = num_items
-        self.axis = axis
         self.epsilon = epsilon
 
         self.register_buffer(
@@ -45,8 +44,8 @@ class RunningMeanStd(nn.Module):
 
     def forward(self, input):
         if self.training:
-            mean = input.mean(self.axis)
-            var = input.var(self.axis)
+            mean = input.mean(tuple(range(input.dim() - 1)))
+            var = input.var(tuple(range(input.dim() - 1)))
         (
             self.running_mean,
             self.running_var,
