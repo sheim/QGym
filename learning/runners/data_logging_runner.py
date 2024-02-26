@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import os
 from learning import LEGGED_GYM_LQRC_DIR
 from learning.env import VecEnv
 
@@ -11,7 +12,7 @@ logger = Logger()
 
 
 class DataLoggingRunner(OnPolicyRunner):
-    def __init__(self, env: VecEnv, train_cfg, device="cpu"):
+    def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
             self.env.num_envs,
@@ -88,12 +89,19 @@ class DataLoggingRunner(OnPolicyRunner):
             if self.it % self.save_interval == 0:
                 self.save()
         self.all_obs = self.all_obs.detach().cpu().numpy()
-        save_path = (
-            f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
+        save_path = os.path.join(
+            LEGGED_GYM_LQRC_DIR,
+            "logs",
+            "standard_training_data.npy"
             if self.policy_cfg["standard_critic_nn"]
-            else f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy"
+            else "custom_training_data.npy",
         )
+
+        dir_path = os.path.dirname(save_path)
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
         np.save(save_path, self.all_obs)
+
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):

@@ -64,8 +64,13 @@ def setup(args):
 def get_ground_truth(env, runner, train_cfg, grid):
     env.dof_state[:, 0] = grid[:, 0]
     env.dof_state[:, 1] = grid[:, 1]
+    env.dof_state[:, 1] = grid[:, 1]
     env_ids_int32 = torch.arange(env.num_envs, device=env.device).to(dtype=torch.int32)
     env.gym.set_dof_state_tensor_indexed(
+        env.sim,
+        gymtorch.unwrap_tensor(env.dof_state),
+        gymtorch.unwrap_tensor(env_ids_int32),
+        len(env_ids_int32),
         env.sim,
         gymtorch.unwrap_tensor(env.dof_state),
         gymtorch.unwrap_tensor(env_ids_int32),
@@ -86,9 +91,7 @@ def get_ground_truth(env, runner, train_cfg, grid):
         rewards[i, :] = total_rewards.detach().cpu().numpy()
         env.check_exit()
 
-    discount_factors = train_cfg.algorithm.gamma * np.ones(
-        (1, runner.num_steps_per_env)
-    )
+    discount_factors = train_cfg.algorithm.gamma * np.ones((1, runner.num_steps_per_env))
     for i in range(runner.num_steps_per_env):
         discount_factors[0, i] = discount_factors[0, i] ** i
     returns = np.matmul(discount_factors, rewards)
