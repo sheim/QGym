@@ -3,11 +3,8 @@ from tensordict import TensorDict
 from learning.env import VecEnv
 
 from learning.utils import Logger
-from learning.utils import PotentialBasedRewardShaping
-from learning.utils import remove_zero_weighted_rewards
 
 from .on_policy_runner import OnPolicyRunner
-
 from learning.storage import DictStorage
 
 logger = Logger()
@@ -26,11 +23,6 @@ class MyRunner(OnPolicyRunner):
 
     def learn(self):
         self.set_up_logger()
-        remove_zero_weighted_rewards(self.policy_cfg["reward"]["pbrs_weights"])
-        PBRS = PotentialBasedRewardShaping(
-            self.policy_cfg["reward"]["pbrs_weights"], self.device
-        )
-        logger.register_rewards(PBRS.get_reward_keys())
 
         rewards_dict = {}
 
@@ -76,7 +68,6 @@ class MyRunner(OnPolicyRunner):
                         }
                     )
 
-                    PBRS.pre_step(self.env)
                     self.env.step()
 
                     actor_obs = self.get_noisy_obs(
@@ -89,7 +80,6 @@ class MyRunner(OnPolicyRunner):
                     dones = timed_out | terminated
 
                     self.update_rewards(rewards_dict, terminated)
-                    rewards_dict.update(PBRS.post_step(self.env, dones))
                     total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
 
                     transition.update(
@@ -99,37 +89,16 @@ class MyRunner(OnPolicyRunner):
                             "dones": dones,
                         }
                     )
+                    storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
                     logger.finish_step(dones)
-
-                    self.alg.process_env_step(total_rewards, dones, timed_out)
-                    # doesn't need detach becuase we have no_inference
-                    storage.add_transitions(transition)
-
-                self.alg.compute_returns(critic_obs)
-                # compute_MC_returns(storage.data, self.alg.gamma)
-                # compute_MC_returns(storage.data, self.alg.gamma, self.alg.critic)
-                # compute_generalized_advantages(
-                #     storage.data,
-                #     self.alg.gamma,
-                #     self.alg.lam,
-                #     self.alg.critic,
-                # )
-                # compute_generalized_advantages(
-                #     storage.data,
-                #     self.alg.gamma,
-                #     self.alg.lam,
-                #     self.alg.critic,
-                #     self.alg.critic.evaluate(critic_obs),
-                # )
             logger.toc("collection")
 
             logger.tic("learning")
-            # self.alg.update_critic2(storage.data, last_obs=critic_obs)
-            self.alg.update_critic2(storage.data)
-            self.alg.update()
+            self.alg.update(storage.data)
+            storage.clear()
             logger.toc("learning")
             logger.log_category()
 
@@ -142,20 +111,6 @@ class MyRunner(OnPolicyRunner):
                 self.save()
             storage.clear()
         self.save()
-
-    def update_rewards(self, rewards_dict, terminated):
-        rewards_dict.update(
-            self.get_rewards(
-                self.policy_cfg["reward"]["termination_weight"], mask=terminated
-            )
-        )
-        rewards_dict.update(
-            self.get_rewards(
-                self.policy_cfg["reward"]["weights"],
-                modifier=self.env.dt,
-                mask=~terminated,
-            )
-        )
 
     def set_up_logger(self):
         logger.register_rewards(list(self.policy_cfg["reward"]["weights"].keys()))

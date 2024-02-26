@@ -43,3 +43,6 @@ class DictStorage:
 
     def clear(self):
         self.fill_count = 0
+        with torch.inference_mode():
+            for tensor in self.data:
+                tensor.zero_()

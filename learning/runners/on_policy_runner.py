@@ -1,12 +1,15 @@
 import os
 import torch
+from tensordict import TensorDict
 from learning.env import VecEnv
 
 from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
+from learning.storage import DictStorage
 
 logger = Logger()
+storage = DictStorage()
 
 
 class OnPolicyRunner(BaseRunner):
@@ -28,8 +31,21 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
         critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
-
+        rewards_dict
         self.save()
+
+        # * start up storage
+        transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
+        transition.update(
+            {
+                "actor_obs": actor_obs,
+                "actions": self.alg.act(actor_obs, critic_obs),
+                "critic_obs": critic_obs,
+                "rewards": self.get_rewards({"termination": 0.0})["termination"],
+                "dones": self.get_timed_out(),
+            }
+        )
+        storage.initialize(transition, device=self.device)
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
@@ -43,6 +59,14 @@ class OnPolicyRunner(BaseRunner):
                         self.policy_cfg["actions"],
                         actions,
                         self.policy_cfg["disable_actions"],
+                    )
+
+                    transition.update(
+                        {
+                            "actor_obs": actor_obs,
+                            "actions": actions,
+                            "critic_obs": critic_obs,
+                        }
                     )
 
                     self.env.step()
@@ -59,16 +83,23 @@ class OnPolicyRunner(BaseRunner):
                     self.update_rewards(rewards_dict, terminated)
                     total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
 
+                    transition.update(
+                        {
+                            "rewards": total_rewards,
+                            "timed_out": timed_out,
+                            "dones": dones,
+                        }
+                    )
+                    storage.add_transitions(transition)
+
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
                     logger.finish_step(dones)
-
-                    self.alg.process_env_step(total_rewards, dones, timed_out)
-                self.alg.compute_returns(critic_obs)
             logger.toc("collection")
 
             logger.tic("learning")
-            self.alg.update()
+            self.alg.update(storage.data)
+            storage.clear()
             logger.toc("learning")
             logger.log_category()
 
@@ -79,6 +110,7 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
+            storage.clear()
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):
@@ -139,15 +171,3 @@ class OnPolicyRunner(BaseRunner):
 
     def export(self, path):
         self.alg.actor_critic.export_policy(path)
-
-    def init_storage(self):
-        num_actor_obs = self.get_obs_size(self.policy_cfg["actor_obs"])
-        num_critic_obs = self.get_obs_size(self.policy_cfg["critic_obs"])
-        num_actions = self.get_action_size(self.policy_cfg["actions"])
-        self.alg.init_storage(
-            self.env.num_envs,
-            self.num_steps_per_env,
-            actor_obs_shape=[num_actor_obs],
-            critic_obs_shape=[num_critic_obs],
-            action_shape=[num_actions],
-        )

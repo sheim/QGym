@@ -123,13 +123,6 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 swing_grf = 1.5
                 stance_grf = 1.5
 
-            class pbrs_weights:
-                reference_traj = 0.0
-                swing_grf = 0.0
-                stance_grf = 0.0
-                min_base_height = 0.0
-                orientation = 0.0
-
             class termination_weight:
                 termination = 0.15
 

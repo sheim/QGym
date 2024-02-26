@@ -124,6 +124,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
 class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
+    runner_class_name = "OnPolicyRunner"
 
     class policy(LeggedRobotRunnerCfg.policy):
         actor_hidden_dims = [256, 256, 128]
@@ -204,5 +205,5 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         run_name = ""
         experiment_name = "mini_cheetah"
         max_iterations = 500
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32

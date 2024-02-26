@@ -126,6 +126,11 @@ class PPO:
         return self.transition.actions
 
     def process_env_step(self, rewards, dones, timed_out=None):
+        if self.storage is None:
+            raise AttributeError(
+                "This version of PPO is deprecated and only works with OldPolicyRunner."
+                "Use PPO2 instead."
+            )
         self.transition.rewards = rewards.clone()
         self.transition.dones = dones
         # * Bootstrapping on time outs
