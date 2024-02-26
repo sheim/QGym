@@ -2,9 +2,9 @@ name: GPUgym Unit Testing
 run-name: PR Unit Testing
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   push:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
 
 jobs:
   Self-hosted-unit-testing:

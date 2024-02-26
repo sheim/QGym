@@ -1,7 +1,6 @@
 import os
 import torch
 from tensordict import TensorDict
-from learning.env import VecEnv
 
 from learning.utils import Logger
 
@@ -13,7 +12,7 @@ storage = DictStorage()
 
 
 class OnPolicyRunner(BaseRunner):
-    def __init__(self, env: VecEnv, train_cfg, device="cpu"):
+    def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
             self.env.num_envs,
@@ -45,7 +44,12 @@ class OnPolicyRunner(BaseRunner):
                 "dones": self.get_timed_out(),
             }
         )
-        storage.initialize(transition, device=self.device)
+        storage.initialize(
+            transition,
+            self.env.num_envs,
+            self.env.num_envs * self.num_steps_per_env,
+            device=self.device,
+        )
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
