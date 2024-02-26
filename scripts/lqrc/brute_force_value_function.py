@@ -22,7 +22,7 @@ def model_switch(args):
     if args["model_type"] == "CholeskyPlusConst":
         return Critic(2, standard_nn=False).to(DEVICE)
     elif args["model_type"] == "StandardMLP":
-        return Critic(2, [512, 256, 128], "elu", standard_nn=True).to(DEVICE)
+        return Critic(2, [128, 64, 32], "tanh", standard_nn=True).to(DEVICE)
     else:
         raise KeyError("Specified model type is not supported for critic evaluation.")
 
@@ -61,9 +61,33 @@ def setup(args):
     return env, runner, train_cfg
 
 
+def create_logging_dict(runner, n_timesteps, reward_list=None):
+    states_to_log = [
+        "dof_pos",
+        "dof_vel",
+        "tau_ff",
+    ]
+    logs_dict = {}
+
+    for state in states_to_log:
+        array_dim = runner.get_obs_size(list([state]))
+        logs_dict[state] = torch.zeros(
+            (runner.env.num_envs, n_timesteps, array_dim),
+            device=runner.env.device,
+        )
+
+    if reward_list is not None:
+        for reward in reward_list:
+            logs_dict["r_" + reward] = torch.zeros(
+                (runner.env.num_envs, n_timesteps),
+                device=runner.env.device,
+            )
+
+    return states_to_log, logs_dict
+
+
 def get_ground_truth(env, runner, train_cfg, grid):
     env.dof_state[:, 0] = grid[:, 0]
-    env.dof_state[:, 1] = grid[:, 1]
     env.dof_state[:, 1] = grid[:, 1]
     env_ids_int32 = torch.arange(env.num_envs, device=env.device).to(dtype=torch.int32)
     env.gym.set_dof_state_tensor_indexed(
@@ -71,13 +95,13 @@ def get_ground_truth(env, runner, train_cfg, grid):
         gymtorch.unwrap_tensor(env.dof_state),
         gymtorch.unwrap_tensor(env_ids_int32),
         len(env_ids_int32),
-        env.sim,
-        gymtorch.unwrap_tensor(env.dof_state),
-        gymtorch.unwrap_tensor(env_ids_int32),
-        len(env_ids_int32),
     )
     rewards_dict = {}
     rewards = np.zeros((runner.num_steps_per_env, env.num_envs))
+    reward_list = runner.policy_cfg["reward"]["weights"]
+    n_steps = runner.num_steps_per_env
+    states_to_log, logs = create_logging_dict(runner, n_steps, reward_list)
+
     for i in range(runner.num_steps_per_env):
         runner.set_actions(
             runner.policy_cfg["actions"],
@@ -90,12 +114,18 @@ def get_ground_truth(env, runner, train_cfg, grid):
         total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
         rewards[i, :] = total_rewards.detach().cpu().numpy()
         env.check_exit()
+        for state in states_to_log:
+            logs[state][:, i, :] = getattr(env, state)
+        for reward in reward_list:
+            logs["r_" + reward][:, i] = rewards_dict[reward]
 
-    discount_factors = train_cfg.algorithm.gamma * np.ones((1, runner.num_steps_per_env))
+    discount_factors = train_cfg.algorithm.gamma * np.ones(
+        (1, runner.num_steps_per_env)
+    )
     for i in range(runner.num_steps_per_env):
         discount_factors[0, i] = discount_factors[0, i] ** i
     returns = np.matmul(discount_factors, rewards)
-    return returns
+    return returns, logs
 
 
 def query_value_function(vf_args, grid):
@@ -120,22 +150,21 @@ if __name__ == "__main__":
     args = get_args()
 
     DEVICE = "cuda:0"
-    steps = 100
+    steps = 50
     npy_fn = (
         f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy"
         if args.custom_critic
         else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
     )
     data = np.load(npy_fn)
-    dof_pos_rng = torch.linspace(
-        min(data[:, 0]), max(data[:, 0]), steps=steps, device=DEVICE
-    )
-    dof_vel_rng = torch.linspace(
-        min(data[:, 1]), max(data[:, 1]), steps=steps, device=DEVICE
-    )
+    # ! data is normalized
+    # dof_pos: 2.0 * torch.pi
+    # dof_vel: 5.0
+    dof_pos_rng = torch.linspace(-torch.pi, torch.pi, steps=steps, device=DEVICE)
+    dof_vel_rng = torch.linspace(-8.0, 8.0, steps=steps, device=DEVICE)
     grid = torch.cartesian_prod(dof_pos_rng, dof_vel_rng)
 
-    EXPORT_POLICY = True
+    EXPORT_POLICY = False
     time_str = time.strftime("%b%d_%H-%M-%S")
     save_path = os.path.join(LEGGED_GYM_LQRC_DIR, f"logs/{time_str}")
     if not os.path.exists(save_path):
@@ -144,14 +173,27 @@ if __name__ == "__main__":
     with torch.no_grad():
         env, runner, train_cfg = setup(args)
 
-    ground_truth_returns = get_ground_truth(env, runner, train_cfg, grid)
+    ground_truth_returns, logs = get_ground_truth(env, runner, train_cfg, grid)
+    logs = {k: v.detach().cpu().numpy() for k, v in logs.items()}
+    np.savez_compressed(os.path.join(save_path, "data.npz"), **logs)
+    print("saved logs to", os.path.join(save_path, "data.npz"))
+
     high_gt_returns = []
     for i in range(ground_truth_returns.shape[1] - 1):
         if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
             high_gt_returns.append(
                 torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
             )
+        if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
+            high_gt_returns.append(
+                torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
+            )
     high_gt_returns = np.array(high_gt_returns)
+    returns_save_path = (
+        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
+        if args.custom_critic
+        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+    )
     returns_save_path = (
         f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
         if args.custom_critic
@@ -163,14 +205,14 @@ if __name__ == "__main__":
     # get NN value functions
     custom_vf_args = {
         "experiment_name": "pendulum_custom_critic",
-        "load_run": "Feb18_16-46-35_custom_critic",
-        "checkpoint": 500,
+        "load_run": "Feb22_14-11-04_custom_critic",
+        "checkpoint": -1,
         "model_type": "CholeskyPlusConst",
     }
     custom_critic_returns = query_value_function(custom_vf_args, grid)
     standard_vf_args = {
         "experiment_name": "pendulum_standard_critic",
-        "load_run": "Feb19_11-59-52_standard_critic",
+        "load_run": "Feb22_14-07-29_standard_critic",
         "checkpoint": -1,
         "model_type": "StandardMLP",
     }

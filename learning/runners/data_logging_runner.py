@@ -2,7 +2,6 @@ import torch
 import numpy as np
 import os
 from learning import LEGGED_GYM_LQRC_DIR
-from learning.env import VecEnv
 
 from learning.utils import Logger
 
