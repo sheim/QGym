@@ -184,7 +184,16 @@ if __name__ == "__main__":
             high_gt_returns.append(
                 torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
             )
+        if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
+            high_gt_returns.append(
+                torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
+            )
     high_gt_returns = np.array(high_gt_returns)
+    returns_save_path = (
+        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
+        if args.custom_critic
+        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+    )
     returns_save_path = (
         f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
         if args.custom_critic

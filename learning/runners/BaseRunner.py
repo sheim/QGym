@@ -1,5 +1,5 @@
 import torch
-from learning.algorithms import PPO
+from learning.algorithms import *  # noqa: F403
 from learning.modules import ActorCritic
 from learning.utils import remove_zero_weighted_rewards
 
@@ -18,7 +18,7 @@ class BaseRunner:
         ).to(self.device)
 
         alg_class = eval(self.cfg["algorithm_class_name"])
-        self.alg: PPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
+        self.alg = alg_class(actor_critic, device=self.device, **self.alg_cfg)
 
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
