@@ -127,7 +127,23 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 termination = 0.15
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        pass
+        # both
+        gamma = 0.99
+        lam = 0.95
+        discount_horizon = 1.0
+        GAE_bootstrap_horizon = 2.0
+        # shared
+        batch_size = 2**15
+        max_grad_steps = 24
+        clip_param = 0.2
+        learning_rate = 5.0e-5
+        max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = False
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

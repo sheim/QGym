@@ -3,6 +3,11 @@ from tensordict import TensorDict
 
 
 @torch.no_grad
+def normalize(x):
+    return (x - x.mean()) / (x.std() + 1e-8)
+
+
+@torch.no_grad
 def compute_MC_returns(data: TensorDict, gamma, critic=None):
     if critic is None:
         last_values = torch.zeros_like(data["rewards"][0])
@@ -16,9 +21,7 @@ def compute_MC_returns(data: TensorDict, gamma, critic=None):
         data["returns"][k] = (
             data["rewards"][k] + gamma * data["returns"][k + 1] * not_done
         )
-    data["returns"] = (data["returns"] - data["returns"].mean()) / (
-        data["returns"].std() + 1e-8
-    )
+    data["returns"] = normalize(data["returns"])
     return
 
 
@@ -53,9 +56,7 @@ def compute_generalized_advantages(data, gamma, lam, critic, last_values=None):
 
     data["returns"] = data["advantages"] + data["values"]
 
-    data["advantages"] = (data["advantages"] - data["advantages"].mean()) / (
-        data["advantages"].std() + 1e-8
-    )
+    data["advantages"] = normalize(data["advantages"])
 
 
 # todo change num_epochs to num_batches

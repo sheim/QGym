@@ -286,11 +286,13 @@ class LeggedRobotRunnerCfg(BaseConfig):
         # both
         gamma = 0.99
         lam = 0.95
+        discount_horizon = 1.0
+        GAE_bootstrap_horizon = 2.0
         # shared
         batch_size = 2**15
-        max_grad_steps = 10
+        max_grad_steps = 24
         clip_param = 0.2
-        learning_rate = 1.0e-3
+        learning_rate = 5.0e-5
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
