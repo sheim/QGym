@@ -152,7 +152,7 @@ class PPO:
             old_mu_batch,
             old_sigma_batch,
         ) in generator:
-            self.actor_critic.act(obs_batch)
+            self.actor_critic.actor.update_distribution(obs_batch)
             actions_log_prob_batch = self.actor_critic.get_actions_log_prob(
                 actions_batch
             )

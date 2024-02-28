@@ -2,6 +2,7 @@ import torch.nn as nn
 
 from .actor import Actor
 from .critic import Critic
+from .utils import StateDependentNoiseDistribution
 
 
 class ActorCritic(nn.Module):
@@ -15,6 +16,7 @@ class ActorCritic(nn.Module):
         activation="elu",
         init_noise_std=1.0,
         normalize_obs=True,
+        use_sde=True,
         **kwargs,
     ):
         if kwargs:
@@ -39,6 +41,19 @@ class ActorCritic(nn.Module):
 
         print(f"Actor MLP: {self.actor.NN}")
         print(f"Critic MLP: {self.critic.NN}")
+
+        # TODO[lm]: Decide how to handle the state dependent noise distribution in
+        # this class. In stable-baselines3 there is a class MlpExtractor which does
+        # what the Actor and Critic classes do here, just with the latent representation
+        # of the networks. Either I make a new class in a similar way and store the
+        # action distribution here, or I make the changes in Actor and Critic and change
+        # the distribution there.
+        if use_sde:
+            self.action_dist = StateDependentNoiseDistribution(
+                num_actions,
+                num_actor_obs,
+                num_critic_obs,
+            )
 
     @property
     def action_mean(self):

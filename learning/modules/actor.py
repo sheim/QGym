@@ -37,6 +37,9 @@ class Actor(nn.Module):
         self.distribution = None
         # disable args validation for speedup
         Normal.set_default_validate_args = False
+        # smooth exploration
+        self.use_smooth_expl = True
+        self.episode_noise = None
 
     @property
     def action_mean(self):
@@ -58,7 +61,23 @@ class Actor(nn.Module):
 
     def act(self, observations):
         self.update_distribution(observations)
+        if self.use_smooth_expl:
+            return self.act_smooth()
         return self.distribution.sample()
+
+    def act_smooth(self):
+        mean = self.distribution.mean
+        if self.episode_noise is None:
+            sample = self.distribution.sample()
+            self.episode_noise = sample - self.distribution.mean
+        else:
+            sample = mean + self.episode_noise
+        # write to csv
+        with open(
+            "/home/lmolnar/workspace/QGym/plots/distribution_smooth.csv", "a"
+        ) as f:
+            f.write(str(mean[0][2].item()) + ", " + str(sample[0][2].item()) + "\n")
+        return sample
 
     def get_actions_log_prob(self, actions):
         return self.distribution.log_prob(actions).sum(dim=-1)

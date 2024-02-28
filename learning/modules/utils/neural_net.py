@@ -3,7 +3,9 @@ import os
 import copy
 
 
-def create_MLP(num_inputs, num_outputs, hidden_dims, activation, dropouts=None):
+def create_MLP(
+    num_inputs, num_outputs, hidden_dims, activation, dropouts=None, latent=False
+):
     activation = get_activation(activation)
 
     if dropouts is None:
@@ -15,7 +17,10 @@ def create_MLP(num_inputs, num_outputs, hidden_dims, activation, dropouts=None):
     else:
         add_layer(layers, num_inputs, hidden_dims[0], activation, dropouts[0])
         for i in range(len(hidden_dims)):
-            if i == len(hidden_dims) - 1:
+            # TODO[lm]: Could also create a separate function that gives the latent
+            # reprentation used for smooth exploration (but if it doesn't mess up
+            # anything, this is simpler)
+            if i == len(hidden_dims) - 1 and not latent:
                 add_layer(layers, hidden_dims[i], num_outputs)
             else:
                 add_layer(
