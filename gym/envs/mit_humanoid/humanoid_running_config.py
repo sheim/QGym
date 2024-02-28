@@ -275,10 +275,10 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 24
         max_iterations = 1000
-        run_name = "ICRA2023"
+        run_name = "Humanoid"
         experiment_name = "HumanoidLocomotion"
         save_interval = 50
         plot_input_gradients = False

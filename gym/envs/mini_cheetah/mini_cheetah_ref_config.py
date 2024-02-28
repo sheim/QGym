@@ -127,23 +127,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 termination = 0.15
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        # training params
-        value_loss_coef = 1.0  # deprecate for PPO2
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 6
-        # mini batch size = num_envs*nsteps/nminibatches
-        num_mini_batches = 4
-        storage_size = 2**17  # new
-        mini_batch_size = 2**15  #  new
-        learning_rate = 5.0e-5
-        schedule = "adaptive"  # can be adaptive, fixed
-        discount_horizon = 1.0  # [s]
-        lam = 0.95
-        GAE_bootstrap_horizon = 2.0  # [s]
-        desired_kl = 0.01
-        max_grad_norm = 1.0
+        pass
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

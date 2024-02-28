@@ -14,8 +14,8 @@ class PPO2:
     def __init__(
         self,
         actor_critic,
-        num_learning_epochs=1,
-        num_mini_batches=1,
+        batch_size=2**15,
+        max_gradient_steps=10,
         clip_param=0.2,
         gamma=0.998,
         lam=0.95,
@@ -39,15 +39,13 @@ class PPO2:
         self.actor_critic = actor_critic.to(self.device)
         self.actor = actor_critic.actor.to(self.device)
         self.critic = actor_critic.critic.to(self.device)
-        self.storage = None  # initialized later
-        # parameters = list(self.actor.parameters()) + list(self.critic.parameters())
         self.optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
 
         # * PPO parameters
         self.clip_param = clip_param
-        self.num_learning_epochs = num_learning_epochs
-        self.num_mini_batches = num_mini_batches
+        self.batch_size = batch_size
+        self.max_gradient_steps = max_gradient_steps
         self.entropy_coef = entropy_coef
         self.gamma = gamma
         self.lam = lam
@@ -82,10 +80,11 @@ class PPO2:
         self.mean_value_loss = 0
         counter = 0
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
             value_batch = self.critic.evaluate(batch["critic_obs"])
             if self.use_clipped_value_loss:
@@ -108,8 +107,6 @@ class PPO2:
         self.mean_value_loss /= counter
 
     def update_actor(self, data):
-        # already done before
-        # compute_generalized_advantages(data, self.gamma, self.lam, self.critic)
         self.mean_surrogate_loss = 0
         counter = 0
 
@@ -120,12 +117,12 @@ class PPO2:
             data["actions"]
         ).detach()
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
-            # ! refactor how this is done
             self.actor.act(batch["actor_obs"])
             actions_log_prob_batch = self.actor.get_actions_log_prob(batch["actions"])
             mu_batch = self.actor.action_mean

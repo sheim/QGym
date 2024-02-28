@@ -244,5 +244,5 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
         run_name = ""
         experiment_name = "FullSend"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32
