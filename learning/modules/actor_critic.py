@@ -1,6 +1,7 @@
 import torch.nn as nn
 
-from .actor import Actor, SmoothActor
+from .actor import Actor
+from .smooth_actor import SmoothActor
 from .critic import Critic
 
 

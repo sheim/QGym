@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 name = "distribution_smooth"
 data = pd.read_csv(name + ".csv")
 
-# Plot the data
-n = 200
-plt.plot(data.iloc[:n, 0])
-plt.plot(data.iloc[:n, 1])
+# Plot the data (last n steps)
+n = 500
+plt.plot(data.iloc[-n:, 0])
+plt.plot(data.iloc[-n:, 1])
 plt.xlabel("timestep")
 plt.ylabel("action")
-plt.title("Smoothing every rollout")
+plt.title("gSDE")
 plt.legend(["mean", "sample"])
 # plt.show()
 

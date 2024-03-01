@@ -4,9 +4,6 @@ from torch.distributions import Normal
 from .utils import create_MLP
 from .utils import export_network
 from .utils import RunningMeanStd
-from .utils import StateDependentNoiseDistribution
-
-from gym import LEGGED_GYM_ROOT_DIR
 
 
 class Actor(nn.Module):
@@ -85,41 +82,3 @@ class Actor(nn.Module):
 
     def export(self, path):
         export_network(self, "policy", path, self.num_obs)
-
-
-class SmoothActor(Actor):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Create latent NN
-        self.NN = create_MLP(
-            self.num_obs,
-            self.num_actions,
-            self.hidden_dims,
-            self.activation,
-            latent=True,
-        )
-        # State dependent action distribution
-        self.distribution = StateDependentNoiseDistribution(
-            self.num_actions,
-            self.num_obs,
-        )
-        # Noise for smooth exploration
-        self.episode_noise = None
-        # Debug mode for plotting
-        self.debug = False
-
-    def act(self, observations):
-        # TODO[lm]: update distribution for gSDE
-        self.update_distribution(observations)
-        mean = self.distribution.mean
-        if self.episode_noise is None:
-            sample = self.distribution.sample()
-            self.episode_noise = sample - self.distribution.mean
-        else:
-            sample = mean + self.episode_noise
-
-        if self.debug:
-            # write to csv (used for plotting)
-            with open(f"{LEGGED_GYM_ROOT_DIR}/plots/distribution_smooth.csv", "a") as f:
-                f.write(str(mean[0][2].item()) + ", " + str(sample[0][2].item()) + "\n")
-        return sample
