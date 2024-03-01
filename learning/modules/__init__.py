@@ -33,3 +33,4 @@
 from .actor_critic import ActorCritic
 from .state_estimator import StateEstimatorNN
 from .actor import Actor
+from .smooth_actor import SmoothActor
