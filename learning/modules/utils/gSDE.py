@@ -5,7 +5,8 @@ import torch.nn as nn
 from torch.distributions import Normal
 
 
-# The follow implementation was used in the gSDE paper on smooth exploration. See code:
+# The following implementation was used in the gSDE paper on smooth exploration.
+# See code:
 # https://github.com/DLR-RM/stable-baselines3/blob/56f20e40a2206bbb16501a0f600e29ce1b112ef1/stable_baselines3/common/distributions.py#L421C7-L421C38
 # TODO[lm]: Need to update some of the naming conventions to fit our codebase.
 class StateDependentNoiseDistribution:
@@ -45,9 +46,6 @@ class StateDependentNoiseDistribution:
         """
         Get the standard deviation from the learned parameter
         (log of it by default). This ensures that the std is positive.
-
-        :param log_std:
-        :return:
         """
         if self.use_expln:
             # From gSDE paper, it allows to keep variance
@@ -71,9 +69,6 @@ class StateDependentNoiseDistribution:
         """
         Sample weights for the noise exploration matrix,
         using a centered Gaussian distribution.
-
-        :param log_std:
-        :param batch_size:
         """
         std = self.get_std(log_std)
         self.weights_dist = Normal(torch.zeros_like(std), std)
@@ -82,7 +77,7 @@ class StateDependentNoiseDistribution:
         # Pre-compute matrices in case of parallel exploration
         self.exploration_matrices = self.weights_dist.rsample((batch_size,))
 
-    def proba_distribution_net(
+    def get_distribution_net(
         self,
         latent_dim: int,
         log_std_init: float = -2.0,
@@ -93,13 +88,6 @@ class StateDependentNoiseDistribution:
         one output will be the deterministic action, the other parameter will be the
         standard deviation of the distribution that control the weights of the noise
         matrix.
-
-        :param latent_dim: Dimension of the last layer of the policy (before the
-        action layer)
-        :param log_std_init: Initial value for the log standard deviation
-        :param latent_sde_dim: Dimension of the last layer of the features extractor
-            for gSDE. By default, it is shared with the policy network.
-        :return:
         """
         # Network for the deterministic action, it represents the mean of the
         # distribution
@@ -119,7 +107,7 @@ class StateDependentNoiseDistribution:
         self.sample_weights(log_std)
         return mean_actions_net, log_std
 
-    def proba_distribution(
+    def get_distribution(
         self,
         mean_actions: torch.Tensor,
         log_std: torch.Tensor,
@@ -127,11 +115,6 @@ class StateDependentNoiseDistribution:
     ) -> "StateDependentNoiseDistribution":
         """
         Create the distribution given its parameters (mean, std)
-
-        :param mean_actions:
-        :param log_std:
-        :param latent_sde:
-        :return:
         """
         # Stop gradient if we don't want to influence the features
         self._latent_sde = latent_sde if self.learn_features else latent_sde.detach()
@@ -174,8 +157,8 @@ class StateDependentNoiseDistribution:
         latent_sde: torch.Tensor,
         deterministic: bool = False,
     ) -> torch.Tensor:
-        # Update the proba distribution
-        self.proba_distribution(mean_actions, log_std, latent_sde)
+        # Update the distribution
+        self.get_distribution(mean_actions, log_std, latent_sde)
         if deterministic:
             return self.mode()
         return self.sample()

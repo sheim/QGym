@@ -240,6 +240,7 @@ class LeggedRobotRunnerCfg(BaseConfig):
         # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         normalize_obs = True
+        smooth_exploration = False
 
         actor_obs = [
             "observation_a",

@@ -38,7 +38,7 @@ class OnPolicyRunner(BaseRunner):
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
                     # Reset noise for smooth exploration
-                    if self.alg.actor_critic.actor.use_smooth_expl and i == 0:
+                    if self.policy_cfg["smooth_exploration"] and i == 0:
                         self.alg.actor_critic.actor.episode_noise = None
 
                     actions = self.alg.act(actor_obs, critic_obs)

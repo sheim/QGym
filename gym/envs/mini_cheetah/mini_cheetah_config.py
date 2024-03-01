@@ -130,6 +130,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         critic_hidden_dims = [128, 64]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
 
         actor_obs = [
             "base_lin_vel",

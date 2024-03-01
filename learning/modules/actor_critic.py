@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from .actor import Actor
+from .actor import Actor, SmoothActor
 from .critic import Critic
 from .utils import StateDependentNoiseDistribution
 
@@ -16,7 +16,7 @@ class ActorCritic(nn.Module):
         activation="elu",
         init_noise_std=1.0,
         normalize_obs=True,
-        use_sde=True,
+        smooth_exploration=False,
         **kwargs,
     ):
         if kwargs:
@@ -26,14 +26,24 @@ class ActorCritic(nn.Module):
             )
         super(ActorCritic, self).__init__()
 
-        self.actor = Actor(
-            num_actor_obs,
-            num_actions,
-            actor_hidden_dims,
-            activation,
-            init_noise_std,
-            normalize_obs,
-        )
+        if smooth_exploration:
+            self.actor = SmoothActor(
+                num_actor_obs,
+                num_actions,
+                actor_hidden_dims,
+                activation,
+                init_noise_std,
+                normalize_obs,
+            )
+        else:
+            self.actor = Actor(
+                num_actor_obs,
+                num_actions,
+                actor_hidden_dims,
+                activation,
+                init_noise_std,
+                normalize_obs,
+            )
 
         self.critic = Critic(
             num_critic_obs, critic_hidden_dims, activation, normalize_obs
@@ -48,7 +58,7 @@ class ActorCritic(nn.Module):
         # of the networks. Either I make a new class in a similar way and store the
         # action distribution here, or I make the changes in Actor and Critic and change
         # the distribution there.
-        if use_sde:
+        if smooth_exploration:
             self.action_dist = StateDependentNoiseDistribution(
                 num_actions,
                 num_actor_obs,
