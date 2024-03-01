@@ -20,8 +20,9 @@ def create_MLP(
             # TODO[lm]: Could also create a separate function that gives the latent
             # reprentation used for smooth exploration (but if it doesn't mess up
             # anything, this is simpler)
-            if i == len(hidden_dims) - 1 and not latent:
-                add_layer(layers, hidden_dims[i], num_outputs)
+            if i == len(hidden_dims) - 1:
+                if not latent:
+                    add_layer(layers, hidden_dims[i], num_outputs)
             else:
                 add_layer(
                     layers,

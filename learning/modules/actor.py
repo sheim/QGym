@@ -4,6 +4,7 @@ from torch.distributions import Normal
 from .utils import create_MLP
 from .utils import export_network
 from .utils import RunningMeanStd
+from .utils import StateDependentNoiseDistribution
 
 from gym import LEGGED_GYM_ROOT_DIR
 
@@ -32,7 +33,11 @@ class Actor(nn.Module):
 
         self.num_obs = num_obs
         self.num_actions = num_actions
-        self.NN = create_MLP(num_obs, num_actions, hidden_dims, activation)
+        self.hidden_dims = hidden_dims
+        self.activation = activation
+        self.NN = create_MLP(
+            num_obs, num_actions, hidden_dims, activation, latent=False
+        )
 
         # Action noise
         self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))
@@ -85,11 +90,26 @@ class Actor(nn.Module):
 class SmoothActor(Actor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Create latent NN
+        self.NN = create_MLP(
+            self.num_obs,
+            self.num_actions,
+            self.hidden_dims,
+            self.activation,
+            latent=True,
+        )
+        # State dependent action distribution
+        self.distribution = StateDependentNoiseDistribution(
+            self.num_actions,
+            self.num_obs,
+        )
         # Noise for smooth exploration
         self.episode_noise = None
+        # Debug mode for plotting
         self.debug = False
 
     def act(self, observations):
+        # TODO[lm]: update distribution for gSDE
         self.update_distribution(observations)
         mean = self.distribution.mean
         if self.episode_noise is None:

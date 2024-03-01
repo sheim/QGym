@@ -26,7 +26,6 @@ class StateDependentNoiseDistribution:
         self,
         num_actions: int,
         num_actor_obs: int,
-        num_critic_obs: int,
         full_std: bool = True,
         use_expln: bool = False,
         learn_features: bool = False,
@@ -34,7 +33,6 @@ class StateDependentNoiseDistribution:
     ):
         self.num_actions = num_actions
         self.num_actor_obs = num_actor_obs
-        self.num_critic_obs = num_critic_obs
         self.full_std = full_std
         self.use_expln = use_expln
         self.learn_features = learn_features
