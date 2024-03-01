@@ -183,15 +183,17 @@ def update_cfg_from_args(env_cfg, train_cfg, args):
             train_cfg.runner.device = args.rl_device
         if args.train_critic_only:
             train_cfg.runner.algorithm_class_name = "PPOCriticOnly"
+            train_cfg.runner_class_name = "CriticOnlyRunner"
+            train_cfg.runner.resume = True
             train_cfg.runner.experiment_name += "_critic_only"
             if args.task == "pendulum" and args.custom_critic:
                 train_cfg.policy.standard_critic_nn = False
                 train_cfg.algorithm.standard_loss = False
-                train_cfg.runner.run_name += "custom_critic"
+                train_cfg.runner.run_name += "custom_critic_only"
             elif args.task == "pendulum" and not args.custom_critic:
                 train_cfg.policy.standard_critic_nn = True
                 train_cfg.algorithm.standard_loss = True
-                train_cfg.runner.run_name += "standard_critic"
+                train_cfg.runner.run_name += "standard_critic_only"
         else:
             if args.task == "pendulum" and args.custom_critic:
                 train_cfg.policy.standard_critic_nn = False

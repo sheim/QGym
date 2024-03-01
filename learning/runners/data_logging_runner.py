@@ -100,6 +100,7 @@ class DataLoggingRunner(OnPolicyRunner):
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
         np.save(save_path, self.all_obs)
+        print(f"Saved training observations to {save_path}")
 
         self.save()
 

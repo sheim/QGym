@@ -10,6 +10,7 @@ from learning.modules.lqrc.utils import get_load_path
 from learning.modules.lqrc.plotting import (
     plot_value_func,
     plot_value_func_error,
+    plot_training_data_dist,
 )
 from isaacgym import gymtorch
 
@@ -204,15 +205,15 @@ if __name__ == "__main__":
 
     # get NN value functions
     custom_vf_args = {
-        "experiment_name": "pendulum_custom_critic",
-        "load_run": "Feb22_14-11-04_custom_critic",
+        "experiment_name": "pendulum_critic_only",
+        "load_run": "Mar01_11-03-27_custom_critic_only",
         "checkpoint": -1,
         "model_type": "CholeskyPlusConst",
     }
     custom_critic_returns = query_value_function(custom_vf_args, grid)
     standard_vf_args = {
-        "experiment_name": "pendulum_standard_critic",
-        "load_run": "Feb22_14-07-29_standard_critic",
+        "experiment_name": "pendulum_critic_only",
+        "load_run": "Mar01_11-06-37_standard_critic_only",
         "checkpoint": -1,
         "model_type": "StandardMLP",
     }
@@ -237,5 +238,5 @@ if __name__ == "__main__":
     )
 
     # ! store data dist with model logs to ensure they're paired properly
-    # plot_training_data_dist(npy_fn,
-    #                         save_path + "/data_distribution.png")
+    plot_training_data_dist(npy_fn,
+                            save_path + "/data_distribution.png")
