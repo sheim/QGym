@@ -69,7 +69,7 @@ class OnPolicyRunner(BaseRunner):
             logger.tic("learning")
             self.alg.update()
             logger.toc("learning")
-            logger.log_category()
+            logger.log_all_categories()
 
             logger.finish_iteration()
             logger.toc("iteration")
