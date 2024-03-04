@@ -175,33 +175,36 @@ if __name__ == "__main__":
         env, runner, train_cfg = setup(args)
 
     ground_truth_returns, logs = get_ground_truth(env, runner, train_cfg, grid)
-    logs = {k: v.detach().cpu().numpy() for k, v in logs.items()}
-    np.savez_compressed(os.path.join(save_path, "data.npz"), **logs)
-    print("saved logs to", os.path.join(save_path, "data.npz"))
+    grid_gt_combined = np.hstack((grid.detach().cpu().numpy(), ground_truth_returns.T))
+    gt_save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/ground_truth.npy"
+    np.save(gt_save_path, grid_gt_combined)
+    print("Saved high returns to", gt_save_path)
 
-    high_gt_returns = []
-    for i in range(ground_truth_returns.shape[1] - 1):
-        if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
-            high_gt_returns.append(
-                torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
-            )
-        if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
-            high_gt_returns.append(
-                torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
-            )
-    high_gt_returns = np.array(high_gt_returns)
-    returns_save_path = (
-        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
-        if args.custom_critic
-        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
-    )
-    returns_save_path = (
-        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
-        if args.custom_critic
-        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
-    )
-    np.save(returns_save_path, high_gt_returns)
-    print("Saved high returns to", returns_save_path)
+    exit()
+
+
+    # logs = {k: v.detach().cpu().numpy() for k, v in logs.items()}
+    # np.savez_compressed(os.path.join(save_path, "data.npz"), **logs)
+    # print("saved logs to", os.path.join(save_path, "data.npz"))
+
+    # high_gt_returns = []
+    # for i in range(ground_truth_returns.shape[1] - 1):
+    #     if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
+    #         high_gt_returns.append(
+    #             torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
+    #         )
+    #     if ground_truth_returns[0, i] > 3.5 and ground_truth_returns[0, i + 1] < 2.0:
+    #         high_gt_returns.append(
+    #             torch.hstack((grid[i, :], grid[i + 1, :])).detach().cpu().numpy()
+    #         )
+    # high_gt_returns = np.array(high_gt_returns)
+    # returns_save_path = (
+    #     f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
+    #     if args.custom_critic
+    #     else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+    # )
+    # np.save(returns_save_path, high_gt_returns)
+    # print("Saved high returns to", returns_save_path)
 
     # get NN value functions
     custom_vf_args = {

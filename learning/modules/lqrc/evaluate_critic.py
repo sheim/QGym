@@ -59,8 +59,8 @@ if __name__ == "__main__":
     c_pred = []
 
     model.eval()
-    t_c = 0
-    p_c = 0
+    # t_c = 0
+    # p_c = 0
     for X_batch in x:
         y_hat = model.evaluate(X_batch.unsqueeze(0))
         y_pred.append(y_hat)

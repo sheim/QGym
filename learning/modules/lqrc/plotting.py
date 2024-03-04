@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib.colors import CenteredNorm, TwoSlopeNorm
 
 
-def graph_3D_helper(ax, contour):
+def graph_3D_helper(ax, contour=False):
     if contour:
         return ax.contourf
     return ax.pcolormesh
@@ -198,13 +198,13 @@ def plot_predictions_and_gradients(
         y_pred = y_pred.detach().cpu().numpy()
         y_actual = y_actual.detach().cpu().numpy()
         if actual_grad is not None:
-            actual_grad = actual_grad.detach().cpu().numpy()
+            actual_grad = actual_grad.detach().cpu().numpy() if not isinstance(actual_grad, np.ndarray) else actual_grad
             if colormap_diff:
                 fig, (ax1, ax2) = plt.subplots(
                     nrows=1, ncols=2, figsize=(16, 8), layout="tight"
                 )
                 sq_len = int(sqrt(x_actual.shape[0]))
-                img1 = ax1.contourf(
+                img1 = graph_3D_helper(ax1)(
                     x_actual[:, 0].reshape(sq_len, sq_len),
                     x_actual[:, 1].reshape(sq_len, sq_len),
                     np.linalg.norm(
@@ -214,16 +214,16 @@ def plot_predictions_and_gradients(
                         - actual_grad,
                         axis=1,
                     ).reshape(sq_len, sq_len),
-                    cmap="RdBu_r",
-                    norm=TwoSlopeNorm(0),
+                    cmap="OrRd",
+                    vmin=0.0, vmax=30.0,
                 )
                 plt.colorbar(img1, ax=ax1)
-                img2 = ax2.contourf(
+                img2 = graph_3D_helper(ax2)(
                     x_actual[:, 0].reshape(sq_len, sq_len),
                     x_actual[:, 1].reshape(sq_len, sq_len),
                     (y_pred - y_actual).reshape(sq_len, sq_len),
-                    cmap="PuOr",
-                    norm=TwoSlopeNorm(0),
+                    cmap="bwr",
+                    norm=CenteredNorm()
                 )
                 plt.colorbar(img2, ax=ax2)
                 set_titles_labels(
@@ -243,7 +243,7 @@ def plot_predictions_and_gradients(
                 c=y_pred,
                 cmap="viridis",
                 marker="o",
-                edgecolors="k",
+                alpha=0.7
             )
             scatter = axes[1].scatter(
                 x_actual[:, 0],
@@ -251,7 +251,7 @@ def plot_predictions_and_gradients(
                 c=y_actual,
                 cmap="viridis",
                 marker="^",
-                edgecolors="k",
+                alpha=0.7
             )
             fig.colorbar(scatter, ax=axes.ravel().tolist(), shrink=0.95, label="f(x)")
             axes[0].set_title("Pointwise Predictions")
@@ -278,6 +278,20 @@ def plot_predictions_and_gradients(
             for a in [45, 135, 180, 225]:
                 ax.view_init(elev=10.0, azim=a)
                 plt.savefig(f"{fn}_angle_{a}.png")
+        if colormap_diff:
+            fig, axis = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+            scatter = axis.scatter(
+                x_actual[:, 0],
+                x_actual[:, 1],
+                c=y_pred - y_actual,
+                cmap="bwr",
+                marker="o",
+                alpha=0.5,
+                norm=CenteredNorm(),
+            )
+            fig.colorbar(scatter, ax=axis, shrink=0.95, label="f(x)")
+            axis.set_title("Error Between Pointwise Predictions and Targets")
+            plt.savefig(f"{fn}_value_error_colormap.png")
     elif dim == 2:
         x_actual = x_actual.detach().cpu().numpy()
         y_pred = y_pred.detach().cpu().numpy()
