@@ -36,7 +36,7 @@ class OnPolicyRunner(BaseRunner):
             logger.tic("collection")
             # * Re-sample noise matrix for smooth exploration
             if self.policy_cfg["smooth_exploration"]:
-                self.alg.actor_critic.actor.sample_weights()
+                self.alg.actor_critic.actor.sample_weights(batch_size=self.env.num_envs)
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):

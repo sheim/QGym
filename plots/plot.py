@@ -10,7 +10,7 @@ n = 500
 plt.plot(data.iloc[-n:, 0])
 plt.plot(data.iloc[-n:, 1])
 plt.xlabel("timestep")
-plt.ylabel("action")
+plt.ylabel("action (NN output)")
 plt.title("gSDE")
 plt.legend(["mean", "sample"])
 # plt.show()

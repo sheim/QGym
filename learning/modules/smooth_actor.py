@@ -21,7 +21,7 @@ class SmoothActor(Actor):
         *args,
         full_std: bool = True,
         use_exp_ln: bool = False,
-        learn_features: bool = False,
+        learn_features: bool = True,
         epsilon: float = 1e-6,
         log_std_init: float = -2.0,
         **kwargs,
@@ -49,7 +49,7 @@ class SmoothActor(Actor):
         else:
             log_std = torch.ones(self.latent_dim, 1)
         self.log_std = nn.Parameter(log_std * self.log_std_init, requires_grad=True)
-        # Sample an exploration matrix (this sets the exploration matrices)
+        # Sample an exploration matrix
         self.sample_weights()
         self.distribution = None
 
