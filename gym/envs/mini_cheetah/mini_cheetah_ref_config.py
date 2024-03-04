@@ -75,6 +75,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         smooth_exploration = True
+        exploration_sample_freq = 8
 
         actor_obs = [
             "base_ang_vel",

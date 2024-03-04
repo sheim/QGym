@@ -54,7 +54,7 @@ class SmoothActor(Actor):
         self.distribution = None
 
         # Debug mode for plotting
-        self.debug = False
+        self.debug = True
 
     def sample_weights(self, batch_size=1):
         # Sample weights for the noise exploration matrix
@@ -103,9 +103,8 @@ class SmoothActor(Actor):
         mean = self.distribution.mean
         sample = mean + self.get_noise()
         if self.debug:
-            # write to csv (used for plotting)
-            with open(f"{LEGGED_GYM_ROOT_DIR}/plots/distribution_smooth.csv", "a") as f:
-                f.write(str(mean[0][2].item()) + ", " + str(sample[0][2].item()) + "\n")
+            path = f"{LEGGED_GYM_ROOT_DIR}/plots/distribution_smooth.csv"
+            self.log_actions(mean[0][2], sample[0][2], path)
         return sample
 
     def act_inference(self, observations):

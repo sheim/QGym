@@ -6,12 +6,12 @@ name = "distribution_smooth"
 data = pd.read_csv(name + ".csv")
 
 # Plot the data (last n steps)
-n = 500
+n = 200
 plt.plot(data.iloc[-n:, 0])
 plt.plot(data.iloc[-n:, 1])
 plt.xlabel("timestep")
 plt.ylabel("action (NN output)")
-plt.title("gSDE")
+plt.title("gSDE (sample_freq=8)")
 plt.legend(["mean", "sample"])
 # plt.show()
 

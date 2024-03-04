@@ -34,12 +34,16 @@ class OnPolicyRunner(BaseRunner):
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
             logger.tic("collection")
-            # * Re-sample noise matrix for smooth exploration
-            if self.policy_cfg["smooth_exploration"]:
-                self.alg.actor_critic.actor.sample_weights(batch_size=self.env.num_envs)
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
+                    # * Re-sample noise matrix for smooth exploration
+                    sample_freq = self.policy_cfg["exploration_sample_freq"]
+                    if self.policy_cfg["smooth_exploration"] and i % sample_freq == 0:
+                        self.alg.actor_critic.actor.sample_weights(
+                            batch_size=self.env.num_envs
+                        )
+
                     actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(
                         self.policy_cfg["actions"],
