@@ -111,14 +111,8 @@ class MyRunner(OnPolicyRunner):
         logger.register_category(
             "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
         )
-
         logger.register_category(
-            "actor",
-            self.alg.actor_critic,
-            [
-                "action_std",
-                "entropy",
-            ],
+            "actor", self.alg.actor_critic, ["action_std", "entropy"]
         )
 
         logger.attach_torch_obj_to_wandb(
