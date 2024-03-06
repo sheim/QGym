@@ -8,6 +8,8 @@ from gym.utils.logging_and_saving import wandb_singleton
 from gym.utils.logging_and_saving import local_code_save_helper
 from torch.multiprocessing import Process, Queue
 
+wandb_helper = wandb_singleton.WandbSingleton()
+
 
 def update_hyperparams(env_cfg, train_cfg, hyperparams):
     for key, val in hyperparams["env_cfg"].items():
@@ -25,6 +27,7 @@ def setup(env_cfg, train_cfg):
     policy_runner = task_registry.make_alg_runner(env, train_cfg)
     task_registry.set_log_dir_name(train_cfg)
     local_code_save_helper.save_local_files_to_logs(train_cfg.log_dir)
+    wandb_helper.setup_wandb(env_cfg=env_cfg, train_cfg=train_cfg, args=args)
 
     return train_cfg, policy_runner
 
@@ -38,16 +41,6 @@ def train(train_cfg, policy_runner):
 
 # Define the objective function for Optuna
 def objective(trial, env_cfg, train_cfg):
-    # Hyperparameter suggestions
-    # env_hypers = {}
-    # train_hypers = {}
-    # train_hypers["learning_rate"] = trial.suggest_loguniform(
-    #     "learning_rate", 1e-5, 1e-1
-    # )
-    # env_hypers["episode_length_s"] = trial.suggest_uniform(
-    #     "episode_length_s", 1.0, 10.0
-    # )
-    # hyperparams = {"env_cfg": env_hypers, "train_cfg": train_hypers}
     train_cfg.algorithm.learning_rate = trial.suggest_loguniform(
         "learning_rate", 1e-5, 1e-1
     )
@@ -71,8 +64,6 @@ def run_setup_and_train(env_cfg, train_cfg, queue):
 if __name__ == "__main__":
     args = get_args()
     env_cfg, train_cfg = task_registry.create_cfgs(args)
-    wandb_helper = wandb_singleton.WandbSingleton()
-    wandb_helper.set_wandb_values(args)
     wandb_helper.setup_wandb(env_cfg=env_cfg, train_cfg=train_cfg, args=args)
     # if wandb_helper.is_wandb_enabled():
     #     if sweep_id is None:
