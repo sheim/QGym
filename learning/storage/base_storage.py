@@ -1,4 +1,4 @@
-""" Store data for different loop
+"""Store data for different loop
 Design consideration: change the original "has-a" relationship of
 LT->rollout->transition to parallel. Transition stores all the needed data for
 every step and will be cleared/updated every step and passed to rollout and

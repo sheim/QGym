@@ -105,7 +105,7 @@ class OnPolicyRunner(BaseRunner):
             self.alg.update(storage.data)
             storage.clear()
             logger.toc("learning")
-            logger.log_category()
+            logger.log_all_categories()
 
             logger.finish_iteration()
             logger.toc("iteration")
@@ -139,6 +139,9 @@ class OnPolicyRunner(BaseRunner):
         logger.register_rewards(["total_rewards"])
         logger.register_category(
             "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
+        )
+        logger.register_category(
+            "actor", self.alg.actor_critic, ["action_std", "entropy"]
         )
 
         logger.attach_torch_obj_to_wandb(
