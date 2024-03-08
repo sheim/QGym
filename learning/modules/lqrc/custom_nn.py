@@ -195,7 +195,7 @@ class CholeskyOffset2(QuadraticNetCholesky):
     def __init__(self, input_size, hidden_dims=128, device="cuda"):
         super().__init__(input_size)
         self.xhat_layer = nn.Linear(input_size, input_size)
-        # self.xhat_layer.register_forward_hook(self.save_xhat())
+        self.xhat_layer.register_forward_hook(self.save_xhat())
 
     def forward(self, x):
         xhat = self.xhat_layer(x)

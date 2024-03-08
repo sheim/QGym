@@ -1,7 +1,16 @@
 from math import sqrt
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import CenteredNorm, TwoSlopeNorm
+
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
+matplotlib.rcParams["mathtext.fontset"] = "stix"
+matplotlib.rcParams["font.family"] = "STIXGeneral"
+
+font = {"size": 12}
+matplotlib.rc("font", **font)
 
 
 def graph_3D_helper(ax, contour=False):
@@ -223,7 +232,7 @@ def plot_predictions_and_gradients(
                     x_actual[:, 1].reshape(sq_len, sq_len),
                     (y_pred - y_actual).reshape(sq_len, sq_len),
                     cmap="bwr",
-                    norm=CenteredNorm()
+                    vmin=-2.0, vmax=2.0
                 )
                 plt.colorbar(img2, ax=ax2)
                 set_titles_labels(
@@ -287,7 +296,7 @@ def plot_predictions_and_gradients(
                 cmap="bwr",
                 marker="o",
                 alpha=0.5,
-                norm=CenteredNorm(),
+                norm=CenteredNorm()
             )
             fig.colorbar(scatter, ax=axis, shrink=0.95, label="f(x)")
             axis.set_title("Error Between Pointwise Predictions and Targets")
