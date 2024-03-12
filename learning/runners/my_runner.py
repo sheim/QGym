@@ -28,7 +28,6 @@ class MyRunner(OnPolicyRunner):
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
         critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
-        rewards_dict
         self.save()
 
         # * start up storage

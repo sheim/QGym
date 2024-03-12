@@ -7,6 +7,7 @@ from gym.utils import get_args, task_registry, randomize_episode_counters
 from gym.utils.logging_and_saving import wandb_singleton
 from gym.utils.logging_and_saving import local_code_save_helper
 from torch.multiprocessing import Process, Queue
+import torch
 
 wandb_helper = wandb_singleton.WandbSingleton()
 
@@ -32,11 +33,6 @@ def setup(env_cfg, train_cfg):
     return train_cfg, policy_runner
 
 
-def train(train_cfg, policy_runner):
-    policy_runner.learn()
-    return policy_runner.alg.mean_surrogate_loss
-
-
 def objective(trial, env_cfg, train_cfg):
     train_cfg.algorithm.learning_rate = trial.suggest_float(
         "learning_rate", 1e-5, 1e-1, log=True
@@ -51,10 +47,60 @@ def objective(trial, env_cfg, train_cfg):
     return result
 
 
+def protocol(runner):
+    # reset the rewards
+    runner.policy_cfg["reward"]["weights"] = {"tracking_lin_vel": 1.0}
+    # allow to run a long time
+    runner.env.max_episode_length = 1e5
+    runner.env.cfg.commands.resampling_time = 1e2
+    # reset environments
+    # runner.env.reset()
+    # simulate and track for 5 seconds, perturb, then track another 5 seconds.
+    five_seconds_of_steps = int(5 / runner.env.dt)
+    # set up reward
+    rewards_dict = {}
+    avg_tracking_reward = 0.0
+
+    # push settings
+    runner.env.cfg.push_robots.max_push_vel_xy = 3.0
+
+    with torch.inference_mode():
+        for i in range(five_seconds_of_steps):
+            runner.set_actions(
+                runner.policy_cfg["actions"], runner.get_inference_actions()
+            )
+            runner.env.step()
+
+            terminated = runner.get_terminated()
+            rewards_dict.update(
+                runner.get_rewards(
+                    runner.policy_cfg["reward"]["weights"], mask=terminated
+                )
+            )
+            avg_tracking_reward += rewards_dict["tracking_lin_vel"].mean()
+
+        avg_tracking_reward /= five_seconds_of_steps
+        # push robots
+        runner.env._push_robots()
+        dones = terminated  # just need to initialize it
+        for i in range(five_seconds_of_steps):
+            runner.set_actions(
+                runner.policy_cfg["actions"], runner.get_inference_actions()
+            )
+            runner.env.step()
+
+            terminated = runner.get_terminated()
+            dones = terminated | dones
+        fail_ratio = dones.sum() / runner.env.num_envs
+
+    return (fail_ratio * avg_tracking_reward).item()
+
+
 def run_setup_and_train(env_cfg, train_cfg, queue):
     train_cfg, policy_runner = setup(env_cfg, train_cfg)
-    train_result = train(train_cfg, policy_runner)
-    queue.put(train_result)
+    policy_runner.learn()
+    result = protocol(policy_runner)
+    queue.put(result)
 
 
 if __name__ == "__main__":
