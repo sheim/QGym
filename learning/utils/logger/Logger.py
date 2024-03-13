@@ -122,19 +122,23 @@ class Logger:
         )
         print(log_string)
 
-    def log_category(self, category="algorithm"):
-        self.iteration_logs.log(category)
+    def log_all_categories(self):
+        for category in self.iteration_logs.logs.keys():
+            self.iteration_logs.log(category)
 
     def log_to_wandb(self):
-        def prepend_to_keys(section, dictionary):
-            return {section + "/" + key: val for key, val in dictionary.items()}
+        def prepend_to_keys(prefix, dictionary):
+            return {prefix + "/" + key: val for key, val in dictionary.items()}
 
         averages = prepend_to_keys("rewards", self.reward_logs.get_average_rewards())
 
-        algorithm_logs = prepend_to_keys(
-            "algorithm", self.iteration_logs.get_all_logs("algorithm")
-        )
-        wandb.log({**averages, **algorithm_logs})
+        category_logs = {
+            f"{category}/{key}": val
+            for category in self.iteration_logs.logs.keys()
+            for key, val in self.iteration_logs.get_all_logs(category).items()
+        }
+
+        wandb.log({**averages, **category_logs})
 
     def tic(self, category="default"):
         self.timer.tic(category)
