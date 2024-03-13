@@ -173,4 +173,4 @@ class OnPolicyRunner(BaseRunner):
         return self.alg.actor.act_inference(obs)
 
     def export(self, path):
-        self.alg.actor.export_policy(path)
+        self.alg.actor.export(path)

@@ -7,7 +7,7 @@ from gym.utils import task_registry
 # * imports for onnx test
 import onnx
 import onnxruntime
-from learning.modules import ActorCritic
+from learning.modules import Actor
 from gym.utils.helpers import get_load_path
 from gym import LEGGED_GYM_ROOT_DIR
 
@@ -28,20 +28,17 @@ def learn_policy(args):
 
 def load_saved_policy(runner):
     num_actor_obs = runner.get_obs_size(runner.policy_cfg["actor_obs"])
-    num_critic_obs = runner.get_obs_size(runner.policy_cfg["critic_obs"])
     num_actions = runner.get_action_size(runner.policy_cfg["actions"])
-    actor_critic = ActorCritic(
-        num_actor_obs, num_critic_obs, num_actions, **runner.policy_cfg
-    ).to(runner.device)
+    actor = Actor(num_actor_obs, num_actions, **runner.policy_cfg).to(runner.device)
     resume_path = get_load_path(
         name=runner.cfg["experiment_name"],
         load_run=runner.cfg["load_run"],
         checkpoint=runner.cfg["checkpoint"],
     )
     loaded_dict = torch.load(resume_path)
-    actor_critic.actor.load_state_dict(loaded_dict["actor_state_dict"])
-    actor_critic.eval()
-    return actor_critic
+    actor.load_state_dict(loaded_dict["actor_state_dict"])
+    actor.eval()
+    return actor
 
 
 class TestDefaultIntegration:
@@ -96,19 +93,19 @@ class TestDefaultIntegration:
         )
 
         obs = torch.randn_like(runner.get_obs(runner.policy_cfg["actor_obs"]))
-        actions_first = runner.alg.actor_critic.act_inference(obs).cpu().clone()
+        actions_first = runner.alg.actor.act_inference(obs).cpu().clone()
         runner.load(model_8_path)
-        actions_loaded = runner.alg.actor_critic.act_inference(obs).cpu().clone()
+        actions_loaded = runner.alg.actor.act_inference(obs).cpu().clone()
 
         assert torch.equal(actions_first, actions_loaded), "Model loading failed"
 
         # * test onnx exporting
 
-        loaded_actor_critic = load_saved_policy(runner)
+        loaded_actor = load_saved_policy(runner)
         export_path = os.path.join(
             LEGGED_GYM_ROOT_DIR, "tests", "integration_tests", "exported_policy"
         )
-        loaded_actor_critic.export_policy(export_path)
+        loaded_actor.export(export_path)
 
         # load the exported onnx
         path_to_onnx = os.path.join(export_path, "policy.onnx")
@@ -122,8 +119,8 @@ class TestDefaultIntegration:
         # compute torch output
         with torch.no_grad():
             test_input = runner.get_obs(runner.policy_cfg["actor_obs"])[0:1]
-            runner_out = runner.alg.actor_critic.actor.act_inference(test_input)
-            loaded_out = loaded_actor_critic.actor.act_inference(test_input)
+            runner_out = runner.alg.actor.act_inference(test_input)
+            loaded_out = loaded_actor.act_inference(test_input)
 
         # compute ONNX Runtime output prediction
         ort_inputs = {ort_session.get_inputs()[0].name: test_input.cpu().numpy()}

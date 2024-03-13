@@ -9,8 +9,6 @@ from learning.utils import (
 
 
 class PPO2:
-    # actor_critic: ActorCritic
-
     def __init__(
         self,
         actor,
@@ -36,7 +34,6 @@ class PPO2:
         self.learning_rate = learning_rate
 
         # * PPO components
-        # todo keeping actor_critic for loading code in runner
         self.actor = actor.to(self.device)
         self.critic = critic.to(self.device)
         self.optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
