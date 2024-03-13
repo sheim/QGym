@@ -181,14 +181,14 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class policy(LeggedRobotRunnerCfg.policy):
+    class actor:
         init_noise_std = 1.0
-        actor_hidden_dims = [512, 256, 128]
+        hidden_dims = [512, 256, 128]
         critic_hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 
-        actor_obs = [
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -198,9 +198,9 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_history",
         ]
-        critic_obs = actor_obs
 
         actions = ["dof_pos_target"]
+        disable_actions = False
 
         class noise:
             base_height = 0.05
@@ -210,6 +210,22 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             base_ang_vel = 0.2
             projected_gravity = 0.05
             height_measurements = 0.1
+
+    class critic:
+        hidden_dims = [512, 256, 128]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            "dof_pos_obs",
+            "dof_vel",
+            "dof_pos_history",
+        ]
 
         class reward:
             class weights:
@@ -248,7 +264,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 24
         max_iterations = 1000
         run_name = "Standing"

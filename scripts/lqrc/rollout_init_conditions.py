@@ -65,9 +65,9 @@ def play(env, runner, train_cfg, init_conditions):
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
-            runner.policy_cfg["actions"],
+            runner.actor_cfg["actions"],
             runner.get_inference_actions(),
-            runner.policy_cfg["disable_actions"],
+            runner.actor_cfg["disable_actions"],
         )
         env.step()
         pos_traj[i, :] = env.dof_pos.detach().cpu().numpy().squeeze()

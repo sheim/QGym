@@ -233,23 +233,17 @@ class LeggedRobotRunnerCfg(BaseConfig):
     class logging:
         enable_local_saving = True
 
-    class policy:
+    class actor:
         init_noise_std = 1.0
-        actor_hidden_dims = [512, 256, 128]
-        critic_hidden_dims = [512, 256, 128]
+        hidden_dims = [512, 256, 128]
         # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         normalize_obs = True
 
-        actor_obs = [
+        obs = [
             "observation_a",
             "observation_b",
             "these_need_to_be_atributes_(states)_of_the_robot_env",
-        ]
-        critic_obs = [
-            "observation_x",
-            "observation_y",
-            "critic_obs_can_be_the_same_or_different_than_actor_obs",
         ]
 
         actions = ["q_des"]
@@ -262,6 +256,17 @@ class LeggedRobotRunnerCfg(BaseConfig):
             ang_vel = 0.2
             projected_gravity = 0.05
             height_measurements = 0.1
+
+    class critic:
+        hidden_dims = [512, 256, 128]
+        # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        normalize_obs = True
+        obs = [
+            "observation_x",
+            "observation_y",
+            "critic_obs_can_be_the_same_or_different_than_actor_obs",
+        ]
 
         class reward:
             class weights:

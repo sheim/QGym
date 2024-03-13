@@ -10,21 +10,16 @@ class Critic(nn.Module):
     def __init__(
         self,
         num_obs,
-        critic_hidden_dims=None,
+        hidden_dims=None,
         activation="elu",
         normalize_obs=True,
         standard_nn=True,
         **kwargs,
     ):
-        if kwargs:
-            print(
-                "Critic.__init__ got unexpected arguments, "
-                "which will be ignored: " + str([key for key in kwargs.keys()])
-            )
         super().__init__()
 
         self.NN = (
-            create_MLP(num_obs, 1, critic_hidden_dims, activation)
+            create_MLP(num_obs, 1, hidden_dims, activation)
             if standard_nn
             else CholeskyPlusConst(num_obs)
         )

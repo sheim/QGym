@@ -23,14 +23,23 @@ class DataLoggingRunner(OnPolicyRunner):
             self.device,
         )
 
+    # def _set_up_alg(self):
+    #     num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+    #     num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+    #     num_actions = self.get_action_size(self.actor_cfg["actions"])
+    #     actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+    #     critic = Critic(num_critic_obs, **self.critic_cfg)
+    #     alg_class = eval(self.cfg["algorithm_class_name"])
+    #     self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
+
     def learn(self):
         self.set_up_logger()
 
         rewards_dict = {}
 
-        self.alg.actor_critic.train()
-        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
-        critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+        self.alg.switch_to_train()
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
+        critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
         self.all_obs = torch.zeros(self.env.num_envs * (tot_iter - self.it + 1), 2)
         self.all_obs[: self.env.num_envs, :] = actor_obs
@@ -63,9 +72,9 @@ class DataLoggingRunner(OnPolicyRunner):
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(
-                        self.policy_cfg["actions"],
+                        self.actor_cfg["actions"],
                         actions,
-                        self.policy_cfg["disable_actions"],
+                        self.actor_cfg["disable_actions"],
                     )
 
                     transition.update(
@@ -79,9 +88,9 @@ class DataLoggingRunner(OnPolicyRunner):
                     self.env.step()
 
                     actor_obs = self.get_noisy_obs(
-                        self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
+                        self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
-                    critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+                    critic_obs = self.get_obs(self.critic_cfg["obs"])
 
                     start = self.env.num_envs * self.it
                     end = self.env.num_envs * (self.it + 1)
@@ -129,7 +138,7 @@ class DataLoggingRunner(OnPolicyRunner):
             "logs",
             "lqrc",
             "standard_training_data.npy"
-            if self.policy_cfg["standard_critic_nn"]
+            if self.critic_cfg["standard_critic_nn"]
             else "custom_training_data.npy",
         )
 
@@ -144,29 +153,25 @@ class DataLoggingRunner(OnPolicyRunner):
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(
             self.get_rewards(
-                self.policy_cfg["reward"]["termination_weight"], mask=terminated
+                self.critic_cfg["reward"]["termination_weight"], mask=terminated
             )
         )
         rewards_dict.update(
             self.get_rewards(
-                self.policy_cfg["reward"]["weights"],
+                self.critic_cfg["reward"]["weights"],
                 modifier=self.env.dt,
                 mask=~terminated,
             )
         )
 
     def set_up_logger(self):
-        logger.register_rewards(list(self.policy_cfg["reward"]["weights"].keys()))
+        logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))
         logger.register_rewards(
-            list(self.policy_cfg["reward"]["termination_weight"].keys())
+            list(self.critic_cfg["reward"]["termination_weight"].keys())
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
             "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
         )
-        logger.register_category(
-            "actor", self.alg.actor_critic, ["action_std", "entropy"]
-        )
-        logger.attach_torch_obj_to_wandb(
-            (self.alg.actor_critic.actor, self.alg.actor_critic.critic)
-        )
+        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
+        logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))

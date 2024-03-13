@@ -19,19 +19,20 @@ class BaseRunner:
         self._set_up_alg()
 
     def _set_up_alg(self):
-        num_actor_obs = self.get_obs_size(self.policy_cfg["actor_obs"])
-        num_critic_obs = self.get_obs_size(self.policy_cfg["critic_obs"])
-        num_actions = self.get_action_size(self.policy_cfg["actions"])
-        actor = Actor(num_actor_obs, num_actions, **self.policy_cfg)
-        critic = Critic(num_critic_obs, **self.policy_cfg)
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic = Critic(num_critic_obs, **self.critic_cfg)
         alg_class = eval(self.cfg["algorithm_class_name"])
         self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def parse_train_cfg(self, train_cfg):
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
-        remove_zero_weighted_rewards(train_cfg["policy"]["reward"]["weights"])
-        self.policy_cfg = train_cfg["policy"]
+        remove_zero_weighted_rewards(train_cfg["critic"]["reward"]["weights"])
+        self.actor_cfg = train_cfg["actor"]
+        self.critic_cfg = train_cfg["critic"]
 
     def init_storage(self):
         raise NotImplementedError

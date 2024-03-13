@@ -27,8 +27,8 @@ class OnPolicyRunner(BaseRunner):
         rewards_dict = {}
 
         self.alg.switch_to_train()
-        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
-        critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
+        critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
         self.save()
 
@@ -59,9 +59,9 @@ class OnPolicyRunner(BaseRunner):
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(
-                        self.policy_cfg["actions"],
+                        self.actor_cfg["actions"],
                         actions,
-                        self.policy_cfg["disable_actions"],
+                        self.actor_cfg["disable_actions"],
                     )
 
                     transition.update(
@@ -75,9 +75,9 @@ class OnPolicyRunner(BaseRunner):
                     self.env.step()
 
                     actor_obs = self.get_noisy_obs(
-                        self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
+                        self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
-                    critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+                    critic_obs = self.get_obs(self.critic_cfg["obs"])
 
                     # * get time_outs
                     timed_out = self.get_timed_out()
@@ -119,21 +119,21 @@ class OnPolicyRunner(BaseRunner):
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(
             self.get_rewards(
-                self.policy_cfg["reward"]["termination_weight"], mask=terminated
+                self.critic_cfg["reward"]["termination_weight"], mask=terminated
             )
         )
         rewards_dict.update(
             self.get_rewards(
-                self.policy_cfg["reward"]["weights"],
+                self.critic_cfg["reward"]["weights"],
                 modifier=self.env.dt,
                 mask=~terminated,
             )
         )
 
     def set_up_logger(self):
-        logger.register_rewards(list(self.policy_cfg["reward"]["weights"].keys()))
+        logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))
         logger.register_rewards(
-            list(self.policy_cfg["reward"]["termination_weight"].keys())
+            list(self.critic_cfg["reward"]["termination_weight"].keys())
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
@@ -169,7 +169,7 @@ class OnPolicyRunner(BaseRunner):
         self.alg.critic.eval()
 
     def get_inference_actions(self):
-        obs = self.get_noisy_obs(self.policy_cfg["actor_obs"], self.policy_cfg["noise"])
+        obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
         return self.alg.actor.act_inference(obs)
 
     def export(self, path):

@@ -11,17 +11,12 @@ class Actor(nn.Module):
         self,
         num_obs,
         num_actions,
-        actor_hidden_dims,
+        hidden_dims,
         activation="elu",
         init_noise_std=1.0,
         normalize_obs=True,
         **kwargs,
     ):
-        if kwargs:
-            print(
-                "Actor.__init__ got unexpected arguments, "
-                "which will be ignored: " + str([key for key in kwargs.keys()])
-            )
         super().__init__()
 
         self._normalize_obs = normalize_obs
@@ -30,7 +25,7 @@ class Actor(nn.Module):
 
         self.num_obs = num_obs
         self.num_actions = num_actions
-        self.NN = create_MLP(num_obs, num_actions, actor_hidden_dims, activation)
+        self.NN = create_MLP(num_obs, num_actions, hidden_dims, activation)
 
         # Action noise
         self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))

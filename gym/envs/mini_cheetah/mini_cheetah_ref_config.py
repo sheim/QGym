@@ -67,15 +67,14 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "MyRunner"
+    runner_class_name = "OnPolicyRunner"
 
-    class policy(MiniCheetahRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [256, 256, 128]
+    class actor:
+        hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         normalize_obs = True
-        actor_obs = [
+        obs = [
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -84,7 +83,25 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
         ]
 
-        critic_obs = [
+        actions = ["dof_pos_target"]
+        disable_actions = False
+
+        class noise:
+            scale = 1.0
+            dof_pos_obs = 0.01
+            base_ang_vel = 0.01
+            dof_pos = 0.005
+            dof_vel = 0.005
+            lin_vel = 0.05
+            ang_vel = [0.3, 0.15, 0.4]
+            gravity_vec = 0.1
+
+    class critic:
+        hidden_dims = [256, 256, 128]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        normalize_obs = True
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -95,12 +112,6 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "dof_pos_target",
         ]
-
-        actions = ["dof_pos_target"]
-        disable_actions = False
-
-        class noise:
-            pass
 
         class reward:
             class weights:

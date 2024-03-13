@@ -138,23 +138,11 @@ class A1Cfg(LeggedRobotCfg):
 class A1RunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
 
-    class policy(LeggedRobotRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 256]
-        critic_hidden_dims = [256, 256, 256]
+    class actor(LeggedRobotRunnerCfg.actor):
+        hidden_dims = [256, 256, 256]
         # activation can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        actor_obs = [
-            "base_height",
-            "base_lin_vel",
-            "base_ang_vel",
-            "projected_gravity",
-            "dof_pos_obs",
-            "dof_vel",
-            "dof_pos_history",
-            "commands",
-        ]
-
-        critic_obs = [
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -168,13 +156,28 @@ class A1RunnerCfg(LeggedRobotRunnerCfg):
         actions = ["dof_pos_target"]
 
         class noise:
-            dof_pos_obs = 0.005  # can be made very low
+            dof_pos_obs = 0.005
             dof_vel = 0.005
             base_ang_vel = 0.05
             projected_gravity = 0.02
 
-        class reward(LeggedRobotRunnerCfg.policy.reward):
-            class weights(LeggedRobotRunnerCfg.policy.reward.weights):
+    class critic:
+        hidden_dims = [256, 256, 256]
+        # activation can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "dof_pos_obs",
+            "dof_vel",
+            "dof_pos_history",
+            "commands",
+        ]
+
+        class reward:
+            class weights:
                 tracking_lin_vel = 1.0
                 tracking_ang_vel = 1.0
                 lin_vel_z = 0.0
@@ -213,7 +216,7 @@ class A1RunnerCfg(LeggedRobotRunnerCfg):
         run_name = ""
         experiment_name = "a1"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         # per iteration
         # (n_steps in Rudin 2021 paper - batch_size = n_steps * n_robots)
         num_steps_per_env = 24

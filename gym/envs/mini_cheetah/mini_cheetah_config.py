@@ -126,13 +126,12 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class policy(LeggedRobotRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [128, 64]
+    class actor:
+        hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 
-        actor_obs = [
+        obs = [
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
@@ -141,19 +140,9 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_target",
         ]
-        critic_obs = [
-            "base_height",
-            "base_lin_vel",
-            "base_ang_vel",
-            "projected_gravity",
-            "commands",
-            "dof_pos_obs",
-            "dof_vel",
-            "dof_pos_target",
-        ]
-
         actions = ["dof_pos_target"]
         add_noise = True
+        disable_actions = False
 
         class noise:
             scale = 1.0
@@ -165,8 +154,23 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             ang_vel = [0.3, 0.15, 0.4]
             gravity_vec = 0.1
 
-        class reward(LeggedRobotRunnerCfg.policy.reward):
-            class weights(LeggedRobotRunnerCfg.policy.reward.weights):
+    class critic:
+        hidden_dims = [128, 64]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            "dof_pos_obs",
+            "dof_vel",
+            "dof_pos_target",
+        ]
+
+        class reward:
+            class weights:
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0

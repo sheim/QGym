@@ -98,15 +98,15 @@ def get_ground_truth(env, runner, train_cfg, grid):
     )
     rewards_dict = {}
     rewards = np.zeros((runner.num_steps_per_env, env.num_envs))
-    reward_list = runner.policy_cfg["reward"]["weights"]
+    reward_list = runner.critic_cfg["reward"]["weights"]
     n_steps = runner.num_steps_per_env
     states_to_log, logs = create_logging_dict(runner, n_steps, reward_list)
 
     for i in range(runner.num_steps_per_env):
         runner.set_actions(
-            runner.policy_cfg["actions"],
+            runner.actor_cfg["actions"],
             runner.get_inference_actions(),
-            runner.policy_cfg["disable_actions"],
+            runner.actor_cfg["disable_actions"],
         )
         env.step()
         terminated = runner.get_terminated()
