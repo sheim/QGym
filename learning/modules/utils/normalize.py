@@ -89,8 +89,6 @@ class RunningMeanStd(nn.Module):
 
         current_mean = self.running_mean
         current_var = self.running_var
-        # current_mean = torch.tensor([torch.pi, 0.0], device="cuda:0")
-        # current_var = torch.tensor([((200.0)**2.0/12.0), ((2.0*torch.pi)/12.0)], device="cuda:0")
 
         y = (input - current_mean.float()) / torch.sqrt(
             current_var.float() + self.epsilon

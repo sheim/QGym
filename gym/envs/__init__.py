@@ -19,7 +19,6 @@ class_dict = {
     "Anymal": ".anymal_c.anymal",
     "A1": ".a1.a1",
     "HumanoidRunning": ".mit_humanoid.humanoid_running",
-    "HumanoidBouncing": ".mit_humanoid.humanoid_bouncing",
     "Pendulum": ".pendulum.pendulum",
 }
 
@@ -32,7 +31,6 @@ config_dict = {
     "A1Cfg": ".a1.a1_config",
     "AnymalCFlatCfg": ".anymal_c.flat.anymal_c_flat_config",
     "HumanoidRunningCfg": ".mit_humanoid.humanoid_running_config",
-    "HumanoidBouncingCfg": ".mit_humanoid.humanoid_bouncing_config",
     "PendulumCfg": ".pendulum.pendulum_config",
 }
 
@@ -45,7 +43,6 @@ runner_config_dict = {
     "A1RunnerCfg": ".a1.a1_config",
     "AnymalCFlatRunnerCfg": ".anymal_c.flat.anymal_c_flat_config",
     "HumanoidRunningRunnerCfg": ".mit_humanoid.humanoid_running_config",
-    "HumanoidBouncingRunnerCfg": ".mit_humanoid.humanoid_bouncing_config",
     "PendulumRunnerCfg": ".pendulum.pendulum_config",
 }
 
@@ -68,10 +65,6 @@ task_dict = {
         "HumanoidRunningCfg",
         "HumanoidRunningRunnerCfg",
     ],
-    "humanoid_bouncing": ["HumanoidBouncing",
-                          "HumanoidBouncingCfg",
-                          "HumanoidBouncingRunnerCfg"],
-    "a1": ["A1", "A1Cfg", "A1RunnerCfg"],
     "flat_anymal_c": ["Anymal", "AnymalCFlatCfg", "AnymalCFlatRunnerCfg"],
     "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"]
 }

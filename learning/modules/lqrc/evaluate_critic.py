@@ -1,6 +1,6 @@
 import os
 
-from learning import LEGGED_GYM_LQRC_DIR
+from learning import LEGGED_GYM_ROOT_DIR
 
 from utils import critic_eval_args, get_load_path
 from plotting import (
@@ -68,7 +68,7 @@ if __name__ == "__main__":
             A_pred.append(model.NN.intermediates["A"])
             c_pred.append(model.NN.intermediates["c"])
 
-    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "logs")
+    save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "lqrc")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 

@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import os
-from learning import LEGGED_GYM_LQRC_DIR
+from learning import LEGGED_GYM_ROOT_DIR
 
 from learning.utils import Logger
 
@@ -78,7 +78,7 @@ class DataLoggingRunner(OnPolicyRunner):
             logger.tic("learning")
             self.alg.update()
             logger.toc("learning")
-            logger.log_category()
+            logger.log_all_categories()
 
             logger.finish_iteration()
             logger.toc("iteration")
@@ -89,8 +89,9 @@ class DataLoggingRunner(OnPolicyRunner):
                 self.save()
         self.all_obs = self.all_obs.detach().cpu().numpy()
         save_path = os.path.join(
-            LEGGED_GYM_LQRC_DIR,
+            LEGGED_GYM_ROOT_DIR,
             "logs",
+            "lqrc",
             "standard_training_data.npy"
             if self.policy_cfg["standard_critic_nn"]
             else "custom_training_data.npy",

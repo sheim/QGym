@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from learning import LEGGED_GYM_LQRC_DIR
+from learning import LEGGED_GYM_ROOT_DIR
 import matplotlib.collections as mcoll
 
 
@@ -202,13 +202,13 @@ def plot_initial_conditions_colored_by_return(
 
 if __name__ == "__main__":
     experiment = "Feb23_14-33-51"
-    file_path = f"{LEGGED_GYM_LQRC_DIR}/logs/{experiment}/data.npz"
+    file_path = f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/{experiment}/data.npz"
     data = np.load(file_path)
 
     rewards_data = {key: data[key] for key in data.files if key[:2] == "r_"}
     data = {key: data[key] for key in data.files if key[:2] != "r_"}
 
-    save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/{experiment}"
+    save_path = f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/{experiment}"
     returns = calculate_cumulative_returns(rewards_data)
 
     # setting colormap outside, so that all returns-related plots use the same
