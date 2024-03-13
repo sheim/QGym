@@ -10,7 +10,7 @@ class Critic(nn.Module):
     def __init__(
         self,
         num_obs,
-        hidden_dims=None,
+        critic_hidden_dims=None,
         activation="elu",
         normalize_obs=True,
         standard_nn=True,
@@ -24,7 +24,7 @@ class Critic(nn.Module):
         super().__init__()
 
         self.NN = (
-            create_MLP(num_obs, 1, hidden_dims, activation)
+            create_MLP(num_obs, 1, critic_hidden_dims, activation)
             if standard_nn
             else CholeskyPlusConst(num_obs)
         )

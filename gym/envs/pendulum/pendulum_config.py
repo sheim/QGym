@@ -61,7 +61,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
     class policy(FixedRobotCfgPPO.policy):
         actor_hidden_dims = [128, 64, 32]
-        critic_hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"
 
@@ -110,6 +109,11 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         max_grad_norm = 1.0
         standard_loss = True
         plus_c_penalty = 0.1
+
+        class critic:
+            standard_nn = True
+            hidden_dims = [128, 64, 32]
+            activation = "tanh"
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
