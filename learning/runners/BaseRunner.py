@@ -25,9 +25,6 @@ class BaseRunner:
         self.num_learning_iterations = self.cfg["max_iterations"]
         self.tot_timesteps = 0
         self.it = 0
-
-        # * init storage and model
-        self.init_storage()
         self.log_dir = train_cfg["log_dir"]
 
     def parse_train_cfg(self, train_cfg):

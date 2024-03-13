@@ -74,7 +74,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-
+        normalize_obs = True
         actor_obs = [
             "base_ang_vel",
             "projected_gravity",
@@ -123,29 +123,25 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 swing_grf = 1.5
                 stance_grf = 1.5
 
-            class pbrs_weights:
-                reference_traj = 0.0
-                swing_grf = 0.0
-                stance_grf = 0.0
-                min_base_height = 0.0
-                orientation = 0.0
-
             class termination_weight:
                 termination = 0.15
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # training params
-        value_loss_coef = 1.0
+        value_loss_coef = 1.0  # deprecate for PPO2
         use_clipped_value_loss = True
         clip_param = 0.2
         entropy_coef = 0.01
         num_learning_epochs = 6
         # mini batch size = num_envs*nsteps/nminibatches
         num_mini_batches = 4
+        storage_size = 2**17  # new
+        mini_batch_size = 2**15  #  new
         learning_rate = 5.0e-5
         schedule = "adaptive"  # can be adaptive, fixed
         discount_horizon = 1.0  # [s]
-        GAE_bootstrap_horizon = 1.0  # [s]
+        lam = 0.95
+        GAE_bootstrap_horizon = 2.0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 
@@ -153,5 +149,5 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32
