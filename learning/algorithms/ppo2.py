@@ -24,6 +24,7 @@ class PPO2:
         use_clipped_value_loss=True,
         schedule="fixed",
         desired_kl=0.01,
+        loss_fn="MSE",
         device="cpu",
         **kwargs,
     ):
@@ -35,8 +36,8 @@ class PPO2:
 
         # * PPO components
         self.actor = actor.to(self.device)
-        self.critic = critic.to(self.device)
         self.optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
+        self.critic = critic.to(self.device)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
 
         # * PPO parameters
@@ -83,17 +84,7 @@ class PPO2:
         generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
         for batch in generator:
             value_batch = self.critic.evaluate(batch["critic_obs"])
-            if self.use_clipped_value_loss:
-                target_value_batch = batch["values"]
-                value_clipped = target_value_batch + (
-                    value_batch - target_value_batch
-                ).clamp(-self.clip_param, self.clip_param)
-                value_losses = (value_batch - target_value_batch).pow(2)
-                value_losses_clipped = (value_clipped - batch["returns"]).pow(2)
-                value_loss = torch.max(value_losses, value_losses_clipped).mean()
-            else:
-                value_loss = (batch["returns"] - value_batch).pow(2).mean()
-
+            value_loss = self.critic.loss_fn(value_batch, batch["returns"])
             self.critic_optimizer.zero_grad()
             value_loss.backward()
             nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)

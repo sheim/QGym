@@ -32,3 +32,6 @@ class Critic(nn.Module):
             with torch.no_grad():
                 critic_observations = self.obs_rms(critic_observations)
         return self.NN(critic_observations).squeeze()
+
+    def loss_fn(self, input, target):
+        return nn.functional.mse_loss(input, target, reduction="mean")

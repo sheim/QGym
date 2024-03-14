@@ -151,6 +151,7 @@ class OnPolicyRunner(BaseRunner):
                 "actor_state_dict": self.alg.actor.state_dict(),
                 "critic_state_dict": self.alg.critic.state_dict(),
                 "optimizer_state_dict": self.alg.optimizer.state_dict(),
+                "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
                 "iter": self.it,
             },
             path,
@@ -162,6 +163,9 @@ class OnPolicyRunner(BaseRunner):
         self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
+            self.alg.critic_optimizer.load_state_dict(
+                loaded_dict["critic_optimizer_state_dict"]
+            )
         self.it = loaded_dict["iter"]
 
     def switch_to_eval(self):

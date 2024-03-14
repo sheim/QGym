@@ -140,7 +140,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # training params
         value_loss_coef = 1.0  # deprecate for PPO2
-        use_clipped_value_loss = True
+        use_clipped_value_loss = True  # deprecate for PPO2
         clip_param = 0.2
         entropy_coef = 0.01
         num_learning_epochs = 6
