@@ -137,6 +137,7 @@ class A1Cfg(LeggedRobotCfg):
 
 class A1RunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
+    runner_class_name = "OldPolicyRunner"
 
     class actor(LeggedRobotRunnerCfg.actor):
         hidden_dims = [256, 256, 256]
@@ -216,7 +217,7 @@ class A1RunnerCfg(LeggedRobotRunnerCfg):
         run_name = ""
         experiment_name = "a1"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "PPO"
         # per iteration
         # (n_steps in Rudin 2021 paper - batch_size = n_steps * n_robots)
         num_steps_per_env = 24

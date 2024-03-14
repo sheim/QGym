@@ -2,8 +2,9 @@ import os
 import torch
 
 from learning.utils import Logger
-
 from .BaseRunner import BaseRunner
+from learning.algorithms import PPO  # noqa: F401
+from learning.modules import ActorCritic, Actor, Critic
 
 logger = Logger()
 
@@ -18,6 +19,16 @@ class OldPolicyRunner(BaseRunner):
             self.cfg["max_iterations"],
             self.device,
         )
+
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic = Critic(num_critic_obs, **self.critic_cfg)
+        actor_critic = ActorCritic(actor, critic)
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        self.alg = alg_class(actor_critic, device=self.device, **self.alg_cfg)
 
     def learn(self):
         self.set_up_logger()
@@ -70,7 +81,7 @@ class OldPolicyRunner(BaseRunner):
             logger.tic("learning")
             self.alg.update()
             logger.toc("learning")
-            logger.log_category()
+            logger.log_all_categories()
 
             logger.finish_iteration()
             logger.toc("iteration")
