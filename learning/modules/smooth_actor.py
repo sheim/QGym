@@ -23,12 +23,12 @@ class SmoothActor(Actor):
         use_exp_ln: bool = False,
         learn_features: bool = True,
         epsilon: float = 1e-6,
-        log_std_init: float = -2.0,
+        log_std_init: float = 0.0,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.full_std = full_std
-        self.use_expln = use_exp_ln
+        self.use_exp_ln = use_exp_ln
         self.learn_features = learn_features
         self.epsilon = epsilon
         self.log_std_init = log_std_init
@@ -54,7 +54,7 @@ class SmoothActor(Actor):
         self.distribution = None
 
         # Debug mode for plotting
-        self.debug = True
+        self.debug = False
 
     def sample_weights(self, batch_size=1):
         # Sample weights for the noise exploration matrix
@@ -67,7 +67,7 @@ class SmoothActor(Actor):
 
     def get_std(self):
         # TODO[lm]: Check if this is ok, and can use action_std in ActorCritic normally
-        if self.use_expln:
+        if self.use_exp_ln:
             # From gSDE paper, it allows to keep variance
             # above zero and prevent it from growing too fast
             below_threshold = torch.exp(self.log_std) * (self.log_std <= 0)
@@ -83,9 +83,7 @@ class SmoothActor(Actor):
             return std
         assert self.latent_dim is not None
         # Reduce the number of parameters:
-        return (
-            torch.ones(self.latent_dim, self.num_actions).to(self.log_std.device) * std
-        )
+        return torch.ones(self.latent_dim, 1).to(self.log_std.device) * std
 
     def update_distribution(self, observations):
         if self._normalize_obs:
