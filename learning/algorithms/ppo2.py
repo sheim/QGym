@@ -74,7 +74,7 @@ class PPO2:
         self.update_critic(data)
         self.update_actor(data)
 
-    def update_critic(self, data, last_obs=None):
+    def update_critic(self, data):
         self.mean_value_loss = 0
         counter = 0
 
