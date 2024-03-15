@@ -16,7 +16,7 @@ from custom_nn import (
     CholeskyOffset1,
     CholeskyOffset2,
 )
-from learning import LEGGED_GYM_LQRC_DIR
+from learning import LEGGED_GYM_ROOT_DIR
 from utils import benchmark_args
 from plotting import (
     plot_loss,
@@ -105,20 +105,23 @@ def generate_bounded_rosenbrock(n, lb, ub, steps):
 
 
 def load_ground_truth(*args, **kwargs):
-    fn = f"{LEGGED_GYM_LQRC_DIR}/logs/ground_truth.npy"
+    fn = f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/ground_truth.npy"
     data = torch.from_numpy(np.load(fn)).to(DEVICE).type(torch.float32)
     return data[:, :-1], data[:, -1].unsqueeze(1)
 
 
 def ground_truth_numerial_gradients():
-    fn = f"{LEGGED_GYM_LQRC_DIR}/logs/ground_truth.npy"
+    fn = f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/ground_truth.npy"
     data = np.load(fn)
     sq_size = int(np.sqrt(data.shape[0]).item())
     gridded_data = data[:, -1].reshape((sq_size, sq_size))
     h_theta = abs(data[0, 0] - data[sq_size, 0]).item()
     h_omega = abs(data[0, 1] - data[1, 1]).item()
     theta_grad, theta_omega = np.gradient(gridded_data, h_theta, h_omega)
-    return np.concatenate((theta_grad.flatten().reshape(-1, 1), theta_omega.flatten().reshape(-1, 1)), axis=1)
+    return np.concatenate(
+        (theta_grad.flatten().reshape(-1, 1), theta_omega.flatten().reshape(-1, 1)),
+        axis=1,
+    )
 
 
 def model_switch(input_dim, model_name=None):
@@ -134,13 +137,20 @@ def model_switch(input_dim, model_name=None):
         num_obs = input_dim
         hidden_dims = [128, 64, 32]
         activation = "tanh"
-        return create_MLP(num_obs, 1, hidden_dims, activation).to(DEVICE), torch.nn.MSELoss(reduction="mean")
+        return create_MLP(num_obs, 1, hidden_dims, activation).to(
+            DEVICE
+        ), torch.nn.MSELoss(reduction="mean")
     elif model_name == "CholeskyOffset1":
-        return CholeskyOffset1(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(reduction="mean")
+        return CholeskyOffset1(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
+            reduction="mean"
+        )
     elif model_name == "CholeskyOffset2":
-        return CholeskyOffset2(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(reduction="mean")
+        return CholeskyOffset2(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
+            reduction="mean"
+        )
     return BaselineMLP(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
-            reduction="mean")
+        reduction="mean"
+    )
 
 
 def test_case_switch(case_name=None):
@@ -212,7 +222,11 @@ if __name__ == "__main__":
         for X_batch, y_batch in train_dataloader:
             X_batch.requires_grad_()
             y_pred = model(X_batch)
-            loss = loss_fn(y_pred, y_batch, intermediates=model.intermediates) if model_type == "CholeskyPlusConst" else loss_fn(y_pred, y_batch)
+            loss = (
+                loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+                if model_type == "CholeskyPlusConst"
+                else loss_fn(y_pred, y_batch)
+            )
             loss_per_batch.append(loss.item())
             optimizer.zero_grad()
             loss.backward()
@@ -255,7 +269,11 @@ if __name__ == "__main__":
         X_batch.requires_grad_()
         X_batch = X_batch + 0
         y_pred = model(X_batch)
-        loss = loss_fn(y_pred, y_batch, intermediates=model.intermediates) if model_type == "CholeskyPlusConst" else loss_fn(y_pred, y_batch)
+        loss = (
+            loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+            if model_type == "CholeskyPlusConst"
+            else loss_fn(y_pred, y_batch)
+        )
 
         if model_type == "QuadraticNetCholesky":  # ! do we want this anymore?
             A_pred = model.intermediates["A"]
@@ -283,7 +301,7 @@ if __name__ == "__main__":
     print(f"Total training time: {timer.get_time('total training')}")
 
     time_str = time.strftime("%Y%m%d_%H%M%S")
-    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "logs", save_str)
+    save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", save_str)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     if save_model:
@@ -296,7 +314,7 @@ if __name__ == "__main__":
             params=dict(model.named_parameters()),
             show_attrs=True,
             show_saved=True,
-        ).render(f"{LEGGED_GYM_LQRC_DIR}/logs/model_viz", format="png")
+        ).render(f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/model_viz", format="png")
         print("Saving to", save_path)
 
     grad_kwargs = {"all_inputs": all_inputs} if test_case == "rosenbrock" else {}

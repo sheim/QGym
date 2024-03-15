@@ -7,7 +7,7 @@ from isaacgym import gymtorch
 # torch needs to be imported after isaacgym imports in local source
 import torch
 
-from learning import LEGGED_GYM_LQRC_DIR
+from learning import LEGGED_GYM_ROOT_DIR
 from learning.modules.lqrc.plotting import plot_trajectories
 
 
@@ -65,9 +65,9 @@ def play(env, runner, train_cfg, init_conditions):
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
-            runner.policy_cfg["actions"],
+            runner.actor_cfg["actions"],
             runner.get_inference_actions(),
-            runner.policy_cfg["disable_actions"],
+            runner.actor_cfg["disable_actions"],
         )
         env.step()
         pos_traj[i, :] = env.dof_pos.detach().cpu().numpy().squeeze()
@@ -89,9 +89,9 @@ if __name__ == "__main__":
     args = get_args()
     DEVICE = "cuda:0"
     npy_fn = (
-        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
+        f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/custom_high_returns.npy"
         if args.custom_critic
-        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+        else f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/standard_high_returns.npy"
     )
     init_conditions = np.array([[0.25, -0.75, 0.2, -0.7]])  # np.load(npy_fn)
     num_init_conditions = 2
@@ -100,13 +100,16 @@ if __name__ == "__main__":
         pos_traj, vel_traj, torques, rewards = play(
             env, runner, train_cfg, init_conditions
         )
+
+    high = np.hstack((init_conditions[0, 0], init_conditions[0, 2]))
+    low = np.hstack((init_conditions[0, 1], init_conditions[0, 3]))
+    title = f"High Return Init {high}, Low Return Init {low}"
+
     plot_trajectories(
         pos_traj,
         vel_traj,
         torques,
         rewards,
-        f"{LEGGED_GYM_LQRC_DIR}/logs/trajectories.png",
-        title=f"High Return Init (theta, omega) {np.hstack((init_conditions[0, 0], init_conditions[0, 2]))}, Low Return Init {np.hstack((init_conditions[0, 1], init_conditions[0, 3]))}",
+        f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/trajectories.png",
+        title=title,
     )
-    # plot_theta_omega_polar(np.vstack((init_conditions[:, 0], init_conditions[:, 2])), np.vstack((init_conditions[:, 1], init_conditions[:, 3])), npy_fn[:-4] + ".png")
-    # print(init_conditions[0, :])

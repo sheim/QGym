@@ -59,26 +59,32 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
     runner_class_name = "DataLoggingRunner"
 
-    class policy(FixedRobotCfgPPO.policy):
-        actor_hidden_dims = [128, 64, 32]
-        critic_hidden_dims = [128, 64, 32]
+    class actor:
+        hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"
 
-        actor_obs = [
+        obs = [
             "dof_pos",
             "dof_vel",
         ]
 
-        critic_obs = actor_obs
-
         actions = ["tau_ff"]
         disable_actions = False
-        standard_critic_nn = True
 
         class noise:
             dof_pos = 0.0
             dof_vel = 0.0
+
+    class critic:
+        obs = [
+            "dof_pos",
+            "dof_vel",
+        ]
+        hidden_dims = [128, 64, 32]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "tanh"
+        standard_critic_nn = True
 
         class reward:
             class weights:
@@ -115,5 +121,5 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32

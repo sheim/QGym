@@ -46,9 +46,9 @@ def play(env, runner, train_cfg):
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
-            runner.policy_cfg["actions"],
+            runner.actor_cfg["actions"],
             runner.get_inference_actions(),
-            runner.policy_cfg["disable_actions"],
+            runner.actor_cfg["disable_actions"],
         )
         env.step()
         env.check_exit()

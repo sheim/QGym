@@ -124,14 +124,14 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
 class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
+    runner_class_name = "OnPolicyRunner"
 
-    class policy(LeggedRobotRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [128, 64]
+    class actor:
+        hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 
-        actor_obs = [
+        obs = [
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
@@ -140,19 +140,9 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_target",
         ]
-        critic_obs = [
-            "base_height",
-            "base_lin_vel",
-            "base_ang_vel",
-            "projected_gravity",
-            "commands",
-            "dof_pos_obs",
-            "dof_vel",
-            "dof_pos_target",
-        ]
-
         actions = ["dof_pos_target"]
         add_noise = True
+        disable_actions = False
 
         class noise:
             scale = 1.0
@@ -164,8 +154,23 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             ang_vel = [0.3, 0.15, 0.4]
             gravity_vec = 0.1
 
-        class reward(LeggedRobotRunnerCfg.policy.reward):
-            class weights(LeggedRobotRunnerCfg.policy.reward.weights):
+    class critic:
+        hidden_dims = [128, 64]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            "dof_pos_obs",
+            "dof_vel",
+            "dof_pos_target",
+        ]
+
+        class reward:
+            class weights:
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
@@ -196,7 +201,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         learning_rate = 1.0e-5
         schedule = "adaptive"  # can be adaptive or fixed
         discount_horizon = 1.0  # [s]
-        GAE_bootstrap_horizon = 2.0  # [s]
+        # GAE_bootstrap_horizon = 2.0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 
@@ -204,5 +209,5 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         run_name = ""
         experiment_name = "mini_cheetah"
         max_iterations = 500
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32

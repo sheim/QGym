@@ -4,7 +4,6 @@ import time
 from gym.envs import __init__  # noqa: F401
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.utils import get_args, task_registry
-from learning import LEGGED_GYM_LQRC_DIR
 from learning.modules import Critic
 from learning.modules.lqrc.utils import get_load_path
 from learning.modules.lqrc.plotting import (
@@ -99,15 +98,15 @@ def get_ground_truth(env, runner, train_cfg, grid):
     )
     rewards_dict = {}
     rewards = np.zeros((runner.num_steps_per_env, env.num_envs))
-    reward_list = runner.policy_cfg["reward"]["weights"]
+    reward_list = runner.critic_cfg["reward"]["weights"]
     n_steps = runner.num_steps_per_env
     states_to_log, logs = create_logging_dict(runner, n_steps, reward_list)
 
     for i in range(runner.num_steps_per_env):
         runner.set_actions(
-            runner.policy_cfg["actions"],
+            runner.actor_cfg["actions"],
             runner.get_inference_actions(),
-            runner.policy_cfg["disable_actions"],
+            runner.actor_cfg["disable_actions"],
         )
         env.step()
         terminated = runner.get_terminated()
@@ -153,9 +152,9 @@ if __name__ == "__main__":
     DEVICE = "cuda:0"
     steps = 50
     npy_fn = (
-        f"{LEGGED_GYM_LQRC_DIR}/logs/custom_training_data.npy"
+        f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/custom_training_data.npy"
         if args.custom_critic
-        else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_training_data.npy"
+        else f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/standard_training_data.npy"
     )
     data = np.load(npy_fn)
     # ! data is normalized
@@ -167,7 +166,7 @@ if __name__ == "__main__":
 
     EXPORT_POLICY = False
     time_str = time.strftime("%b%d_%H-%M-%S")
-    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, f"logs/{time_str}")
+    save_path = os.path.join(LEGGED_GYM_ROOT_DIR, f"logs/{time_str}")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     # get ground truth
@@ -176,12 +175,11 @@ if __name__ == "__main__":
 
     ground_truth_returns, logs = get_ground_truth(env, runner, train_cfg, grid)
     grid_gt_combined = np.hstack((grid.detach().cpu().numpy(), ground_truth_returns.T))
-    gt_save_path = f"{LEGGED_GYM_LQRC_DIR}/logs/ground_truth.npy"
+    gt_save_path = f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/ground_truth.npy"
     np.save(gt_save_path, grid_gt_combined)
     print("Saved high returns to", gt_save_path)
 
     exit()
-
 
     # logs = {k: v.detach().cpu().numpy() for k, v in logs.items()}
     # np.savez_compressed(os.path.join(save_path, "data.npz"), **logs)
@@ -199,9 +197,9 @@ if __name__ == "__main__":
     #         )
     # high_gt_returns = np.array(high_gt_returns)
     # returns_save_path = (
-    #     f"{LEGGED_GYM_LQRC_DIR}/logs/custom_high_returns.npy"
+    #     f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/custom_high_returns.npy"
     #     if args.custom_critic
-    #     else f"{LEGGED_GYM_LQRC_DIR}/logs/standard_high_returns.npy"
+    #     else f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/standard_high_returns.npy"
     # )
     # np.save(returns_save_path, high_gt_returns)
     # print("Saved high returns to", returns_save_path)
@@ -241,5 +239,4 @@ if __name__ == "__main__":
     )
 
     # ! store data dist with model logs to ensure they're paired properly
-    plot_training_data_dist(npy_fn,
-                            save_path + "/data_distribution.png")
+    plot_training_data_dist(npy_fn, save_path + "/data_distribution.png")

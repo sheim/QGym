@@ -170,21 +170,24 @@ class CholeskyOffset1(QuadraticNetCholesky):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        C = self.create_cholesky(output[:, :self.L_indices])
+        C = self.create_cholesky(output[:, : self.L_indices])
         A = C.bmm(C.transpose(1, 2))
-        offset = output[:, self.L_indices:]
+        offset = output[:, self.L_indices :]
         x_bar = x - offset
-        y_pred = (x_bar.unsqueeze(2).transpose(1, 2).bmm(A).bmm(x_bar.unsqueeze(2))).squeeze(2)
+        y_pred = (
+            x_bar.unsqueeze(2).transpose(1, 2).bmm(A).bmm(x_bar.unsqueeze(2))
+        ).squeeze(2)
         return y_pred
 
     def save_intermediate(self):
         """
         Forward hook to save A and offset
         """
+
         def hook(module, input, output):
-            C = self.create_cholesky(output[:, :self.L_indices])
+            C = self.create_cholesky(output[:, : self.L_indices])
             A = C.bmm(C.transpose(1, 2))
-            offset = output[:, self.L_indices:]
+            offset = output[:, self.L_indices :]
             self.intermediates["A"] = A
             self.intermediates["offset"] = offset
 
@@ -207,13 +210,16 @@ class CholeskyOffset2(QuadraticNetCholesky):
         output = self.activation_3(output)
         C = self.create_cholesky(output)
         A = C.bmm(C.transpose(1, 2))
-        y_pred = (xhat.unsqueeze(2).transpose(1, 2).bmm(A).bmm(xhat.unsqueeze(2))).squeeze(2)
+        y_pred = (
+            xhat.unsqueeze(2).transpose(1, 2).bmm(A).bmm(xhat.unsqueeze(2))
+        ).squeeze(2)
         return y_pred
 
     def save_intermediate(self):
         """
         Forward hook to save A
         """
+
         def hook(module, input, output):
             C = self.create_cholesky(output)
             A = C.bmm(C.transpose(1, 2))
@@ -225,6 +231,7 @@ class CholeskyOffset2(QuadraticNetCholesky):
         """
         Forward hook to save xhat for debugging
         """
+
         def hook(module, input, output):
             self.intermediates["xhat"] = output
 

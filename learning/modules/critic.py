@@ -16,11 +16,6 @@ class Critic(nn.Module):
         standard_nn=True,
         **kwargs,
     ):
-        if kwargs:
-            print(
-                "Critic.__init__ got unexpected arguments, "
-                "which will be ignored: " + str([key for key in kwargs.keys()])
-            )
         super().__init__()
 
         self.NN = (
@@ -34,9 +29,9 @@ class Critic(nn.Module):
 
     def evaluate(self, critic_observations):
         if self._normalize_obs:
-            critic_observations = self.normalize(critic_observations)
+            with torch.no_grad():
+                critic_observations = self.obs_rms(critic_observations)
         return self.NN(critic_observations).squeeze()
 
-    def normalize(self, observation):
-        with torch.no_grad():
-            return self.obs_rms(observation)
+    def loss_fn(self, input, target):
+        return nn.functional.mse_loss(input, target, reduction="mean")

@@ -126,8 +126,7 @@ def test_logging_iteration():
     logger.register_category("performanceAB", mocky, ["a", "b"])
 
     for _ in range(10):
-        logger.log_category("performanceA")
-        logger.log_category("performanceAB")
+        logger.log_all_categories()
         logger.finish_iteration()
 
     for key, val in logger.iteration_logs.logs["performanceA"].items():
