@@ -1,6 +1,6 @@
 from gym.envs import __init__  # noqa: F401
 from gym.utils import get_args, task_registry
-from gym.utils import KeyboardInterface
+from gym.utils import SliderInterface
 from gym.utils import VisualizationRecorder
 import numpy as np
 # torch needs to be imported after isaacgym imports in local source
@@ -28,13 +28,9 @@ def setup(args):
     return env, runner, train_cfg
 
 
+
 def play(env, runner, train_cfg):
-    # * set up recording
-    if env.cfg.viewer.record:
-        recorder = VisualizationRecorder(
-            env, train_cfg.runner.experiment_name, train_cfg.runner.load_run
-        )
-    saveLogs = True
+    saveLogs = False
     log = {'dof_pos_obs': [], 
            'dof_vel': [], 
            'torques': [],
@@ -47,13 +43,22 @@ def play(env, runner, train_cfg):
            'reward': [],
             'dof_names': [],
            }
-    
+    RECORD_FRAMES = False
+    print(env.dof_names)
+ 
     # * set up interface: GamepadInterface(env) or KeyboardInterface(env)
     COMMANDS_INTERFACE = hasattr(env, "commands")
     if COMMANDS_INTERFACE:
         # interface = GamepadInterface(env)
-        interface = KeyboardInterface(env)
-    
+        interface = SliderInterface(env)
+    img_idx = 0
+
+    for i in range(10*int(env.max_episode_length)):
+
+   
+
+        #print(env.num_envs)
+        #print(env.torques.size())
         log['dof_pos_obs'] += (env.dof_pos_obs.tolist())
         log['dof_vel'] += (env.dof_vel.tolist())
         log['torques'] += (env.torques.tolist())
@@ -65,18 +70,16 @@ def play(env, runner, train_cfg):
         log['dof_pos_error']+=(env.default_dof_pos - env.dof_pos).tolist()
         
         reward_weights = runner.policy_cfg['reward']['weights']
+        #print(runner.get_rewards(reward_weights))
         log['reward'] += runner.get_rewards(reward_weights).tolist()
          
-        print(i)
+        #print(i)
         if i ==1000 and saveLogs:
             log['dof_names'] = env.dof_names
             np.savez('new_logs', **log)
 
-    for i in range(10 * int(env.max_episode_length)):
         if COMMANDS_INTERFACE:
             interface.update(env)
-        if env.cfg.viewer.record:
-            recorder.update(i)
         runner.set_actions(
             runner.policy_cfg["actions"],
             runner.get_inference_actions(),
@@ -86,7 +89,9 @@ def play(env, runner, train_cfg):
         env.check_exit()
 
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
+    EXPORT_POLICY = True
     args = get_args()
     with torch.no_grad():
         env, runner, train_cfg = setup(args)
