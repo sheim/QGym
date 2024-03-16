@@ -24,7 +24,7 @@ Simple Foot: foot approximated as single box-contact -->
     </inertial>
     <visual>
       <origin
-        xyz="0 0 0"
+        xyz="-0.00565 0 -0.05735"
         rpy="0 0 0" />
       <geometry>
         <mesh
@@ -47,16 +47,16 @@ Simple Foot: foot approximated as single box-contact -->
     name="left_hip_yaw">
     <inertial>
       <origin
-        xyz="-0.065362  -0.000128  -0.063947"
+        xyz="-0.065677489200101  -0.001868461810995  -0.063608863694661"
         rpy="0 0 0" />
-      <mass value=" 0.842752" />
+      <mass value="1.03610198878872" />
       <inertia
-        ixx="0.001502 "
-        ixy="0.000004 "
-        ixz="0.000533"
-        iyy="0.001361 "
-        iyz="0.000000"
-        izz="0.001170" />
+        ixx="0.00567730565299"
+        ixy="-0.000123286844996"
+        ixz="-0.003803404981833"
+        iyy="0.01000676842184"
+        iyz="-0.000123074285517"
+        izz="0.005622832879212" />
     </inertial>
     <visual>
       <origin
@@ -77,7 +77,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="06_left_hip_yaw"
     type="revolute">
     <origin
-      xyz="0 0.082 0"
+      xyz="-0.00565 0.082 -0.05735"
       rpy="0 -0.174533 0" />
     <parent
       link="base" />
@@ -91,16 +91,16 @@ Simple Foot: foot approximated as single box-contact -->
     name="left_hip_abad">
     <inertial>
       <origin
-        xyz=" 0.067579  -0.013035 0.000132"
+        xyz="0.058112835965384 -0.013505242569335 0.014569589589137"
         rpy="0 0 0" />
-      <mass value="1.199631" />
+      <mass value="1.10845642066563" />
       <inertia
-        ixx="0.001745 "
-        ixy="0.000003 "
-        ixz=" -0.000082"
-        iyy="0.003338 "
-        iyz=" -0.000010 "
-        izz=" 0.001951" />
+        ixx="0.001946765858581"
+        ixy="0.000875106562403"
+        ixz="-0.000401465299746"
+        iyy="0.005349108237236"
+        iyz="0.000216871363655"
+        izz="0.005114615354879" />
     </inertial>
     <visual>
       <origin
@@ -135,20 +135,20 @@ Simple Foot: foot approximated as single box-contact -->
     name="left_upper_leg">
     <inertial>
       <origin
-        xyz=" -0.001100  0.026032 -0.078842"
+        xyz="0.004372713492862  0.025610933851324 -0.09370979295432"
         rpy="0 0 0" />
-      <mass value="2.634789" />
+      <mass value="2.9466623694791" />
       <inertia
-        ixx="0.024489 "
-        ixy="0.000068 "
-        ixz=" 0.000512 "
-        iyy="0.026049 "
-        iyz="0.002657 "
-        izz="0.003812 " />
+        ixx="0.056092231067477"
+        ixy="-0.000490336872141"
+        ixz="0.004048303589526"
+        iyy="0.055684035451577"
+        iyz="0.009711050120379"
+        izz="0.005614311941973" />
     </inertial>
     <visual>
       <origin
-        xyz="0 0 0"
+        xyz="0.01283 0 -0.0174"
         rpy="0 0 0" />
       <geometry>
         <mesh
@@ -163,7 +163,7 @@ Simple Foot: foot approximated as single box-contact -->
     <collision>
         <origin rpy="0 0 0" xyz="0.0 0.0 -0.16"/>
         <geometry>
-            <cylinder radius="0.035" length="0.18"/>
+            <cylinder radius="0.035" length="0.16"/>
         </geometry>
     </collision>
   </link>
@@ -171,7 +171,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="08_left_hip_pitch"
     type="revolute">
     <origin
-      xyz="0.08837 -0.00284 -0.01385"
+      xyz="0.07133 -0.002 0.0"
       rpy="0 -0.261799 0" />
     <parent
       link="left_hip_abad" />
@@ -186,16 +186,16 @@ Simple Foot: foot approximated as single box-contact -->
     name="left_lower_leg">
     <inertial>
       <origin
-        xyz="0.005232 0.000457  -0.131581"
+        xyz="-0.014401204856919 -0.001696539969774 0.027394674089734"
         rpy="0 0 0" />
-      <mass value="0.346291" />
+      <mass value="0.238357586915263" />
       <inertia
-        ixx=" 0.002952 "
-        ixy=" 0.0"
-        ixz=" 0.000083"
-        iyy=" 0.002943"
-        iyz=" 0.000033"
-        izz=" 0.000238" />
+        ixx="0.010975524578483"
+        ixy="0.000008"
+        ixz="0.000491443762571"
+        iyy="0.011034922309191"
+        iyz="0.00009"
+        izz="0.000294128826005" />
     </inertial>
     <visual>
       <origin
@@ -214,7 +214,7 @@ Simple Foot: foot approximated as single box-contact -->
     <collision>
         <origin rpy="0 0 0" xyz="0.0 0.0 -0.15"/>
         <geometry>
-            <cylinder radius="0.035" length="0.16"/>
+            <cylinder radius="0.05" length="0.13"/>
         </geometry>
     </collision>
   </link>
@@ -222,7 +222,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="09_left_knee"
     type="revolute">
     <origin
-      xyz="-0.01306 0.0 -0.24916"
+      xyz="0.0 0.0 -0.2666"
       rpy="0 0 0" />
     <parent
       link="left_upper_leg" />
@@ -237,16 +237,16 @@ Simple Foot: foot approximated as single box-contact -->
     name="left_foot">
     <inertial>
       <origin
-        xyz="0.022696 0.0 -0.013879 "
+        xyz="0.003235539757018 -0.000321708855445 -0.024835658864996"
         rpy="0 0 0" />
-      <mass value=" 0.279583" />
+      <mass value="0.434332672008075" />
       <inertia
-        ixx="0.000092"
-        ixy="0.0"
-        ixz="-0.000054 "
-        iyy="0.08 "
-        iyz="0.0 "
-        izz="0.000769" />
+        ixx="0.000370048860637"
+        ixy="0.000000361777951684732"
+        ixz="-0.000118105634294"
+        iyy="0.002398432542765"
+        iyz="-0.00000349674373383071"
+        izz="0.002083498286479" />
     </inertial>
     <!-- Foot inertia Iyy default: 0.000806
     Modified to account for reflected motor inertia -->
@@ -265,9 +265,13 @@ Simple Foot: foot approximated as single box-contact -->
       </material>
     </visual>
     <collision>
-        <origin rpy="1.57079 0 0" xyz="0.03 0.0 -0.03"/>
+        <!-- <origin rpy="1.57079 0 0" xyz="0.03 0.0 -0.03"/>
         <geometry>
             <box size="0.20 0.02 0.04"/>
+        </geometry> -->
+        <origin rpy="0 1.57079 0" xyz="0.03 0.0 -0.03"/>
+        <geometry>
+            <cylinder length="0.15" radius="0.02"/>
         </geometry>
     </collision>
   </link>
@@ -283,22 +287,22 @@ Simple Foot: foot approximated as single box-contact -->
       link="left_foot" />
     <axis
       xyz="0 1 0" />
-          <limit effort="68" lower="-1.5" upper="1.5" velocity="24"/>
+          <limit effort="68" lower="-0.97" upper="0.97" velocity="24"/>
   </joint>
  <link
     name="right_hip_yaw">
     <inertial>
       <origin
-        xyz="-0.065362  0.000128  -0.063947"
+        xyz="-0.065184991281157 0.001391305332592 -0.064121979944007"
         rpy="0 0 0" />
-      <mass value=" 0.842752" />
+      <mass value="0.944770728939119" />
       <inertia
-        ixx="0.001502 "
-        ixy="-0.000004 "
-        ixz="-0.000533"
-        iyy="0.001361 "
-        iyz="0.000000"
-        izz="0.001170" />
+        ixx="0.005357052181805"
+        ixy="0.0000818747123"
+        ixz="-0.003427894976548"
+        iyy="0.00923535702765"
+        iyz="0.000084203916519"
+        izz="0.005156514191139" />
     </inertial>
     <visual>
       <origin
@@ -319,7 +323,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="01_right_hip_yaw"
     type="revolute">
     <origin
-      xyz="0 -0.082 0"
+      xyz="-0.00565 -0.082 -0.05735"
       rpy="0 -0.174533 0" />
     <parent
       link="base" />
@@ -334,16 +338,16 @@ Simple Foot: foot approximated as single box-contact -->
     name="right_hip_abad">
     <inertial>
       <origin
-        xyz=" 0.067579  0.013035 0.000132"
+        xyz="0.052141443908008  0.013947510011721  0.024209980877026"
         rpy="0 0 0" />
-      <mass value="1.199631" />
+      <mass value="2.22134334871633" />
       <inertia
-        ixx="0.001745 "
-        ixy="-0.000003 "
-        ixz=" 0.000082"
-        iyy="0.003338 "
-        iyz=" -0.000010 "
-        izz=" 0.001951" />
+        ixx="0.003252746154843"
+        ixy="-0.001623511116749"
+        ixz="-0.002263316469026"
+        iyy="0.008719830483193"
+        iyz="-0.000745379387761"
+        izz="0.007646079982067" />
     </inertial>
     <visual>
       <origin
@@ -379,20 +383,20 @@ Simple Foot: foot approximated as single box-contact -->
     name="right_upper_leg">
     <inertial>
       <origin
-        xyz=" -0.001100  -0.026032 -0.078842"
+        xyz="0.006755522658048 -0.024808560969254 -0.091196015308728"
         rpy="0 0 0" />
-      <mass value="2.634789" />
+      <mass value="3.20991362323237" />
       <inertia
-        ixx="0.024489 "
-        ixy="-0.000068 "
-        ixz=" -0.000512 "
-        iyy="0.026049 "
-        iyz="0.002657 "
-        izz="0.003812 " />
+        ixx="0.054987344909268"
+        ixy="0.000849211308416"
+        ixz="0.006853857315879"
+        iyy="0.055272867443404"
+        iyz="-0.009594753352539"
+        izz="0.006327830944097" />
     </inertial>
     <visual>
       <origin
-        xyz="0 0 0"
+        xyz="0.01283 0 -0.0174"
         rpy="0 0 0" />
       <geometry>
         <mesh
@@ -407,7 +411,7 @@ Simple Foot: foot approximated as single box-contact -->
     <collision>
         <origin rpy="0 0 0" xyz="0.0 0.0 -0.16"/>
         <geometry>
-            <cylinder radius="0.035" length="0.18"/>
+            <cylinder radius="0.035" length="0.16"/>
         </geometry>
     </collision>
   </link>
@@ -415,7 +419,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="03_right_hip_pitch"
     type="revolute">
     <origin
-      xyz="0.08837 0.00284 -0.01385"
+      xyz="0.07133 0.002 0.0"
       rpy="0 -0.261799 0" />
     <parent
       link="right_hip_abad" />
@@ -430,16 +434,16 @@ Simple Foot: foot approximated as single box-contact -->
     name="right_lower_leg">
     <inertial>
       <origin
-        xyz="0.005232 -0.000457  -0.131581"
+        xyz="-0.021181283533562 0.001390129997816 0.007356617786071"
         rpy="0 0 0" />
-      <mass value="0.346291" />
+      <mass value="0.224587667752391" />
       <inertia
-        ixx=" 0.002952 "
-        ixy=" 0.0"
-        ixz=" -0.000083"
-        iyy=" 0.002943"
-        iyz=" 0.000033"
-        izz=" 0.000238" />
+        ixx="0.010215815580851"
+        ixy="0.000006180468"
+        ixz="0.000362813548474"
+        iyy="0.010326014694671"
+        iyz="-0.0000402996255"
+        izz="0.000352688938011" />
     </inertial>
     <visual>
       <origin
@@ -458,7 +462,7 @@ Simple Foot: foot approximated as single box-contact -->
     <collision>
         <origin rpy="0 0 0" xyz="0.0 0.0 -0.15"/>
         <geometry>
-            <cylinder radius="0.035" length="0.16"/>
+            <cylinder radius="0.05" length="0.13"/>
         </geometry>
     </collision>
   </link>
@@ -466,7 +470,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="04_right_knee"
     type="revolute">
     <origin
-      xyz="-0.01306 0.0 -0.24916"
+      xyz="0.0 0.0 -0.2666"
       rpy="0 0 0" />
     <parent
       link="right_upper_leg" />
@@ -481,16 +485,16 @@ Simple Foot: foot approximated as single box-contact -->
     name="right_foot">
     <inertial>
       <origin
-        xyz="0.022696 0.0 -0.013879 "
+        xyz="0.008967719334277 0.00070566689364 -0.023317389576155"
         rpy="0 0 0" />
-      <mass value=" 0.279583" />
+      <mass value="0.48135110558567" />
       <inertia
-        ixx="0.000092"
-        ixy="0.0"
-        ixz="0.000054 "
-        iyy="0.08 "
-        iyz="0.0 "
-        izz="0.000769" />
+        ixx="0.000362930457918"
+        ixy="-0.00000178237"
+        ixz="-0.000047781"
+        iyy="0.002320413729313"
+        iyz="0.00000826302"
+        izz="0.002012953781741" />
     </inertial>
     <!-- Foot inertia Iyy default: 0.000806
     Modified to account for reflected motor inertia -->
@@ -509,9 +513,13 @@ Simple Foot: foot approximated as single box-contact -->
       </material>
     </visual>
     <collision>
-        <origin rpy="1.57079 0 0" xyz="0.03 0.0 -0.03"/>
+        <!-- <origin rpy="1.57079 0 0" xyz="0.03 0.0 -0.03"/>
         <geometry>
             <box size="0.20 0.02 0.04"/>
+        </geometry> -->
+        <origin rpy="0 1.57079 0" xyz="0.03 0.0 -0.03"/>
+        <geometry>
+          <cylinder length="0.15" radius="0.02"/>
         </geometry>
     </collision>
   </link>
@@ -527,7 +535,7 @@ Simple Foot: foot approximated as single box-contact -->
       link="right_foot" />
     <axis
       xyz="0 1 0" />
-          <limit effort="68" lower="-1.5" upper="1.5" velocity="24"/>
+          <limit effort="68" lower="-0.97" upper="0.97" velocity="24"/>
   </joint>
   <!-- Left Arm -->
   <link
@@ -564,7 +572,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="15_left_shoulder_pitch"
     type="fixed">
     <origin
-      xyz="0.01911 0.17608 0.30392"
+      xyz="0.01346 0.17608 0.24657"
       rpy="0 0 0" />
     <parent
       link="base" />
@@ -792,7 +800,7 @@ Simple Foot: foot approximated as single box-contact -->
     name="11_right_shoulder_pitch"
     type="fixed">
     <origin
-      xyz="0.01911 -0.17608 0.30392"
+      xyz="0.01346 -0.17608 0.24657"
       rpy="0 0 0" />
     <parent
       link="base" />

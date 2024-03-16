@@ -532,6 +532,29 @@ class LeggedRobot(BaseTask):
             self.num_envs, 1, dtype=torch.float, device=self.device
         )
 
+        # # * get the body_name to body_index dict
+        # body_dict = self.gym.get_actor_rigid_body_dict(
+        #     self.envs[0], self.actor_handles[0]
+        # )
+        # # * extract a list of body_names where the index is the id number
+        # body_names = [
+        #     body_tuple[0]
+        #     for body_tuple in sorted(
+        #         body_dict.items(), key=lambda body_tuple: body_tuple[1]
+        #     )
+        # ]
+        # # * construct a list of id numbers corresponding to end_effectors
+        # self.end_effector_ids = []
+        # for end_effector_name in self.cfg.asset.foot_collisionbox_names:
+        #     self.end_effector_ids.extend(
+        #         [
+        #             body_names.index(body_name)
+        #             for body_name in body_names
+        #             if end_effector_name in body_name
+        #         ]
+        #     )
+        # # ----------------------------------------
+
         if self.cfg.terrain.measure_heights:
             self.height_points = self._init_height_points()
         self.measured_heights = 0
@@ -994,11 +1017,11 @@ class LeggedRobot(BaseTask):
 
     def _reward_ang_vel_xy(self):
         """Penalize xy axes base angular velocity"""
-        return -torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
+        return -torch.mean(torch.square(self.base_ang_vel[:, :2]), dim=1)
 
     def _reward_orientation(self):
         """Penalize non flat base orientation"""
-        return -torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
+        return -torch.mean(torch.square(self.projected_gravity[:, :2]), dim=1)
 
     def _reward_base_height(self):
         """Penalize base height away from target"""
@@ -1009,11 +1032,11 @@ class LeggedRobot(BaseTask):
 
     def _reward_torques(self):
         """Penalize torques"""
-        return -torch.sum(torch.square(self.torques), dim=1)
+        return -torch.mean(torch.square(self.torques), dim=1)
 
     def _reward_dof_vel(self):
         """Penalize dof velocities"""
-        return -torch.sum(torch.square(self.dof_vel), dim=1)
+        return -torch.mean(torch.square(self.dof_vel), dim=1)
 
     def _reward_action_rate(self):
         """Penalize changes in actions"""
@@ -1025,7 +1048,7 @@ class LeggedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_action_rate2(self):
         """Penalize changes in actions"""
@@ -1039,7 +1062,7 @@ class LeggedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_collision(self):
         """Penalize collisions on selected bodies"""
@@ -1064,26 +1087,26 @@ class LeggedRobot(BaseTask):
         # * lower limit
         out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)
-        return -torch.sum(out_of_limits, dim=1)
+        return -torch.mean(out_of_limits, dim=1)
 
     def _reward_dof_vel_limits(self):
         """Penalize dof velocities too close to the limit"""
         # * clip to max error = 1 rad/s per joint to avoid huge penalties
         limit = self.cfg.reward_settings.soft_dof_vel_limit
         error = self.dof_vel.abs() - self.dof_vel_limits * limit
-        return -torch.sum(error.clip(min=0.0, max=1.0), dim=1)
+        return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)
 
     def _reward_torque_limits(self):
         """penalize torques too close to the limit"""
         limit = self.cfg.reward_settings.soft_torque_limit
         error = self.torques.abs() - self.torque_limits * limit
-        return -torch.sum(error.clip(min=0.0, max=1.0), dim=1)
+        return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)
 
     def _reward_tracking_lin_vel(self):
         """Tracking of linear velocity commands (xy axes)"""
         error = torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2])
         error = torch.exp(-error / self.cfg.reward_settings.tracking_sigma)
-        return torch.sum(error, dim=1)
+        return torch.mean(error, dim=1)
 
     def _reward_tracking_ang_vel(self):
         """Tracking of angular velocity commands (yaw)"""
@@ -1092,7 +1115,7 @@ class LeggedRobot(BaseTask):
 
     def _reward_feet_contact_forces(self):
         """penalize high contact forces"""
-        return -torch.sum(
+        return -torch.mean(
             (
                 torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
                 - self.cfg.reward_settings.max_contact_force

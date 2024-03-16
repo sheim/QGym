@@ -3,13 +3,15 @@ from gym.envs.base.legged_robot_config import (
     LeggedRobotRunnerCfg,
 )
 
+BASE_HEIGHT_REF = 0.80
+
 
 class MITHumanoidCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_observations = 49 + 3 * 18  # 121
         num_actuators = 18
-        episode_length_s = 100  # episode length in seconds
+        episode_length_s = 5  # episode length in seconds
         num_privileged_obs = num_observations
 
     class terrain(LeggedRobotCfg.terrain):
@@ -75,13 +77,13 @@ class MITHumanoidCfg(LeggedRobotCfg):
         ]  # yaw
 
         root_vel_range = [
-            [-0.1, 0.1],  # x
-            [-0.1, 0.1],  # y
-            [-0.1, 0.1],  # z
-            [-0.1, 0.1],  # roll
-            [-0.1, 0.1],  # pitch
-            [-0.1, 0.1],
-        ]  # yaw
+            [-0.5, 1.5],  # x
+            [-0.55, 0.55],  # y
+            [-0.35, 0.1],  # z
+            [-0.35, 0.35],  # roll
+            [-0.35, 0.35],  # pitch
+            [-0.35, 0.35],  # yaw
+        ]
 
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
@@ -97,21 +99,24 @@ class MITHumanoidCfg(LeggedRobotCfg):
             "elbow": 40.0,
         }  # [N*m/rad]
         damping = {
-            "hip_yaw": 5.0,
-            "hip_abad": 5.0,
-            "hip_pitch": 5.0,
-            "knee": 5.0,
-            "ankle": 5.0,
-            "shoulder_pitch": 5.0,
-            "shoulder_abad": 5.0,
-            "shoulder_yaw": 5.0,
-            "elbow": 5.0,
+            "hip_yaw": 2.0,
+            "hip_abad": 2.0,
+            "hip_pitch": 2.0,
+            "knee": 2.0,
+            "ankle": 2.0,
+            "shoulder_pitch": 2.0,
+            "shoulder_abad": 2.0,
+            "shoulder_yaw": 2.0,
+            "elbow": 1.0,
         }  # [N*m*s/rad]
 
         ctrl_frequency = 100
-        desired_sim_frequency = 800
+        desired_sim_frequency = 1000
 
         filter_gain = 0.1586  # 1: no filtering, 0: wall
+
+    class oscillator:
+        base_frequency = 1.5  # [Hz]
 
     class commands:
         resampling_time = 10.0  # time before command are changed[s]
@@ -138,6 +143,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
             + "mit_humanoid/urdf/humanoid_R_sf.urdf"
         )
+        # foot_collisionbox_names = ["foot"]
         foot_name = "foot"
         penalize_contacts_on = ["base", "arm"]
         terminate_after_contacts_on = ["base"]
@@ -148,35 +154,88 @@ class MITHumanoidCfg(LeggedRobotCfg):
         # * see GymDofDriveModeFlags
         # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
         default_dof_drive_mode = 3
+        fix_base_link = False
         disable_gravity = False
         disable_motors = False
         apply_humanoid_jacobian = False
+        total_mass = 25.0
 
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
         max_contact_force = 1500.0
-
-        base_height_target = 0.65
+        base_height_target = BASE_HEIGHT_REF
         tracking_sigma = 0.5
+
+        # a smooth switch based on |cmd| (commanded velocity).
+        switch_scale = 0.5
+        switch_threshold = 0.2
 
     class scaling(LeggedRobotCfg.scaling):
         # * dimensionless time: sqrt(L/g) or sqrt(I/[mgL]), with I=I0+mL^2
-        virtual_leg_length = 0.65
-        dimensionless_time = (virtual_leg_length / 9.81) ** 0.5
-        base_height = virtual_leg_length
-        base_lin_vel = virtual_leg_length / dimensionless_time
-        base_ang_vel = 3.14 / dimensionless_time
-        dof_vel = 20  # ought to be roughly max expected speed.
-        height_measurements = virtual_leg_length
+        # virtual_leg_length = 0.65
+        # dimensionless_time = (virtual_leg_length / 9.81) ** 0.5
+        # base_height = virtual_leg_length
+        # base_lin_vel = virtual_leg_length / dimensionless_time
+        # base_ang_vel = 3.14 / dimensionless_time
+        # dof_vel = 20  # ought to be roughly max expected speed.
+        # height_measurements = virtual_leg_length
 
-        # todo check order of joints, create per-joint scaling
-        dof_pos = 3.14
+        # # todo check order of joints, create per-joint scaling
+        # dof_pos = 3.14
+        # dof_pos_obs = dof_pos
+        # # * Action scales
+        # dof_pos_target = dof_pos
+        # tau_ff = 0.1
+        base_ang_vel = 2.5
+        base_lin_vel = 1.5
+        commands = 1
+        base_height = BASE_HEIGHT_REF
+        dof_pos = [
+            0.1,
+            0.2,
+            0.4,
+            0.4,
+            0.4,
+            0.1,
+            0.2,
+            0.4,
+            0.4,
+            0.4,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+        ]
         dof_pos_obs = dof_pos
-        # * Action scales
+        # # * Action scales
         dof_pos_target = dof_pos
-        tau_ff = 0.1
+        dof_vel = [
+            0.5,
+            1.0,
+            4.0,
+            4.0,
+            2.0,
+            0.5,
+            1.0,
+            4.0,
+            4.0,
+            2.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+        ]
+        dof_pos_history = 3 * dof_pos_obs
 
 
 class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
@@ -184,6 +243,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     runner_class_name = "OnPolicyRunner"
 
     class policy(LeggedRobotRunnerCfg.policy):
+        disable_actions = False
         init_noise_std = 1.0
         actor_hidden_dims = [512, 256, 128]
         critic_hidden_dims = [512, 256, 128]
@@ -199,26 +259,27 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_history",
+            "oscillator_obs",
         ]
         critic_obs = actor_obs
 
         actions = ["dof_pos_target"]
 
         class noise:
-            base_height = 0.05
-            dof_pos_obs = 0.0
-            dof_vel = 0.0
-            base_lin_vel = 0.1
-            base_ang_vel = 0.2
-            projected_gravity = 0.05
-            height_measurements = 0.1
+            base_height = 0.0  # 0.05
+            dof_pos_obs = 0.0  # 0.0
+            dof_vel = 0.0  # 0.0
+            base_lin_vel = 0.0  # 0.1
+            base_ang_vel = 0.0  # 0.2
+            projected_gravity = 0.0  # 0.05
+            height_measurements = 0.0  # 0.1
 
         class reward:
             class weights:
-                tracking_ang_vel = 0.5
-                tracking_lin_vel = 0.5
-                orientation = 1.5
-                torques = 5.0e-6
+                tracking_ang_vel = 1.5
+                tracking_lin_vel = 3.0
+                orientation = 1.0
+                torques = 5.0e-4
                 min_base_height = 1.5
                 action_rate = 0.01
                 action_rate2 = 0.001
@@ -226,8 +287,10 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
                 ang_vel_xy = 0.0
                 dof_vel = 0.0
                 stand_still = 0.0
-                dof_pos_limits = 0.0
-                dof_near_home = 0.5
+                dof_pos_limits = 0.25
+                dof_near_home = 0.1
+                stance = 1.0
+                swing = 1.0
 
             class termination_weight:
                 termination = 15
@@ -245,13 +308,15 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         schedule = "adaptive"  # could be adaptive, fixed
         gamma = 0.999
         lam = 0.95
+        discount_horizon = 0.5  # [s]
+        GAE_bootstrap_horizon = 0.2  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 24
+        num_steps_per_env = 32
         max_iterations = 1000
         run_name = "Standing"
         experiment_name = "Humanoid"

@@ -163,7 +163,7 @@ class LeggedRobotCfg(BaseConfig):
         file = ""
         # * name of the feet bodies,
         # * used to index body state and contact force tensors
-        foot_name = "None"
+        foot_name = "foot"
         penalize_contacts_on = []
         terminate_after_contacts_on = []
         end_effector_names = []
