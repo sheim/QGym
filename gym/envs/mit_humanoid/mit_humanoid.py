@@ -2,6 +2,7 @@ import torch
 
 from gym.envs.base.legged_robot import LeggedRobot
 from .jacobian import _apply_coupling
+from gym.utils import exp_avg_filter
 
 
 class MIT_Humanoid(LeggedRobot):
@@ -12,19 +13,17 @@ class MIT_Humanoid(LeggedRobot):
         super()._init_buffers()
 
     def _compute_torques(self):
-        return torch.clip(
-            _apply_coupling(
-                self.dof_pos,
-                self.dof_vel,
-                self.dof_pos_target + self.default_dof_pos,
-                self.dof_vel_target,
-                self.p_gains,
-                self.d_gains,
-                self.tau_ff,
-            ),
-            -self.torque_limits,
-            self.torque_limits,
-        )  # view shape
+        torques = _apply_coupling(
+            self.dof_pos,
+            self.dof_vel,
+            self.dof_pos_target + self.default_dof_pos,
+            self.dof_vel_target,
+            self.p_gains,
+            self.d_gains,
+            self.tau_ff,
+        )
+        torques = torques.clip(-self.torque_limits, self.torque_limits)
+        return exp_avg_filter(torques, self.torques, self.cfg.control.filter_gain)
 
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity w. squared exp

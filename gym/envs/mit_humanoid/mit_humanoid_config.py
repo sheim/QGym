@@ -111,6 +111,8 @@ class MITHumanoidCfg(LeggedRobotCfg):
         ctrl_frequency = 100
         desired_sim_frequency = 800
 
+        filter_gain = 0.1586  # 1: no filtering, 0: wall
+
     class commands:
         resampling_time = 10.0  # time before command are changed[s]
 
