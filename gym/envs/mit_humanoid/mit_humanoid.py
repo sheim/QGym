@@ -12,23 +12,19 @@ class MIT_Humanoid(LeggedRobot):
         super()._init_buffers()
 
     def _compute_torques(self):
-        self.desired_pos_target = self.dof_pos_target + self.default_dof_pos
-        q = self.dof_pos.clone()
-        qd = self.dof_vel.clone()
-        q_des = self.desired_pos_target.clone()
-        qd_des = self.dof_vel_target.clone()
-        tau_ff = self.tau_ff.clone()
-        kp = self.p_gains.clone()
-        kd = self.d_gains.clone()
-
-        if self.cfg.asset.apply_humanoid_jacobian:
-            torques = _apply_coupling(q, qd, q_des, qd_des, kp, kd, tau_ff)
-        else:
-            torques = kp * (q_des - q) + kd * (qd_des - qd) + tau_ff
-
-        torques = torch.clip(torques, -self.torque_limits, self.torque_limits)
-
-        return torques.view(self.torques.shape)
+        return torch.clip(
+            _apply_coupling(
+                self.dof_pos,
+                self.dof_vel,
+                self.dof_pos_target + self.default_dof_pos,
+                self.dof_vel_target,
+                self.p_gains,
+                self.d_gains,
+                self.tau_ff,
+            ),
+            -self.torque_limits,
+            self.torque_limits,
+        )  # view shape
 
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity w. squared exp
