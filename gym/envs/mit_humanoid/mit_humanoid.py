@@ -15,6 +15,31 @@ class MIT_Humanoid(LeggedRobot):
         self.oscillator_obs = torch.zeros(self.num_envs, 4, device=self.device)
         self.oscillator_freq = torch.zeros(self.num_envs, 2, device=self.device)
 
+        self.dof_pos_target_history = torch.zeros(
+            (self.num_envs, self.num_dof, 12), device=self.device
+        )
+        self._init_history_buffers()
+
+    def _init_history_buffers(self):
+        self.dof_pos_target_history = torch.zeros(
+            (self.num_envs, self.num_dof * self.cfg.env.history_length),
+            device=self.device,
+        )
+        self.dof_pos_history = torch.zeros(
+            self.num_envs,
+            self.num_dof * self.cfg.env.history_length,
+            device=self.device,
+        )
+        self.dof_vel_history = torch.zeros(
+            self.num_envs,
+            self.num_dof * self.cfg.env.history_length,
+            device=self.device,
+        )
+        self.history_counter = torch.zeros(self.num_envs, dtype=int, device=self.device)
+        self.history_threshold = int(
+            self.cfg.control.ctrl_frequency / self.cfg.env.history_frequency
+        )
+
     def _reset_system(self, env_ids):
         if len(env_ids) == 0:
             return
@@ -31,7 +56,14 @@ class MIT_Humanoid(LeggedRobot):
         self.oscillator_obs = torch.cat(
             (self.oscillators.cos(), self.oscillators.sin()), dim=1
         )
+        self._reset_history_buffers(env_ids)
         return
+
+    def _reset_history_buffers(self, ids):
+        n = self.cfg.env.history_length
+        self.dof_pos_target_history[ids] = self.dof_pos_target[ids].tile(n)
+        self.dof_pos_history[ids] = self.dof_pos_target[ids].tile(n)
+        self.dof_vel_history[ids] = self.dof_pos_target[ids].tile(n)
 
     # compute_torques accounting for coupling, and filtering torques
     def _compute_torques(self):
@@ -52,6 +84,7 @@ class MIT_Humanoid(LeggedRobot):
     def _post_decimation_step(self):
         super()._post_decimation_step()
         self._step_oscillators()
+        self._update_history_buffers()
 
     def _step_oscillators(self, dt=None):
         if dt is None:
@@ -61,6 +94,22 @@ class MIT_Humanoid(LeggedRobot):
         self.oscillator_obs = torch.cat(
             (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
         )
+
+    def _update_history_buffers(self):
+        self.history_counter += 1
+
+        ids = torch.nonzero(
+            self.history_counter == self.history_threshold, as_tuple=False
+        ).flatten()
+
+        self.dof_pos_target_history[ids].roll(self.num_dof, dims=1)  # check
+        self.dof_pos_target_history[ids, : self.num_dof] = self.dof_pos_target[ids]
+        self.dof_pos_history[ids].roll(self.num_dof, dims=1)  # check
+        self.dof_pos_history[ids, : self.num_dof] = self.dof_pos_target[ids]
+        self.dof_vel_history[ids].roll(self.num_dof, dims=1)  # check
+        self.dof_vel_history[ids, : self.num_dof] = self.dof_pos_target[ids]
+
+        self.history_counter[ids] = 0
 
     # --- rewards ---
 

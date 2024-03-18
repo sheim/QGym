@@ -12,7 +12,9 @@ class MITHumanoidCfg(LeggedRobotCfg):
         num_observations = 49 + 3 * 18  # 121
         num_actuators = 18
         episode_length_s = 5  # episode length in seconds
-        num_privileged_obs = num_observations
+
+        history_length = 3  # n samples
+        history_frequency = 10  # [Hz]
 
     class terrain(LeggedRobotCfg.terrain):
         pass
@@ -172,21 +174,6 @@ class MITHumanoidCfg(LeggedRobotCfg):
         switch_threshold = 0.2
 
     class scaling(LeggedRobotCfg.scaling):
-        # * dimensionless time: sqrt(L/g) or sqrt(I/[mgL]), with I=I0+mL^2
-        # virtual_leg_length = 0.65
-        # dimensionless_time = (virtual_leg_length / 9.81) ** 0.5
-        # base_height = virtual_leg_length
-        # base_lin_vel = virtual_leg_length / dimensionless_time
-        # base_ang_vel = 3.14 / dimensionless_time
-        # dof_vel = 20  # ought to be roughly max expected speed.
-        # height_measurements = virtual_leg_length
-
-        # # todo check order of joints, create per-joint scaling
-        # dof_pos = 3.14
-        # dof_pos_obs = dof_pos
-        # # * Action scales
-        # dof_pos_target = dof_pos
-        # tau_ff = 0.1
         base_ang_vel = 2.5
         base_lin_vel = 1.5
         commands = 1
