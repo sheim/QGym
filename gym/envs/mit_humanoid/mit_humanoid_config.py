@@ -70,15 +70,15 @@ class MITHumanoidCfg(LeggedRobotCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.7, 0.72],  # z
+            [0.7, 0.8],  # z
             [-0.1, 0.1],  # roll
             [-0.1, 0.1],  # pitch
             [-0.1, 0.1],
         ]  # yaw
 
         root_vel_range = [
-            [-0.5, 1.5],  # x
-            [-0.55, 0.55],  # y
+            [-0.5, 2.5],  # x
+            [-0.5, 0.5],  # y
             [-0.35, 0.1],  # z
             [-0.35, 0.35],  # roll
             [-0.35, 0.35],  # pitch
@@ -122,18 +122,18 @@ class MITHumanoidCfg(LeggedRobotCfg):
         resampling_time = 10.0  # time before command are changed[s]
 
         class ranges:
-            lin_vel_x = [-1.0, 1.0]  # min max [m/s]
+            lin_vel_x = [-1.0, 4.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 1  # max [rad/s]
 
     class push_robots:
         toggle = False
-        interval_s = 15
-        max_push_vel_xy = 0.05
-        push_box_dims = [0.1, 0.2, 0.3]  # x,y,z [m]
+        interval_s = 2
+        max_push_vel_xy = 0.6
+        push_box_dims = [0.1, 0.1, 0.3]  # x,y,z [m]
 
     class domain_rand:
-        randomize_friction = False
+        randomize_friction = True
         friction_range = [0.5, 1.25]
         randomize_base_mass = True
         added_mass_range = [-1.0, 1.0]
@@ -157,7 +157,6 @@ class MITHumanoidCfg(LeggedRobotCfg):
         fix_base_link = False
         disable_gravity = False
         disable_motors = False
-        apply_humanoid_jacobian = False
         total_mass = 25.0
 
     class reward_settings(LeggedRobotCfg.reward_settings):
@@ -195,22 +194,22 @@ class MITHumanoidCfg(LeggedRobotCfg):
         dof_pos = [
             0.1,
             0.2,
-            0.4,
-            0.4,
-            0.4,
+            0.8,
+            0.8,
+            0.8,
             0.1,
             0.2,
-            0.4,
-            0.4,
-            0.4,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
+            0.8,
+            0.8,
+            0.8,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
         ]
         dof_pos_obs = dof_pos
         # # * Action scales
@@ -248,7 +247,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         actor_hidden_dims = [512, 256, 128]
         critic_hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = "tanh"
 
         actor_obs = [
             "base_height",
@@ -266,13 +265,13 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         actions = ["dof_pos_target"]
 
         class noise:
-            base_height = 0.0  # 0.05
-            dof_pos_obs = 0.0  # 0.0
-            dof_vel = 0.0  # 0.0
-            base_lin_vel = 0.0  # 0.1
-            base_ang_vel = 0.0  # 0.2
-            projected_gravity = 0.0  # 0.05
-            height_measurements = 0.0  # 0.1
+            base_height = 0.05
+            dof_pos_obs = 0.0
+            dof_vel = 0.0
+            base_lin_vel = 0.1
+            base_ang_vel = 0.2
+            projected_gravity = 0.05
+            height_measurements = 0.1
 
         class reward:
             class weights:
@@ -285,12 +284,13 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
                 action_rate2 = 0.001
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
-                dof_vel = 0.0
-                stand_still = 0.0
+                dof_vel = 0.25
+                stand_still = 0.25
                 dof_pos_limits = 0.25
-                dof_near_home = 0.1
+                dof_near_home = 0.25
                 stance = 1.0
                 swing = 1.0
+                walk_freq = 0.5
 
             class termination_weight:
                 termination = 15
@@ -300,7 +300,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         value_loss_coef = 1.0
         use_clipped_value_loss = True
         clip_param = 0.2
-        entropy_coef = 0.001
+        entropy_coef = 0.002
         num_learning_epochs = 5
         # * mini batch size = num_envs*nsteps / nminibatches
         num_mini_batches = 4
@@ -308,8 +308,6 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         schedule = "adaptive"  # could be adaptive, fixed
         gamma = 0.999
         lam = 0.95
-        discount_horizon = 0.5  # [s]
-        GAE_bootstrap_horizon = 0.2  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
 

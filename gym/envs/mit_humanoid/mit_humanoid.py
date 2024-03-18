@@ -111,8 +111,9 @@ class MIT_Humanoid(LeggedRobot):
 
     def _reward_dof_vel(self):
         # Penalize dof velocities
-        return torch.mean(self._sqrdexp(self.dof_vel / self.scales["dof_vel"]), dim=1)
-        # * self._switch("stand")
+        return torch.mean(
+            self._sqrdexp(self.dof_vel / self.scales["dof_vel"]), dim=1
+        ) * self._switch("stand")
 
     def _reward_dof_near_home(self):
         return torch.mean(
@@ -131,7 +132,7 @@ class MIT_Humanoid(LeggedRobot):
         rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
         rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
         rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
-        return rew_vel + rew_pos - rew_base_vel  # * self._switch("stand")
+        return rew_vel + rew_pos - rew_base_vel * self._switch("stand")
 
     def _reward_stance(self):
         phase = torch.maximum(
@@ -151,3 +152,13 @@ class MIT_Humanoid(LeggedRobot):
             return torch.clamp_max(grf / self.cfg.asset.total_mass, 1.0)
         else:
             return grf
+
+    def _reward_walk_freq(self):
+        # Penalize deviation from base frequency
+        return torch.mean(
+            self._sqrdexp(
+                (self.oscillator_freq - self.cfg.oscillator.base_frequency)
+                / self.cfg.oscillator.base_frequency
+            ),
+            dim=1,
+        ) * self._switch("move")
