@@ -11,12 +11,11 @@ from learning.utils import Logger
 from .on_policy_runner import OnPolicyRunner
 from learning.storage import DictStorage
 
-
 logger = Logger()
 storage = DictStorage()
 
 
-class CriticOnlyRunner(OnPolicyRunner):
+class CustomCriticRunner(OnPolicyRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
@@ -151,23 +150,6 @@ class CriticOnlyRunner(OnPolicyRunner):
         np.save(save_path, self.all_obs)
         print(f"Saved training observations to {save_path}")
         self.save()
-
-    def load(self, path, load_optimizer=True):
-        loaded_dict = torch.load(path)
-        self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
-
-    def save(self):
-        os.makedirs(self.log_dir, exist_ok=True)
-        path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
-        torch.save(
-            {
-                "actor_state_dict": self.alg.actor.state_dict(),
-                "critic_state_dict": self.alg.critic.state_dict(),
-                "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
-                "iter": self.it,
-            },
-            path,
-        )
 
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(

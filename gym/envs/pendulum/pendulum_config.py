@@ -57,7 +57,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "DataLoggingRunner"
+    runner_class_name = "CustomCriticRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -77,6 +77,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             dof_vel = 0.0
 
     class critic:
+        critic_class_name = "Critic"
         obs = [
             "dof_pos",
             "dof_vel",
@@ -84,7 +85,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"
-        standard_critic_nn = True
 
         class reward:
             class weights:
@@ -114,7 +114,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         # GAE_bootstrap_horizon = .0  # [s]
         desired_kl = 0.01
         max_grad_norm = 1.0
-        standard_loss = True
         plus_c_penalty = 0.1
 
     class runner(FixedRobotCfgPPO.runner):
