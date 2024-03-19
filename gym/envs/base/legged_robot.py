@@ -110,10 +110,10 @@ class LeggedRobot(BaseTask):
 
         self.base_height = self.root_states[:, 2:3]
 
-        n = self.num_actuators
-        self.dof_pos_history[:, 2 * n :] = self.dof_pos_history[:, n : 2 * n]
-        self.dof_pos_history[:, n : 2 * n] = self.dof_pos_history[:, :n]
-        self.dof_pos_history[:, :n] = self.dof_pos_target
+        self.dof_pos_history.roll(self.num_actuators)
+        self.dof_pos_history[:, : self.num_actuators] = (
+            self.dof_pos - self.default_dof_pos
+        )
         self.dof_pos_obs = self.dof_pos - self.default_dof_pos
 
         env_ids = (
@@ -133,7 +133,9 @@ class LeggedRobot(BaseTask):
         self._reset_system(env_ids)
         self._resample_commands(env_ids)
         # * reset buffers
-        self.dof_pos_history[env_ids] = 0.0
+        self.dof_pos_history[env_ids] = (
+            self.dof_pos[env_ids] - self.default_dof_pos
+        ).tile(3)
         self.episode_length_buf[env_ids] = 0
 
     def _initialize_sim(self):

@@ -9,12 +9,11 @@ BASE_HEIGHT_REF = 0.80
 class MITHumanoidCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 4096
-        num_observations = 49 + 3 * 18  # 121
         num_actuators = 18
         episode_length_s = 5  # episode length in seconds
 
-        history_length = 3  # n samples
-        history_frequency = 10  # [Hz]
+        sampled_history_length = 3  # n samples
+        sampled_history_frequency = 10  # [Hz]
 
     class terrain(LeggedRobotCfg.terrain):
         pass
@@ -29,17 +28,17 @@ class MITHumanoidCfg(LeggedRobotCfg):
         default_joint_angles = {
             "hip_yaw": 0.0,
             "hip_abad": 0.0,
-            "hip_pitch": -0.4,
-            "knee": 0.9,
-            "ankle": -0.45,
+            "hip_pitch": -0.667751,
+            "knee": 1.4087,
+            "ankle": -0.708876,
             "shoulder_pitch": 0.0,
             "shoulder_abad": 0.0,
             "shoulder_yaw": 0.0,
-            "elbow": 0.0,
+            "elbow": -1.25,
         }
 
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 0.66]  # x,y,z [m]
+        pos = [0.0, 0.0, 0.72]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -47,22 +46,22 @@ class MITHumanoidCfg(LeggedRobotCfg):
         # * initialization for random range setup
 
         dof_pos_range = {
-            "hip_yaw": [0.0, 0.0],
-            "hip_abad": [0.0, 0.0],
-            "hip_pitch": [-0.29, -0.25],
-            "knee": [0.67, 0.71],
-            "ankle": [-0.43, -0.39],
+            "hip_yaw": [-0.1, 0.1],
+            "hip_abad": [-0.1, 0.1],
+            "hip_pitch": [-0.2, 0.2],
+            "knee": [-0.2, 0.2],
+            "ankle": [-0.15, 0.15],
             "shoulder_pitch": [0.0, 0.0],
             "shoulder_abad": [0.0, 0.0],
             "shoulder_yaw": [0.0, 0.0],
-            "elbow": [0.0, 0.0],
+            "elbow": [0, 0],
         }
         dof_vel_range = {
-            "hip_yaw": [-0.0, 0.1],
-            "hip_abad": [-0.0, 0.1],
-            "hip_pitch": [-0.1, -0.1],
-            "knee": [-0.05, 0.05],
-            "ankle": [-0.05, 0.05],
+            "hip_yaw": [-0.1, 0.1],
+            "hip_abad": [-0.1, 0.1],
+            "hip_pitch": [-0.1, 0.1],
+            "knee": [-0.1, 0.1],
+            "ankle": [-0.1, 0.1],
             "shoulder_pitch": [0.0, 0.0],
             "shoulder_abad": [0.0, 0.0],
             "shoulder_yaw": [0.0, 0.0],
@@ -72,15 +71,15 @@ class MITHumanoidCfg(LeggedRobotCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.7, 0.8],  # z
+            [0.72, 0.72],  # z
             [-0.1, 0.1],  # roll
             [-0.1, 0.1],  # pitch
             [-0.1, 0.1],
         ]  # yaw
 
         root_vel_range = [
-            [-0.5, 2.5],  # x
-            [-0.5, 0.5],  # y
+            [-0.75, 2.75],  # x
+            [-0.55, 0.55],  # y
             [-0.35, 0.1],  # z
             [-0.35, 0.35],  # roll
             [-0.35, 0.35],  # pitch
@@ -98,7 +97,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
             "shoulder_pitch": 40.0,
             "shoulder_abad": 40.0,
             "shoulder_yaw": 40.0,
-            "elbow": 40.0,
+            "elbow": 50.0,
         }  # [N*m/rad]
         damping = {
             "hip_yaw": 2.0,
@@ -118,19 +117,19 @@ class MITHumanoidCfg(LeggedRobotCfg):
         filter_gain = 0.1586  # 1: no filtering, 0: wall
 
     class oscillator:
-        base_frequency = 1.5  # [Hz]
+        base_frequency = 2.0  # [Hz]
 
     class commands:
         resampling_time = 10.0  # time before command are changed[s]
 
         class ranges:
-            lin_vel_x = [-1.0, 4.0]  # min max [m/s]
-            lin_vel_y = 1.0  # max [m/s]
-            yaw_vel = 1  # max [rad/s]
+            lin_vel_x = [-1.0, 4.0]  # min max [m/s] [-0.75, 0.75]
+            lin_vel_y = 0.35  # max [m/s]
+            yaw_vel = 0.5  # max [rad/s]
 
     class push_robots:
-        toggle = False
-        interval_s = 2
+        toggle = True
+        interval_s = 1
         max_push_vel_xy = 0.6
         push_box_dims = [0.1, 0.1, 0.3]  # x,y,z [m]
 
@@ -147,11 +146,11 @@ class MITHumanoidCfg(LeggedRobotCfg):
         )
         # foot_collisionbox_names = ["foot"]
         foot_name = "foot"
-        penalize_contacts_on = ["base", "arm"]
+        penalize_contacts_on = ["arm"]
         terminate_after_contacts_on = ["base"]
-        end_effector_names = ["hand", "foot"]
+        end_effector_names = ["hand", "foot"]  # ??
         flip_visual_attachments = False
-        self_collisions = 1  # 1 to disagble, 0 to enable...bitwise filter
+        self_collisions = 0  # 1 to disagble, 0 to enable...bitwise filter
         collapse_fixed_joints = False
         # * see GymDofDriveModeFlags
         # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
@@ -198,7 +197,6 @@ class MITHumanoidCfg(LeggedRobotCfg):
             0.1,
             0.1,
         ]
-        dof_pos_obs = dof_pos
         # # * Action scales
         dof_pos_target = dof_pos
         dof_vel = [
@@ -221,7 +219,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
             1.0,
             1.0,
         ]
-        dof_pos_history = 3 * dof_pos_obs
+        dof_pos_history = 3 * dof_pos
 
 
 class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
@@ -231,8 +229,8 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     class policy(LeggedRobotRunnerCfg.policy):
         disable_actions = False
         init_noise_std = 1.0
-        actor_hidden_dims = [512, 256, 128]
-        critic_hidden_dims = [512, 256, 128]
+        actor_hidden_dims = [256, 256, 128]
+        critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"
 
@@ -245,6 +243,9 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_history",
+            "sampled_history_dof_pos",
+            "sampled_history_dof_vel",
+            "sampled_history_dof_pos_target",
             "oscillator_obs",
         ]
         critic_obs = actor_obs
@@ -252,18 +253,17 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         actions = ["dof_pos_target"]
 
         class noise:
-            base_height = 0.05
-            dof_pos_obs = 0.0
-            dof_vel = 0.0
-            base_lin_vel = 0.1
-            base_ang_vel = 0.2
-            projected_gravity = 0.05
-            height_measurements = 0.1
+            dof_pos = 0.005
+            dof_vel = 0.05
+            base_ang_vel = 0.025
+            base_lin_vel = 0.025
+            projected_gravity = 0.01
+            feet_contact_state = 0.025
 
         class reward:
             class weights:
-                tracking_ang_vel = 1.5
                 tracking_lin_vel = 3.0
+                tracking_ang_vel = 1.5
                 orientation = 1.0
                 torques = 5.0e-4
                 min_base_height = 1.5
@@ -277,6 +277,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
                 dof_near_home = 0.25
                 stance = 1.0
                 swing = 1.0
+                hips_forward = 0.5
                 walk_freq = 0.0
 
             class termination_weight:
