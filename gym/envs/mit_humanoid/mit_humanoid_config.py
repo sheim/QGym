@@ -277,7 +277,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
                 dof_near_home = 0.25
                 stance = 1.0
                 swing = 1.0
-                walk_freq = 0.5
+                walk_freq = 0.0
 
             class termination_weight:
                 termination = 15

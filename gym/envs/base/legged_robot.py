@@ -481,41 +481,26 @@ class LeggedRobot(BaseTask):
             get_axis_params(-1.0, self.up_axis_idx), device=self.device
         ).repeat((self.num_envs, 1))
         self.torques = torch.zeros(
-            self.num_envs,
-            self.num_actuators,
-            dtype=torch.float,
-            device=self.device,
+            self.num_envs, self.num_actuators, dtype=torch.float, device=self.device
         )
         self.p_gains = torch.zeros(
-            self.num_actuators, dtype=torch.float, device=self.device
+            self.num_envs, self.num_actuators, dtype=torch.float, device=self.device
         )
         self.d_gains = torch.zeros(
-            self.num_actuators, dtype=torch.float, device=self.device
+            self.num_envs, self.num_actuators, dtype=torch.float, device=self.device
         )
         self.dof_pos_target = torch.zeros(
-            self.num_envs,
-            self.num_actuators,
-            dtype=torch.float,
-            device=self.device,
+            self.num_envs, self.num_actuators, dtype=torch.float, device=self.device
         )
         self.dof_vel_target = torch.zeros(
-            self.num_envs,
-            self.num_actuators,
-            dtype=torch.float,
-            device=self.device,
+            self.num_envs, self.num_actuators, dtype=torch.float, device=self.device
         )
         self.tau_ff = torch.zeros(
-            self.num_envs,
-            self.num_actuators,
-            dtype=torch.float,
-            device=self.device,
+            self.num_envs, self.num_actuators, dtype=torch.float, device=self.device
         )
 
         self.dof_pos_history = torch.zeros(
-            self.num_envs,
-            self.num_actuators * 3,
-            dtype=torch.float,
-            device=self.device,
+            self.num_envs, self.num_actuators * 3, dtype=torch.float, device=self.device
         )
         self.commands = torch.zeros(
             self.num_envs, 3, dtype=torch.float, device=self.device
@@ -582,8 +567,8 @@ class LeggedRobot(BaseTask):
             found = False
             for dof_name in self.cfg.control.stiffness.keys():
                 if dof_name in name:
-                    self.p_gains[i] = self.cfg.control.stiffness[dof_name]
-                    self.d_gains[i] = self.cfg.control.damping[dof_name]
+                    self.p_gains[:, i] = self.cfg.control.stiffness[dof_name]
+                    self.d_gains[:, i] = self.cfg.control.damping[dof_name]
                     found = True
             if not found:
                 self.p_gains[i] = 0.0
