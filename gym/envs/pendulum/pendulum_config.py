@@ -5,7 +5,7 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 2**13
+        num_envs = 2**12
         num_actuators = 1  # 1 for theta connecting base and pole
         episode_length_s = 5.0
 
@@ -77,7 +77,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             dof_vel = 0.0
 
     class critic:
-        critic_class_name = "Critic"
+        critic_class_name = "Cholesky"
         obs = [
             "dof_pos",
             "dof_vel",

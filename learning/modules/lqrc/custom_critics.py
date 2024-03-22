@@ -1,10 +1,10 @@
-from math import floor
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset
+
 from learning.modules.critic import Critic
-from learning.modules.utils import get_activation
+from learning.modules.utils import RunningMeanStd
+from learning.modules.utils.neural_net import get_activation
 
 
 class CustomCriticBaseline(Critic):
@@ -19,7 +19,7 @@ class CustomCriticBaseline(Critic):
         device="cuda",
         **kwargs,
     ):
-        nn.Module.__init__()
+        super(Critic, self).__init__()
         hidden_dims = [32, 128] if hidden_dims is None else hidden_dims
         assert len(hidden_dims) == 2, "Too many hidden dims passed to Custom Critic"
         activation = get_activation(activation)
@@ -28,12 +28,18 @@ class CustomCriticBaseline(Critic):
         self.device = device
         self.intermediates = {}
 
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_obs)
+
         self.connection_1 = nn.Linear(self.input_size, hidden_dims[0])
         self.activation_1 = activation
         self.connection_2 = nn.Linear(hidden_dims[0], hidden_dims[1])
         self.activation_2 = activation
         self.connection_3 = nn.Linear(hidden_dims[1], output_size)
         self.activation_3 = nn.Softplus()
+
+        self.NN = self.forward
 
     def forward(self, x):
         output = self.connection_1(x)
@@ -182,7 +188,7 @@ class CholeskyOffset1(Cholesky):
         output = self.activation_3(output)
         C = self.create_cholesky(output[:, : self.L_indices])
         A = C.bmm(C.transpose(1, 2))
-        offset = output[:, self.L_indices :]
+        offset = output[:, self.L_indices:]
         x_bar = x - offset
         y_pred = (
             x_bar.unsqueeze(2).transpose(1, 2).bmm(A).bmm(x_bar.unsqueeze(2))

@@ -3,7 +3,6 @@ import torch.nn as nn
 
 from .utils import create_MLP
 from .utils import RunningMeanStd
-from .lqrc import CholeskyPlusConst
 
 
 class Critic(nn.Module):
