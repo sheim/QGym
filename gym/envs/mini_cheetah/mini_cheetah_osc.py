@@ -11,6 +11,7 @@ MINI_CHEETAH_MASS = 8.292 * 9.81  # Weight of mini cheetah in Newtons
 
 class MiniCheetahOsc(MiniCheetah):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
+        self.pca_scalings = torch.zeros(1, 3, device=sim_device)
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
         self.process_noise_std = self.cfg.osc.process_noise_std
 
@@ -250,6 +251,80 @@ class MiniCheetahOsc(MiniCheetah):
                 (len(env_ids), 1),
                 device=self.device,
             ).squeeze(1)
+
+    def _compute_torques(self):
+        mode = "all"
+        if mode == "one_leg":
+            # 4th leg, all actuators
+            eigenvectors_og = torch.tensor(
+                [
+                    [-0.02939241, 0.81596737, 0.57735027],
+                    [0.72134468, -0.38252912, 0.57735027],
+                    [-0.69195227, -0.43343826, 0.57735027],
+                ],
+                device=self.device,
+            )
+            eigenvectors = torch.zeros(
+                3, self.dof_pos_target.shape[1], device=self.device
+            )
+            eigenvectors[:, 9:12] = eigenvectors_og.T
+        elif mode == "joint":
+            # 3rd actuator kfe, all legs
+            eigenvectors_og = torch.tensor(
+                [
+                    [0.30653829, -0.76561209, -0.26433388],
+                    [-0.5543308, -0.12128448, 0.65422278],
+                    [-0.40904421, 0.38943236, -0.65652515],
+                    [0.65683672, 0.49746421, 0.26663625],
+                ],
+                device=self.device,
+            ).T
+            eigenvectors = torch.zeros(
+                3, self.dof_pos_target.shape[1], device=self.device
+            )
+            for i in range(0, 4):
+                eigenvectors[:, i * 3] = eigenvectors_og[:, i]
+        elif mode == "all":
+            eigenvectors = (
+                torch.tensor(
+                    [
+                        [-0.03376138, -0.02442507, 0.03189318],
+                        [0.33413213, -0.70889628, 0.18863108],
+                        [-0.33155045, 0.23009204, -0.19336469],
+                        [-0.00520263, -0.06861266, 0.14744584],
+                        [0.36084328, 0.53007859, 0.30072622],
+                        [-0.37715193, -0.04550793, -0.32017996],
+                        [-0.03926625, 0.09404448, -0.00661434],
+                        [0.37683584, 0.18909904, 0.1956597],
+                        [-0.31592719, 0.07459572, 0.10245965],
+                        [-0.02376299, 0.11192239, -0.02117587],
+                        [0.38753615, -0.0902991, -0.74731018],
+                        [-0.33272457, -0.29209121, 0.32182934],
+                    ],
+                    device=self.device,
+                ).T
+            )
+        else:
+            Warning("PC MODE NOT RECOGNIZED in compute_torques")
+        # print(self.default_dof_pos.shape)
+        # print(self.dof_pos_target.shape)
+        # print(eigenvectors.shape)
+        self.dof_pos_target = self.default_dof_pos.repeat(
+            self.num_envs, 1
+        )
+        for i in range(0, 3):  # todo sanity check this! unit test or something?
+            self.dof_pos_target += torch.mul(
+                eigenvectors[i, :].repeat(self.num_envs, 1),
+                self.pca_scalings[:, i:i+1],
+            )
+
+        torques = (
+            self.p_gains * (self.dof_pos_target + self.default_dof_pos - self.dof_pos)
+            + self.d_gains * (self.dof_vel_target - self.dof_vel)
+            + self.tau_ff
+        )
+        torques = torch.clip(torques, -self.torque_limits, self.torque_limits)
+        return torques.view(self.torques.shape)
 
     def perturb_base_velocity(self, velocity_delta, env_ids=None):
         if env_ids is None:

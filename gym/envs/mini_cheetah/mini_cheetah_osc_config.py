@@ -11,6 +11,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         ref_env = 0
         pos = [-2.0, 3, 2]  # [m]
         lookat = [0.0, 1.0, 0.5]  # [m]
+        record = True
 
     class env(MiniCheetahCfg.env):
         num_envs = 4096
@@ -162,6 +163,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
 
     class policy(MiniCheetahRunnerCfg.policy):
+        disable_actions = False
         actor_hidden_dims = [256, 256, 128]
         critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
@@ -190,7 +192,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_target",
         ]
 
-        actions = ["dof_pos_target"]
+        actions = ["pca_scalings"]
 
         class noise:
             pass
@@ -243,6 +245,6 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "FullSend"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 1000  # number of policy updates
         algorithm_class_name = "PPO"
         num_steps_per_env = 32
