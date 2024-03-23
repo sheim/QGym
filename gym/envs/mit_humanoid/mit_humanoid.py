@@ -101,13 +101,19 @@ class MIT_Humanoid(LeggedRobot):
             as_tuple=False,
         ).flatten()
 
-        self.sampled_history_dof_pos_target[ids].roll(self.num_dof, dims=1)  # check
+        self.sampled_history_dof_pos_target[ids] = torch.roll(
+            self.sampled_history_dof_pos_target[ids], self.num_dof, dims=1
+        )  # check
         self.sampled_history_dof_pos_target[ids, : self.num_dof] = self.dof_pos_target[
             ids
         ]
-        self.sampled_history_dof_pos[ids].roll(self.num_dof, dims=1)  # check
+        self.sampled_history_dof_pos[ids] = torch.roll(
+            self.sampled_history_dof_pos[ids], self.num_dof, dims=1
+        )  # check
         self.sampled_history_dof_pos[ids, : self.num_dof] = self.dof_pos_target[ids]
-        self.sampled_history_dof_vel[ids].roll(self.num_dof, dims=1)  # check
+        self.sampled_history_dof_vel[ids] = torch.roll(
+            self.sampled_history_dof_vel[ids], self.num_dof, dims=1
+        )  # check
         self.sampled_history_dof_vel[ids, : self.num_dof] = self.dof_pos_target[ids]
 
         self.sampled_history_counter[ids] = 0

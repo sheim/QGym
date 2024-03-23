@@ -113,8 +113,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 dof_vel = 0.0
                 min_base_height = 1.5
                 collision = 0.0
-                action_rate = 0.01
-                action_rate2 = 0.001
+                action_rate = 1.0
+                action_rate2 = 1.0
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0

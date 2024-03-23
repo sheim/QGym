@@ -110,7 +110,7 @@ class LeggedRobot(BaseTask):
 
         self.base_height = self.root_states[:, 2:3]
 
-        self.dof_pos_history.roll(self.num_actuators)
+        self.dof_pos_history = self.dof_pos_history.roll(self.num_actuators)
         self.dof_pos_history[:, : self.num_actuators] = (
             self.dof_pos - self.default_dof_pos
         )
