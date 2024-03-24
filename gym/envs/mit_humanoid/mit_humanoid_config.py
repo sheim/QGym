@@ -142,7 +142,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
     class asset(LeggedRobotCfg.asset):
         file = (
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
-            + "mit_humanoid/urdf/humanoid_R_sf.urdf"
+            + "mit_humanoid/urdf/humanoid_F_sf_learnt.urdf"
         )
         # foot_collisionbox_names = ["foot"]
         foot_name = "foot"
@@ -289,12 +289,12 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         use_clipped_value_loss = True
         clip_param = 0.2
         entropy_coef = 0.01
-        num_learning_epochs = 5
+        num_learning_epochs = 4
         # * mini batch size = num_envs*nsteps / nminibatches
         num_mini_batches = 4
-        learning_rate = 5.0e-5
+        learning_rate = 1.0e-6
         schedule = "adaptive"  # could be adaptive, fixed
-        gamma = 0.999
+        gamma = 0.99
         lam = 0.95
         desired_kl = 0.01
         max_grad_norm = 1.0

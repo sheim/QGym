@@ -570,7 +570,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="15_left_shoulder_pitch"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0.01346 0.17608 0.24657"
       rpy="0 0 0" />
@@ -615,7 +615,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="16_left_shoulder_abad"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0 .05760 0"
       rpy="0.0 0 0" />
@@ -668,7 +668,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="17_left_shoulder_yaw"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0 0 -.10250"
       rpy="0.0 0 0" />
@@ -719,7 +719,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="18_left_elbow"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0 0 -.15750"
       rpy="0 0 0.0" />
@@ -798,7 +798,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="11_right_shoulder_pitch"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0.01346 -0.17608 0.24657"
       rpy="0 0 0" />
@@ -843,7 +843,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="12_right_shoulder_abad"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0 -.05760 0"
       rpy="0.0 0 0" />
@@ -896,7 +896,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="13_right_shoulder_yaw"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0 0 -.10250"
       rpy="0.0 0 0" />
@@ -947,7 +947,7 @@ Simple Foot: foot approximated as single box-contact -->
   </link>
   <joint
     name="14_right_elbow"
-    type="fixed">
+    type="revolute">
     <origin
       xyz="0 0 -.15750"
       rpy="0 0 0.0" />
