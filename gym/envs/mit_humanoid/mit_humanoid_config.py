@@ -224,7 +224,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
 
 class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "OldPolicyRunner"
 
     class policy(LeggedRobotRunnerCfg.policy):
         disable_actions = False
@@ -301,7 +301,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "PPO"
         num_steps_per_env = 32
         max_iterations = 1000
         run_name = "Standing"
