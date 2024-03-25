@@ -69,9 +69,9 @@ def play(env, runner, train_cfg):
         log['commands'] += env.commands.tolist()
         log['dof_pos_error']+=(env.default_dof_pos - env.dof_pos).tolist()
         
-        reward_weights = runner.policy_cfg['reward']['weights']
+        # reward_weights = runner.policy_cfg['reward']['weights']
         #print(runner.get_rewards(reward_weights))
-        log['reward'] += runner.get_rewards(reward_weights).tolist()
+        # log['reward'] += runner.get_rewards(reward_weights).tolist()
          
         #print(i)
         if i ==1000 and saveLogs:
@@ -80,11 +80,6 @@ def play(env, runner, train_cfg):
 
         if COMMANDS_INTERFACE:
             interface.update(env)
-        runner.set_actions(
-            runner.policy_cfg["actions"],
-            runner.get_inference_actions(),
-            runner.policy_cfg["disable_actions"],
-        )
         env.step()
         env.check_exit()
 

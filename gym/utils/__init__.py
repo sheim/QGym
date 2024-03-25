@@ -40,6 +40,6 @@ from .helpers import (
 from .task_registry import task_registry
 from .gym_math_wrappers import *
 from .terrain import Terrain
-from .interfaces import KeyboardInterface, GamepadInterface
+from .interfaces import KeyboardInterface, GamepadInterface, SliderInterface
 from .logging_and_saving.VisualizationRecorder import VisualizationRecorder
 from .math.simple_math import *

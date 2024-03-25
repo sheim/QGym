@@ -1,2 +1,3 @@
 from .KeyboardInterface import KeyboardInterface
 from .GamepadInterface import GamepadInterface
+from .SliderInterface import SliderInterface

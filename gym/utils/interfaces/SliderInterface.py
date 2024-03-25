@@ -18,7 +18,7 @@ class SliderInterface:
         self.master.update()
 
     def update(self, env):
-        mode = 'joint'
+        mode = 'all'
         scalings=[]
         for w in self.sliders: 
             scalings.append(w.get())
