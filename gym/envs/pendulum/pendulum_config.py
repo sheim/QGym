@@ -84,7 +84,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"
-        standard_critic_nn = True
 
         class reward:
             class weights:
@@ -107,7 +106,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         num_learning_epochs = 6
         # * mini batch size = num_envs*nsteps / nminibatches
         num_mini_batches = 4
-        learning_rate = 1.0e-3
+        learning_rate = 1.0e-4
         schedule = "fixed"  # could be adaptive, fixed
         discount_horizon = 2.0  # [s]
         lam = 0.98
