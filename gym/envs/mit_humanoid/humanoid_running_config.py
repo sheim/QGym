@@ -165,7 +165,6 @@ class HumanoidRunningCfg(LeggedRobotCfg):
 
         fix_base_link = False
         disable_gravity = False
-        disable_actions = False
         disable_motors = False
 
         # (1: disable, 0: enable...bitwise filter)
@@ -201,15 +200,14 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
     do_wandb = True
     seed = -1
 
-    class policy(LeggedRobotRunnerCfg.policy):
+    class actor(LeggedRobotRunnerCfg.actor):
         init_noise_std = 1.0
-        actor_hidden_dims = [256, 256, 256]
-        critic_hidden_dims = [256, 256, 256]
+        hidden_dims = [256, 256, 256]
         # (elu, relu, selu, crelu, lrelu, tanh, sigmoid)
         activation = "elu"
         normalize_obs = True  # True, False
 
-        actor_obs = [
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -221,10 +219,8 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
             "in_contact",
         ]
 
-        critic_obs = actor_obs
-
         actions = ["dof_pos_target_legs"]
-
+        disable_actions = False
         add_noise = True
         noise_level = 1.0  # scales other values
 
@@ -236,6 +232,24 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
             dof_pos = 0.005
             dof_vel = 0.01
             in_contact = 0.1
+
+    class critic:
+        hidden_dims = [256, 256, 256]
+        # (elu, relu, selu, crelu, lrelu, tanh, sigmoid)
+        activation = "elu"
+        normalize_obs = True  # True, False
+
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            "phase_obs",
+            "dof_pos_legs",
+            "dof_vel_legs",
+            "in_contact",
+        ]
 
         class reward:
             class weights:
@@ -275,8 +289,8 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
-        algorithm_class_name = "PPO"
-        num_steps_per_env = 24
+        algorithm_class_name = "PPO2"
+        num_steps_per_env = 32
         max_iterations = 1000
         run_name = "ICRA2023"
         experiment_name = "HumanoidLocomotion"

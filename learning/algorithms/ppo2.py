@@ -53,7 +53,7 @@ class PPO2:
         self.actor.test()
         self.critic.test()
 
-    def train_mode(self):
+    def switch_to_train(self):
         self.actor.train()
         self.critic.train()
 

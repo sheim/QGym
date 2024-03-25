@@ -17,11 +17,6 @@ class Actor(nn.Module):
         normalize_obs=True,
         **kwargs,
     ):
-        if kwargs:
-            print(
-                "Actor.__init__ got unexpected arguments, "
-                "which will be ignored: " + str([key for key in kwargs.keys()])
-            )
         super().__init__()
 
         self._normalize_obs = normalize_obs
