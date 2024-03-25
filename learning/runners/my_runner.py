@@ -28,7 +28,6 @@ class MyRunner(OnPolicyRunner):
         actor_obs = self.get_obs(self.actor_cfg["actor_obs"])
         critic_obs = self.get_obs(self.critic_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
-        rewards_dict
         self.save()
 
         # * start up storage
@@ -112,7 +111,6 @@ class MyRunner(OnPolicyRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-            storage.clear()
         self.save()
 
     def set_up_logger(self):
@@ -124,10 +122,6 @@ class MyRunner(OnPolicyRunner):
         logger.register_category(
             "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
         )
-        logger.register_category(
-            "actor", self.alg.actor_critic, ["action_std", "entropy"]
-        )
+        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
-        logger.attach_torch_obj_to_wandb(
-            (self.alg.actor_critic.actor, self.alg.actor_critic.critic)
-        )
+        logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))

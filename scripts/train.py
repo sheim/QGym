@@ -14,6 +14,7 @@ def setup():
     env = task_registry.make_env(name=args.task, env_cfg=env_cfg)
     randomize_episode_counters(env)
 
+    randomize_episode_counters(env)
     policy_runner = task_registry.make_alg_runner(env, train_cfg)
 
     local_code_save_helper.save_local_files_to_logs(train_cfg.log_dir)

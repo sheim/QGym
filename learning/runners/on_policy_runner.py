@@ -30,7 +30,6 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
-        rewards_dict
         self.save()
 
         # * start up storage
@@ -115,7 +114,6 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-            storage.clear()
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):

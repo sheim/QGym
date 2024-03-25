@@ -292,7 +292,7 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
         max_iterations = 1000
-        run_name = "ICRA2023"
+        run_name = "HumanoidRunning"
         experiment_name = "HumanoidLocomotion"
         save_interval = 50
         plot_input_gradients = False
