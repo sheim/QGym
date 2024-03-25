@@ -144,17 +144,15 @@ class OnPolicyRunner(BaseRunner):
             "actor", self.alg.actor_critic, ["action_std", "entropy"]
         )
 
-        logger.attach_torch_obj_to_wandb(
-            (self.alg.actor_critic.actor, self.alg.actor_critic.critic)
-        )
+        logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 
     def save(self):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
         torch.save(
             {
-                "actor_state_dict": self.alg.actor_critic.actor.state_dict(),
-                "critic_state_dict": self.alg.actor_critic.critic.state_dict(),
+                "actor_state_dict": self.alg.actor.state_dict(),
+                "critic_state_dict": self.alg.critic.state_dict(),
                 "optimizer_state_dict": self.alg.optimizer.state_dict(),
                 "iter": self.it,
             },
@@ -163,18 +161,19 @@ class OnPolicyRunner(BaseRunner):
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
-        self.alg.actor_critic.actor.load_state_dict(loaded_dict["actor_state_dict"])
-        self.alg.actor_critic.critic.load_state_dict(loaded_dict["critic_state_dict"])
+        self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
+        self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
         self.it = loaded_dict["iter"]
 
     def switch_to_eval(self):
-        self.alg.actor_critic.eval()
+        self.alg.actor.eval()
+        self.alg.critic.eval()
 
     def get_inference_actions(self):
         obs = self.get_noisy_obs(self.policy_cfg["actor_obs"], self.policy_cfg["noise"])
-        return self.alg.actor_critic.actor.act_inference(obs)
+        return self.alg.actor.act_inference(obs)
 
     def export(self, path):
-        self.alg.actor_critic.export_policy(path)
+        self.alg.actor.export(path)

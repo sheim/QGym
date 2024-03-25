@@ -9,11 +9,10 @@ from learning.utils import (
 
 
 class PPO2:
-    # actor_critic: ActorCritic
-
     def __init__(
         self,
-        actor_critic,
+        actor,
+        critic,
         num_learning_epochs=1,
         num_mini_batches=1,
         clip_param=0.2,
@@ -35,12 +34,8 @@ class PPO2:
         self.learning_rate = learning_rate
 
         # * PPO components
-        # todo keeping actor_critic for loading code in runner
-        self.actor_critic = actor_critic.to(self.device)
-        self.actor = actor_critic.actor.to(self.device)
-        self.critic = actor_critic.critic.to(self.device)
-        self.storage = None  # initialized later
-        # parameters = list(self.actor.parameters()) + list(self.critic.parameters())
+        self.actor = actor.to(self.device)
+        self.critic = critic.to(self.device)
         self.optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
 
