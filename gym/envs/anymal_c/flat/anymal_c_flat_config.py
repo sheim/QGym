@@ -85,6 +85,7 @@ class AnymalCFlatCfg(LeggedRobotCfg):
         toggle = True
         interval_s = 1
         max_push_vel_xy = 0.5
+        push_box_dims = [0.2, 0.2, 0.2]
 
     class domain_rand(LeggedRobotCfg.domain_rand):
         randomize_base_mass = True
@@ -120,6 +121,7 @@ class AnymalCFlatCfg(LeggedRobotCfg):
 
 class AnymalCFlatRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
+    runner_class_name = "OldPolicyRunner"
 
     class actor(LeggedRobotRunnerCfg.actor):
         hidden_dims = [256, 256, 256]
@@ -199,6 +201,6 @@ class AnymalCFlatRunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
         experiment_name = "flat_anymal_c"
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "PPO"
         max_iterations = 1000  # number of policy updates
         num_steps_per_env = 24
