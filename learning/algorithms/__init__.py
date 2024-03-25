@@ -33,3 +33,4 @@
 from .ppo import PPO
 from .ppo2 import PPO2
 from .SE import StateEstimator
+from .sac import SAC

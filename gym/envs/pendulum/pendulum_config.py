@@ -27,9 +27,9 @@ class PendulumCfg(FixedRobotCfg):
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
-            "theta": [-torch.pi, torch.pi],
+            "theta": [-torch.pi / 4, torch.pi / 4],
         }
-        dof_vel_range = {"theta": [-5, 5]}
+        dof_vel_range = {"theta": [-1, 1]}
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
@@ -57,7 +57,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "DataLoggingRunner"
+    runner_class_name = "OffPolicyRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -91,9 +91,9 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
                 theta = 0.0
                 omega = 0.0
                 equilibrium = 1.0
-                energy = 0.0
+                energy = 0.05
                 dof_vel = 0.0
-                torques = 0.025
+                torques = 0.01
 
             class termination_weight:
                 termination = 0.0
@@ -121,5 +121,5 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "SAC"
         num_steps_per_env = 32
