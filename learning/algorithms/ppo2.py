@@ -67,9 +67,12 @@ class PPO2:
         else:
             with torch.no_grad():
                 last_values = self.critic.evaluate(last_obs).detach()
-        compute_generalized_advantages(
+
+        data["values"] = self.critic.evaluate(data["critic_obs"])
+        data["advantages"] = compute_generalized_advantages(
             data, self.gamma, self.lam, self.critic, last_values
         )
+        data["returns"] = data["advantages"] + data["values"]
 
         self.update_critic(data)
         self.update_actor(data)
