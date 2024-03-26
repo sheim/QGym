@@ -5,7 +5,9 @@ from tensordict import TensorDict
 from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
+from learning.modules import Actor, Critic
 from learning.storage import DictStorage
+from learning.algorithms import SAC
 
 logger = Logger()
 storage = DictStorage()
@@ -20,6 +22,15 @@ class OffPolicyRunner(BaseRunner):
             self.cfg["max_iterations"],
             self.device,
         )
+
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic_1 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
+        critic_2 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
+        self.alg = SAC(actor, critic_1, critic_2, device=self.device, **self.alg_cfg)
 
     def learn(self):
         self.set_up_logger()
@@ -141,7 +152,9 @@ class OffPolicyRunner(BaseRunner):
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
-        logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
+        logger.attach_torch_obj_to_wandb(
+            (self.alg.actor, self.alg.critic_1, self.alg.critic_2)
+        )
 
     def save(self):
         os.makedirs(self.log_dir, exist_ok=True)
@@ -149,7 +162,8 @@ class OffPolicyRunner(BaseRunner):
         torch.save(
             {
                 "actor_state_dict": self.alg.actor.state_dict(),
-                "critic_state_dict": self.alg.critic.state_dict(),
+                "critic_1_state_dict": self.alg.critic_1.state_dict(),
+                "critic_2_state_dict": self.alg.critic_2.state_dict(),
                 "optimizer_state_dict": self.alg.optimizer.state_dict(),
                 "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
                 "iter": self.it,
@@ -160,7 +174,8 @@ class OffPolicyRunner(BaseRunner):
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
-        self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
+        self.alg.critic_1.load_state_dict(loaded_dict["critic_1_state_dict"])
+        self.alg.critic_2.load_state_dict(loaded_dict["critic_2_state_dict"])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
             self.alg.critic_optimizer.load_state_dict(
@@ -170,7 +185,8 @@ class OffPolicyRunner(BaseRunner):
 
     def switch_to_eval(self):
         self.alg.actor.eval()
-        self.alg.critic.eval()
+        self.alg.critic_1.eval()
+        self.alg.critic_2.eval()
 
     def get_inference_actions(self):
         obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])

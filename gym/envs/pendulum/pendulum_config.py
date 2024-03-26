@@ -57,7 +57,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "OffPolicyRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -114,7 +114,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         # Critic
         use_clipped_value_loss = True
         # Actor
-        entropy_coef = 0.01
+        entropy_coef = 0.1
         schedule = "adaptive"  # could be adaptive, fixed
         desired_kl = 0.01
 
@@ -122,5 +122,5 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "SAC"
         num_steps_per_env = 32

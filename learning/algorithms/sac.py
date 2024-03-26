@@ -12,9 +12,10 @@ class SAC:
     def __init__(
         self,
         actor,
-        critic,
-        num_learning_epochs=1,
-        num_mini_batches=1,
+        critic_1,
+        critic_2,
+        batch_size=2**15,
+        max_gradient_steps=10,
         clip_param=0.2,
         gamma=0.998,
         lam=0.95,
@@ -37,26 +38,41 @@ class SAC:
         # * PPO components
         self.actor = actor.to(self.device)
         self.optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
-        self.critic = critic.to(self.device)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
+        self.critic_1 = critic_1.to(self.device)
+        self.critic_2 = critic_2.to(self.device)
+        self.critic_optimizer = optim.Adam(
+            list(self.critic_1.parameters()) + list(self.critic_2.parameters()),
+            lr=learning_rate,
+        )
 
         # * PPO parameters
         self.clip_param = clip_param
-        self.num_learning_epochs = num_learning_epochs
-        self.num_mini_batches = num_mini_batches
+        self.batch_size = batch_size
+        self.max_gradient_steps = max_gradient_steps
         self.entropy_coef = entropy_coef
         self.gamma = gamma
         self.lam = lam
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
+        # * SAC parameters
+        self.learning_starts = 100
+        self.batch_size = batch_size
+        self.tau = 0.005
+        self.gamma = 0.99
+        self.ent_coef = "fixed"
+        self.target_entropy = "fixed"
+        self.mean_surrogate_loss = 0
+        self.mean_value_loss = 0
 
     def test_mode(self):
         self.actor.test()
-        self.critic.test()
+        self.critic_1.test()
+        self.critic_2.test()
 
     def switch_to_train(self):
         self.actor.train()
-        self.critic.train()
+        self.critic_1.train()
+        self.critic_2.train()
 
     def act(self, obs, critic_obs):
         return self.actor.act(obs).detach()
@@ -64,30 +80,67 @@ class SAC:
     def update(self, data, last_obs=None):
         if last_obs is None:
             last_values = None
-        else:
-            with torch.no_grad():
-                last_values = self.critic.evaluate(last_obs).detach()
-        compute_generalized_advantages(
-            data, self.gamma, self.lam, self.critic, last_values
-        )
+        # else:
+        # todo
+        # with torch.no_grad():
+        #     last_values_1 = self.critic_1.evaluate(last_obs).detach()
+        #     last_values_2 = self.critic_2.evaluate(last_obs).detach()
+        #     last_values = torch.min(last_values_1, last_values_2)
+
+        # data["values"] = self.critic.evaluate(data["critic_obs"])
+        # data["advantages"] = compute_generalized_advantages(
+        #     data, self.gamma, self.lam, self.critic, last_values
+        # )
+        # data["returns"] = data["advantages"] + data["values"]
 
         self.update_critic(data)
+
+        # todo properly take min over here too? but might not be needed for SAC anyway
+        obs_actions = torch.cat((data["critic_obs"], data["actions"]), dim=-1)
+        data["values"] = self.critic_1.evaluate(obs_actions)
+        data["advantages"] = compute_generalized_advantages(
+            data, self.gamma, self.lam, self.critic_1, last_values
+        )
+        data["returns"] = data["advantages"] + data["values"]
         self.update_actor(data)
 
     def update_critic(self, data):
         self.mean_value_loss = 0
         counter = 0
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
-            value_batch = self.critic.evaluate(batch["critic_obs"])
-            value_loss = self.critic.loss_fn(value_batch, batch["returns"])
+            actions = self.actor.act(batch["actor_obs"])
+            actions_log_prob = self.actor.get_actions_log_prob(actions)
+
+            obs_action_batch = torch.cat((batch["critic_obs"], actions), dim=-1)
+            qvalue_1 = self.critic_1.evaluate(obs_action_batch)
+            qvalue_2 = self.critic_2.evaluate(obs_action_batch)
+            qvalue_min = torch.min(qvalue_1, qvalue_2)
+
+            targets = (
+                self.gamma
+                * batch["dones"].logical_not()
+                * (qvalue_min - self.entropy_coef * actions_log_prob)
+            ) + batch["rewards"]
+
+            value_loss = self.critic_1.loss_fn(
+                qvalue_1, targets
+            ) + self.critic_2.loss_fn(qvalue_2, targets)
+            #####
+            # value_batch = self.critic.evaluate(batch["critic_obs"])
+            # value_loss = self.critic.loss_fn(value_batch, batch["returns"])
+            #####
             self.critic_optimizer.zero_grad()
             value_loss.backward()
-            nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+            nn.utils.clip_grad_norm_(
+                list(self.critic_1.parameters()) + list(self.critic_2.parameters()),
+                self.max_grad_norm,
+            )
             self.critic_optimizer.step()
             self.mean_value_loss += value_loss.item()
             counter += 1
@@ -106,10 +159,11 @@ class SAC:
             data["actions"]
         ).detach()
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
             # ! refactor how this is done
             self.actor.act(batch["actor_obs"])
@@ -158,10 +212,7 @@ class SAC:
             # * Gradient step
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(
-                list(self.actor.parameters()) + list(self.critic.parameters()),
-                self.max_grad_norm,
-            )
+            nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
             self.optimizer.step()
             self.mean_surrogate_loss += surrogate_loss.item()
             counter += 1
