@@ -57,7 +57,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "OffPolicyRunner"
+    runner_class_name = "OnPolicyRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -98,27 +98,29 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        # training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
+        # both
+        gamma = 0.99
+        lam = 0.95
+        # shared
+        batch_size = 2**15
+        max_grad_steps = 10
+        # new
+        storage_size = 2**17  # new
+        batch_size = 2**15  #  new
+
         clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 6
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 4
-        learning_rate = 1.0e-4
-        schedule = "fixed"  # could be adaptive, fixed
-        discount_horizon = 2.0  # [s]
-        lam = 0.98
-        # GAE_bootstrap_horizon = .0  # [s]
-        desired_kl = 0.01
+        learning_rate = 1.0e-3
         max_grad_norm = 1.0
-        standard_loss = True
-        plus_c_penalty = 0.1
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "SAC"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32
