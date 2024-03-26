@@ -24,7 +24,8 @@ def normalize(input, eps=1e-8):
 
 
 @torch.no_grad
-def compute_generalized_advantages(data, gamma, lam, critic, last_values=None):
+def compute_generalized_advantages(data, gamma, lam, critic):
+    last_values = critic.evaluate(data["next_critic_obs"][-1])
     advantages = torch.zeros_like(data["values"])
     if last_values is not None:
         # todo check this
@@ -65,6 +66,7 @@ def create_uniform_generator(
     if max_gradient_steps:
         num_epochs = max_gradient_steps // num_batches_per_epoch
         num_epochs = max(num_epochs, 1)
+
     for epoch in range(num_epochs):
         indices = torch.randperm(total_data, device=data.device)
         for i in range(num_batches_per_epoch):
