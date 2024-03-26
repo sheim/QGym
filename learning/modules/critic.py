@@ -27,5 +27,5 @@ class Critic(nn.Module):
                 critic_observations = self.obs_rms(critic_observations)
         return self.NN(critic_observations).squeeze()
 
-    def loss_fn(self, input, target):
-        return nn.functional.mse_loss(input, target, reduction="mean")
+    def loss_fn(self, obs, target):
+        return nn.functional.mse_loss(self.evaluate(obs), target, reduction="mean")

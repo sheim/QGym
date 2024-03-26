@@ -24,7 +24,6 @@ class PPO2:
         use_clipped_value_loss=True,
         schedule="fixed",
         desired_kl=0.01,
-        loss_fn="MSE",
         device="cpu",
         **kwargs,
     ):
@@ -80,8 +79,7 @@ class PPO2:
         batch_size = total_data // self.num_mini_batches
         generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
         for batch in generator:
-            value_batch = self.critic.evaluate(batch["critic_obs"])
-            value_loss = self.critic.loss_fn(value_batch, batch["returns"])
+            value_loss = self.critic.loss_fn(batch["critic_obs"], batch["returns"])
             self.critic_optimizer.zero_grad()
             value_loss.backward()
             nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
