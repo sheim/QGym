@@ -4,7 +4,6 @@ import torch.optim as optim
 
 from learning.utils import (
     create_uniform_generator,
-    compute_generalized_advantages,
 )
 
 
@@ -77,35 +76,9 @@ class SAC:
     def act(self, obs, critic_obs):
         return self.actor.act(obs).detach()
 
-    def update(self, data, last_obs=None):
-        if last_obs is None:
-            last_values = None
-        # else:
-        # todo
-        # with torch.no_grad():
-        #     last_values_1 = self.critic_1.evaluate(last_obs).detach()
-        #     last_values_2 = self.critic_2.evaluate(last_obs).detach()
-        #     last_values = torch.min(last_values_1, last_values_2)
-
-        # data["values"] = self.critic.evaluate(data["critic_obs"])
-        # data["advantages"] = compute_generalized_advantages(
-        #     data, self.gamma, self.lam, self.critic, last_values
-        # )
-        # data["returns"] = data["advantages"] + data["values"]
-
-        self.update_critic(data)
-
-        # todo properly take min over here too? but might not be needed for SAC anyway
-        obs_actions = torch.cat((data["critic_obs"], data["actions"]), dim=-1)
-        data["values"] = self.critic_1.evaluate(obs_actions)
-        data["advantages"] = compute_generalized_advantages(
-            data, self.gamma, self.lam, self.critic_1, last_values
-        )
-        data["returns"] = data["advantages"] + data["values"]
-        self.update_actor(data)
-
-    def update_critic(self, data):
+    def update(self, data):
         self.mean_value_loss = 0
+        self.mean_surrogate_loss = 0
         counter = 0
 
         generator = create_uniform_generator(
@@ -114,23 +87,24 @@ class SAC:
             max_gradient_steps=self.max_gradient_steps,
         )
         for batch in generator:
-            actions = self.actor.act(batch["actor_obs"])
-            actions_log_prob = self.actor.get_actions_log_prob(actions)
+            next_action = self.actor.act(batch["next_actor_obs"])
+            next_actions_log_prob = self.actor.get_actions_log_prob(next_action)
 
-            obs_action_batch = torch.cat((batch["critic_obs"], actions), dim=-1)
-            qvalue_1 = self.critic_1.evaluate(obs_action_batch)
-            qvalue_2 = self.critic_2.evaluate(obs_action_batch)
+            next_obs_action = torch.cat((batch["next_critic_obs"], next_action), dim=-1)
+            qvalue_1 = self.critic_1.evaluate(next_obs_action)
+            qvalue_2 = self.critic_2.evaluate(next_obs_action)
             qvalue_min = torch.min(qvalue_1, qvalue_2)
 
             targets = (
                 self.gamma
                 * batch["dones"].logical_not()
-                * (qvalue_min - self.entropy_coef * actions_log_prob)
+                * (qvalue_min - self.entropy_coef * next_actions_log_prob)
             ) + batch["rewards"]
 
+            obs_action = torch.cat((batch["critic_obs"], batch["actions"]), dim=-1)
             value_loss = self.critic_1.loss_fn(
-                qvalue_1, targets
-            ) + self.critic_2.loss_fn(qvalue_2, targets)
+                obs_action, targets
+            ) + self.critic_2.loss_fn(obs_action, targets)
             #####
             # value_batch = self.critic.evaluate(batch["critic_obs"])
             # value_loss = self.critic.loss_fn(value_batch, batch["returns"])
@@ -144,6 +118,21 @@ class SAC:
             self.critic_optimizer.step()
             self.mean_value_loss += value_loss.item()
             counter += 1
+
+            action = self.actor.act(batch["actor_obs"])
+            actions_log_prob = self.actor.get_actions_log_prob(action)
+            obs_action = torch.cat((batch["critic_obs"], action), dim=-1)
+            qvalue_1 = self.critic_1.evaluate(obs_action)
+            qvalue_2 = self.critic_2.evaluate(obs_action)
+            qvalue_min = torch.min(qvalue_1, qvalue_2)
+            # update actor
+            actor_loss = (qvalue_min - self.entropy_coef * actions_log_prob).mean()
+            self.optimizer.zero_grad()
+            actor_loss.backward()
+            nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
+            self.optimizer.step()
+            self.mean_surrogate_loss += actor_loss.item()
+
         self.mean_value_loss /= counter
 
     def update_actor(self, data):
