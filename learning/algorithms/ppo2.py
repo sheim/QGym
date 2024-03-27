@@ -49,15 +49,11 @@ class PPO2:
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
 
-    def test_mode(self):
-        self.actor.test()
-        self.critic.test()
-
     def switch_to_train(self):
         self.actor.train()
         self.critic.train()
 
-    def act(self, obs, critic_obs):
+    def act(self, obs):
         return self.actor.act(obs).detach()
 
     def update(self, data):
