@@ -5,7 +5,7 @@ from tensordict import TensorDict
 from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
-from learning.modules import Actor, Critic
+from learning.modules import Critic, ChimeraActor
 from learning.storage import DictStorage
 from learning.algorithms import SAC
 
@@ -27,10 +27,20 @@ class OffPolicyRunner(BaseRunner):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
         num_actions = self.get_action_size(self.actor_cfg["actions"])
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
-        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        actor = ChimeraActor(num_actor_obs, num_actions, **self.actor_cfg)
         critic_1 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
         critic_2 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
-        self.alg = SAC(actor, critic_1, critic_2, device=self.device, **self.alg_cfg)
+        target_critic_1 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
+        target_critic_2 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
+        self.alg = SAC(
+            actor,
+            critic_1,
+            critic_2,
+            target_critic_1,
+            target_critic_2,
+            device=self.device,
+            **self.alg_cfg,
+        )
 
     def learn(self):
         self.set_up_logger()
@@ -49,7 +59,7 @@ class OffPolicyRunner(BaseRunner):
             {
                 "actor_obs": actor_obs,
                 "next_actor_obs": actor_obs,
-                "actions": self.alg.act(actor_obs, critic_obs),
+                "actions": self.alg.act(actor_obs),
                 "critic_obs": critic_obs,
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
@@ -70,7 +80,7 @@ class OffPolicyRunner(BaseRunner):
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    actions = self.alg.act(actor_obs, critic_obs)
+                    actions = self.alg.act(actor_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],
                         actions,
@@ -152,9 +162,16 @@ class OffPolicyRunner(BaseRunner):
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
-            "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
+            "algorithm",
+            self.alg,
+            [
+                "mean_critic_1_loss",
+                "mean_critic_2_loss",
+                "mean_actor_loss",
+                "mean_alpha_loss",
+            ],
         )
-        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
+        # logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
         logger.attach_torch_obj_to_wandb(
             (self.alg.actor, self.alg.critic_1, self.alg.critic_2)
@@ -163,27 +180,37 @@ class OffPolicyRunner(BaseRunner):
     def save(self):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
-        torch.save(
-            {
-                "actor_state_dict": self.alg.actor.state_dict(),
-                "critic_1_state_dict": self.alg.critic_1.state_dict(),
-                "critic_2_state_dict": self.alg.critic_2.state_dict(),
-                "optimizer_state_dict": self.alg.optimizer.state_dict(),
-                "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
-                "iter": self.it,
-            },
-            path,
-        )
+        save_dict = {
+            "actor_state_dict": self.alg.actor.state_dict(),
+            "critic_1_state_dict": self.alg.critic_1.state_dict(),
+            "critic_2_state_dict": self.alg.critic_2.state_dict(),
+            "log_alpha": self.alg.log_alpha,
+            "actor_optimizer_state_dict": self.alg.actor_optimizer.state_dict(),
+            "critic_1_optimizer_state_dict": self.alg.critic_1_optimizer.state_dict(),
+            "critic_2_optimizer_state_dict": self.alg.critic_2_optimizer.state_dict(),
+            "log_alpha_optimizer_state_dict": self.alg.log_alpha_optimizer.state_dict(),
+            "iter": self.it,
+        }
+        torch.save(save_dict, path)
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
         self.alg.critic_1.load_state_dict(loaded_dict["critic_1_state_dict"])
         self.alg.critic_2.load_state_dict(loaded_dict["critic_2_state_dict"])
+        self.log_alpha = loaded_dict["log_alpha"]
         if load_optimizer:
-            self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
-            self.alg.critic_optimizer.load_state_dict(
-                loaded_dict["critic_optimizer_state_dict"]
+            self.alg.actor_optimizer.load_state_dict(
+                loaded_dict["actor_optimizer_state_dict"]
+            )
+            self.alg.critic_1_optimizer.load_state_dict(
+                loaded_dict["critic_1_optimizer_state_dict"]
+            )
+            self.alg.critic_2_optimizer.load_state_dict(
+                loaded_dict["critic_2_optimizer_state_dict"]
+            )
+            self.alg.log_alpha_optimizer.load_state_dict(
+                loaded_dict["log_alpha_optimizer_state_dict"]
             )
         self.it = loaded_dict["iter"]
 
@@ -194,7 +221,7 @@ class OffPolicyRunner(BaseRunner):
 
     def get_inference_actions(self):
         obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
-        return self.alg.actor.act_inference(obs)
+        return self.alg.act(obs)  # todo inference mode
 
     def export(self, path):
         self.alg.actor.export(path)

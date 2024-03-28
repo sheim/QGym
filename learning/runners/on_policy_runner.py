@@ -38,7 +38,7 @@ class OnPolicyRunner(BaseRunner):
             {
                 "actor_obs": actor_obs,
                 "next_actor_obs": actor_obs,
-                "actions": self.alg.act(actor_obs, critic_obs),
+                "actions": self.alg.act(actor_obs),
                 "critic_obs": critic_obs,
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
@@ -59,7 +59,7 @@ class OnPolicyRunner(BaseRunner):
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    actions = self.alg.act(actor_obs, critic_obs)
+                    actions = self.alg.act(actor_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],
                         actions,

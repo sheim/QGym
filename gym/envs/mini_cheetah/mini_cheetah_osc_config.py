@@ -160,6 +160,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
+    runner_class_name = "OnPolicyRunner"
 
     class policy:
         hidden_dims = [256, 256, 128]
