@@ -57,7 +57,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "OffPolicyRunner"
+    runner_class_name = "OnPolicyRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -122,5 +122,5 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "SAC"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32
