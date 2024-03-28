@@ -44,6 +44,7 @@ runner_config_dict = {
     "AnymalCFlatRunnerCfg": ".anymal_c.flat.anymal_c_flat_config",
     "HumanoidRunningRunnerCfg": ".mit_humanoid.humanoid_running_config",
     "PendulumRunnerCfg": ".pendulum.pendulum_config",
+    "PendulumSACRunnerCfg": ".pendulum.pendulum_SAC_config",
 }
 
 task_dict = {
@@ -66,7 +67,8 @@ task_dict = {
         "HumanoidRunningRunnerCfg",
     ],
     "flat_anymal_c": ["Anymal", "AnymalCFlatCfg", "AnymalCFlatRunnerCfg"],
-    "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"]
+    "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"],
+    "sac_pendulum": ["Pendulum", "PendulumCfg", "PendulumSACRunnerCfg"],
 }
 
 for class_name, class_location in class_dict.items():

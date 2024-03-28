@@ -1,0 +1,72 @@
+from gym.envs.base.fixed_robot_config import FixedRobotCfgPPO
+
+
+class PendulumSACRunnerCfg(FixedRobotCfgPPO):
+    seed = -1
+    runner_class_name = "OffPolicyRunner"
+
+    class actor:
+        hidden_dims = [128, 64, 32, 32]
+        split_idx = 2
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "tanh"
+
+        obs = [
+            "dof_pos",
+            "dof_vel",
+        ]
+
+        actions = ["tau_ff"]
+        disable_actions = False
+
+        class noise:
+            dof_pos = 0.0
+            dof_vel = 0.0
+
+    class critic:
+        obs = [
+            "dof_pos",
+            "dof_vel",
+        ]
+        hidden_dims = [128, 64, 32]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "tanh"
+
+        class reward:
+            class weights:
+                theta = 0.0
+                omega = 0.0
+                equilibrium = 1.0
+                energy = 0.05
+                dof_vel = 0.0
+                torques = 0.01
+
+            class termination_weight:
+                termination = 0.0
+
+    class algorithm(FixedRobotCfgPPO.algorithm):
+        batch_size = 2**17
+        max_gradient_steps = 10
+        action_max = 5.0
+        action_min = -5.0
+        actor_noise_std = 1.0
+        log_std_max = 4.0
+        log_std_min = -20.0
+        alpha = 0.2
+        target_entropy = -1.0
+        max_grad_norm = 1.0
+        polyak = 0.98  # flipped compared to stable-baselines3 (polyak == 1-tau)
+        gamma = 0.98
+        alpha_lr = 1e-4
+        actor_lr = 1e-5
+        critic_lr = 1e-5
+        # gSDE parameters missing: batch_size = 256!!!, but batch_size ~2**17
+        # warm-up steps
+        # auto entropy coefficient (alpha)
+
+    class runner(FixedRobotCfgPPO.runner):
+        run_name = ""
+        experiment_name = "pendulum"
+        max_iterations = 500  # number of policy updates
+        algorithm_class_name = "SAC"
+        num_steps_per_env = 32
