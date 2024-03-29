@@ -172,12 +172,9 @@ class MIT_Humanoid(LeggedRobot):
         ) * self._switch("stand")
 
     def _reward_dof_near_home(self):
-        return torch.mean(
-            self._sqrdexp(
-                (self.dof_pos - self.default_dof_pos) / self.scales["dof_pos"]
-            ),
-            dim=1,
-        )
+        return self._sqrdexp(
+            (self.dof_pos - self.default_dof_pos) / self.scales["dof_pos"]
+        ).mean(dim=1)
 
     def _reward_stand_still(self):
         """Penalize motion at zero commands"""
@@ -233,4 +230,5 @@ class MIT_Humanoid(LeggedRobot):
         hip_yaw_abad /= torch.stack(
             (self.scales["dof_pos"][0:2], self.scales["dof_pos"][5:7]), dim=1
         )
-        return self._sqrdexp(hip_yaw_abad).sum(dim=1).mean(dim=1)
+        return (hip_yaw_abad).pow(2).mean(dim=1)
+        # return self._sqrdexp(hip_yaw_abad).sum(dim=1).mean(dim=1)

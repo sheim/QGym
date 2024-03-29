@@ -117,20 +117,20 @@ class MITHumanoidCfg(LeggedRobotCfg):
         filter_gain = 0.1586  # 1: no filtering, 0: wall
 
     class oscillator:
-        base_frequency = 2.0  # [Hz]
+        base_frequency = 3.0  # [Hz]
 
     class commands:
         resampling_time = 10.0  # time before command are changed[s]
 
         class ranges:
-            lin_vel_x = [-1.0, 4.0]  # min max [m/s] [-0.75, 0.75]
-            lin_vel_y = 0.35  # max [m/s]
-            yaw_vel = 0.5  # max [rad/s]
+            lin_vel_x = [-0.0, 0.0]  # min max [m/s] [-0.75, 0.75]
+            lin_vel_y = 0.0  # max [m/s]
+            yaw_vel = 0.0  # max [rad/s]
 
     class push_robots:
         toggle = True
         interval_s = 1
-        max_push_vel_xy = 0.6
+        max_push_vel_xy = 0.5
         push_box_dims = [0.1, 0.1, 0.3]  # x,y,z [m]
 
     class domain_rand:
@@ -155,18 +155,18 @@ class MITHumanoidCfg(LeggedRobotCfg):
         # * see GymDofDriveModeFlags
         # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
         default_dof_drive_mode = 3
-        fix_base_link = False
+        fix_base_link = True
         disable_gravity = False
         disable_motors = False
         total_mass = 25.0
 
     class reward_settings(LeggedRobotCfg.reward_settings):
-        soft_dof_pos_limit = 0.9
-        soft_dof_vel_limit = 0.9
-        soft_torque_limit = 0.9
+        soft_dof_pos_limit = 0.8
+        soft_dof_vel_limit = 0.8
+        soft_torque_limit = 0.8
         max_contact_force = 1500.0
         base_height_target = BASE_HEIGHT_REF
-        tracking_sigma = 0.5
+        tracking_sigma = 0.25
 
         # a smooth switch based on |cmd| (commanded velocity).
         switch_scale = 0.5
@@ -229,28 +229,28 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     class policy(LeggedRobotRunnerCfg.policy):
         disable_actions = False
         init_noise_std = 1.0
-        actor_hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [256, 256, 128]
+        actor_hidden_dims = [512, 512, 128]
+        critic_hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
+        activation = "elu"
 
         actor_obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
-            "commands",
+            # "commands",
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_history",
-            "sampled_history_dof_pos",
-            "sampled_history_dof_vel",
-            "sampled_history_dof_pos_target",
+            # "sampled_history_dof_pos",
+            # "sampled_history_dof_vel",
+            # "sampled_history_dof_pos_target",
             "oscillator_obs",
         ]
         critic_obs = actor_obs
 
-        actions = ["dof_pos_target", "oscillator_freq"]
+        actions = ["dof_pos_target"]
 
         class noise:
             dof_pos = 0.005
@@ -262,23 +262,23 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
 
         class reward:
             class weights:
-                # tracking_lin_vel = 3.0
+                # tracking_lin_vel = 0.0
                 # tracking_ang_vel = 1.5
                 # orientation = 1.0
                 torques = 5.0e-4
                 # min_base_height = 1.5
-                action_rate = 0.01
-                action_rate2 = 0.001
+                action_rate = 1e-3
+                action_rate2 = 1e-3
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
                 # dof_vel = 0.25
                 # stand_still = 0.25
                 dof_pos_limits = 0.25
-                # dof_near_home = 0.25
+                dof_near_home = 0.25
                 stance = 1.0
                 swing = 1.0
-                hips_forward = 0.5
-                walk_freq = 2.5
+                hips_forward = 0.0
+                walk_freq = 0.0  # 2.5
 
             class termination_weight:
                 termination = 15

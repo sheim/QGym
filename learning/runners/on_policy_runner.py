@@ -38,8 +38,10 @@ class OnPolicyRunner(BaseRunner):
         transition.update(
             {
                 "actor_obs": actor_obs,
+                "next_actor_obs": actor_obs,
                 "actions": self.alg.act(actor_obs, critic_obs),
                 "critic_obs": critic_obs,
+                "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
                 "dones": self.get_timed_out(),
             }
@@ -89,6 +91,8 @@ class OnPolicyRunner(BaseRunner):
 
                     transition.update(
                         {
+                            "next_actor_obs": actor_obs,
+                            "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
                             "timed_out": timed_out,
                             "dones": dones,
