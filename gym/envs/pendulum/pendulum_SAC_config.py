@@ -45,7 +45,9 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        batch_size = 2**17
+        initial_fill = 1000
+        storage_size = 10**17
+        batch_size = 256
         max_gradient_steps = 10
         action_max = 5.0
         action_min = -5.0
@@ -69,4 +71,5 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         experiment_name = "pendulum"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "SAC"
-        num_steps_per_env = 32
+        save_interval = 10
+        num_steps_per_env = 100

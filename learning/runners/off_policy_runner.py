@@ -6,11 +6,11 @@ from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
 from learning.modules import Critic, ChimeraActor
-from learning.storage import DictStorage
+from learning.storage import ReplayBuffer
 from learning.algorithms import SAC
 
 logger = Logger()
-storage = DictStorage()
+storage = ReplayBuffer()
 
 
 class OffPolicyRunner(BaseRunner):
@@ -72,6 +72,52 @@ class OffPolicyRunner(BaseRunner):
             self.env.num_envs * self.num_steps_per_env,
             device=self.device,
         )
+
+        # fill buffer
+        for _ in range(self.alg_cfg["initial_fill"]):
+            with torch.inference_mode():
+                actions = self.alg.act(actor_obs)
+                self.set_actions(
+                    self.actor_cfg["actions"],
+                    actions,
+                    self.actor_cfg["disable_actions"],
+                )
+                transition.update(
+                    {
+                        "actor_obs": actor_obs,
+                        "actions": actions,
+                        "critic_obs": critic_obs,
+                    }
+                )
+
+                self.env.step()
+
+                actor_obs = self.get_noisy_obs(
+                    self.actor_cfg["obs"], self.actor_cfg["noise"]
+                )
+                critic_obs = self.get_obs(self.critic_cfg["obs"])
+
+                # * get time_outs
+                timed_out = self.get_timed_out()
+                terminated = self.get_terminated()
+                dones = timed_out | terminated
+
+                self.update_rewards(rewards_dict, terminated)
+                total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
+
+                transition.update(
+                    {
+                        "next_actor_obs": actor_obs,
+                        "next_critic_obs": critic_obs,
+                        "rewards": total_rewards,
+                        "timed_out": timed_out,
+                        "dones": dones,
+                    }
+                )
+                storage.add_transitions(transition)
+                # print every 10% of initial fill
+                if _ % (self.alg_cfg["initial_fill"] // 10) == 0:
+                    print(f"Filled {100 * _ / self.alg_cfg['initial_fill']}%")
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):

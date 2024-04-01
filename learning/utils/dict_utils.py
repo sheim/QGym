@@ -60,10 +60,13 @@ def create_uniform_generator(
     total_data = n * m
 
     if batch_size > total_data:
+        Warning("Batch size is larger than total data, using available data only.")
         batch_size = total_data
 
     num_batches_per_epoch = total_data // batch_size
     if max_gradient_steps:
+        if max_gradient_steps < num_batches_per_epoch:
+            num_batches_per_epoch = max_gradient_steps
         num_epochs = max_gradient_steps // num_batches_per_epoch
         num_epochs = max(num_epochs, 1)
 
