@@ -6,10 +6,10 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
     runner_class_name = "OffPolicyRunner"
 
     class actor:
-        hidden_dims = [128, 64, 32, 32]
+        hidden_dims = [128, 64, 32]
         split_idx = 2
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
+        activation = "elu"
 
         obs = [
             "dof_pos",
@@ -28,16 +28,16 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
             "dof_pos",
             "dof_vel",
         ]
-        hidden_dims = [128, 64, 32]
+        hidden_dims = [256, 256]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
+        activation = "elu"
 
         class reward:
             class weights:
                 theta = 0.0
                 omega = 0.0
-                equilibrium = 1.0
-                energy = 0.05
+                equilibrium = 10.0
+                energy = 0.5
                 dof_vel = 0.0
                 torques = 0.01
 
@@ -48,7 +48,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         initial_fill = 1000
         storage_size = 10**17
         batch_size = 256
-        max_gradient_steps = 10
+        max_gradient_steps = 1  # 10 # SB3: 1
         action_max = 5.0
         action_min = -5.0
         actor_noise_std = 1.0
@@ -59,9 +59,9 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         max_grad_norm = 1.0
         polyak = 0.98  # flipped compared to stable-baselines3 (polyak == 1-tau)
         gamma = 0.98
-        alpha_lr = 1e-4
-        actor_lr = 1e-5
-        critic_lr = 1e-5
+        alpha_lr = 3e-4
+        actor_lr = 3e-4
+        critic_lr = 3e-4
         # gSDE parameters missing: batch_size = 256!!!, but batch_size ~2**17
         # warm-up steps
         # auto entropy coefficient (alpha)

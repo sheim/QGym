@@ -1,5 +1,6 @@
 import torch
-import torch.nn as nn
+
+# import torch.nn as nn
 import torch.optim as optim
 
 from learning.utils import create_uniform_generator, polyak_update
@@ -174,8 +175,12 @@ class SAC:
                 actions_normalized * self.action_delta + self.action_offset
             ).clamp(self.action_min, self.action_max)
             ## *
-            action_logp = distribution.log_prob(actions).sum(-1) - torch.log(
-                1.0 - actions_normalized.pow(2) + 1e-6
+            # action_logp = distribution.log_prob(actions).sum(-1) - torch.log(
+            #     1.0 - actions_normalized.pow(2) + 1e-6
+            # ).sum(-1)
+            action_logp = (
+                distribution.log_prob(actions)
+                - torch.log(1.0 - actions_normalized.pow(2) + 1e-6)
             ).sum(-1)
 
             # * returns target_action = actions_scaled, target_action_logp = action_logp
@@ -200,14 +205,14 @@ class SAC:
         critic_loss_1 = self.critic_1.loss_fn(critic_in, target)
         self.critic_1_optimizer.zero_grad()
         critic_loss_1.backward()
-        nn.utils.clip_grad_norm_(self.critic_1.parameters(), self.max_grad_norm)
+        # nn.utils.clip_grad_norm_(self.critic_1.parameters(), self.max_grad_norm)
         self.critic_1_optimizer.step()
 
         # critic_prediction_2 = self.critic_2.forward(critic_in)
         critic_loss_2 = self.critic_2.loss_fn(critic_in, target)
         self.critic_2_optimizer.zero_grad()
         critic_loss_2.backward()
-        nn.utils.clip_grad_norm_(self.critic_2.parameters(), self.max_grad_norm)
+        # nn.utils.clip_grad_norm_(self.critic_2.parameters(), self.max_grad_norm)
         self.critic_2_optimizer.step()
 
         self.mean_critic_1_loss += critic_loss_1.item()
@@ -239,8 +244,9 @@ class SAC:
         actor_prediction_logp = action_logp
 
         alpha_loss = (
-            -self.log_alpha * (action_logp + self.target_entropy).detach().mean()
-        )
+            -self.log_alpha * (action_logp + self.target_entropy).detach()
+        ).mean()
+        # -(self.log_alpha * (action_logp + self.target_entropy)).detach().mean()
 
         self.log_alpha_optimizer.zero_grad()
         alpha_loss.backward()
@@ -255,7 +261,7 @@ class SAC:
         ).mean()
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
-        nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
+        # nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
         self.actor_optimizer.step()
 
         self.mean_alpha_loss += alpha_loss.item()

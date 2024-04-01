@@ -33,7 +33,7 @@ class PendulumCfg(FixedRobotCfg):
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 20
+        ctrl_frequency = 100
         desired_sim_frequency = 200
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
@@ -43,7 +43,7 @@ class PendulumCfg(FixedRobotCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "pendulum/urdf/pendulum.urdf"
         disable_gravity = False
         disable_motors = False  # all torques set to 0
-        joint_damping = 0.1
+        joint_damping = 0.5
 
     class reward_settings(FixedRobotCfg.reward_settings):
         tracking_sigma = 0.25
@@ -52,7 +52,7 @@ class PendulumCfg(FixedRobotCfg):
         dof_vel = 5.0
         dof_pos = 2.0 * torch.pi
         # * Action scales
-        tau_ff = 1.0
+        tau_ff = 5.0
 
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
