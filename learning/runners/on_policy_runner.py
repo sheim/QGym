@@ -18,7 +18,7 @@ class OnPolicyRunner(BaseRunner):
             self.device,
         )
 
-    def learn(self):
+    def learn(self, states_to_log_dict=None):
         self.set_up_logger()
 
         rewards_dict = {}
@@ -52,6 +52,17 @@ class OnPolicyRunner(BaseRunner):
                     )
 
                     self.env.step()
+
+                    # * Log states
+                    # This continuously overwrites the rollout data, so when the state
+                    # dict is written to a file it contains the last rollout for each
+                    # iteration.
+                    it_idx = self.it - 1
+                    if states_to_log_dict is not None:
+                        for state in states_to_log_dict:
+                            states_to_log_dict[state][0, it_idx, i, :] = getattr(
+                                self.env, state
+                            )[0, :]
 
                     actor_obs = self.get_noisy_obs(
                         self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
