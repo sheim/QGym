@@ -141,7 +141,7 @@ class CustomCriticRunner(OnPolicyRunner):
             "logs",
             "lqrc",
             "standard_training_data.npy"
-            if self.critic_cfg["standard_critic_nn"]
+            if "Cholesky" not in self.critic_cfg["critic_class_name"]
             else "custom_training_data.npy",
         )
 

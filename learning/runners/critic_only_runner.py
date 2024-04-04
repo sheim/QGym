@@ -6,7 +6,12 @@ from tensordict import TensorDict
 from gym import LEGGED_GYM_ROOT_DIR
 from learning.algorithms import *  # noqa: F403
 from learning.modules import Actor, Critic
-from learning.modules.lqrc import Cholesky, CholeskyPlusConst, CholeskyOffset1, CholeskyOffset2
+from learning.modules.lqrc import (
+    Cholesky,
+    CholeskyPlusConst,
+    CholeskyOffset1,
+    CholeskyOffset2
+)
 from learning.utils import Logger
 
 from .on_policy_runner import OnPolicyRunner
