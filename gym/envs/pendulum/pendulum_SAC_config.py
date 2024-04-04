@@ -49,8 +49,8 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         storage_size = 10**17
         batch_size = 256
         max_gradient_steps = 1  # 10 # SB3: 1
-        action_max = 5.0
-        action_min = -5.0
+        action_max = 1.0
+        action_min = -1.0
         actor_noise_std = 1.0
         log_std_max = 4.0
         log_std_min = -20.0

@@ -23,7 +23,7 @@ class PendulumCfg(FixedRobotCfg):
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_basic"
 
         # * initial conditions for reset_to_range
         dof_pos_range = {

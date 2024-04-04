@@ -50,6 +50,7 @@ class OffPolicyRunner(BaseRunner):
         self.alg.switch_to_train()
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
+        actions = self.alg.act(actor_obs)
         tot_iter = self.it + self.num_learning_iterations
         self.save()
 
@@ -76,7 +77,7 @@ class OffPolicyRunner(BaseRunner):
         # fill buffer
         for _ in range(self.alg_cfg["initial_fill"]):
             with torch.inference_mode():
-                actions = self.alg.act(actor_obs)
+                actions = torch.rand_like(actions) * 2 - 1
                 self.set_actions(
                     self.actor_cfg["actions"],
                     actions,
@@ -267,7 +268,12 @@ class OffPolicyRunner(BaseRunner):
 
     def get_inference_actions(self):
         obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
-        return self.alg.act(obs)  # todo inference mode
+        mean = self.alg.actor.forward(obs)  # todo inference mode
+        actions = torch.tanh(mean)
+        actions = (actions * self.alg.action_delta + self.alg.action_offset).clamp(
+            self.alg.action_min, self.alg.action_max
+        )
+        return actions
 
     def export(self, path):
         self.alg.actor.export(path)
