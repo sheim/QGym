@@ -47,8 +47,8 @@
     <origin xyz="0 0 0"/>
     <parent link="base"/>
     <child link="pole"/>
-    <limit effort="5.0"/>
-    <limit velocity="100.0"/>
+    <limit effort="2.0"/>
+    <limit velocity="8.0"/>
      <!-- lower="-50" upper="50"/> -->
 
   </joint>

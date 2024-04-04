@@ -27,14 +27,14 @@ class PendulumCfg(FixedRobotCfg):
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
-            "theta": [-torch.pi / 4, torch.pi / 4],
+            "theta": [-torch.pi, torch.pi],
         }
         dof_vel_range = {"theta": [-1, 1]}
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 100
-        desired_sim_frequency = 200
+        ctrl_frequency = 20
+        desired_sim_frequency = 100
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
 
@@ -52,7 +52,7 @@ class PendulumCfg(FixedRobotCfg):
         dof_vel = 5.0
         dof_pos = 2.0 * torch.pi
         # * Action scales
-        tau_ff = 5.0
+        tau_ff = 2.0
 
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
@@ -62,7 +62,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     class actor:
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
+        activation = "elu"
 
         obs = [
             "dof_pos",
@@ -83,14 +83,14 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         ]
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
+        activation = "elu"
 
         class reward:
             class weights:
                 theta = 0.0
                 omega = 0.0
                 equilibrium = 1.0
-                energy = 0.05
+                energy = 0.0
                 dof_vel = 0.0
                 torques = 0.01
 

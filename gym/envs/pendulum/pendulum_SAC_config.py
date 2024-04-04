@@ -12,7 +12,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         activation = "elu"
 
         obs = [
-            "dof_pos",
+            "dof_pos_obs",
             "dof_vel",
         ]
 
