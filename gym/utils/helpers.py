@@ -190,10 +190,10 @@ def update_cfg_from_args(env_cfg, train_cfg, args):
             train_cfg.runner_class_name = "CriticOnlyRunner"
             train_cfg.runner.resume = True
             train_cfg.runner.experiment_name += "_critic_only"
-            train_cfg.runner.run_name += "custom_critic_only" if args.task == "pendulum" and args.custom_critic else "standard_critic_only"
+            train_cfg.runner.run_name += f"{train_cfg.critic.critic_class_name}_custom_critic_only" if args.task == "pendulum" and args.custom_critic else "standard_critic_only"
         else:
             train_cfg.runner.experiment_name += "_custom_critic" if args.task == "pendulum" and args.custom_critic else "_standard_critic"
-            train_cfg.runner.run_name += "custom_critic" if args.task == "pendulum" and args.custom_critic else "standard_critic"
+            train_cfg.runner.run_name += f"{train_cfg.critic.critic_class_name}_custom_critic" if args.task == "pendulum" and args.custom_critic else "standard_critic"
 
 
 def get_args(custom_parameters=None):

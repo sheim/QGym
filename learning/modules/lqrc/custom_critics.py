@@ -126,7 +126,7 @@ class CholeskyPlusConst(Cholesky):
             device=device,
         )
         self.activation_3.register_forward_hook(self.save_intermediate())
-        self.const_penalty = 0.0 if kwargs.get("const_penalty") is None else kwargs.get("const_penalty")
+        self.const_penalty = 0.1 # 0.0 if kwargs.get("const_penalty") is None else kwargs.get("const_penalty")
 
     def forward(self, x):
         output = self.connection_1(x)
