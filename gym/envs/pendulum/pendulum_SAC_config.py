@@ -11,11 +11,11 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 
+        normalize_obs = False
         obs = [
             "dof_pos_obs",
             "dof_vel",
         ]
-
         actions = ["tau_ff"]
         disable_actions = False
 
@@ -25,30 +25,31 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
 
     class critic:
         obs = [
-            "dof_pos",
+            "dof_pos_obs",
             "dof_vel",
         ]
         hidden_dims = [256, 256]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        normalize_obs = False
 
         class reward:
             class weights:
                 theta = 0.0
                 omega = 0.0
                 equilibrium = 10.0
-                energy = 0.5
+                energy = 1.0
                 dof_vel = 0.0
-                torques = 0.01
+                torques = 0.001
 
             class termination_weight:
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        initial_fill = 1000
-        storage_size = 10**17
+        initial_fill = 10**3
+        storage_size = 10**6  # 17
         batch_size = 256
-        max_gradient_steps = 1  # 10 # SB3: 1
+        max_gradient_steps = 100  # 10 # SB3: 1
         action_max = 1.0
         action_min = -1.0
         actor_noise_std = 1.0
@@ -72,4 +73,4 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "SAC"
         save_interval = 10
-        num_steps_per_env = 100
+        num_steps_per_env = 64

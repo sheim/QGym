@@ -23,18 +23,18 @@ class PendulumCfg(FixedRobotCfg):
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_basic"
+        reset_mode = "reset_to_range"
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
-            "theta": [-torch.pi, torch.pi],
+            "theta": [-torch.pi / 4, torch.pi / 4],
         }
         dof_vel_range = {"theta": [-1, 1]}
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 20
-        desired_sim_frequency = 100
+        ctrl_frequency = 100
+        desired_sim_frequency = 200
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
 
@@ -43,7 +43,7 @@ class PendulumCfg(FixedRobotCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "pendulum/urdf/pendulum.urdf"
         disable_gravity = False
         disable_motors = False  # all torques set to 0
-        joint_damping = 0.5
+        joint_damping = 0.1
 
     class reward_settings(FixedRobotCfg.reward_settings):
         tracking_sigma = 0.25
@@ -52,7 +52,7 @@ class PendulumCfg(FixedRobotCfg):
         dof_vel = 5.0
         dof_pos = 2.0 * torch.pi
         # * Action scales
-        tau_ff = 2.0
+        tau_ff = 1.0
 
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
@@ -62,7 +62,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     class actor:
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = "tanh"
 
         obs = [
             "dof_pos",
@@ -83,14 +83,14 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         ]
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = "tanh"
 
         class reward:
             class weights:
                 theta = 0.0
                 omega = 0.0
                 equilibrium = 1.0
-                energy = 0.0
+                energy = 0.05
                 dof_vel = 0.0
                 torques = 0.01
 
@@ -100,22 +100,22 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     class algorithm(FixedRobotCfgPPO.algorithm):
         # both
         gamma = 0.99
-        lam = 0.95
+        discount_horizon = 2.0
+        lam = 0.98
         # shared
-        batch_size = 2**15
-        max_grad_steps = 10
+        max_gradient_steps = 10
         # new
         storage_size = 2**17  # new
-        batch_size = 2**15  #  new
+        batch_size = 2**16  #  new
 
         clip_param = 0.2
-        learning_rate = 1.0e-3
+        learning_rate = 1.0e-4
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
         # Actor
-        entropy_coef = 0.1
-        schedule = "adaptive"  # could be adaptive, fixed
+        entropy_coef = 0.01
+        schedule = "fixed"  # could be adaptive, fixed
         desired_kl = 0.01
 
     class runner(FixedRobotCfgPPO.runner):

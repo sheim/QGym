@@ -170,7 +170,7 @@ class FixedRobotCfgPPO(BaseConfig):
         lam = 0.95
         # shared
         batch_size = 2**15
-        max_grad_steps = 10
+        max_gradient_steps = 10
         # new
         storage_size = 2**17  # new
         batch_size = 2**15  #  new

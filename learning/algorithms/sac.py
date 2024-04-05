@@ -139,14 +139,14 @@ class SAC:
             self.update_critic(batch)
             self.update_actor_and_alpha(batch)
 
-            # Update Target Networks
-            self.target_critic_1 = polyak_update(
-                self.critic_1, self.target_critic_1, self.polyak
-            )
-            self.target_critic_1 = polyak_update(
-                self.critic_1, self.target_critic_1, self.polyak
-            )
             count += 1
+        # Update Target Networks
+        self.target_critic_1 = polyak_update(
+            self.critic_1, self.target_critic_1, self.polyak
+        )
+        self.target_critic_2 = polyak_update(
+            self.critic_2, self.target_critic_2, self.polyak
+        )
         self.mean_actor_loss /= count
         self.mean_alpha_loss /= count
         self.mean_critic_1_loss /= count
@@ -243,14 +243,14 @@ class SAC:
         actor_prediction = actions_scaled
         actor_prediction_logp = action_logp
 
-        alpha_loss = (
-            -self.log_alpha * (action_logp + self.target_entropy).detach()
-        ).mean()
-        # -(self.log_alpha * (action_logp + self.target_entropy)).detach().mean()
+        # alpha_loss = (
+        #     -self.log_alpha * (action_logp + self.target_entropy).detach()
+        # ).mean()
+        # # -(self.log_alpha * (action_logp + self.target_entropy)).detach().mean()
 
-        self.log_alpha_optimizer.zero_grad()
-        alpha_loss.backward()
-        self.log_alpha_optimizer.step()
+        # self.log_alpha_optimizer.zero_grad()
+        # alpha_loss.backward()
+        # self.log_alpha_optimizer.step()
 
         critic_in = torch.cat((critic_obs, actor_prediction), dim=-1)
         q_value_1 = self.critic_1.forward(critic_in)
@@ -264,5 +264,5 @@ class SAC:
         # nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
         self.actor_optimizer.step()
 
-        self.mean_alpha_loss += alpha_loss.item()
+        # self.mean_alpha_loss += alpha_loss.item()
         self.mean_actor_loss += actor_loss.item()

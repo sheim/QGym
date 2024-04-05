@@ -216,6 +216,7 @@ class OffPolicyRunner(BaseRunner):
                 "mean_critic_2_loss",
                 "mean_actor_loss",
                 "mean_alpha_loss",
+                "alpha",
             ],
         )
         # logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
