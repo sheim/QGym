@@ -66,7 +66,11 @@ def play(env, runner, train_cfg):
 
     # * set up logging
     log_file_path = os.path.join(
-        LEGGED_GYM_ROOT_DIR, "gym", "logs", "data", "play", protocol_name + ".npz"
+        LEGGED_GYM_ROOT_DIR,
+        "gym",
+        "smooth_exploration",
+        "data_play",
+        protocol_name + ".npz",
     )
     if not os.path.exists(os.path.dirname(log_file_path)):
         os.makedirs(os.path.dirname(log_file_path))

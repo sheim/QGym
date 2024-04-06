@@ -83,5 +83,5 @@ env.bak/
 venv.bak/
 
 # Smooth exploration
-gym/smooth_exploration/data
-gym/smooth_exploration/figures
+gym/smooth_exploration/data*
+gym/smooth_exploration/figures*

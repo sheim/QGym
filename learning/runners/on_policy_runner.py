@@ -34,6 +34,13 @@ class OnPolicyRunner(BaseRunner):
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
             logger.tic("collection")
+
+            # * Simulate environment and log states
+            if states_to_log_dict is not None:
+                it_idx = self.it - 1
+                if it_idx % 10 == 0:
+                    self.sim_and_log_states(states_to_log_dict, it_idx)
+
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
@@ -52,17 +59,6 @@ class OnPolicyRunner(BaseRunner):
                     )
 
                     self.env.step()
-
-                    # * Log states
-                    # This continuously overwrites the rollout data, so when the state
-                    # dict is written to a file it contains the last rollout for each
-                    # iteration.
-                    it_idx = self.it - 1
-                    if states_to_log_dict is not None:
-                        for state in states_to_log_dict:
-                            states_to_log_dict[state][0, it_idx, i, :] = getattr(
-                                self.env, state
-                            )[0, :]
 
                     actor_obs = self.get_noisy_obs(
                         self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
@@ -171,3 +167,42 @@ class OnPolicyRunner(BaseRunner):
             critic_obs_shape=[num_critic_obs],
             action_shape=[num_actions],
         )
+
+    def sim_and_log_states(self, states_to_log_dict, it_idx):
+        # Simulate environment for as many steps as expected in the dict.
+        # Log states to the dict, as well as whether the env terminated.
+        steps = states_to_log_dict["terminated"].shape[2]
+        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
+        critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+        with torch.inference_mode():
+            for i in range(steps):
+                sample_freq = self.policy_cfg["exploration_sample_freq"]
+                if self.policy_cfg["smooth_exploration"] and i % sample_freq == 0:
+                    self.alg.actor_critic.actor.sample_weights(
+                        batch_size=self.env.num_envs
+                    )
+
+                actions = self.alg.act(actor_obs, critic_obs)
+                self.set_actions(
+                    self.policy_cfg["actions"],
+                    actions,
+                    self.policy_cfg["disable_actions"],
+                )
+
+                self.env.step()
+
+                actor_obs = self.get_noisy_obs(
+                    self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
+                )
+                critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+                # Log states (just for the first env)
+                terminated = self.get_terminated()[0]
+                for state in states_to_log_dict:
+                    if state == "terminated":
+                        states_to_log_dict[state][0, it_idx, i, :] = terminated
+                    else:
+                        states_to_log_dict[state][0, it_idx, i, :] = getattr(
+                            self.env, state
+                        )[0, :]

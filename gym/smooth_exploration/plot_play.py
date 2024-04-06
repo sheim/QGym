@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 name = "mini_cheetah_ref"
-data_dir = "./data/play/" + name
-fig_dir = "./figures/play"
+data_dir = "./data_play/" + name
+fig_dir = "./figures_play/" + name
 
 # load data
 dof_pos_obs = np.load(data_dir + "/dof_pos_obs.npy")[0]
