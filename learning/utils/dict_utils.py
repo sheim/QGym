@@ -48,7 +48,7 @@ def compute_generalized_advantages(data, gamma, lam, critic):
         )
         advantages[k] = td_error + gamma * lam * not_done * advantages[k + 1]
 
-    return normalize(advantages)
+    return advantages
 
 
 # todo change num_epochs to num_batches

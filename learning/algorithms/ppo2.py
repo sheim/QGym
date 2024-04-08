@@ -5,6 +5,7 @@ import torch.optim as optim
 from learning.utils import (
     create_uniform_generator,
     compute_generalized_advantages,
+    normalize,
 )
 
 
@@ -62,8 +63,8 @@ class PPO2:
             data, self.gamma, self.lam, self.critic
         )
         data["returns"] = data["advantages"] + data["values"]
-
         self.update_critic(data)
+        data["advantages"] = normalize(data["advantages"])
         self.update_actor(data)
 
     def update_critic(self, data):

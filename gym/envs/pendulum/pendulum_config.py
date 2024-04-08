@@ -103,7 +103,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         discount_horizon = 2.0
         lam = 0.98
         # shared
-        max_gradient_steps = 10
+        max_gradient_steps = 24
         # new
         storage_size = 2**17  # new
         batch_size = 2**16  #  new
