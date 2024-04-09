@@ -77,7 +77,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             dof_vel = 0.0
 
     class critic:
-        critic_class_name = "Cholesky"
+        critic_class_name = ""
         obs = [
             "dof_pos",
             "dof_vel",

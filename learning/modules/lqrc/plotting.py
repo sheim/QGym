@@ -336,55 +336,30 @@ def plot_predictions_and_gradients(
         print("Dimension less than 2, cannot graph")
 
 
-def plot_pointwise_predictions(dim, x_actual, y_pred, y_actual, fn):
-    if dim > 3:
-        print("Dimension greater than 3, cannot graph")
-    elif dim == 3:
-        x_actual = x_actual.detach().cpu().numpy()
-        y_pred = y_pred.detach().cpu().numpy()
-        y_actual = y_actual.detach().cpu().numpy()
+def plot_autoencoder(targets, predictions, fn):
+    targets = targets.detach().cpu().numpy()
+    predictions = predictions.detach().cpu().numpy()
 
-        fig = plt.figure(constrained_layout=True)
-        ax = fig.add_subplot(projection="3d")
-        ax.scatter(
-            x_actual[:, 0], x_actual[:, 1], y_pred, marker="o", label="Predicted"
-        )
-        ax.scatter(x_actual[:, 0], x_actual[:, 1], y_actual, marker="^", label="Actual")
-        ax.set_xlim(-15, 15)
-        ax.set_ylim(-15, 15)
-        ax.set_zlim(-15, 250)
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-        ax.set_zlabel("f(x, y)")
-        ax.legend(loc="upper left")
-        ax.set_title("Pointwise Predictions vs Actual")
-        plt.legend(loc="upper left")
-        plt.savefig(f"{fn}.png")
-    elif dim == 2:
-        x_actual = x_actual.detach().cpu().numpy()
-        y_pred = y_pred.detach().cpu().numpy()
-        y_actual = y_actual.detach().cpu().numpy()
-
-        _, ax = plt.subplots()
-        ax.scatter(x_actual, y_pred, label="Predicted")
-        ax.scatter(x_actual, y_actual, label="Actual", alpha=0.5)
-        ax.set_ylim(-10, 250)
-        ax.set_xlim(-15, 15)
-        ax.set_ylabel("y")
-        ax.set_xlabel("x")
-        ax.legend(loc="upper left")
-        ax.set_title("Pointwise Predictions vs Actual")
-        plt.savefig(f"{fn}.png")
-    else:
-        print("Dimension less than 2, cannot graph")
+    _, ax = plt.subplots()
+    ax.scatter(targets[:, 0], targets[:, 1], label="Targets", alpha=0.5)
+    ax.scatter(predictions[:, 0], predictions[:, 1], label="Predictions", alpha=0.5)
+    ax.set_xlim(min(np.min(targets[:, 0]), np.min(predictions[:, 0])),
+                max(np.max(targets[:, 0]), np.max(predictions[:, 0])))
+    ax.set_ylim(min(np.min(targets[:, 1]), np.min(predictions[:, 1])),
+                max(np.max(targets[:, 1]), np.max(predictions[:, 1])))
+    ax.set_xlabel("theta")
+    ax.set_ylabel("theta dot")
+    ax.legend(loc="upper left")
+    ax.set_title("Pointwise Predictions vs Actual")
+    plt.savefig(f"{fn}.png")
 
 
-def plot_loss(loss_arr, fn):
+def plot_loss(loss_arr, fn, title="Training Loss Across Epochs"):
     _, ax = plt.subplots()
     ax.plot(loss_arr)
     ax.set_ylim(min(0, min(loss_arr) - 1.0), max(loss_arr) + 1.0)
     ax.set_xlim(0, len(loss_arr))
     ax.set_ylabel("Average Batch MSE")
     ax.set_xlabel("Epoch")
-    ax.set_title("Training Loss Across Epochs")
+    ax.set_title(title)
     plt.savefig(f"{fn}.png")
