@@ -5,7 +5,7 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 2**13
+        num_envs = 2**8
         num_actuators = 1  # 1 for theta connecting base and pole
         episode_length_s = 5.0
 
@@ -23,7 +23,7 @@ class PendulumCfg(FixedRobotCfg):
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_basic"
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
@@ -52,7 +52,7 @@ class PendulumCfg(FixedRobotCfg):
         dof_vel = 5.0
         dof_pos = 2.0 * torch.pi
         # * Action scales
-        tau_ff = 1.0
+        tau_ff = 10.0
 
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):

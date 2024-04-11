@@ -44,6 +44,8 @@ class ChimeraActor(nn.Module):
             hidden_dims[-split_idx], num_actions, hidden_dims[split_idx:], activation
         )
 
+        # nn.init.orthogonal_()
+
         # maybe zap
         self.distribution = Normal(torch.zeros(num_actions), torch.ones(num_actions))
         Normal.set_default_validate_args = False

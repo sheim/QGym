@@ -84,7 +84,6 @@ class SAC:
         # self.max_grad_norm = max_grad_norm
         # self.use_clipped_value_loss = use_clipped_value_loss
         # * SAC parameters
-        self.learning_starts = 100
         self.batch_size = batch_size
         self.polyak = polyak
         self.gamma = gamma
@@ -195,8 +194,9 @@ class SAC:
 
             target_next = (
                 torch.min(target_critic_prediction_1, target_critic_prediction_2)
-                - self.alpha * target_action_logp
+                - self.alpha.detach() * target_action_logp
             )
+            # the detach inside torch.no_grad() should be redundant
             target = rewards + self.gamma * dones.logical_not() * target_next
 
         critic_in = torch.cat((critic_obs, actions), dim=-1)
@@ -243,14 +243,21 @@ class SAC:
         actor_prediction = actions_scaled
         actor_prediction_logp = action_logp
 
+        # entropy loss
+        alpha_loss = -(
+            self.log_alpha * (action_logp + self.target_entropy).detach()
+        ).mean()
+
         # alpha_loss = (
         #     -self.log_alpha * (action_logp + self.target_entropy).detach()
         # ).mean()
-        # # -(self.log_alpha * (action_logp + self.target_entropy)).detach().mean()
+        # alpha_loss = (
+        #     -(self.log_alpha * (action_logp + self.target_entropy)).detach().mean()
+        # )
 
-        # self.log_alpha_optimizer.zero_grad()
-        # alpha_loss.backward()
-        # self.log_alpha_optimizer.step()
+        self.log_alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.log_alpha_optimizer.step()
 
         critic_in = torch.cat((critic_obs, actor_prediction), dim=-1)
         q_value_1 = self.critic_1.forward(critic_in)
@@ -264,5 +271,5 @@ class SAC:
         # nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
         self.actor_optimizer.step()
 
-        # self.mean_alpha_loss += alpha_loss.item()
+        self.mean_alpha_loss += alpha_loss.item()
         self.mean_actor_loss += actor_loss.item()

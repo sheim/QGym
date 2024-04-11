@@ -269,7 +269,7 @@ class OffPolicyRunner(BaseRunner):
 
     def get_inference_actions(self):
         obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
-        mean = self.alg.actor.forward(obs)  # todo inference mode
+        mean = self.alg.actor.forward(obs)
         actions = torch.tanh(mean)
         actions = (actions * self.alg.action_delta + self.alg.action_offset).clamp(
             self.alg.action_min, self.alg.action_max
