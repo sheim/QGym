@@ -5,7 +5,7 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 2**8
+        num_envs = 1  # 2**8
         num_actuators = 1  # 1 for theta connecting base and pole
         episode_length_s = 5.0
 
