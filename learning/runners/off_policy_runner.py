@@ -120,7 +120,9 @@ class OffPolicyRunner(BaseRunner):
                 )
                 storage.add_transitions(transition)
                 # print every 10% of initial fill
-                if _ % (self.alg_cfg["initial_fill"] // 10) == 0:
+                if (self.alg_cfg["initial_fill"] > 10) and (
+                    _ % (self.alg_cfg["initial_fill"] // 10) == 0
+                ):
                     print(f"Filled {100 * _ / self.alg_cfg['initial_fill']}%")
 
         logger.tic("runtime")
