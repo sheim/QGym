@@ -6,10 +6,17 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
     runner_class_name = "OffPolicyRunner"
 
     class actor:
-        hidden_dims = [128, 64, 32]
-        split_idx = 2
+        hidden_dims = {
+            "latent": [128, 128],
+            "mean": [64, 32],
+            "std": [64, 32],
+        }
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = {
+            "latent": "elu",
+            "mean": "elu",
+            "std": "tanh",
+        }
 
         normalize_obs = False
         obs = [
@@ -46,7 +53,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        initial_fill = 256
+        initial_fill = 2
         storage_size = 10**6  # 17
         batch_size = 256
         max_gradient_steps = 10  # 10 # SB3: 1

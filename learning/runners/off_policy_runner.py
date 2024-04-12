@@ -32,6 +32,9 @@ class OffPolicyRunner(BaseRunner):
         critic_2 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
         target_critic_1 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
         target_critic_2 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
+
+        print(actor)
+
         self.alg = SAC(
             actor,
             critic_1,

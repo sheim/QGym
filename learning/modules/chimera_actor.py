@@ -12,7 +12,6 @@ class ChimeraActor(nn.Module):
         num_obs,
         num_actions,
         hidden_dims,
-        split_idx=1,
         activation="tanh",
         log_std_max: float = 4.0,
         log_std_min: float = -20.0,
@@ -33,15 +32,23 @@ class ChimeraActor(nn.Module):
         self.num_obs = num_obs
         self.num_actions = num_actions
 
-        assert split_idx < len(hidden_dims)
         self.latent_NN = create_MLP(
-            num_obs, hidden_dims[-split_idx], hidden_dims[:-split_idx], activation
+            num_obs,
+            hidden_dims["latent"][-1],
+            hidden_dims["latent"][:-1],
+            activation["latent"],
         )
         self.mean_NN = create_MLP(
-            hidden_dims[-split_idx], num_actions, hidden_dims[split_idx:], activation
+            hidden_dims["latent"][-1],
+            num_actions,
+            hidden_dims["mean"],
+            activation["mean"],
         )
         self.std_NN = create_MLP(
-            hidden_dims[-split_idx], num_actions, hidden_dims[split_idx:], activation
+            hidden_dims["latent"][-1],
+            num_actions,
+            hidden_dims["std"],
+            activation["std"],
         )
 
         # nn.init.orthogonal_()
