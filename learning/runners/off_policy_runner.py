@@ -73,7 +73,7 @@ class OffPolicyRunner(BaseRunner):
         storage.initialize(
             transition,
             self.env.num_envs,
-            self.env.num_envs * self.num_steps_per_env,
+            self.alg_cfg["storage_size"],
             device=self.device,
         )
 
@@ -179,8 +179,8 @@ class OffPolicyRunner(BaseRunner):
             logger.toc("collection")
 
             logger.tic("learning")
-            self.alg.update(storage.data)
-            storage.clear()
+            full_data = storage.data[: storage.fill_count]
+            self.alg.update(full_data)
             logger.toc("learning")
             logger.log_all_categories()
 
