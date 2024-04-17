@@ -22,10 +22,14 @@ if __name__ == "__main__":
     lb = torch.tensor([-torch.pi, -8.0])
     ub = torch.tensor([torch.pi, 8.0])
 
-    model = Autoencoder(input_dim, latent_dim, [16, 8, 4, 2])
+    # model = Autoencoder(input_dim, latent_dim, [16, 8, 4, 2], "elu")
+    # model = Autoencoder(input_dim, latent_dim, [512, 256, 128], "elu")
+    model = Autoencoder(input_dim, latent_dim, [64, 32, 16, 8], "elu")
+
+    # ! TODO: train on reference motion swing up trajectories
 
     loss = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.03)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0003)
     training_loss = []
     for epoch in range(num_epochs):
         batch_loss = []
@@ -53,9 +57,9 @@ if __name__ == "__main__":
 
     print(f"Average loss on test set {torch.mean(torch.tensor(test_loss))}")
 
-    save_str = "autoencoder"
+    save_str = "autoencoders"
     time_str = time.strftime("%Y%m%d_%H%M%S")
-    save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "autoencoders", save_str)
+    save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", save_str)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 

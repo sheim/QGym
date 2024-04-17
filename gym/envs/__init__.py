@@ -20,6 +20,7 @@ class_dict = {
     "A1": ".a1.a1",
     "HumanoidRunning": ".mit_humanoid.humanoid_running",
     "Pendulum": ".pendulum.pendulum",
+    "LQRPendulum": ".pendulum.lqr_pendulum",
 }
 
 config_dict = {
@@ -32,6 +33,7 @@ config_dict = {
     "AnymalCFlatCfg": ".anymal_c.flat.anymal_c_flat_config",
     "HumanoidRunningCfg": ".mit_humanoid.humanoid_running_config",
     "PendulumCfg": ".pendulum.pendulum_config",
+    "LQRPendulumCfg": ".pendulum.lqr_pendulum_config",
 }
 
 runner_config_dict = {
@@ -44,6 +46,7 @@ runner_config_dict = {
     "AnymalCFlatRunnerCfg": ".anymal_c.flat.anymal_c_flat_config",
     "HumanoidRunningRunnerCfg": ".mit_humanoid.humanoid_running_config",
     "PendulumRunnerCfg": ".pendulum.pendulum_config",
+    "LQRPendulumRunnerCfg": ".pendulum.lqr_pendulum_config",
 }
 
 task_dict = {
@@ -66,7 +69,8 @@ task_dict = {
         "HumanoidRunningRunnerCfg",
     ],
     "flat_anymal_c": ["Anymal", "AnymalCFlatCfg", "AnymalCFlatRunnerCfg"],
-    "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"]
+    "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"],
+    "lqr_pendulum": ["LQRPendulum", "LQRPendulumCfg", "LQRPendulumRunnerCfg"],
 }
 
 for class_name, class_location in class_dict.items():

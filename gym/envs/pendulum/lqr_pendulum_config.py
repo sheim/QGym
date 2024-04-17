@@ -3,7 +3,7 @@ import torch
 from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 
-class PendulumCfg(FixedRobotCfg):
+class LQRPendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 1  # 1 for theta connecting base and pole
@@ -27,7 +27,7 @@ class PendulumCfg(FixedRobotCfg):
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
-            "theta": [-torch.pi, torch.pi],
+            "theta": [-torch.pi/60.0, torch.pi/60.0],
         }
         dof_vel_range = {"theta": [-5, 5]}
 
@@ -57,7 +57,7 @@ class PendulumCfg(FixedRobotCfg):
         tau_ff = 1.0
 
 
-class PendulumRunnerCfg(FixedRobotCfgPPO):
+class LQRPendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
     runner_class_name = "CustomCriticRunner"
 
