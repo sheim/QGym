@@ -3,6 +3,7 @@ import torch.nn as nn
 from .actor import Actor
 from .smooth_actor import SmoothActor
 from .critic import Critic
+from .pink_actor import PinkActor
 
 
 class ActorCritic(nn.Module):
@@ -17,6 +18,7 @@ class ActorCritic(nn.Module):
         init_noise_std=1.0,
         normalize_obs=True,
         smooth_exploration=False,
+        pink_exploration=False,
         **kwargs,
     ):
         if kwargs:
@@ -35,6 +37,17 @@ class ActorCritic(nn.Module):
                 init_noise_std,
                 normalize_obs,
             )
+
+        elif pink_exploration:
+            self.actor = PinkActor(
+                num_actor_obs,
+                num_actions,
+                actor_hidden_dims,
+                activation,
+                init_noise_std,
+                normalize_obs,
+            )
+
         else:
             self.actor = Actor(
                 num_actor_obs,

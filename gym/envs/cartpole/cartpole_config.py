@@ -74,6 +74,9 @@ class CartpoleRunnerCfg(FixedRobotCfgPPO):
         actor_hidden_dims = [num_units] * num_layers
         critic_hidden_dims = [num_units] * num_layers
         activation = "elu"
+        pink_exploration = True
+        smooth_exploration = False
+        exploration_sample_freq = 8
 
         actor_obs = [
             "cart_obs",

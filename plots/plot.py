@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Read the CSV file
-name = "distribution_smooth"
+name = "plots/distribution_pink"
 data = pd.read_csv(name + ".csv")
 
 # Plot the data (last n steps)
