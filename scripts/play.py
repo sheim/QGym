@@ -16,9 +16,9 @@ def setup(args):
         env_cfg.commands.resampling_time = 9999
     env_cfg.env.episode_length_s = 9999
     env_cfg.env.num_projectiles = 20
+    env_cfg.init_state.reset_mode = "reset_to_range"
     task_registry.make_gym_and_sim()
     env = task_registry.make_env(args.task, env_cfg)
-    env.cfg.init_state.reset_mode = "reset_to_basic"
     train_cfg.runner.resume = True
     train_cfg.logging.enable_local_saving = False
     runner = task_registry.make_alg_runner(env, train_cfg)
