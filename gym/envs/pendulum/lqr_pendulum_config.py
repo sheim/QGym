@@ -7,7 +7,7 @@ class LQRPendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 1  # 1 for theta connecting base and pole
-        episode_length_s = 5.0
+        episode_length_s = 3.0
 
     class terrain(FixedRobotCfg.terrain):
         pass
@@ -18,16 +18,16 @@ class LQRPendulumCfg(FixedRobotCfg):
         lookat = [0.0, 0.0, 0.0]  # [m]
 
     class init_state(FixedRobotCfg.init_state):
-        default_joint_angles = {"theta": 0.0}  # -torch.pi / 2.0}
+        default_joint_angles = {"theta": 1.0e-6}  # -torch.pi / 2.0}
 
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_basic"
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
-            "theta": [-torch.pi/60.0, torch.pi/60.0],
+            "theta": [-torch.pi/20.0, torch.pi/20.0],
         }
         dof_vel_range = {"theta": [-5, 5]}
 
