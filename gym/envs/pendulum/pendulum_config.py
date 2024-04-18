@@ -5,9 +5,9 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 2**8
+        num_envs = 1  # 4096
         num_actuators = 1  # 1 for theta connecting base and pole
-        episode_length_s = 5.0
+        episode_length_s = 25.0
 
     class terrain(FixedRobotCfg.terrain):
         pass
@@ -18,7 +18,7 @@ class PendulumCfg(FixedRobotCfg):
         lookat = [0.0, 0.0, 0.0]  # [m]
 
     class init_state(FixedRobotCfg.init_state):
-        default_joint_angles = {"theta": 0.0}  # -torch.pi / 2.0}
+        default_joint_angles = {"theta": 0}  # -torch.pi / 2.0}
 
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
@@ -27,13 +27,13 @@ class PendulumCfg(FixedRobotCfg):
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
-            "theta": [-torch.pi / 4, torch.pi / 4],
+            "theta": [-torch.pi / 2, torch.pi / 2],
         }
         dof_vel_range = {"theta": [-1, 1]}
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 100
+        ctrl_frequency = 25
         desired_sim_frequency = 200
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
@@ -52,7 +52,7 @@ class PendulumCfg(FixedRobotCfg):
         dof_vel = 5.0
         dof_pos = 2.0 * torch.pi
         # * Action scales
-        tau_ff = 10.0
+        tau_ff = 5.0
 
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):

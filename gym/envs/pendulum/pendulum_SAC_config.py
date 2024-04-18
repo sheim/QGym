@@ -8,14 +8,14 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
     class actor:
         hidden_dims = {
             "latent": [128, 128],
-            "mean": [64, 32],
-            "std": [64, 32],
+            "mean": [32],
+            "std": [32],
         }
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = {
             "latent": "elu",
             "mean": "elu",
-            "std": "tanh",
+            "std": "elu",
         }
 
         normalize_obs = False
@@ -35,7 +35,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
             "dof_pos_obs",
             "dof_vel",
         ]
-        hidden_dims = [256, 256]
+        hidden_dims = [64, 64]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         normalize_obs = False
@@ -53,16 +53,16 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        initial_fill = 2
+        initial_fill = 100
         storage_size = 10**6  # 17
-        batch_size = 256
-        max_gradient_steps = 10  # 10 # SB3: 1
+        batch_size = 256  # 4096
+        max_gradient_steps = 1  # 10 # SB3: 1
         action_max = 1.0
         action_min = -1.0
         actor_noise_std = 1.0
         log_std_max = 4.0
         log_std_min = -20.0
-        alpha = 0.2
+        alpha = 0.8
         target_entropy = 1.0  # -1.0
         max_grad_norm = 1.0
         polyak = 0.98  # flipped compared to stable-baselines3 (polyak == 1-tau)

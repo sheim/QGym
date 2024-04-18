@@ -50,4 +50,5 @@ class Pendulum(FixedRobot):
         )
         desired_energy = m_pendulum * 9.81 * l_pendulum
         energy_error = kinetic_energy + potential_energy - desired_energy
-        return self._sqrdexp(energy_error / desired_energy)
+        return -(energy_error / desired_energy).pow(2)
+        # return self._sqrdexp(energy_error / desired_energy)
