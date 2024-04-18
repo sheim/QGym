@@ -15,7 +15,9 @@ class LQRPendulum(Pendulum):
         b = self.cfg.asset.joint_damping
         length = self.cfg.asset.length
         g = 9.81
-        theta_ddot = (1.0/(m*length**2))*(u-b*theta_dot - m*g*length*torch.sin(theta + (torch.pi/2.0)))
+        ml2 = m*length**2
+        theta_ddot = (1.0/ml2)*(u-b*theta_dot - m*g*length*torch.sin(theta + (torch.pi/2.0)))
+        # theta_ddot = (1.0/ml2)*(u-b*theta_dot - m*g*length*torch.sin(theta))
         return torch.hstack((theta_dot, theta_ddot))
 
     def _compute_torques(self):
@@ -65,7 +67,7 @@ class LQRPendulum(Pendulum):
                                u_d[env])
             torques[env] = torch.from_numpy(u_prime)
 
-        # torques = torch.clip(torques, -self.torque_limits, self.torque_limits)
+        torques = torch.clip(torques, -self.torque_limits, self.torque_limits)
         if torch.any(torques != torch.zeros_like(torques)):
             print("torques", torques)
         timer.toc("Entered compute_torques()")
@@ -82,7 +84,8 @@ class LQRPendulum(Pendulum):
         x = x.cpu().detach().numpy()
         x_d = x_d.cpu().detach().numpy()
         u_d = u_d.cpu().detach().numpy()
-        S = scipy.linalg.solve_discrete_are(A, B, Q, R)
+        S = scipy.linalg.solve_continuous_are(A, B, Q, R)
+        # S = scipy.linalg.solve_discrete_are(A, B, Q, R)
         B_T = B.transpose(-1, -2)
         x_bar = (x - x_d)
         u_prime = u_d - linalg.inv(R)@B_T@S@x_bar
@@ -93,12 +96,13 @@ class LQRPendulum(Pendulum):
         b = self.cfg.asset.joint_damping
         length = self.cfg.asset.length
         g = 9.81
+        ml2 = m*length**2
         A = torch.tensor([[0.0, 1.0],
-                          [(1.0/m*length**2)*(-m*g*length*torch.cos(x_d[0] + torch.pi/2.0)), -(b/m*length**2)]])
+                          [(1.0/ml2)*(-m*g*length*torch.cos(x_d[0] + (torch.pi/2.0))), -(b/ml2)]])
         # A = torch.tensor([[0.0, 1.0],
-        #                   [(1.0/m*length**2)*(-m*g*length*torch.cos(x_d[0] + torch.pi/2.0)), 0.0]])
+        #                   [(1.0/ml2)*(-m*g*length*torch.cos(x_d[0])), -(b/ml2)]])
         B = torch.tensor([[0.0],
-                          [(1.0/m*length**2)]])
+                          [(1.0/ml2)]])
         return A, B
 
 
