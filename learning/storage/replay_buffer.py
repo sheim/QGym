@@ -44,7 +44,7 @@ class ReplayBuffer:
         self.add_index += 1
 
     def get_data(self):
-        return self.data[: max(self.fill_count, self.max_length), :]
+        return self.data[: min(self.fill_count, self.max_length), :]
 
     def clear(self):
         self.fill_count = 0

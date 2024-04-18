@@ -63,7 +63,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         log_std_max = 4.0
         log_std_min = -20.0
         alpha = 0.8
-        target_entropy = 1.0  # -1.0
+        target_entropy = -1.0
         max_grad_norm = 1.0
         polyak = 0.98  # flipped compared to stable-baselines3 (polyak == 1-tau)
         gamma = 0.98
