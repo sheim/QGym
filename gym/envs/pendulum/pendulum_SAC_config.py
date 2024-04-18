@@ -1,4 +1,35 @@
+import torch
 from gym.envs.base.fixed_robot_config import FixedRobotCfgPPO
+from gym.envs.pendulum.pendulum_config import PendulumCfg
+
+
+class PendulumSACCfg(PendulumCfg):
+    class env(PendulumCfg.env):
+        num_envs = 1
+        episode_length_s = 5.0
+
+    class init_state(PendulumCfg.init_state):
+        reset_mode = "reset_to_basic"
+        default_joint_angles = {"theta": 0.0}
+        dof_pos_range = {
+            "theta": [-torch.pi / 2, torch.pi / 2],
+        }
+        dof_vel_range = {"theta": [-1, 1]}
+
+    class control(PendulumCfg.control):
+        ctrl_frequency = 25
+        desired_sim_frequency = 200
+
+    class asset(PendulumCfg.asset):
+        joint_damping = 0.1
+
+    class reward_settings(PendulumCfg.reward_settings):
+        tracking_sigma = 0.25
+
+    class scaling(PendulumCfg.scaling):
+        dof_vel = 5.0
+        dof_pos = 2.0 * torch.pi
+        tau_ff = 5.0
 
 
 class PendulumSACRunnerCfg(FixedRobotCfgPPO):

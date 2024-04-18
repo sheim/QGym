@@ -5,8 +5,8 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 1  # 4096
-        num_actuators = 1  # 1 for theta connecting base and pole
+        num_envs = 4096
+        num_actuators = 1
         episode_length_s = 25.0
 
     class terrain(FixedRobotCfg.terrain):
@@ -23,7 +23,7 @@ class PendulumCfg(FixedRobotCfg):
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_basic"
+        reset_mode = "reset_to_range"
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
