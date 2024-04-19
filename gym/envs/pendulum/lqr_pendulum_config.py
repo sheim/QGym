@@ -27,14 +27,14 @@ class LQRPendulumCfg(FixedRobotCfg):
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
-            "theta": [-1e-3, 1e-3],
+            "theta": [-torch.pi / 2.0, torch.pi / 2.0],
         }
-        dof_vel_range = {"theta": [-5, 5]}
+        dof_vel_range = {"theta": [0, 0]}
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 100
-        desired_sim_frequency = 200
+        ctrl_frequency = 500
+        desired_sim_frequency = 500
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
 
