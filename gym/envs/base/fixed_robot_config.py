@@ -125,7 +125,7 @@ class FixedRobotCfgPPO(BaseConfig):
 
     class policy:
         init_noise_std = 1.0
-        actor_hidden_dims = [512, 256, 128]
+        hidden_dims = [512, 256, 128]
         critic_hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
@@ -134,7 +134,7 @@ class FixedRobotCfgPPO(BaseConfig):
         # rnn_hidden_size = 512
         # rnn_num_layers = 1
 
-        actor_obs = [
+        obs = [
             "observation_a",
             "observation_b",
             "these_need_to_be_atributes_(states)_of_the_robot_env",
@@ -182,7 +182,7 @@ class FixedRobotCfgPPO(BaseConfig):
 
     class runner:
         policy_class_name = "ActorCritic"
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 24  # per iteration
         max_iterations = 500  # number of policy updates
 
