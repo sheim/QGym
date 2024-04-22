@@ -35,10 +35,6 @@ class Pendulum(FixedRobot):
         #     -error.pow(2).sum(dim=1) / self.cfg.reward_settings.tracking_sigma
         # )
 
-    def _reward_torques(self):
-        """Penalize torques"""
-        return self._sqrdexp(torch.mean(torch.square(self.torques), dim=1), scale=0.2)
-
     def _reward_energy(self):
         m_pendulum = 1.0
         l_pendulum = 1.0

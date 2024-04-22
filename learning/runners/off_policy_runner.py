@@ -221,6 +221,11 @@ class OffPolicyRunner(BaseRunner):
                 "mean_actor_loss",
                 "mean_alpha_loss",
                 "alpha",
+                # "test_actions",
+                "test_action_mean",
+                "test_action_std",
+                "test_action_max",
+                "test_action_min",
             ],
         )
         # logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])

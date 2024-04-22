@@ -12,10 +12,10 @@ class ChimeraActor(nn.Module):
         num_obs,
         num_actions,
         hidden_dims,
-        activation="tanh",
-        log_std_max: float = 4.0,
-        log_std_min: float = -20.0,
-        std_init: float = 1.0,
+        activation,
+        std_init=1.0,
+        log_std_max=4.0,
+        log_std_min=-20.0,
         normalize_obs=True,
         **kwargs,
     ):
@@ -33,25 +33,23 @@ class ChimeraActor(nn.Module):
         self.num_actions = num_actions
 
         self.latent_NN = create_MLP(
-            num_obs,
-            hidden_dims["latent"][-1],
-            hidden_dims["latent"][:-1],
-            activation["latent"],
+            num_inputs=num_obs,
+            num_outputs=hidden_dims["latent"][-1],
+            hidden_dims=hidden_dims["latent"][:-1],
+            activation=activation["latent"],
         )
         self.mean_NN = create_MLP(
-            hidden_dims["latent"][-1],
-            num_actions,
-            hidden_dims["mean"],
-            activation["mean"],
+            num_inputs=hidden_dims["latent"][-1],
+            num_outputs=num_actions,
+            hidden_dims=hidden_dims["mean"],
+            activation=activation["mean"],
         )
         self.std_NN = create_MLP(
-            hidden_dims["latent"][-1],
-            num_actions,
-            hidden_dims["std"],
-            activation["std"],
+            num_inputs=hidden_dims["latent"][-1],
+            num_outputs=num_actions,
+            hidden_dims=hidden_dims["std"],
+            activation=activation["std"],
         )
-
-        # nn.init.orthogonal_()
 
         # maybe zap
         self.distribution = Normal(torch.zeros(num_actions), torch.ones(num_actions))

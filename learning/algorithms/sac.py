@@ -90,6 +90,13 @@ class SAC:
         # self.ent_coef = "fixed"
         # self.target_entropy = "fixed"
 
+        self.test_input = torch.randn(256, 3, device=self.device)
+        self.test_actions = torch.zeros(256, 1, device=self.device)
+        self.test_action_mean = torch.zeros(256, device=self.device)
+        self.test_action_std = torch.zeros(256, device=self.device)
+        self.test_action_max = torch.zeros(256, device=self.device)
+        self.test_action_min = torch.zeros(256, device=self.device)
+
     @property
     def alpha(self):
         return self.log_alpha.exp()
@@ -112,10 +119,16 @@ class SAC:
         mean, std = self.actor.forward(obs, deterministic=False)
         distribution = torch.distributions.Normal(mean, std)
         actions = distribution.rsample()
-
-        ## * self._scale_actions(actions, intermediate=True)
         actions_normalized = torch.tanh(actions)
         # RSL also does a resahpe(-1, self.action_size), not sure why
+        actions_scaled = (
+            actions_normalized * self.action_delta + self.action_offset
+        ).clamp(self.action_min, self.action_max)
+        return actions_scaled
+
+    def act_inference(self, obs):
+        mean = self.actor.forward(obs, deterministic=True)
+        actions_normalized = torch.tanh(mean)
         actions_scaled = (
             actions_normalized * self.action_delta + self.action_offset
         ).clamp(self.action_min, self.action_max)
@@ -150,7 +163,12 @@ class SAC:
         self.mean_alpha_loss /= count
         self.mean_critic_1_loss /= count
         self.mean_critic_2_loss /= count
-
+        with torch.inference_mode():
+            self.test_actions = self.act_inference(self.test_input).cpu()
+            self.test_action_mean = self.test_actions.mean().item()
+            self.test_action_std = self.test_actions.std().item()
+            self.test_action_max = self.test_actions.max().item()
+            self.test_action_min = self.test_actions.min().item()
         return None
 
     def update_critic(self, batch):
