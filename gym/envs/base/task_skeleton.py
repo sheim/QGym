@@ -5,7 +5,7 @@ from gym.utils.helpers import class_to_dict
 
 
 class TaskSkeleton:
-    def __init__(self, num_envs=1, max_episode_length=1.0, device="cpu"):
+    def __init__(self, num_envs=1, max_episode_length=1, device="cpu"):
         self.num_envs = num_envs
         self.max_episode_length = max_episode_length
         self.device = device
@@ -82,4 +82,4 @@ class TaskSkeleton:
         self.dt = self.cfg.control.ctrl_dt
         self.scales = class_to_dict(self.cfg.scaling, self.device)
         self.max_episode_length_s = self.cfg.env.episode_length_s
-        self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
+        self.max_episode_length = int(np.ceil(self.max_episode_length_s / self.dt))
