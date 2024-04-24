@@ -1,0 +1,592 @@
+import torch
+import numpy as np
+from isaacgym.torch_utils import torch_rand_float
+
+from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
+
+from isaacgym import gymtorch
+
+MINI_CHEETAH_MASS = 8.292 * 9.81  # Weight of mini cheetah in Newtons
+
+
+class MiniCheetahPca(MiniCheetah):
+    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
+        super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+        self.process_noise_std = self.cfg.osc.process_noise_std
+
+    def _init_buffers(self):
+        super()._init_buffers()
+        num_pcas = 6
+        self.pca_scalings = torch.zeros(self.num_envs, num_pcas, device=self.device)
+        self.eigenvectors = torch.zeros(
+                num_pcas, self.dof_pos_target.shape[1], device=self.device
+            )
+        self.oscillators = torch.zeros(self.num_envs, 4, device=self.device)
+        self.oscillator_obs = torch.zeros(self.num_envs, 8, device=self.device)
+
+        self.oscillators_vel = torch.zeros_like(self.oscillators)
+        self.grf = torch.zeros(self.num_envs, 4, device=self.device)
+        self.osc_omega = self.cfg.osc.omega * torch.ones(
+            self.num_envs, 1, device=self.device
+        )
+        self.osc_coupling = self.cfg.osc.coupling * torch.ones(
+            self.num_envs, 1, device=self.device
+        )
+        self.osc_offset = self.cfg.osc.offset * torch.ones(
+            self.num_envs, 1, device=self.device
+        )
+
+    def _reset_oscillators(self, env_ids):
+        if len(env_ids) == 0:
+            return
+            # * random
+        if self.cfg.osc.init_to == "random":
+            self.oscillators[env_ids] = torch_rand_float(
+                0,
+                2 * torch.pi,
+                shape=self.oscillators[env_ids].shape,
+                device=self.device,
+            )
+        elif self.cfg.osc.init_to == "standing":
+            self.oscillators[env_ids] = 3 * torch.pi / 2
+        elif self.cfg.osc.init_to == "trot":
+            self.oscillators[env_ids] = torch.tensor(
+                [0.0, torch.pi, torch.pi, 0.0], device=self.device
+            )
+        elif self.cfg.osc.init_to == "pace":
+            self.oscillators[env_ids] = torch.tensor(
+                [0.0, torch.pi, 0.0, torch.pi], device=self.device
+            )
+            if self.cfg.osc.init_w_offset:
+                self.oscillators[env_ids, :] += (
+                    torch.rand_like(self.oscillators[env_ids, 0]).unsqueeze(1)
+                    * 2
+                    * torch.pi
+                )
+        elif self.cfg.osc.init_to == "pronk":
+            self.oscillators[env_ids, :] *= 0.0
+        elif self.cfg.osc.init_to == "bound":
+            self.oscillators[env_ids, :] = torch.tensor(
+                [torch.pi, torch.pi, 0.0, 0.0], device=self.device
+            )
+        else:
+            raise NotImplementedError
+
+        if self.cfg.osc.init_w_offset:
+            self.oscillators[env_ids, :] += (
+                torch.rand_like(self.oscillators[env_ids, 0]).unsqueeze(1)
+                * 2
+                * torch.pi
+            )
+        self.oscillators = torch.remainder(self.oscillators, 2 * torch.pi)
+
+    def _reset_system(self, env_ids):
+        if len(env_ids) == 0:
+            return
+        self._reset_oscillators(env_ids)
+
+        self.oscillator_obs = torch.cat(
+            (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
+        )
+
+        # * keep some robots in the same starting state as they ended
+        timed_out_subset = (self.timed_out & ~self.terminated) * (
+            torch.rand(self.num_envs, device=self.device)
+            < self.cfg.init_state.timeout_reset_ratio
+        )
+
+        env_ids = (self.terminated | timed_out_subset).nonzero().flatten()
+        if len(env_ids) == 0:
+            return
+        super()._reset_system(env_ids)
+
+    def _pre_decimation_step(self):
+        super()._pre_decimation_step()
+        # self.grf = self._compute_grf()
+        if not self.cfg.osc.randomize_osc_params:
+            self.compute_osc_slope()
+        self.compute_pca()
+    def compute_osc_slope(self):
+        cmd_x = torch.abs(self.commands[:, 0:1]) - self.cfg.osc.stop_threshold
+        stop = cmd_x < 0
+
+        self.osc_offset = stop * self.cfg.osc.offset
+        self.osc_omega = (
+            stop * self.cfg.osc.omega_stop
+            + torch.randn_like(self.osc_omega) * self.cfg.osc.omega_var
+        )
+        self.osc_coupling = (
+            stop * self.cfg.osc.coupling_stop
+            + torch.randn_like(self.osc_coupling) * self.cfg.osc.coupling_var
+        )
+
+        self.osc_omega += (~stop) * torch.clamp(
+            cmd_x * self.cfg.osc.omega_slope + self.cfg.osc.omega_step,
+            min=0.0,
+            max=self.cfg.osc.omega_max,
+        )
+        self.osc_coupling += (~stop) * torch.clamp(
+            cmd_x * self.cfg.osc.coupling_slope + self.cfg.osc.coupling_step,
+            min=0.0,
+            max=self.cfg.osc.coupling_max,
+        )
+
+        self.osc_omega = torch.clamp_min(self.osc_omega, 0.1)
+        self.osc_coupling = torch.clamp_min(self.osc_coupling, 0)
+
+    def _process_rigid_body_props(self, props, env_id):
+        if env_id == 0:
+            # * init buffers for the domain rand changes
+            self.mass = torch.zeros(self.num_envs, 1, device=self.device)
+            self.com = torch.zeros(self.num_envs, 3, device=self.device)
+
+        # * randomize mass
+        if self.cfg.domain_rand.randomize_base_mass:
+            lower = self.cfg.domain_rand.lower_mass_offset
+            upper = self.cfg.domain_rand.upper_mass_offset
+            # self.mass_
+            props[0].mass += np.random.uniform(lower, upper)
+            self.mass[env_id] = props[0].mass
+            # * randomize com position
+            lower = self.cfg.domain_rand.lower_z_offset
+            upper = self.cfg.domain_rand.upper_z_offset
+            props[0].com.z += np.random.uniform(lower, upper)
+            self.com[env_id, 2] = props[0].com.z
+
+            lower = self.cfg.domain_rand.lower_x_offset
+            upper = self.cfg.domain_rand.upper_x_offset
+            props[0].com.x += np.random.uniform(lower, upper)
+            self.com[env_id, 0] = props[0].com.x
+        return props
+
+    def _post_decimation_step(self):
+        """Update all states that are not handled in PhysX"""
+        super()._post_decimation_step()
+        self.grf = self._compute_grf()
+        # self._step_oscillators()
+
+    def _post_physx_step(self):
+        super()._post_physx_step()
+        self._step_oscillators(self.dt / self.cfg.control.decimation)
+        return None
+
+    def _step_oscillators(self, dt=None):
+        if dt is None:
+            dt = self.dt
+
+        local_feedback = self.osc_coupling * (
+            torch.cos(self.oscillators) + self.osc_offset
+        )
+        grf = self._compute_grf()
+        self.oscillators_vel = self.osc_omega - grf * local_feedback
+        # self.oscillators_vel *= torch_rand_float(0.9,
+        #                                          1.1,
+        #                                          self.oscillators_vel.shape,
+        #                                          self.device)
+        self.oscillators_vel += (
+            torch.randn(self.oscillators_vel.shape, device=self.device)
+            * self.cfg.osc.process_noise_std
+        )
+
+        self.oscillators_vel *= 2 * torch.pi
+        self.oscillators += (
+            self.oscillators_vel * dt
+        )  # torch.clamp(self.oscillators_vel * dt, min=0)
+        self.oscillators = torch.remainder(self.oscillators, 2 * torch.pi)
+        self.oscillator_obs = torch.cat(
+            (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
+        )
+
+    def _resample_commands(self, env_ids):
+        """Randommly select commands of some environments
+
+        Args:
+            env_ids (List[int]): Environments ids for which new commands are needed
+        """
+        if len(env_ids) == 0:
+            return
+        super()._resample_commands(env_ids)
+        possible_commands = torch.tensor(
+            self.command_ranges["lin_vel_x"], device=self.device
+        )
+        self.commands[env_ids, 0:1] = possible_commands[
+            torch.randint(
+                0, len(possible_commands), (len(env_ids), 1), device=self.device
+            )
+        ]
+
+        if 0 in self.cfg.commands.ranges.lin_vel_x:
+            # * with 20% chance, reset to 0 commands except for forward
+            self.commands[env_ids, 1:] *= (
+                torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+                < 0.8
+            ).unsqueeze(1)
+            # * with 20% chance, reset to 0 commands except for rotation
+            self.commands[env_ids, :2] *= (
+                torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+                < 0.8
+            ).unsqueeze(1)
+            # * with 10% chance, reset to 0
+            self.commands[env_ids, :] *= (
+                torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+                < 0.9
+            ).unsqueeze(1)
+
+        if self.cfg.osc.randomize_osc_params:
+            self._resample_osc_params(env_ids)
+
+    def _resample_osc_params(self, env_ids):
+        if len(env_ids) > 0:
+            self.osc_omega[env_ids, 0] = torch_rand_float(
+                self.cfg.osc.omega_range[0],
+                self.cfg.osc.omega_range[1],
+                (len(env_ids), 1),
+                device=self.device,
+            ).squeeze(1)
+            self.osc_coupling[env_ids, 0] = torch_rand_float(
+                self.cfg.osc.coupling_range[0],
+                self.cfg.osc.coupling_range[1],
+                (len(env_ids), 1),
+                device=self.device,
+            ).squeeze(1)
+            self.osc_offset[env_ids, 0] = torch_rand_float(
+                self.cfg.osc.offset_range[0],
+                self.cfg.osc.offset_range[1],
+                (len(env_ids), 1),
+                device=self.device,
+            ).squeeze(1)
+
+    def compute_pca(self):
+        if not self.cfg.pca.torques:
+            if self.cfg.pca.mode =="symmetries":
+                one_eigvec = self.eigenvectors = torch.from_numpy(
+                    np.load("/home/aileen/QGym/scripts/pca_components_ref_clean.npy")).to(self.device).T
+                #torch.tensor([[-0.0, 0.72134468, -0.69195227]], device = self.device)
+                one_eigvec=one_eigvec[0:1,0:3]
+                self.eigenvectors[0,:]=torch.cat((one_eigvec,one_eigvec,one_eigvec,one_eigvec),1)
+                self.eigenvectors[1,:] = torch.cat((one_eigvec,-one_eigvec,-one_eigvec, one_eigvec),1)
+                self.eigenvectors[2,:] = torch.cat((one_eigvec,-one_eigvec,one_eigvec,-one_eigvec),1)
+                self.eigenvectors[3,:] = torch.cat((one_eigvec,one_eigvec,-one_eigvec,-one_eigvec),1)
+
+                self.eigenvectors[:,3:4] = -self.eigenvectors[:,3:4]
+
+                self.eigenvectors[:,9:10] = -self.eigenvectors[:,9:10]
+
+            if self.cfg.pca.mode == "one_leg":
+                # 4th leg, all actuators
+                self.eigenvectors = torch.from_numpy(
+                    np.load("/home/aileen/QGym/scripts/pca_components.npy")).to(self.device).T
+                self.eigenvectors = torch.hstack([self.eigenvectors[0:6,0:3],self.eigenvectors[0:6,0:3],
+                                                  self.eigenvectors[0:6,0:3],self.eigenvectors[0:6,0:3]])
+                self.eigenvectors[:,4:6]=-self.eigenvectors[:,4:6]
+                self.eigenvectors[:,3:4] = -self.eigenvectors[:,3:4]
+
+                self.eigenvectors[:,7:9] = -self.eigenvectors[:,7:9]
+                self.eigenvectors[:,9:10] = -self.eigenvectors[:,9:10]
+                # self.eigenvectors = torch.tensor(
+                #     [
+                #         [-0.02939241, 0.81596737, 0.57735027],
+                #         [0.72134468, -0.38252912, 0.57735027],
+                #         [-0.69195227, -0.43343826, 0.57735027],
+                #         [0.02939241, -0.81596737, -0.57735027],
+                #         [-0.72134468, 0.38252912, -0.57735027],
+                #         [0.69195227, 0.43343826, -0.57735027],
+                #         [0.02939241, -0.81596737, -0.57735027],
+                #         [-0.72134468, 0.38252912, -0.57735027],
+                #         [0.69195227, 0.43343826, -0.57735027],
+                #         [-0.02939241, 0.81596737, 0.57735027],
+                #         [0.72134468, -0.38252912, 0.57735027],
+                #         [-0.69195227, -0.43343826, 0.57735027]
+                #     ],
+                #     device=self.device,
+                # ).T
+                # self.eigenvectors = self.eigenvectors[1:3,:]
+
+                # eigenvectors = torch.zeros(
+                #     3, self.dof_pos_target_copy.shape[1], device=self.device
+                # )
+                # eigenvectors[:, 9:12] = eigenvectors_og.T
+            elif self.cfg.pca.mode == "joint":
+                # 3rd actuator kfe, all legs
+                eigenvectors_og = torch.tensor(
+                    [
+                        [0.30653829, -0.76561209, -0.26433388],
+                        [-0.5543308, -0.12128448, 0.65422278],
+                        [-0.40904421, 0.38943236, -0.65652515],
+                        [0.65683672, 0.49746421, 0.26663625],
+                    ],
+                    device=self.device,
+                ).T
+                for i in range(0, 4):
+                    self.eigenvectors[:, i * 3] = eigenvectors_og[:, i]
+            elif self.cfg.pca.mode == "all":
+                self.eigenvectors = torch.from_numpy(
+                    np.load("/home/aileen/QGym/scripts/pca_components.npy")).to(self.device).T
+            else:
+                Warning("PC MODE NOT RECOGNIZED in compute_torques")
+            # fulleig = torch.zeros((12,12))
+            # fulleig[0:3,:]=(eigenvectors)
+            # default_scale = torch.mul(self.default_dof_pos, torch.inverse(fulleig))
+
+            # default_scale = torch.tensor([[-3.31386603,  0.01028646, -0.09361623]], device=self.device)
+            # default_scale = default_scale.repeat(self.pca_scalings.shape[0], 1)
+            # self.pca_scalings +=default_scale
+            #print(self.default_dof_pos)
+            #print(self.pca_scalings.shape)
+
+            #self.pca_scalings = torch.randn(1,6).repeat(self.num_envs, 1).to(self.device) # ! REMOVE LATER
+
+            self.dof_pos_target = torch.zeros(self.num_envs, self.dof_pos_target.shape[1], device=self.device)
+            for i in range(0, self.pca_scalings.shape[1]):  # todo sanity check this! unit test or something?
+                self.dof_pos_target += torch.mul(
+                    self.eigenvectors[i, :].repeat(self.num_envs, 1),
+                    self.pca_scalings[:, i:i+1],
+                )
+        else:
+            self.dof_pos_target = (self.torques - self.tau_ff-self.d_gains*(self.dof_vel_target - self.dof_vel))/self.p_gains - self.default_dof_pos + self.dof_pos
+
+    def _compute_torques(self):
+        #print(self.dof_pos)
+        if self.cfg.pca.torques:
+            self.eigenvectors = torch.from_numpy(
+                np.load("/home/aileen/QGym/scripts/pca_components_torques.npy")).to(self.device).T
+            for i in range(0, self.pca_scalings.shape[1]):
+                self.torques += torch.mul(
+                    self.eigenvectors[i, :].repeat(self.num_envs, 1),
+                    self.pca_scalings[:, i:i+1],
+                )
+        else:
+            self.torques = (
+                self.p_gains * (self.dof_pos_target + self.default_dof_pos - self.dof_pos)
+                + self.d_gains * (self.dof_vel_target - self.dof_vel)
+                + self.tau_ff
+            )
+        self.torques = torch.clip(self.torques, -self.torque_limits, self.torque_limits)
+        return self.torques.view(self.torques.shape)
+
+    def perturb_base_velocity(self, velocity_delta, env_ids=None):
+        if env_ids is None:
+            env_ids = [range(self.num_envs)]
+        self.root_states[env_ids, 7:10] += velocity_delta
+        self.gym.set_actor_root_state_tensor(
+            self.sim, gymtorch.unwrap_tensor(self.root_states)
+        )
+
+    def _compute_grf(self, grf_norm=True):
+        grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
+        if grf_norm:
+            return torch.clamp_max(grf / MINI_CHEETAH_MASS, 1.0)
+        else:
+            return grf
+
+    def _switch(self):
+        c_vel = torch.linalg.norm(self.commands, dim=1)
+        return torch.exp(
+            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1))
+            / self.cfg.reward_settings.switch_scale
+        )
+
+    def _reward_cursorial(self):
+        # penalize the abad joints being away from 0
+        return -torch.mean(
+            torch.square(self.dof_pos[:, 0:12:3] / self.scales["dof_pos"][0]), dim=1
+        )
+
+    def _reward_swing_grf(self):
+        # Reward non-zero grf during swing (0 to pi)
+        rew = self.get_swing_grf(self.cfg.osc.osc_bool, self.cfg.osc.grf_bool)
+        return -torch.sum(rew, dim=1)
+
+    def _reward_stance_grf(self):
+        # Reward non-zero grf during stance (pi to 2pi)
+        rew = self.get_stance_grf(self.cfg.osc.osc_bool, self.cfg.osc.grf_bool)
+        return torch.sum(rew, dim=1)
+
+    def get_swing_grf(self, osc_bool=False, contact_bool=False):
+        if osc_bool:
+            phase = torch.lt(self.oscillators, torch.pi).int()
+        else:
+            phase = torch.maximum(
+                torch.zeros_like(self.oscillators), torch.sin(self.oscillators)
+            )
+        if contact_bool:
+            return phase * torch.gt(self._compute_grf(), self.cfg.osc.grf_threshold)
+        else:
+            return phase * self._compute_grf()
+
+    def get_stance_grf(self, osc_bool=False, contact_bool=False):
+        if osc_bool:
+            phase = torch.gt(self.oscillators, torch.pi).int()
+        else:
+            phase = torch.maximum(
+                torch.zeros_like(self.oscillators), -torch.sin(self.oscillators)
+            )
+        if contact_bool:
+            return phase * torch.gt(self._compute_grf(), self.cfg.osc.grf_threshold)
+        else:
+            return phase * self._compute_grf()
+
+    def _reward_coupled_grf(self):
+        """
+        Multiply rewards for stance/swing grf, discount when undesirable
+        behavior (grf during swing, no grf during stance)
+        """
+        swing_rew = self.get_swing_grf()
+        stance_rew = self.get_stance_grf()
+        combined_rew = self._sqrdexp(swing_rew * 2) + stance_rew
+        prod = torch.prod(torch.clip(combined_rew, 0, 1), dim=1)
+        return prod - torch.ones_like(prod)
+
+    def _reward_swing_velocity(self):
+        """Reward non-zero end effector velocity during swing (0 to pi)"""
+        # velocity = torch.tanh(torch.norm(self.end_effector_lin_vel, dim=-1))
+        velocity = torch.zeros_like(
+            self.oscillators
+        )  # TODO: Grab velocity from AJ V2 code
+        phase_bool = torch.lt(self.oscillators, torch.pi).int()
+        phase_sin = torch.maximum(
+            torch.zeros_like(self.oscillators), torch.sin(self.oscillators)
+        )
+        if self.cfg.osc.osc_bool:
+            rew = phase_bool * velocity
+        else:
+            rew = phase_sin * velocity
+        return torch.mean(rew, dim=1)
+
+    def _reward_stance_velocity(self):
+        """Reward zero end effector velocity during swing (pi to 2pi)"""
+        # velocity = torch.tanh(torch.norm(self.end_effector_lin_vel, dim=-1))
+        velocity = torch.zeros_like(
+            self.oscillators
+        )  # TODO: Grab velocity from AJ V2 code
+        ph_bool = torch.gt(self.oscillators, torch.pi).int()
+        ph_sin = torch.maximum(
+            torch.zeros_like(self.oscillators), -torch.sin(self.oscillators)
+        )
+        if self.cfg.osc.osc_bool:
+            rew = ph_bool * velocity
+        else:
+            rew = ph_sin * velocity
+        return -torch.mean(rew, dim=1)
+
+    def _reward_dof_vel(self):
+        return super()._reward_dof_vel() * self._switch()
+
+    def _reward_dof_near_home(self):
+        return super()._reward_dof_near_home() * self._switch()
+
+    def _reward_stand_still(self):
+        """Penalize motion at zero commands"""
+        # * normalize angles so we care about being within 5 deg
+        rew_pos = torch.mean(
+            self._sqrdexp((self.dof_pos - self.default_dof_pos) / torch.pi * 36), dim=1
+        )
+        rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
+        rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
+        rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
+        return (rew_vel + rew_pos - rew_base_vel) * self._switch()
+
+    def _reward_standing_torques(self):
+        """Penalize torques at zero commands"""
+        return super()._reward_torques() * self._switch()
+
+    # * gait similarity scores
+    def angle_difference(self, theta1, theta2):
+        diff = torch.abs(theta1 - theta2) % (2 * torch.pi)
+        return torch.min(diff, 2 * torch.pi - diff)
+
+    def _reward_trot(self):
+        # ! diagonal difference, front right and hind left
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 3])
+        similarity = self._sqrdexp(angle, torch.pi)
+        # ! diagonal difference, front left and hind right
+        angle = self.angle_difference(self.oscillators[:, 1], self.oscillators[:, 2])
+        similarity *= self._sqrdexp(angle, torch.pi)
+        # ! diagonal difference, front left and hind right
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 1])
+        similarity *= self._sqrdexp(angle - torch.pi, torch.pi)
+        # ! diagonal difference, front left and hind right
+        angle = self.angle_difference(self.oscillators[:, 2], self.oscillators[:, 3])
+        similarity *= self._sqrdexp(angle - torch.pi, torch.pi)
+        return similarity
+
+    def _reward_pronk(self):
+        # ! diagonal difference, front right and hind left
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 3])
+        similarity = self._sqrdexp(angle, torch.pi)
+        # ! diagonal difference, front left and hind right
+        angle = self.angle_difference(self.oscillators[:, 1], self.oscillators[:, 2])
+        similarity *= self._sqrdexp(angle, torch.pi)
+        # ! difference, front right and front left
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 1])
+        similarity *= self._sqrdexp(angle, torch.pi)
+        # ! difference front right and hind right
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 2])
+        similarity *= self._sqrdexp(angle, torch.pi)
+        return similarity
+
+    def _reward_pace(self):
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 2])
+        similarity = self._sqrdexp(angle, torch.pi)
+        # ! difference front left and hind left
+        angle = self.angle_difference(self.oscillators[:, 1], self.oscillators[:, 3])
+        similarity *= self._sqrdexp(angle, torch.pi)
+        # ! difference front left and hind left
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 1])
+        similarity *= self._sqrdexp(angle - torch.pi, torch.pi)
+        # ! difference front left and hind left
+        angle = self.angle_difference(self.oscillators[:, 2], self.oscillators[:, 3])
+        similarity *= self._sqrdexp(angle - torch.pi, torch.pi)
+
+        return similarity
+
+    def _reward_any_symm_gait(self):
+        rew_trot = self._reward_trot()
+        rew_pace = self._reward_pace()
+        rew_bound = self._reward_bound()
+        return torch.max(torch.max(rew_trot, rew_pace), rew_bound)
+
+    def _reward_enc_pace(self):
+        return self._reward_pace()
+
+    def _reward_bound(self):
+        # ! difference, front right and front left
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 1])
+        similarity = self._sqrdexp(angle, torch.pi)
+        # ! difference hind right and hind left
+        angle = self.angle_difference(self.oscillators[:, 2], self.oscillators[:, 3])
+        similarity *= self._sqrdexp(angle, torch.pi)
+        # ! difference right side
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 2])
+        similarity *= self._sqrdexp(angle - torch.pi, torch.pi)
+        # ! difference right side
+        angle = self.angle_difference(self.oscillators[:, 1], self.oscillators[:, 3])
+        similarity *= self._sqrdexp(angle - torch.pi, torch.pi)
+        return similarity
+
+    def _reward_asymettric(self):
+        # ! hind legs
+        angle = self.angle_difference(self.oscillators[:, 2], self.oscillators[:, 3])
+        similarity = 1 - self._sqrdexp(angle, torch.pi)
+        similarity *= 1 - self._sqrdexp((torch.pi - angle), torch.pi)
+        # ! difference, left legs
+        angle = self.angle_difference(self.oscillators[:, 1], self.oscillators[:, 3])
+        similarity *= 1 - self._sqrdexp(angle, torch.pi)
+        similarity *= 1 - self._sqrdexp((torch.pi - angle), torch.pi)
+        # ! difference right legs
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 2])
+        similarity *= 1 - self._sqrdexp(angle, torch.pi)
+        similarity *= 1 - self._sqrdexp((torch.pi - angle), torch.pi)
+        # ! front legs
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 1])
+        similarity *= 1 - self._sqrdexp(angle, torch.pi)
+        similarity *= 1 - self._sqrdexp((torch.pi - angle), torch.pi)
+        # ! diagonal FR
+        angle = self.angle_difference(self.oscillators[:, 0], self.oscillators[:, 3])
+        similarity *= 1 - self._sqrdexp(angle, torch.pi)
+        similarity *= 1 - self._sqrdexp((torch.pi - angle), torch.pi)
+        # ! diagonal FL
+        angle = self.angle_difference(self.oscillators[:, 1], self.oscillators[:, 2])
+        similarity *= 1 - self._sqrdexp(angle, torch.pi)
+        similarity *= 1 - self._sqrdexp((torch.pi - angle), torch.pi)
+        return similarity
