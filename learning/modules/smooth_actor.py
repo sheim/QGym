@@ -13,14 +13,13 @@ from gym import LEGGED_GYM_ROOT_DIR
 class SmoothActor(Actor):
     weights_dist: Normal
     _latent_sde: torch.Tensor
-    exploration_mat: torch.Tensor
     exploration_matrices: torch.Tensor
 
     def __init__(
         self,
         *args,
         full_std: bool = True,
-        use_exp_ln: bool = False,
+        use_exp_ln: bool = True,
         learn_features: bool = True,
         epsilon: float = 1e-6,
         log_std_init: float = 0.0,
@@ -60,8 +59,6 @@ class SmoothActor(Actor):
         # Sample weights for the noise exploration matrix
         std = self.get_std()
         self.weights_dist = Normal(torch.zeros_like(std), std)
-        # Reparametrization trick to pass gradients
-        self.exploration_mat = self.weights_dist.rsample()
         # Pre-compute matrices in case of parallel exploration
         self.exploration_matrices = self.weights_dist.rsample((batch_size,))
 
@@ -87,12 +84,20 @@ class SmoothActor(Actor):
 
     def update_distribution(self, observations):
         if self._normalize_obs:
-            observations = self.normalize(observations)
+            with torch.no_grad():
+                observations = self.obs_rms(observations)
         # Get latent features and compute distribution
         self._latent_sde = self.latent_net(observations)
         if not self.learn_features:
             self._latent_sde = self._latent_sde.detach()
-        variance = torch.mm(self._latent_sde**2, self.get_std() ** 2)
+        if self._latent_sde.dim() == 2:
+            variance = torch.mm(self._latent_sde**2, self.get_std() ** 2)
+        elif self._latent_sde.dim() == 3:
+            variance = torch.einsum(
+                "abc,cd->abd", self._latent_sde**2, self.get_std() ** 2
+            )
+        else:
+            raise ValueError("Invalid latent_sde dimension")
         mean_actions = self.mean_actions_net(self._latent_sde)
         self.distribution = Normal(mean_actions, torch.sqrt(variance + self.epsilon))
 
@@ -107,7 +112,8 @@ class SmoothActor(Actor):
 
     def act_inference(self, observations):
         if self._normalize_obs:
-            observations = self.normalize(observations)
+            with torch.no_grad():
+                observations = self.obs_rms(observations)
         latent_sde = self.latent_net(observations)
         mean_actions = self.mean_actions_net(latent_sde)
         return mean_actions
@@ -116,12 +122,9 @@ class SmoothActor(Actor):
         latent_sde = self._latent_sde
         if not self.learn_features:
             latent_sde = latent_sde.detach()
-        # Default case: only one exploration matrix
-        if len(latent_sde) == 1 or len(latent_sde) != len(self.exploration_matrices):
-            return torch.mm(latent_sde, self.exploration_mat.to(latent_sde.device))
         # Use batch matrix multiplication for efficient computation
         # (batch_size, n_features) -> (batch_size, 1, n_features)
         latent_sde = latent_sde.unsqueeze(dim=1)
         # (batch_size, 1, n_actions)
-        noise = torch.bmm(latent_sde, self.exploration_matrices)
+        noise = torch.bmm(latent_sde, self.exploration_matrices.to(latent_sde.device))
         return noise.squeeze(dim=1)

@@ -4,7 +4,7 @@ import torch
 from learning.utils import Logger
 from .BaseRunner import BaseRunner
 from learning.algorithms import PPO  # noqa: F401
-from learning.modules import ActorCritic, Actor, Critic
+from learning.modules import ActorCritic, Actor, Critic, SmoothActor
 
 logger = Logger()
 
@@ -24,7 +24,10 @@ class OldPolicyRunner(BaseRunner):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
         num_actions = self.get_action_size(self.actor_cfg["actions"])
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
-        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        if self.actor_cfg["smooth_exploration"]:
+            actor = SmoothActor(num_actor_obs, num_actions, **self.actor_cfg)
+        else:
+            actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
         critic = Critic(num_critic_obs, **self.critic_cfg)
         actor_critic = ActorCritic(actor, critic)
         alg_class = eval(self.cfg["algorithm_class_name"])
@@ -42,6 +45,10 @@ class OldPolicyRunner(BaseRunner):
 
         self.save()
 
+        # * Initialize smooth exploration matrices
+        if self.actor_cfg["smooth_exploration"]:
+            self.alg.actor_critic.actor.sample_weights(batch_size=self.env.num_envs)
+
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
@@ -49,6 +56,13 @@ class OldPolicyRunner(BaseRunner):
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
+                    # * Re-sample noise matrix for smooth exploration
+                    sample_freq = self.actor_cfg["exploration_sample_freq"]
+                    if self.actor_cfg["smooth_exploration"] and i % sample_freq == 0:
+                        self.alg.actor_critic.actor.sample_weights(
+                            batch_size=self.env.num_envs
+                        )
+
                     actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],

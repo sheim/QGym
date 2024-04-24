@@ -32,6 +32,10 @@ class OnPolicyRunner(BaseRunner):
         tot_iter = self.it + self.num_learning_iterations
         self.save()
 
+        # * Initialize smooth exploration matrices
+        if self.actor_cfg["smooth_exploration"]:
+            self.alg.actor.sample_weights(batch_size=self.env.num_envs)
+
         # * start up storage
         transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
         transition.update(
@@ -65,11 +69,9 @@ class OnPolicyRunner(BaseRunner):
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
                     # * Re-sample noise matrix for smooth exploration
-                    sample_freq = self.policy_cfg["exploration_sample_freq"]
-                    if self.policy_cfg["smooth_exploration"] and i % sample_freq == 0:
-                        self.alg.actor_critic.actor.sample_weights(
-                            batch_size=self.env.num_envs
-                        )
+                    sample_freq = self.actor_cfg["exploration_sample_freq"]
+                    if self.actor_cfg["smooth_exploration"] and i % sample_freq == 0:
+                        self.alg.actor.sample_weights(batch_size=self.env.num_envs)
 
                     actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(

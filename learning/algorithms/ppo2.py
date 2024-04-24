@@ -6,6 +6,7 @@ from learning.utils import (
     create_uniform_generator,
     compute_generalized_advantages,
 )
+from learning.modules import SmoothActor
 
 
 class PPO2:
@@ -99,7 +100,7 @@ class PPO2:
         self.mean_surrogate_loss = 0
         counter = 0
 
-        self.actor.act(data["actor_obs"])
+        self.actor.update_distribution(data["actor_obs"])
         data["old_sigma_batch"] = self.actor.action_std.detach()
         data["old_mu_batch"] = self.actor.action_mean.detach()
         data["old_actions_log_prob_batch"] = self.actor.get_actions_log_prob(
@@ -111,8 +112,12 @@ class PPO2:
         batch_size = total_data // self.num_mini_batches
         generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
         for batch in generator:
+            # * Re-sample noise for smooth actor
+            if isinstance(self.actor, SmoothActor):
+                self.actor.sample_weights(batch_size)
+
             # ! refactor how this is done
-            self.actor.act(batch["actor_obs"])
+            self.actor.update_distribution(batch["actor_obs"])
             actions_log_prob_batch = self.actor.get_actions_log_prob(batch["actions"])
             mu_batch = self.actor.action_mean
             sigma_batch = self.actor.action_std
