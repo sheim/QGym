@@ -18,7 +18,7 @@ class LQRPendulumCfg(FixedRobotCfg):
         lookat = [0.0, 0.0, 0.0]  # [m]
 
     class init_state(FixedRobotCfg.init_state):
-        default_joint_angles = {"theta": 1e-3}  # -torch.pi / 2.0}
+        default_joint_angles = {"theta": torch.pi}  # -torch.pi / 2.0}
 
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
@@ -29,7 +29,7 @@ class LQRPendulumCfg(FixedRobotCfg):
         dof_pos_range = {
             "theta": [-torch.pi / 2.0, torch.pi / 2.0],
         }
-        dof_vel_range = {"theta": [0, 0]}
+        dof_vel_range = {"theta": [-5, 5]}
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
