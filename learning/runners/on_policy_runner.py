@@ -54,6 +54,20 @@ class OnPolicyRunner(BaseRunner):
             device=self.device,
         )
 
+        # burn in observation normalization.
+        with torch.inference_mode():
+            for _ in range(200):
+                actions = self.alg.act(actor_obs, critic_obs)
+                self.set_actions(
+                    self.actor_cfg["actions"],
+                    actions,
+                    self.actor_cfg["disable_actions"],
+                )
+                self.env.step()
+                actor_obs = self.get_noisy_obs(
+                    self.actor_cfg["obs"], self.actor_cfg["noise"]
+                )
+
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
