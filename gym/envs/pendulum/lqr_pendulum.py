@@ -58,7 +58,6 @@ class LQRPendulum(Pendulum):
         S = S.expand(batch_envs, -1, -1)
         R_inv = torch.linalg.inv(R.expand(batch_envs, -1, -1))
         x_bar = x - x_desired.expand(batch_envs, -1)
-        # u_prime = u_desired - torch.linalg.inv(R) @ B_T @ S @ x_bar
         K = torch.einsum("...ij, ...jk -> ...ik",
                         torch.einsum("...ij, ...jk -> ...ik", R_inv, B_T),
                         S)

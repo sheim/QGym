@@ -1,22 +1,19 @@
 import os
-import numpy as np
+import time
 import torch
+import numpy as np
 from tensordict import TensorDict
 
 from gym import LEGGED_GYM_ROOT_DIR
-from learning.algorithms import *  # noqa: F403
-from learning.modules import Actor, Critic
-from learning.modules.lqrc import Cholesky, CholeskyPlusConst, CholeskyOffset1, CholeskyOffset2
 from learning.utils import Logger
-
-from .on_policy_runner import OnPolicyRunner
+from .custom_critic_runner import OnPolicyRunner
 from learning.storage import DictStorage
 
 logger = Logger()
 storage = DictStorage()
 
 
-class CustomCriticRunner(OnPolicyRunner):
+class LQRDataGenRunner(OnPolicyRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
@@ -25,16 +22,10 @@ class CustomCriticRunner(OnPolicyRunner):
             self.cfg["max_iterations"],
             self.device,
         )
-
-    def _set_up_alg(self):
-        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
-        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
-        critic_class_name = self.critic_cfg["critic_class_name"]
-        num_actions = self.get_action_size(self.actor_cfg["actions"])
-        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
-        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
-        alg_class = eval(self.cfg["algorithm_class_name"])
-        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
+        self.total_steps = self.num_learning_iterations*self.num_steps_per_env
+        self.data_dict = {"observations": np.zeros((self.total_steps, env.num_envs, env.dof_state.shape[0])),
+                          "actions": np.zeros((self.total_steps, env.num_envs, env.num_actuators)),
+                          "total_rewards": np.zeros((self.total_steps, env.num_envs, 1))}
 
     def learn(self):
         self.set_up_logger()
@@ -45,8 +36,6 @@ class CustomCriticRunner(OnPolicyRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
-        self.all_obs = torch.zeros(self.env.num_envs * (tot_iter - self.it + 1), 2)
-        self.all_obs[: self.env.num_envs, :] = actor_obs
         self.save()
 
         # * start up storage
@@ -95,9 +84,6 @@ class CustomCriticRunner(OnPolicyRunner):
                         self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
                     critic_obs = self.get_obs(self.critic_cfg["obs"])
-                    start = self.env.num_envs * self.it
-                    end = self.env.num_envs * (self.it + 1)
-                    self.all_obs[start:end, :] = actor_obs
 
                     # * get time_outs
                     timed_out = self.get_timed_out()
@@ -119,6 +105,9 @@ class CustomCriticRunner(OnPolicyRunner):
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
                     logger.finish_step(dones)
+                    self.data_dict["observations"][self.it*i, ...] = actor_obs
+                    self.data_dict["actions"][self.it*i, ...] = self.torques
+                    self.data_dict["total_rewards"][self.it*i, ...] = total_rewards
             logger.toc("collection")
 
             logger.tic("learning")
@@ -134,46 +123,12 @@ class CustomCriticRunner(OnPolicyRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-        self.all_obs = self.all_obs.detach().cpu().numpy()
-        save_path = os.path.join(
-            LEGGED_GYM_ROOT_DIR,
-            "logs",
-            "lqrc",
-            "standard_training_data.npy"
-            if "Cholesky" not in self.critic_cfg["critic_class_name"]
-            else "custom_training_data.npy",
-        )
+        self.save()
 
+        time_str = time.strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "lqrc", "lqr_data", f"lqr_{time_str}.npz")
         dir_path = os.path.dirname(save_path)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
-        np.save(save_path, self.all_obs)
-        print(f"Saved training observations to {save_path}")
-        self.save()
-
-    def update_rewards(self, rewards_dict, terminated):
-        rewards_dict.update(
-            self.get_rewards(
-                self.critic_cfg["reward"]["termination_weight"], mask=terminated
-            )
-        )
-        rewards_dict.update(
-            self.get_rewards(
-                self.critic_cfg["reward"]["weights"],
-                modifier=self.env.dt,
-                mask=~terminated,
-            )
-        )
-
-    def set_up_logger(self):
-        logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))
-        logger.register_rewards(
-            list(self.critic_cfg["reward"]["termination_weight"].keys())
-        )
-        logger.register_rewards(["total_rewards"])
-        logger.register_category(
-            "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
-        )
-        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
-
-        logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
+        np.savez(save_path, *self.data_dict)
+        print(f"Saved data from LQR Pendulum run to {save_path}")

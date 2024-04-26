@@ -59,7 +59,7 @@ class LQRPendulumCfg(FixedRobotCfg):
 
 class LQRPendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "CustomCriticRunner"
+    runner_class_name = "OnPolicyRunner" #"LQRDataGenRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
