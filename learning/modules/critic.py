@@ -15,7 +15,7 @@ class Critic(nn.Module):
     ):
         super().__init__()
 
-        self.NN = create_MLP(num_obs, 1, hidden_dims, activation)
+        self.NN = create_MLP(num_obs, 1, hidden_dims, activation, latent=False)
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
             self.obs_rms = RunningMeanStd(num_obs)

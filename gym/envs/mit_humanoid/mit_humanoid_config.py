@@ -187,6 +187,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         critic_hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
 
         obs = [
             "base_height",

@@ -21,7 +21,7 @@ class OnPolicyRunner(BaseRunner):
             self.device,
         )
 
-    def learn(self):
+    def learn(self, states_to_log_dict=None):
         self.set_up_logger()
 
         rewards_dict = {}
@@ -31,6 +31,10 @@ class OnPolicyRunner(BaseRunner):
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
         self.save()
+
+        # * Initialize smooth exploration matrices
+        if self.actor_cfg["smooth_exploration"]:
+            self.alg.actor.sample_weights(batch_size=self.env.num_envs)
 
         # * start up storage
         transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
@@ -50,13 +54,39 @@ class OnPolicyRunner(BaseRunner):
             device=self.device,
         )
 
+        # burn in observation normalization.
+        with torch.inference_mode():
+            for _ in range(200):
+                actions = self.alg.act(actor_obs, critic_obs)
+                self.set_actions(
+                    self.actor_cfg["actions"],
+                    actions,
+                    self.actor_cfg["disable_actions"],
+                )
+                self.env.step()
+                actor_obs = self.get_noisy_obs(
+                    self.actor_cfg["obs"], self.actor_cfg["noise"]
+                )
+
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
             logger.tic("collection")
+
+            # * Simulate environment and log states
+            if states_to_log_dict is not None:
+                it_idx = self.it - 1
+                if it_idx % 10 == 0:
+                    self.sim_and_log_states(states_to_log_dict, it_idx)
+
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
+                    # * Re-sample noise matrix for smooth exploration
+                    sample_freq = self.actor_cfg["exploration_sample_freq"]
+                    if self.actor_cfg["smooth_exploration"] and i % sample_freq == 0:
+                        self.alg.actor.sample_weights(batch_size=self.env.num_envs)
+
                     actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],
@@ -178,3 +208,42 @@ class OnPolicyRunner(BaseRunner):
 
     def export(self, path):
         self.alg.actor.export(path)
+
+    def sim_and_log_states(self, states_to_log_dict, it_idx):
+        # Simulate environment for as many steps as expected in the dict.
+        # Log states to the dict, as well as whether the env terminated.
+        steps = states_to_log_dict["terminated"].shape[2]
+        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
+        critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+        with torch.inference_mode():
+            for i in range(steps):
+                sample_freq = self.policy_cfg["exploration_sample_freq"]
+                if self.policy_cfg["smooth_exploration"] and i % sample_freq == 0:
+                    self.alg.actor_critic.actor.sample_weights(
+                        batch_size=self.env.num_envs
+                    )
+
+                actions = self.alg.act(actor_obs, critic_obs)
+                self.set_actions(
+                    self.policy_cfg["actions"],
+                    actions,
+                    self.policy_cfg["disable_actions"],
+                )
+
+                self.env.step()
+
+                actor_obs = self.get_noisy_obs(
+                    self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
+                )
+                critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+                # Log states (just for the first env)
+                terminated = self.get_terminated()[0]
+                for state in states_to_log_dict:
+                    if state == "terminated":
+                        states_to_log_dict[state][0, it_idx, i, :] = terminated
+                    else:
+                        states_to_log_dict[state][0, it_idx, i, :] = getattr(
+                            self.env, state
+                        )[0, :]

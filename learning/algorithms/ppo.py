@@ -34,7 +34,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from learning.modules import ActorCritic
+from learning.modules import ActorCritic, SmoothActor
 from learning.storage import RolloutStorage
 
 
@@ -162,7 +162,11 @@ class PPO:
             old_mu_batch,
             old_sigma_batch,
         ) in generator:
-            self.actor_critic.act(obs_batch)
+            # TODO[lm]: Look into resampling noise here, gSDE paper seems to do it.
+            if isinstance(self.actor_critic.actor, SmoothActor):
+                batch_size = obs_batch.shape[0]
+                self.actor_critic.actor.sample_weights(batch_size)
+            self.actor_critic.actor.update_distribution(obs_batch)
             actions_log_prob_batch = self.actor_critic.get_actions_log_prob(
                 actions_batch
             )

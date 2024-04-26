@@ -1,0 +1,19 @@
+{
+    "method": "grid",
+    "metric": {
+        "name": "rewards/total_rewards",
+        "goal": "maximize"
+    },
+    "run_cap": 10,
+    "parameters": {
+        "train_cfg.policy.exploration_sample_freq":{
+            "values": [4, 8, 16, 32]
+        },
+        "train_cfg.runner.num_steps_per_env":{
+            "values": [32, 64]
+        },
+        "train_cfg.runner.max_iterations":{
+            "values": [800]
+        }
+    }
+}
