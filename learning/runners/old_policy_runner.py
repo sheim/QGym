@@ -4,7 +4,7 @@ import torch
 from learning.utils import Logger
 from .BaseRunner import BaseRunner
 from learning.algorithms import PPO  # noqa: F401
-from learning.modules import ActorCritic, Actor, Critic, SmoothActor
+from learning.modules import ActorCritic, Actor, Critic, SmoothActor, PinkActor
 
 logger = Logger()
 
@@ -26,6 +26,8 @@ class OldPolicyRunner(BaseRunner):
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
         if self.actor_cfg["smooth_exploration"]:
             actor = SmoothActor(num_actor_obs, num_actions, **self.actor_cfg)
+        elif self.actor_cfg["pink_exploration"]:
+            actor = PinkActor(num_actor_obs, num_actions, **self.actor_cfg)
         else:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
         critic = Critic(num_critic_obs, **self.critic_cfg)

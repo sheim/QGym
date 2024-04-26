@@ -37,7 +37,8 @@ class PinkActor(Actor):
 
     def update_distribution(self, observations):
         if self._normalize_obs:
-            observations = self.normalize(observations)
+            with torch.no_grad():
+                observations = self.obs_rms(observations)
         # Get latent features and compute distribution
         mean_actions = self.NN(observations)
         action_std = torch.ones_like(mean_actions) * torch.exp(self.log_std)
@@ -61,6 +62,7 @@ class PinkActor(Actor):
 
     def act_inference(self, observations):
         if self._normalize_obs:
-            observations = self.normalize(observations)
+            with torch.no_grad():
+                observations = self.obs_rms(observations)
         mean_actions = self.NN(observations)
         return mean_actions
