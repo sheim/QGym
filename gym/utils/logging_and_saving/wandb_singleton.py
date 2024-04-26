@@ -7,7 +7,7 @@ from gym import LEGGED_GYM_ROOT_DIR
 class WandbSingleton(object):
     def __new__(self):
         if not hasattr(self, "instance"):
-            self.instance = super(WandbSingleton, self).__new__(self)
+            self.instance = super().__new__(self)
             self.entity_name = None
             self.project_name = None
             self.experiment_name = ""

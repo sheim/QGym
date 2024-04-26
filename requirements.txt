@@ -13,3 +13,4 @@ ruff
 pre-commit
 onnx
 onnxruntime
+tensordict

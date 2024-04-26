@@ -33,7 +33,7 @@ def _run_training_test(output_tensor_file, env, runner):
     runner.learn()
 
     # * get the test values after learning
-    actions = runner.env.get_states(runner.policy_cfg["actions"])
+    actions = runner.env.get_states(runner.actor_cfg["actions"])
 
     # * return the values to the parent for assertion
     actions.detach().cpu()

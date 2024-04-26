@@ -16,8 +16,6 @@ gym/wandb
 *.npz
 user/wandb_config.json
 *trajectories/
-plots/*.csv
-plots/*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -83,3 +81,7 @@ ipython_config.py
 venv/
 env.bak/
 venv.bak/
+
+# Smooth exploration
+gym/smooth_exploration/data*
+gym/smooth_exploration/figures*

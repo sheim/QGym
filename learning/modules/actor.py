@@ -19,11 +19,6 @@ class Actor(nn.Module):
         normalize_obs=True,
         **kwargs,
     ):
-        if kwargs:
-            print(
-                "Actor.__init__ got unexpected arguments, "
-                "which will be ignored: " + str([key for key in kwargs.keys()])
-            )
         super().__init__()
 
         self._normalize_obs = normalize_obs
@@ -60,9 +55,7 @@ class Actor(nn.Module):
         return self.distribution.entropy().sum(dim=-1)
 
     def update_distribution(self, observations):
-        if self._normalize_obs:
-            observations = self.normalize(observations)
-        mean = self.NN(observations)
+        mean = self.act_inference(observations)
         self.distribution = Normal(mean, mean * 0.0 + self.std)
 
     def act(self, observations):
@@ -79,16 +72,12 @@ class Actor(nn.Module):
 
     def act_inference(self, observations):
         if self._normalize_obs:
-            observations = self.normalize(observations)
-        actions_mean = self.NN(observations)
-        return actions_mean
+            with torch.no_grad():
+                observations = self.obs_rms(observations)
+        return self.NN(observations)
 
     def forward(self, observations):
         return self.act_inference(observations)
-
-    def normalize(self, observation):
-        with torch.no_grad():
-            return self.obs_rms(observation)
 
     def export(self, path):
         export_network(self, "policy", path, self.num_obs)
