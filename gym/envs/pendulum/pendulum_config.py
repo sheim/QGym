@@ -68,6 +68,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             "dof_pos",
             "dof_vel",
         ]
+        normalize_obs = True
 
         actions = ["tau_ff"]
         disable_actions = False
@@ -77,14 +78,14 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             dof_vel = 0.0
 
     class critic:
+        hidden_dims = [128, 64, 32]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "tanh"
         obs = [
             "dof_pos",
             "dof_vel",
         ]
-        hidden_dims = [128, 64, 32]
-        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
-        standard_critic_nn = True
+        normalize_obs = True
 
         class reward:
             class weights:

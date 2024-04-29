@@ -58,7 +58,7 @@ class PPO2:
         self.actor.train()
         self.critic.train()
 
-    def act(self, obs, critic_obs):
+    def act(self, obs):
         return self.actor.act(obs).detach()
 
     def update(self, data, last_obs=None):
