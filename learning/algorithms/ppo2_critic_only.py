@@ -73,7 +73,7 @@ class PPO2CriticOnly(PPO2):
         )
 
         self.update_critic(data)
-        self.update_actor(data) #! gradient step is disabled
+        self.update_actor(data)  #! gradient step is disabled
 
     def update_critic(self, data):
         self.mean_value_loss = 0
@@ -117,7 +117,7 @@ class PPO2CriticOnly(PPO2):
             actions_log_prob_batch = self.actor.get_actions_log_prob(batch["actions"])
             mu_batch = self.actor.action_mean
             sigma_batch = self.actor.action_std
-            entropy_batch = self.actor.entropy
+            # entropy_batch = self.actor.entropy
 
             # * KL
             if self.desired_kl is not None and self.schedule == "adaptive":
@@ -154,7 +154,7 @@ class PPO2CriticOnly(PPO2):
             )
             surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
-            loss = surrogate_loss - self.entropy_coef * entropy_batch.mean()
+            # loss = surrogate_loss - self.entropy_coef * entropy_batch.mean()
 
             # * Gradient step
             # self.optimizer.zero_grad()

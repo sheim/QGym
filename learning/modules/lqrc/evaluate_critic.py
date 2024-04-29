@@ -4,13 +4,13 @@ from learning import LEGGED_GYM_ROOT_DIR
 
 from utils import critic_eval_args, get_load_path
 from plotting import (
-    plot_custom_critic,
     plot_critic_prediction_only,
 )
 from learning.modules import Critic
 from learning.modules.lqrc.custom_critics import (
-    CustomCriticBaseline, Cholesky, CholeskyPlusConst, CholeskyOffset1,
-    CholeskyOffset2
+    CholeskyPlusConst,
+    CholeskyOffset1,
+    CholeskyOffset2,
 )
 import torch
 
@@ -74,5 +74,5 @@ if __name__ == "__main__":
     fn = args["fn"]
 
     plot_critic_prediction_only(
-            x, torch.vstack(y_pred), save_path + f"/{fn}.png", contour=args["contour"]
-        )
+        x, torch.vstack(y_pred), save_path + f"/{fn}.png", contour=args["contour"]
+    )

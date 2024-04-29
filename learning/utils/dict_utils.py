@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from tensordict import TensorDict
 
@@ -71,3 +72,12 @@ def create_uniform_generator(data, batch_size, num_epochs, keys=None):
                 indices[i * batch_size : (i + 1) * batch_size]
             ]
             yield batched_data
+
+
+@torch.no_grad
+def export_to_numpy(data, path):
+    # check if path ends iwth ".npz", and if not append it.
+    if not path.endswith(".npz"):
+        path += ".npz"
+    np.savez_compressed(path, **{key: val.cpu().numpy() for key, val in data.items()})
+    return

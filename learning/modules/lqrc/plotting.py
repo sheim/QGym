@@ -343,10 +343,14 @@ def plot_autoencoder(targets, predictions, fn):
     _, ax = plt.subplots()
     ax.scatter(targets[:, 0], targets[:, 1], label="Targets", alpha=0.5)
     ax.scatter(predictions[:, 0], predictions[:, 1], label="Predictions", alpha=0.5)
-    ax.set_xlim(min(np.min(targets[:, 0]), np.min(predictions[:, 0])),
-                max(np.max(targets[:, 0]), np.max(predictions[:, 0])))
-    ax.set_ylim(min(np.min(targets[:, 1]), np.min(predictions[:, 1])),
-                max(np.max(targets[:, 1]), np.max(predictions[:, 1])))
+    ax.set_xlim(
+        min(np.min(targets[:, 0]), np.min(predictions[:, 0])),
+        max(np.max(targets[:, 0]), np.max(predictions[:, 0])),
+    )
+    ax.set_ylim(
+        min(np.min(targets[:, 1]), np.min(predictions[:, 1])),
+        max(np.max(targets[:, 1]), np.max(predictions[:, 1])),
+    )
     ax.set_xlabel("theta")
     ax.set_ylabel("theta dot")
     ax.legend(loc="upper left")

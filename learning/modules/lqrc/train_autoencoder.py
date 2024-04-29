@@ -9,7 +9,7 @@ from plotting import plot_loss, plot_autoencoder
 
 
 def generate_data(lb, ub, n):
-    return (ub - lb).expand(n, -1)*torch.rand(n, ub.shape[-1]) + lb
+    return (ub - lb).expand(n, -1) * torch.rand(n, ub.shape[-1]) + lb
 
 
 if __name__ == "__main__":
@@ -50,10 +50,10 @@ if __name__ == "__main__":
     targets = generate_data(lb, ub, 100)
     predictions = torch.zeros_like(targets)
     for ix, target in enumerate(targets):
-            prediction = model(target)
-            predictions[ix, :] = prediction
-            loss = nn.MSELoss(reduction="mean")(target, prediction)
-            test_loss.append(loss)
+        prediction = model(target)
+        predictions[ix, :] = prediction
+        loss = nn.MSELoss(reduction="mean")(target, prediction)
+        test_loss.append(loss)
 
     print(f"Average loss on test set {torch.mean(torch.tensor(test_loss))}")
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
         os.makedirs(save_path)
 
     plot_loss(training_loss, f"{save_path}/{save_str}_loss")
-    plot_autoencoder(targets, predictions,  f"{save_path}/{save_str}_predictions")
+    plot_autoencoder(targets, predictions, f"{save_path}/{save_str}_predictions")
 
     if args["save_model"]:
         torch.save(

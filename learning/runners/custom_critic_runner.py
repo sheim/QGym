@@ -5,8 +5,7 @@ from tensordict import TensorDict
 
 from gym import LEGGED_GYM_ROOT_DIR
 from learning.algorithms import *  # noqa: F403
-from learning.modules import Actor, Critic
-from learning.modules.lqrc import Cholesky, CholeskyPlusConst, CholeskyOffset1, CholeskyOffset2
+from learning.modules import Actor
 from learning.utils import Logger
 
 from .on_policy_runner import OnPolicyRunner
@@ -28,7 +27,7 @@ class CustomCriticRunner(OnPolicyRunner):
 
     def _set_up_alg(self):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
-        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])  # noqa: F841
         critic_class_name = self.critic_cfg["critic_class_name"]
         num_actions = self.get_action_size(self.actor_cfg["actions"])
         actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)

@@ -31,6 +31,9 @@ class BaseRunner:
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
         remove_zero_weighted_rewards(train_cfg["critic"]["reward"]["weights"])
+        remove_zero_weighted_rewards(
+            train_cfg["critic"]["reward"]["termination_weight"]
+        )
         self.actor_cfg = train_cfg["actor"]
         self.critic_cfg = train_cfg["critic"]
 

@@ -7,13 +7,15 @@ from gym.envs.pendulum.pendulum import Pendulum
 class LQRPendulum(Pendulum):
     def _init_buffers(self):
         super()._init_buffers()
-        self.x_desired = torch.tensor([0., 0.], device=self.device)
+        self.x_desired = torch.tensor([0.0, 0.0], device=self.device)
         self.u_desired = torch.zeros(self.torques.shape, device=self.device)
         self.A, self.B = self.linearize_pendulum_dynamics(self.x_desired)
         self.Q = torch.eye(self.dof_state.shape[1], device=self.device)
         self.Q[0, 0] = 10.0
         self.R = torch.eye(self.torques.shape[1], device=self.device)
-        self.S = torch.from_numpy(self.solve_ricatti(self.Q, self.R)).float().to(self.device)
+        self.S = (
+            torch.from_numpy(self.solve_ricatti(self.Q, self.R)).float().to(self.device)
+        )
 
     def _compute_torques(self):
         """Compute torques from actions.
@@ -41,7 +43,9 @@ class LQRPendulum(Pendulum):
                 actuated_dof_vel[:, idx] = self.dof_vel[:, dof_idx]
                 idx += 1
 
-        torques = self.lqr_u_prime(self.S, self.R, self.dof_state, self.x_desired, self.u_desired)
+        torques = self.lqr_u_prime(
+            self.S, self.R, self.dof_state, self.x_desired, self.u_desired
+        )
         return torques.view(self.torques.shape)
 
     def solve_ricatti(self, Q, R):
@@ -58,10 +62,14 @@ class LQRPendulum(Pendulum):
         S = S.expand(batch_envs, -1, -1)
         R_inv = torch.linalg.inv(R.expand(batch_envs, -1, -1))
         x_bar = x - x_desired.expand(batch_envs, -1)
-        K = torch.einsum("...ij, ...jk -> ...ik",
-                        torch.einsum("...ij, ...jk -> ...ik", R_inv, B_T),
-                        S)
-        u_prime = u_desired - torch.einsum("...ij, ...jk -> ...ik", K, x_bar.unsqueeze(-1)).squeeze(-1)
+        K = torch.einsum(
+            "...ij, ...jk -> ...ik",
+            torch.einsum("...ij, ...jk -> ...ik", R_inv, B_T),
+            S,
+        )
+        u_prime = u_desired - torch.einsum(
+            "...ij, ...jk -> ...ik", K, x_bar.unsqueeze(-1)
+        ).squeeze(-1)
         return u_prime
 
     def linearize_pendulum_dynamics(self, x_desired):
@@ -71,6 +79,9 @@ class LQRPendulum(Pendulum):
         g = 9.81
         ml2 = m * length**2
 
-        A = torch.tensor([[0.0, 1.0], [g / length * torch.cos(x_desired[0]), -b / ml2]], device=self.device)
+        A = torch.tensor(
+            [[0.0, 1.0], [g / length * torch.cos(x_desired[0]), -b / ml2]],
+            device=self.device,
+        )
         B = torch.tensor([[0.0], [(1.0 / ml2)]], device=self.device)
         return A, B

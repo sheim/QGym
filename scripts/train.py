@@ -1,5 +1,5 @@
 from gym.envs import __init__  # noqa: F401
-from gym.utils import get_args, task_registry, randomize_episode_counters
+from gym.utils import get_args, task_registry
 from gym.utils.logging_and_saving import wandb_singleton
 from gym.utils.logging_and_saving import local_code_save_helper
 

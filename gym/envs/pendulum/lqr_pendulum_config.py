@@ -5,7 +5,7 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class LQRPendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 2**12
+        num_envs = 32  # 2**12
         num_actuators = 1  # 1 for theta connecting base and pole
         episode_length_s = 3.0
 
@@ -59,7 +59,7 @@ class LQRPendulumCfg(FixedRobotCfg):
 
 class LQRPendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "OnPolicyRunner" #"LQRDataGenRunner"
+    runner_class_name = "LQRDataGenRunner"  # "LQRDataGenRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]

@@ -8,7 +8,6 @@ from learning.modules.utils.neural_net import get_activation
 
 
 class CustomCriticBaseline(Critic):
-
     def __init__(
         self,
         num_obs,
@@ -81,11 +80,11 @@ class Cholesky(CustomCriticBaseline):
         output = self.activation_3(output)
         C = self.create_cholesky(output)
         A = torch.einsum("...ij, ...jk -> ...ik", C, C.transpose(-2, -1))
-        y_pred = torch.einsum("...ij, ...jk -> ...ik",
-                              torch.einsum("...ij, ...jk -> ...ik",
-                                           x.unsqueeze(-1).transpose(-2, -1),
-                                           A),
-                              x.unsqueeze(-1)).squeeze(-1)
+        y_pred = torch.einsum(
+            "...ij, ...jk -> ...ik",
+            torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A),
+            x.unsqueeze(-1),
+        ).squeeze(-1)
         return y_pred
 
     def create_cholesky(self, x):
@@ -126,7 +125,8 @@ class CholeskyPlusConst(Cholesky):
             device=device,
         )
         self.activation_3.register_forward_hook(self.save_intermediate())
-        self.const_penalty = 0.1 # 0.0 if kwargs.get("const_penalty") is None else kwargs.get("const_penalty")
+        # 0.0 if kwargs.get("const_penalty") is None else kwargs.get("const_penalty")
+        self.const_penalty = 0.1
 
     def forward(self, x):
         output = self.connection_1(x)
@@ -138,11 +138,11 @@ class CholeskyPlusConst(Cholesky):
         C = self.create_cholesky(output[..., :-1])
         A = torch.einsum("...ij, ...jk -> ...ik", C, C.transpose(-2, -1))
         c = output[..., -1]
-        y_pred = torch.einsum("...ij, ...jk -> ...ik",
-                              torch.einsum("...ij, ...jk -> ...ik",
-                                           x.unsqueeze(-1).transpose(-2, -1),
-                                           A),
-                              x.unsqueeze(-1)) + c.unsqueeze(-1).unsqueeze(-1)
+        y_pred = torch.einsum(
+            "...ij, ...jk -> ...ik",
+            torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A),
+            x.unsqueeze(-1),
+        ) + c.unsqueeze(-1).unsqueeze(-1)
         return y_pred.squeeze(-1)
 
     def save_intermediate(self):
@@ -191,22 +191,24 @@ class CholeskyOffset1(Cholesky):
         output = self.activation_2(output)
         output = self.connection_3(output)
         output = self.activation_3(output)
-        C = self.create_cholesky(output[..., :self.L_indices])
+        C = self.create_cholesky(output[..., : self.L_indices])
         A = torch.einsum("...ij, ...jk -> ...ik", C, C.transpose(-2, -1))
-        offset = output[..., self.L_indices:]
+        offset = output[..., self.L_indices :]
         x_bar = x - offset
-        y_pred = torch.einsum("...ij, ...jk -> ...ik",
-                              torch.einsum("...ij, ...jk -> ...ik",
-                                           x_bar.unsqueeze(-1).transpose(-2, -1),
-                                           A),
-                              x_bar.unsqueeze(-1)).squeeze(-1)
+        y_pred = torch.einsum(
+            "...ij, ...jk -> ...ik",
+            torch.einsum(
+                "...ij, ...jk -> ...ik", x_bar.unsqueeze(-1).transpose(-2, -1), A
+            ),
+            x_bar.unsqueeze(-1),
+        ).squeeze(-1)
         return y_pred
 
     def save_intermediate(self):
         def hook(module, input, output):
-            C = self.create_cholesky(output[..., :self.L_indices])
+            C = self.create_cholesky(output[..., : self.L_indices])
             A = torch.einsum("...ij, ...jk -> ...ik", C, C.transpose(-2, -1))
-            offset = output[..., self.L_indices:]
+            offset = output[..., self.L_indices :]
             self.intermediates["A"] = A
             self.intermediates["offset"] = offset
 
@@ -238,11 +240,13 @@ class CholeskyOffset2(Cholesky):
         output = self.activation_3(output)
         C = self.create_cholesky(output)
         A = torch.einsum("...ij, ...jk -> ...ik", C, C.transpose(-2, -1))
-        y_pred = torch.einsum("...ij, ...jk -> ...ik",
-                              torch.einsum("...ij, ...jk -> ...ik",
-                                           xhat.unsqueeze(-1).transpose(-2, -1),
-                                           A),
-                              xhat.unsqueeze(-1)).squeeze(-1)
+        y_pred = torch.einsum(
+            "...ij, ...jk -> ...ik",
+            torch.einsum(
+                "...ij, ...jk -> ...ik", xhat.unsqueeze(-1).transpose(-2, -1), A
+            ),
+            xhat.unsqueeze(-1),
+        ).squeeze(-1)
         return y_pred
 
     def save_intermediate(self):
