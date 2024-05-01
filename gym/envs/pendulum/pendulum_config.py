@@ -23,7 +23,7 @@ class PendulumCfg(FixedRobotCfg):
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_uniform"
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
@@ -33,8 +33,8 @@ class PendulumCfg(FixedRobotCfg):
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 100
-        desired_sim_frequency = 200
+        ctrl_frequency = 10
+        desired_sim_frequency = 100
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
 
@@ -59,7 +59,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "CustomCriticRunner"
+    runner_class_name = "OnPolicyRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -121,6 +121,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 200  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 32
+        num_steps_per_env = 50
