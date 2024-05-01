@@ -198,6 +198,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_history",
         ]
+        normalize_obs = True
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -226,6 +227,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_history",
         ]
+        normalize_obs = True
 
         class reward:
             class weights:

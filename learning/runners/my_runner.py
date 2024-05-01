@@ -111,7 +111,6 @@ class MyRunner(OnPolicyRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-            storage.clear()
         self.save()
 
     def set_up_logger(self):

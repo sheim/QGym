@@ -240,10 +240,15 @@ class LeggedRobotRunnerCfg(BaseConfig):
         activation = "elu"
         normalize_obs = True
 
-        obs = [
+        actor_obs = [
             "observation_a",
             "observation_b",
             "these_need_to_be_atributes_(states)_of_the_robot_env",
+        ]
+        critic_obs = [
+            "observation_x",
+            "observation_y",
+            "critic_obs_can_be_the_same_or_different_than_actor_obs",
         ]
 
         actions = ["q_des"]

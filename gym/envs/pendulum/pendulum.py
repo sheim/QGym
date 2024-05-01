@@ -48,11 +48,17 @@ class Pendulum(FixedRobot):
 
     def _reward_energy(self):
         kinetic_energy = (
-            0.5 * self.cfg.mass * self.cfg.length**2 * torch.square(self.dof_vel[:, 0])
+            0.5
+            * self.cfg.asset.mass
+            * self.cfg.asset.length**2
+            * torch.square(self.dof_vel[:, 0])
         )
         potential_energy = (
-            self.cfg.mass * 9.81 * self.cfg.length * torch.cos(self.dof_pos[:, 0])
+            self.cfg.asset.mass
+            * 9.81
+            * self.cfg.asset.length
+            * torch.cos(self.dof_pos[:, 0])
         )
-        desired_energy = self.cfg.mass * 9.81 * self.cfg.length
+        desired_energy = self.cfg.asset.mass * 9.81 * self.cfg.asset.length
         energy_error = kinetic_energy + potential_energy - desired_energy
         return self._sqrdexp(energy_error / desired_energy)

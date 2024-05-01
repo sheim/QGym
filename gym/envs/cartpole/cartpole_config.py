@@ -67,7 +67,7 @@ class CartpoleRunnerCfg(FixedRobotCfgPPO):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class policy(FixedRobotCfgPPO.policy):
+    class actor(FixedRobotCfgPPO.actor):
         init_noise_std = 1.0
         num_layers = 2
         num_units = 32

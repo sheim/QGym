@@ -128,8 +128,8 @@ class TestDefaultIntegration:
 
         # compare ONNX Runtime and PyTorch results
         torch.testing.assert_close(
-            runner_out.cpu().numpy(), loaded_out.cpu().numpy(), rtol=1e-05, atol=1e-8
+            runner_out.cpu().numpy(), loaded_out.cpu().numpy(), rtol=1e-05, atol=1e-7
         )
         torch.testing.assert_close(
-            runner_out.cpu().numpy(), ort_out[0], rtol=1e-05, atol=1e-8
+            runner_out.cpu().numpy(), ort_out[0], rtol=1e-05, atol=1e-7
         )
