@@ -59,7 +59,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "DataLoggingRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
