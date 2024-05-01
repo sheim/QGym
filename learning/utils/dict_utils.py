@@ -10,30 +10,28 @@ def compute_MC_returns(data: TensorDict, gamma, critic=None):
     else:
         last_values = critic.evaluate(data["critic_obs"][-1])
 
-    data.update({"returns": torch.zeros_like(data["rewards"])})
-    data["returns"][-1] = last_values * ~data["dones"][-1]
+    returns = torch.zeros_like(data["rewards"])
+    returns[-1] = last_values * ~data["dones"][-1]
     for k in reversed(range(data["rewards"].shape[0] - 1)):
         not_done = ~data["dones"][k]
-        data["returns"][k] = (
-            data["rewards"][k] + gamma * data["returns"][k + 1] * not_done
-        )
-    data["returns"] = (data["returns"] - data["returns"].mean()) / (
-        data["returns"].std() + 1e-8
-    )
-    return
+        returns[k] = data["rewards"][k] + gamma * returns[k + 1] * not_done
+
+    return normalize(returns)
+
+
+@torch.no_grad
+def normalize(input, eps=1e-8):
+    return (input - input.mean()) / (input.std() + eps)
 
 
 @torch.no_grad
 def compute_generalized_advantages(data, gamma, lam, critic, last_values=None):
-    data.update({"values": critic.evaluate(data["critic_obs"])})
-
-    data.update({"advantages": torch.zeros_like(data["values"])})
-
+    advantages = torch.zeros_like(data["values"])
     if last_values is not None:
         # todo check this
         # since we don't have observations for the last step, need last value plugged in
         not_done = ~data["dones"][-1]
-        data["advantages"][-1] = (
+        advantages[-1] = (
             data["rewards"][-1]
             + gamma * data["values"][-1] * data["timed_out"][-1]
             + gamma * last_values * not_done
@@ -48,15 +46,9 @@ def compute_generalized_advantages(data, gamma, lam, critic, last_values=None):
             + gamma * data["values"][k + 1] * not_done
             - data["values"][k]
         )
-        data["advantages"][k] = (
-            td_error + gamma * lam * not_done * data["advantages"][k + 1]
-        )
+        advantages[k] = td_error + gamma * lam * not_done * advantages[k + 1]
 
-    data["returns"] = data["advantages"] + data["values"]
-
-    data["advantages"] = (data["advantages"] - data["advantages"].mean()) / (
-        data["advantages"].std() + 1e-8
-    )
+    return normalize(advantages)
 
 
 # todo change num_epochs to num_batches
