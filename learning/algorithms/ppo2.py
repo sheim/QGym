@@ -61,16 +61,10 @@ class PPO2:
     def act(self, obs):
         return self.actor.act(obs).detach()
 
-    def update(self, data, last_obs=None):
-        if last_obs is None:
-            last_values = None
-        else:
-            with torch.no_grad():
-                last_values = self.critic.evaluate(last_obs).detach()
-
+    def update(self, data):
         data["values"] = self.critic.evaluate(data["critic_obs"])
         data["advantages"] = compute_generalized_advantages(
-            data, self.gamma, self.lam, self.critic, last_values
+            data, self.gamma, self.lam, self.critic
         )
         data["returns"] = data["advantages"] + data["values"]
 
@@ -161,10 +155,7 @@ class PPO2:
             # * Gradient step
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(
-                list(self.actor.parameters()) + list(self.critic.parameters()),
-                self.max_grad_norm,
-            )
+            nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
             self.optimizer.step()
             self.mean_surrogate_loss += surrogate_loss.item()
             counter += 1
