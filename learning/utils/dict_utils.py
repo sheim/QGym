@@ -59,11 +59,14 @@ def create_uniform_generator(
 ):
     n, m = data.shape
     total_data = n * m
+
+    if batch_size > total_data:
+        batch_size = total_data
+
     num_batches_per_epoch = total_data // batch_size
     if max_gradient_steps:
         num_epochs = max_gradient_steps // num_batches_per_epoch
         num_epochs = max(num_epochs, 1)
-
     for epoch in range(num_epochs):
         indices = torch.randperm(total_data, device=data.device)
         for i in range(num_batches_per_epoch):
