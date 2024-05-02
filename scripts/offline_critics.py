@@ -34,7 +34,7 @@ critic_name = "Cholesky"
 test_critic = eval(f"{critic_name}(**test_critic_params).to(DEVICE)")
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 # load data
-iteration = 1
+iteration = 200
 data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(DEVICE)
 gamma = 0.99
 lam = 0.99
