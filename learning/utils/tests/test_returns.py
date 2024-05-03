@@ -1,7 +1,7 @@
 import pytest
 import torch
 from tensordict import TensorDict
-from learning.utils import compute_MC_returns
+from learning.utils import compute_MC_returns, compute_generalized_advantages
 
 
 class CriticConstant(torch.nn.Module):
@@ -10,7 +10,7 @@ class CriticConstant(torch.nn.Module):
         self.output = output
 
     def evaluate(self, obs):
-        return self.output * torch.ones(obs.shape[0])
+        return self.output * torch.ones(obs.shape[:-1])
 
 
 @pytest.fixture
@@ -20,7 +20,7 @@ def setup_data():
     rewards = torch.ones((n_timesteps, n_envs))
     terminated = torch.zeros((n_timesteps, n_envs), dtype=torch.bool)
     timed_out = torch.zeros_like(terminated)
-    critic_obs = torch.rand((n_timesteps, n_envs))
+    critic_obs = torch.rand((n_timesteps, n_envs, 1))
 
     # Terminating conditions setup
     timed_out[-1, [0, 2]] = True
@@ -36,7 +36,9 @@ def setup_data():
             "terminated": terminated,
             "dones": dones,
             "critic_obs": critic_obs,
-        }
+            "next_critic_obs": torch.roll(critic_obs, shifts=-1, dims=0),
+        },
+        batch_size=(n_timesteps, n_envs),
     )
 
     return data
@@ -120,3 +122,12 @@ def test_critic_always_four_gamma_half(setup_data):
         ]
     ).T
     torch.testing.assert_close(returns, expected_returns)
+
+
+def test_gae_critic_always_zero_lambda_one(setup_data):
+    data = setup_data
+    critic = CriticConstant(0)
+    returns = compute_MC_returns(data, gamma=0.5, critic=critic)
+    advantages = compute_generalized_advantages(data, gamma=0.5, lam=1.0, critic=critic)
+    expected_advantages = returns - critic.evaluate(data["critic_obs"])
+    torch.testing.assert_close(advantages, expected_advantages)
