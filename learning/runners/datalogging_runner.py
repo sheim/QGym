@@ -42,7 +42,9 @@ class DataLoggingRunner(BaseRunner):
                 "critic_obs": critic_obs,
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
-                "dones": self.get_timed_out(),
+                "timed_out": self.get_timed_out(),
+                "terminated": self.get_terminated(),
+                "dones": self.get_timed_out() | self.get_terminated(),
             }
         )
         storage.initialize(
@@ -101,6 +103,7 @@ class DataLoggingRunner(BaseRunner):
                             "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
                             "timed_out": timed_out,
+                            "terminated": terminated,
                             "dones": dones,
                         }
                     )
