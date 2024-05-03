@@ -41,7 +41,7 @@ def plot_pendulum_critic_predictions(
     )
     fig.colorbar(scatter, ax=axis, shrink=0.95, label=colorbar_label)
     axis.set_title(title)
-    plt.savefig(f"{fn}_value_error_colormap.png")
+    plt.savefig(f"{fn}.png")
 
 
 def graph_3D_helper(ax, contour=False):
