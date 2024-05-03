@@ -4,6 +4,7 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
+from learning.modules.lqrc.plotting import plot_pendulum_critic_predictions
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -28,7 +29,8 @@ test_critic_params = {
     "device": DEVICE,
 }
 learning_rate = 1.0e-4
-test_critic = Cholesky(**test_critic_params).to(DEVICE)
+critic_name = "Cholesky"
+test_critic = eval(f"{critic_name}(**test_critic_params).to(DEVICE)")
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 # load data
 iteration = 1
@@ -68,3 +70,12 @@ for batch in generator:
 mean_value_loss /= counter
 
 # compare new and old critics
+vmin = min(torch.min(data["returns"]).item(), torch.min(data["values"]).item()) # thinking of swtiching this to a list comprehension when we have multiple critics
+vmax = max(torch.max(data["returns"]).item(), torch.max(data["values"]).item())
+plot_pendulum_critic_predictions(x=batch,
+                                 predictions=data["values"],
+                                 targets=data["returns"],
+                                 title=f"{critic_name}_it{iteration}",
+                                 fn=f"{critic_name}_it{iteration}",
+                                 vmin=vmin,
+                                 vmax=vmax)

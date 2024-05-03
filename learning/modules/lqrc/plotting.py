@@ -2,7 +2,7 @@ from math import sqrt
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import CenteredNorm
+from matplotlib.colors import TwoSlopeNorm
 
 matplotlib.rcParams["pdf.fonttype"] = 42
 matplotlib.rcParams["ps.fonttype"] = 42
@@ -11,6 +11,37 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 font = {"size": 12}
 matplotlib.rc("font", **font)
+
+
+def plot_pendulum_critic_predictions(
+    x,
+    predictions,
+    targets,
+    title,
+    fn,
+    colorbar_label="f(x)",
+    vmin=None,
+    vmax=None
+):
+    x = x.detach().cpu().numpy()
+    predictions = predictions.detach().cpu().numpy()
+    targets = targets.detach().cpu().numpy()
+    vmin = np.min(predictions) if vmin is None else vmin
+    vmax = np.max(predictions) if vmax is None else vmax
+
+    fig, axis = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+    scatter = axis.scatter(
+        x[:, 0],
+        x[:, 1],
+        c=predictions - targets,
+        cmap="bwr",
+        marker="o",
+        alpha=0.5,
+        norm=TwoSlopeNorm(vcenter=0.0, vmin=vmin, vmax=vmax),
+    )
+    fig.colorbar(scatter, ax=axis, shrink=0.95, label=colorbar_label)
+    axis.set_title(title)
+    plt.savefig(f"{fn}_value_error_colormap.png")
 
 
 def graph_3D_helper(ax, contour=False):
