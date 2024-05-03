@@ -1,10 +1,11 @@
+import time
 from learning.modules.lqrc import Cholesky
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import plot_pendulum_critic_predictions
+from learning.modules.lqrc.plotting import plot_pendulum_single_critic_predictions
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -13,7 +14,7 @@ from torch import nn
 DEVICE = "cuda:0"
 # handle some bookkeeping
 #
-run_name = "May02_08-59-46_standard_critic"
+run_name = "May03_17-11-21_standard_critic"  # "May02_08-59-46_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -70,12 +71,17 @@ for batch in generator:
 mean_value_loss /= counter
 
 # compare new and old critics
-vmin = min(torch.min(data["returns"]).item(), torch.min(data["values"]).item()) # thinking of swtiching this to a list comprehension when we have multiple critics
-vmax = max(torch.max(data["returns"]).item(), torch.max(data["values"]).item())
-plot_pendulum_critic_predictions(x=batch,
-                                 predictions=data["values"],
-                                 targets=data["returns"],
-                                 title=f"{critic_name}_it{iteration}",
-                                 fn=f"{critic_name}_it{iteration}",
-                                 vmin=vmin,
-                                 vmax=vmax)
+time_str = time.strftime("%Y%m%d_%H%M%S")
+save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
+# TODO: revisit this, TwoSlopeNorm was causing discoloration
+# vmin = min(torch.min(data["returns"]).item(), torch.min(data["values"]).item())
+# vmax = max(torch.max(data["returns"]).item(), torch.max(data["values"]).item())
+plot_pendulum_single_critic_predictions(
+    x=data["critic_obs"][-1],
+    predictions=data["values"][-1],
+    targets=data["returns"][-1],
+    title=f"{critic_name}_iteration{iteration}",
+    fn=save_path + f"/{critic_name}_it{iteration}",
+)

@@ -2,7 +2,7 @@ from math import sqrt
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import TwoSlopeNorm
+from matplotlib.colors import CenteredNorm
 
 matplotlib.rcParams["pdf.fonttype"] = 42
 matplotlib.rcParams["ps.fonttype"] = 42
@@ -13,35 +13,29 @@ font = {"size": 12}
 matplotlib.rc("font", **font)
 
 
-def plot_pendulum_critic_predictions(
-    x,
-    predictions,
-    targets,
-    title,
-    fn,
-    colorbar_label="f(x)",
-    vmin=None,
-    vmax=None
+def plot_pendulum_single_critic_predictions(
+    x, predictions, targets, title, fn, colorbar_label="f(x)"
 ):
-    x = x.detach().cpu().numpy()
-    predictions = predictions.detach().cpu().numpy()
-    targets = targets.detach().cpu().numpy()
-    vmin = np.min(predictions) if vmin is None else vmin
-    vmax = np.max(predictions) if vmax is None else vmax
+    x = x.detach().cpu().numpy().reshape(-1, 2)
+    predictions = predictions.detach().cpu().numpy().reshape(-1)
+    targets = targets.detach().cpu().numpy().reshape(-1)
+    error = predictions - targets
 
-    fig, axis = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
-    scatter = axis.scatter(
-        x[:, 0],
-        x[:, 1],
-        c=predictions - targets,
-        cmap="bwr",
-        marker="o",
-        alpha=0.5,
-        norm=TwoSlopeNorm(vcenter=0.0, vmin=vmin, vmax=vmax),
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
+    # error
+    scatter = axes[0].scatter(
+        x[:, 0], x[:, 1], c=error, cmap="bwr", alpha=0.5, norm=CenteredNorm()
     )
-    fig.colorbar(scatter, ax=axis, shrink=0.95, label=colorbar_label)
-    axis.set_title(title)
+    # prediction values
+    scatter = axes[1].scatter(
+        x[:, 0], x[:, 1], c=predictions, cmap="bwr", alpha=0.5, norm=CenteredNorm()
+    )
+    axes[0].set_title("Error")
+    axes[1].set_title("Predictions")
+    fig.colorbar(scatter, ax=axes.ravel().tolist(), shrink=0.95, label=colorbar_label)
+    fig.suptitle(title, fontsize=16)
     plt.savefig(f"{fn}.png")
+    print(f"Saved to {fn}.png")
 
 
 def graph_3D_helper(ax, contour=False):
