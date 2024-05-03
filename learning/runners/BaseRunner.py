@@ -1,6 +1,6 @@
 import torch
 from learning.algorithms import *  # noqa: F403
-from learning.modules import Actor, Critic, SmoothActor
+from learning.modules import Actor, Critic, SmoothActor, PinkActor
 from learning.utils import remove_zero_weighted_rewards
 
 
@@ -24,6 +24,8 @@ class BaseRunner:
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
         if self.actor_cfg["smooth_exploration"]:
             actor = SmoothActor(num_actor_obs, num_actions, **self.actor_cfg)
+        elif self.actor_cfg["pink_exploration"]:
+            actor = PinkActor(num_actor_obs, num_actions, **self.actor_cfg)
         else:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
         critic = Critic(num_critic_obs, **self.critic_cfg)
