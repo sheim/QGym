@@ -56,6 +56,7 @@ class DataLoggingRunner(BaseRunner):
         # burn in observation normalization.
         if self.actor_cfg["normalize_obs"] or self.critic_cfg["normalize_obs"]:
             self.burn_in_normalization()
+        self.env.reset()
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
