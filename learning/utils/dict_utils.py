@@ -16,7 +16,7 @@ def compute_MC_returns(data: TensorDict, gamma, critic=None):
         not_done = ~data["dones"][k]
         returns[k] = data["rewards"][k] + gamma * returns[k + 1] * not_done
 
-    return normalize(returns)
+    return returns
 
 
 @torch.no_grad
