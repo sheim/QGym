@@ -167,7 +167,9 @@ class OnPolicyRunner(BaseRunner):
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
-            "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
+            "algorithm",
+            self.alg,
+            ["mean_value_loss", "mean_surrogate_loss", "learning_rate"],
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 

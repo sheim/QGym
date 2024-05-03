@@ -74,7 +74,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         smooth_exploration = True
-        exploration_sample_freq = 8
+        exploration_sample_freq = 16
 
         normalize_obs = True
         obs = [
@@ -151,17 +151,17 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         num_mini_batches = 4
         storage_size = 2**17  # new
         mini_batch_size = 2**15  #  new
-        learning_rate = 5.0e-5
+        learning_rate = 0.002
         schedule = "adaptive"  # can be adaptive, fixed
         discount_horizon = 1.0  # [s]
         lam = 0.95
         GAE_bootstrap_horizon = 2.0  # [s]
-        desired_kl = 0.01
+        desired_kl = 0.02
         max_grad_norm = 1.0
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 800  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
