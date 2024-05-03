@@ -1,3 +1,4 @@
+from math import sqrt
 import torch
 
 from gym.envs.base.fixed_robot import FixedRobot
@@ -9,21 +10,22 @@ class Pendulum(FixedRobot):
         super()._post_physics_step()
 
     def reset_to_uniform(self, env_ids):
-        grid_points = self.num_envs // 2
-        grid_pos = torch.linspace(
+        grid_points = int(sqrt(self.num_envs))
+        lin_pos = torch.linspace(
             self.dof_pos_range[0, 0],
             self.dof_pos_range[0, 1],
             grid_points,
             device=self.device,
-        ).unsqueeze(1)
-        grid_vel = torch.linspace(
+        )
+        lin_vel = torch.linspace(
             self.dof_vel_range[0, 0],
             self.dof_vel_range[0, 1],
             grid_points,
             device=self.device,
-        ).unsqueeze(1)
-        self.dof_pos[env_ids] = grid_pos[env_ids % grid_points]
-        self.dof_vel[env_ids] = grid_vel[env_ids % grid_points]
+        )
+        grid = torch.cartesian_prod(lin_pos, lin_vel)
+        self.dof_pos[env_ids] = grid[:, 0].unsqueeze(-1)
+        self.dof_vel[env_ids] = grid[:, 1].unsqueeze(-1)
 
     def _reward_theta(self):
         theta_rwd = torch.cos(self.dof_pos[:, 0]) / self.scales["dof_pos"]
