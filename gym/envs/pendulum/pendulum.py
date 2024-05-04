@@ -9,6 +9,10 @@ class Pendulum(FixedRobot):
         """Update all states that are not handled in PhysX"""
         super()._post_physics_step()
 
+    def _check_terminations_and_timeouts(self):
+        super()._check_terminations_and_timeouts()
+        self.terminated = self.timed_out
+
     def reset_to_uniform(self, env_ids):
         grid_points = int(sqrt(self.num_envs))
         lin_pos = torch.linspace(

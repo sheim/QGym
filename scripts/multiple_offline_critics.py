@@ -1,14 +1,12 @@
 import time
-from learning.modules.lqrc import Cholesky
+from learning.modules.lqrc import Cholesky  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import (
-    plot_pendulum_single_critic,
-    plot_pendulum_multiple_critics,
-)
+from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
+
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch

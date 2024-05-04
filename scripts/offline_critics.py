@@ -1,5 +1,5 @@
 import time
-from learning.modules.lqrc import Cholesky
+from learning.modules.lqrc import Cholesky  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
@@ -14,7 +14,7 @@ from torch import nn
 DEVICE = "cuda:0"
 # handle some bookkeeping
 #
-run_name = "May03_17-11-21_standard_critic"  # "May02_08-59-46_standard_critic"
+run_name = "May03_20-49-23_standard_critic"  # "May02_08-59-46_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -30,7 +30,7 @@ test_critic_params = {
     "device": DEVICE,
 }
 learning_rate = 1.0e-4
-critic_name = "Cholesky"
+critic_name = " # noqa F401"
 test_critic = eval(f"{critic_name}(**test_critic_params).to(DEVICE)")
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 # load data
@@ -78,7 +78,7 @@ if not os.path.exists(save_path):
 # TODO: revisit this, TwoSlopeNorm was causing discoloration
 # vmin = min(torch.min(data["returns"]).item(), torch.min(data["values"]).item())
 # vmax = max(torch.max(data["returns"]).item(), torch.max(data["values"]).item())
-plot_pendulum_single_critic_predictions(
+plot_pendulum_single_critic(
     x=data["critic_obs"][-1],
     predictions=data["values"][-1],
     targets=data["returns"][-1],
