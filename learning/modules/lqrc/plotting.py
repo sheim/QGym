@@ -13,7 +13,11 @@ font = {"size": 12}
 matplotlib.rc("font", **font)
 
 
-def plot_pendulum_single_critic_predictions(
+def plot_pendulum_multiple_critics(graphing_data):
+    pass
+
+
+def plot_pendulum_single_critic(
     x, predictions, targets, title, fn, colorbar_label="f(x)"
 ):
     x = x.detach().cpu().numpy().reshape(-1, 2)

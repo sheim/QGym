@@ -5,7 +5,7 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import plot_pendulum_single_critic_predictions
+from learning.modules.lqrc.plotting import plot_pendulum_single_critic
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
