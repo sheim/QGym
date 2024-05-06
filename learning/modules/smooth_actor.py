@@ -57,11 +57,12 @@ class SmoothActor(Actor):
 
     def sample_weights(self, batch_size=1):
         # Sample weights for the noise exploration matrix
-        std = self.get_std()
+        std = self.get_std
         self.weights_dist = Normal(torch.zeros_like(std), std)
         # Pre-compute matrices in case of parallel exploration
         self.exploration_matrices = self.weights_dist.rsample((batch_size,))
 
+    @property
     def get_std(self):
         # TODO[lm]: Check if this is ok, and can use action_std in ActorCritic normally
         if self.use_exp_ln:
@@ -91,11 +92,9 @@ class SmoothActor(Actor):
         if not self.learn_features:
             self._latent_sde = self._latent_sde.detach()
         if self._latent_sde.dim() == 2:
-            variance = torch.mm(self._latent_sde**2, self.get_std() ** 2)
+            variance = torch.mm(self._latent_sde**2, self.get_std**2)
         elif self._latent_sde.dim() == 3:
-            variance = torch.einsum(
-                "abc,cd->abd", self._latent_sde**2, self.get_std() ** 2
-            )
+            variance = torch.einsum("abc,cd->abd", self._latent_sde**2, self.get_std**2)
         else:
             raise ValueError("Invalid latent_sde dimension")
         mean_actions = self.mean_actions_net(self._latent_sde)

@@ -87,7 +87,7 @@ def export_network(network, network_name, path, num_inputs, latent=True):
 
     if latent:
         path_latent = os.path.join(path, network_name + "_latent.onnx")
-        model_latent = model.latent_net
+        model_latent = torch.nn.Sequential(model.obs_rms, model.latent_net)
         model_latent.eval()
         dummy_input = torch.rand((num_inputs))
         model_traced = torch.jit.trace(model_latent, dummy_input)
