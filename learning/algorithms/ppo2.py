@@ -27,6 +27,8 @@ class PPO2:
         desired_kl=0.01,
         loss_fn="MSE",
         device="cpu",
+        lr_range=[1e-4, 1e-2],
+        lr_ratio=1.3,
         **kwargs,
     ):
         self.device = device
@@ -34,6 +36,8 @@ class PPO2:
         self.desired_kl = desired_kl
         self.schedule = schedule
         self.learning_rate = learning_rate
+        self.lr_range = lr_range
+        self.lr_ratio = lr_ratio
 
         # * PPO components
         self.actor = actor.to(self.device)
@@ -137,11 +141,16 @@ class PPO2:
                         axis=-1,
                     )
                     kl_mean = torch.mean(kl)
+                    lr_min, lr_max = self.lr_range
 
                     if kl_mean > self.desired_kl * 2.0:
-                        self.learning_rate = max(2e-4, self.learning_rate / 1.1)
+                        self.learning_rate = max(
+                            lr_min, self.learning_rate / self.lr_ratio
+                        )
                     elif kl_mean < self.desired_kl / 2.0 and kl_mean > 0.0:
-                        self.learning_rate = min(1e-2, self.learning_rate * 1.1)
+                        self.learning_rate = min(
+                            lr_max, self.learning_rate * self.lr_ratio
+                        )
 
                     for param_group in self.optimizer.param_groups:
                         # ! check this

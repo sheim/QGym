@@ -151,13 +151,16 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         num_mini_batches = 4
         storage_size = 2**17  # new
         mini_batch_size = 2**15  #  new
-        learning_rate = 0.002
-        schedule = "adaptive"  # can be adaptive, fixed
         discount_horizon = 1.0  # [s]
         lam = 0.95
         GAE_bootstrap_horizon = 2.0  # [s]
         desired_kl = 0.02
         max_grad_norm = 1.0
+        # * Learning rate
+        learning_rate = 0.002
+        schedule = "adaptive"  # can be adaptive or fixed
+        lr_range = [3e-4, 1e-2]
+        lr_ratio = 1.3
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

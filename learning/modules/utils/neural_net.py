@@ -62,7 +62,7 @@ def add_layer(layer_list, num_inputs, num_outputs, activation=None, dropout=0):
         layer_list.append(activation)
 
 
-def export_network(network, network_name, path, num_inputs):
+def export_network(network, network_name, path, num_inputs, latent=True):
     """
     Thsi function traces and exports the given network module in .pt and
     .onnx file formats. These can be used for evaluation on other systems
@@ -84,3 +84,11 @@ def export_network(network, network_name, path, num_inputs):
     model_traced = torch.jit.trace(model, dummy_input)
     torch.jit.save(model_traced, path_TS)
     torch.onnx.export(model_traced, dummy_input, path_onnx)
+
+    if latent:
+        path_latent = os.path.join(path, network_name + "_latent.onnx")
+        model_latent = model.latent_net
+        model_latent.eval()
+        dummy_input = torch.rand((num_inputs))
+        model_traced = torch.jit.trace(model_latent, dummy_input)
+        torch.onnx.export(model_traced, dummy_input, path_latent)

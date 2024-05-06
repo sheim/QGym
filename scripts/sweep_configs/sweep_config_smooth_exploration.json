@@ -11,9 +11,6 @@
         },
         "train_cfg.runner.num_steps_per_env":{
             "values": [32, 64]
-        },
-        "train_cfg.runner.max_iterations":{
-            "values": [800]
         }
     }
 }

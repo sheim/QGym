@@ -130,16 +130,17 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = False
+        smooth_exploration = True
+        exploration_sample_freq = 16
 
         obs = [
-            "base_lin_vel",
+            # "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
             "dof_pos_obs",
             "dof_vel",
-            "dof_pos_target",
+            # "dof_pos_target",
         ]
         actions = ["dof_pos_target"]
         add_noise = True
@@ -195,20 +196,23 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         value_loss_coef = 1.0
         use_clipped_value_loss = True
         clip_param = 0.2
-        entropy_coef = 0.02
-        num_learning_epochs = 4
+        entropy_coef = 0.01
+        num_learning_epochs = 6
         # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 8
-        learning_rate = 1.0e-5
-        schedule = "adaptive"  # can be adaptive or fixed
+        num_mini_batches = 4
         discount_horizon = 1.0  # [s]
         # GAE_bootstrap_horizon = 2.0  # [s]
-        desired_kl = 0.01
+        desired_kl = 0.02
         max_grad_norm = 1.0
+        # * Learning rate
+        learning_rate = 0.002
+        schedule = "adaptive"  # can be adaptive or fixed
+        lr_range = [2e-4, 1e-2]
+        lr_ratio = 1.3
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah"
-        max_iterations = 500
+        max_iterations = 800
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
