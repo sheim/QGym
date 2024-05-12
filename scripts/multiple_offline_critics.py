@@ -1,12 +1,17 @@
 import time
-from learning.modules.lqrc import Cholesky  # noqa F401
+from learning.modules.lqrc import (
+    CustomCriticBaseline,
+    Cholesky,
+    CholeskyPlusConst,
+    CholeskyOffset1,
+    CholeskyOffset2,
+)  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
-
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -14,16 +19,12 @@ from torch import nn
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May03_17-11-21_standard_critic"  # "May02_08-59-46_standard_critic"
+run_name = "May12_13-27-05_standard_critic"  # "May03_20-49-23_standard_critic" "May02_08-59-46_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
-save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-critics = ["Cholesky"]  # list of strings of the class names of critics to test
-graphing_data = {critic: {} for critic in critics}
+
 # create fresh critic
 test_critic_params = {
     "num_obs": 2,
@@ -34,18 +35,28 @@ test_critic_params = {
     "device": DEVICE,
 }
 learning_rate = 1.0e-4
+critic_names = ["Cholesky", "CholeskyPlusConst", "CholeskyOffset1", "CholeskyOffset2"]
+test_critics = {
+    name: eval(f"{name}(**test_critic_params).to(DEVICE)") for name in critic_names
+}
+critic_optimizers = {
+    name: torch.optim.Adam(critic.parameters(), lr=learning_rate)
+    for name, critic in test_critics.items()
+}
+gamma = 0.99
+lam = 0.99
 tot_iter = 200
+
 for iteration in range(tot_iter):
     # load data
     data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(DEVICE)
-    gamma = 0.99
-    lam = 0.99
 
     # compute ground-truth
     episode_rollouts = compute_MC_returns(data, gamma)
-    for critic in critics:
-        test_critic = eval(f"{critic}(**test_critic_params).to(DEVICE)")
-        critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
+
+    graphing_data = {data_name: {} for data_name in ["critic_obs", "values", "returns"]}
+    for name, test_critic in test_critics.items():
+        critic_optimizer = critic_optimizers[name]
         # train new critic
         data["values"] = test_critic.evaluate(data["critic_obs"])
         data["advantages"] = compute_generalized_advantages(
@@ -70,17 +81,25 @@ for iteration in range(tot_iter):
             nn.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
             critic_optimizer.step()
             mean_value_loss += value_loss.item()
-            print("Value loss: ", value_loss.item())
+            print(f"{name} value loss: ", value_loss.item())
             counter += 1
         mean_value_loss /= counter
-        graphing_data[critic]["critic_obs"] = data["critic_obs"][-1]
-        graphing_data[critic]["values"] = data["values"][-1]
-        graphing_data[critic]["returns"] = data["returns"][-1]
+
+        graphing_data["critic_obs"][name] = data[-1, :]["critic_obs"]
+        graphing_data["values"][name] = data[-1, :]["values"]
+        graphing_data["returns"][name] = data[-1, :]["returns"]
 
     # compare new and old critics
-    # TODO: revisit this, TwoSlopeNorm was causing discoloration
-    # vmin = min(torch.min(data["returns"]).item(), torch.min(data["values"]).item())
-    # vmax = max(torch.max(data["returns"]).item(), torch.max(data["values"]).item())
+    save_path = os.path.join(
+        LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str
+    )
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
     plot_pendulum_multiple_critics(
-        graphing_data,
-    )  # TODO: WIP
+        graphing_data["critic_obs"],
+        graphing_data["values"],
+        graphing_data["returns"],
+        title=f"iteration{iteration}",
+        fn=save_path + f"/{len(critic_names)}_critics_it{iteration}",
+    )

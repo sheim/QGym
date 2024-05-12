@@ -156,7 +156,7 @@ class CholeskyPlusConst(Cholesky):
         return hook
 
     def loss_fn(self, input, target):
-        loss = F.mse_loss(input, target, reduction="mean")
+        loss = F.mse_loss(self.evaluate(input), target, reduction="mean")
         const_loss = self.const_penalty * torch.mean(self.intermediates["c"])
         return loss + const_loss
 

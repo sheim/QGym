@@ -13,8 +13,51 @@ font = {"size": 12}
 matplotlib.rc("font", **font)
 
 
-def plot_pendulum_multiple_critics(graphing_data):
-    pass
+def plot_pendulum_multiple_critics(
+    x, predictions, targets, title, fn, colorbar_label="f(x)"
+):
+    num_critics = len(x.keys())
+    assert (
+        num_critics >= 1
+    ), "This function requires at least two critics for graphing. To graph a single critic please use its corresponding graphing function."
+    fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
+    error = {}
+    for ix, critic_name in enumerate(x):
+        np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
+        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = targets[critic_name].detach().cpu().numpy().reshape(-1)
+        np_error = np_predictions - np_targets
+
+        # predictions
+        pred_scatter = axes[0, ix].scatter(
+            np_x[:, 0],
+            np_x[:, 1],
+            c=np_predictions,
+            cmap="PiYG",
+            alpha=0.5,
+            norm=CenteredNorm(),
+        )
+        axes[0, ix].set_title(f"{critic_name} Prediction")
+
+        # error
+        error_scatter = axes[1, ix].scatter(
+            np_x[:, 0],
+            np_x[:, 1],
+            c=np_error,
+            cmap="bwr",
+            alpha=0.5,
+            norm=CenteredNorm(),
+        )
+        axes[1, ix].set_title(f"{critic_name} Error")
+    fig.colorbar(
+        pred_scatter, ax=axes[0, :].ravel().tolist(), shrink=0.95, label=colorbar_label
+    )
+    fig.colorbar(
+        error_scatter, ax=axes[1, :].ravel().tolist(), shrink=0.95, label=colorbar_label
+    )
+    fig.suptitle(title, fontsize=16)
+    plt.savefig(f"{fn}.png")
+    print(f"Saved to {fn}.png")
 
 
 def plot_pendulum_single_critic(
