@@ -1,12 +1,4 @@
 import time
-from learning.modules.critic import Critic
-from learning.modules.lqrc import (
-    CustomCriticBaseline,
-    Cholesky,
-    CholeskyPlusConst,
-    CholeskyOffset1,
-    CholeskyOffset2,
-)  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
@@ -22,7 +14,7 @@ from torch import nn
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May12_13-27-05_standard_critic"  # "May03_20-49-23_standard_critic" "May02_08-59-46_standard_critic"
+run_name = "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -68,7 +60,7 @@ gamma = 0.99
 lam = 1.0
 tot_iter = 200
 
-for iteration in range(tot_iter):
+for iteration in range(0, tot_iter, 50):
     # load data
     data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(DEVICE)
 

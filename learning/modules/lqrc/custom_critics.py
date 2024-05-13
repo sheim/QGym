@@ -85,7 +85,7 @@ class Cholesky(CustomCriticBaseline):
             torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A),
             x.unsqueeze(-1),
         ).squeeze(-1)
-        return y_pred
+        return y_pred.squeeze(-1)
 
     def create_cholesky(self, x):
         n = self.input_size

@@ -1,5 +1,7 @@
 import time
-from learning.modules.lqrc import Cholesky  # noqa F401
+
+# from learning.modules.lqrc import Cholesky  # noqa F401
+from learning.modules.lqrc import PosDefInput  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
@@ -9,11 +11,10 @@ from learning.modules.lqrc.plotting import plot_pendulum_single_critic
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
-from torch import nn
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May12_13-27-05_standard_critic"  # "May03_20-49-23_standard_critic" "May02_08-59-46_standard_critic"
+run_name = "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -22,21 +23,21 @@ time_str = time.strftime("%Y%m%d_%H%M%S")
 # create fresh critic
 test_critic_params = {
     "num_obs": 2,
-    "hidden_dims": None,
+    "hidden_dims": [128, 128, 64],
     "activation": "elu",
-    "normalize_obs": False,
+    "normalize_obs": True,
     "output_size": 1,
     "device": DEVICE,
 }
 learning_rate = 1.0e-4
-critic_name = "Cholesky"
-test_critic = eval(f"{critic_name}(**test_critic_params).to(DEVICE)")
+critic_name = "PosDefInput"
+test_critic = PosDefInput(**test_critic_params).to(DEVICE)
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 gamma = 0.99
 lam = 0.99
 tot_iter = 200
 
-for iteration in range(tot_iter):
+for iteration in range(199, tot_iter, 50):
     # load data
     data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(DEVICE)
 
@@ -50,8 +51,8 @@ for iteration in range(tot_iter):
 
     mean_value_loss = 0
     counter = 0
-    max_gradient_steps = 24
-    max_grad_norm = 1.0
+    max_gradient_steps = 100
+    # max_grad_norm = 1.0
     batch_size = 2**16
     generator = create_uniform_generator(
         data,
@@ -62,7 +63,7 @@ for iteration in range(tot_iter):
         value_loss = test_critic.loss_fn(batch["critic_obs"], batch["returns"])
         critic_optimizer.zero_grad()
         value_loss.backward()
-        nn.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
+        # nn.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
         critic_optimizer.step()
         mean_value_loss += value_loss.item()
         print("Value loss: ", value_loss.item())
