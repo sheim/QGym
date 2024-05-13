@@ -14,9 +14,9 @@ def extract_iteration(filename):
 
 image_folder = (
     os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph")
-    + "/20240512_153648"
+    + "/20240512_205525"
 )
-video_name = "video.avi"
+video_name = f"{image_folder}/video.avi"
 img_names = os.listdir(image_folder)
 # Sort the list using the custom key function
 img_names = sorted(img_names, key=extract_iteration)

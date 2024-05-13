@@ -1,4 +1,5 @@
 import time
+from learning.modules.critic import Critic
 from learning.modules.lqrc import (
     CustomCriticBaseline,
     Cholesky,
@@ -11,7 +12,9 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
+from learning.modules.lqrc.plotting import (
+    plot_pendulum_multiple_critics,
+)
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -26,7 +29,7 @@ log_dir = os.path.join(
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
 # create fresh critic
-test_critic_params = {
+custom_critic_params = {
     "num_obs": 2,
     "hidden_dims": None,
     "activation": "elu",
@@ -34,17 +37,35 @@ test_critic_params = {
     "output_size": 1,
     "device": DEVICE,
 }
-learning_rate = 1.0e-4
-critic_names = ["Cholesky", "CholeskyPlusConst", "CholeskyOffset1", "CholeskyOffset2"]
-test_critics = {
-    name: eval(f"{name}(**test_critic_params).to(DEVICE)") for name in critic_names
+vanilla_critic_params = {
+    "num_obs": 2,
+    "hidden_dims": [128, 64, 32],
+    "activation": "elu",
+    "normalize_obs": False,
+    "output_size": 1,
+    "device": DEVICE,
 }
+learning_rate = 1.0e-4
+critic_names = [
+    "Critic",
+    "Cholesky",
+    "CholeskyPlusConst",
+    "CholeskyOffset1",
+    "CholeskyOffset2",
+]
+test_critics = {
+    name: eval(f"{name}(**custom_critic_params).to(DEVICE)")
+    if not name == "Critic"
+    else eval(f"{name}(**vanilla_critic_params).to(DEVICE)")
+    for name in critic_names
+}
+
 critic_optimizers = {
     name: torch.optim.Adam(critic.parameters(), lr=learning_rate)
     for name, critic in test_critics.items()
 }
 gamma = 0.99
-lam = 0.99
+lam = 1.0
 tot_iter = 200
 
 for iteration in range(tot_iter):
@@ -52,9 +73,13 @@ for iteration in range(tot_iter):
     data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(DEVICE)
 
     # compute ground-truth
-    episode_rollouts = compute_MC_returns(data, gamma)
-
     graphing_data = {data_name: {} for data_name in ["critic_obs", "values", "returns"]}
+
+    episode_rollouts = compute_MC_returns(data, gamma)
+    graphing_data["critic_obs"]["Ground Truth MC Returns"] = data[0, :]["critic_obs"]
+    graphing_data["values"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
+    graphing_data["returns"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
+
     for name, test_critic in test_critics.items():
         critic_optimizer = critic_optimizers[name]
         # train new critic
@@ -85,9 +110,9 @@ for iteration in range(tot_iter):
             counter += 1
         mean_value_loss /= counter
 
-        graphing_data["critic_obs"][name] = data[-1, :]["critic_obs"]
-        graphing_data["values"][name] = data[-1, :]["values"]
-        graphing_data["returns"][name] = data[-1, :]["returns"]
+        graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
+        graphing_data["values"][name] = data[0, :]["values"]
+        graphing_data["returns"][name] = data[0, :]["returns"]
 
     # compare new and old critics
     save_path = os.path.join(

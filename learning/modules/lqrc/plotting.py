@@ -2,7 +2,7 @@ from math import sqrt
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import CenteredNorm
+from matplotlib.colors import CenteredNorm, TwoSlopeNorm
 
 matplotlib.rcParams["pdf.fonttype"] = 42
 matplotlib.rcParams["ps.fonttype"] = 42
@@ -29,26 +29,29 @@ def plot_pendulum_multiple_critics(
         np_error = np_predictions - np_targets
 
         # predictions
-        pred_scatter = axes[0, ix].scatter(
-            np_x[:, 0],
-            np_x[:, 1],
-            c=np_predictions,
-            cmap="PiYG",
-            alpha=0.5,
-            norm=CenteredNorm(),
-        )
+        if np.any(~np.equal(np_predictions, np.zeros_like(np_predictions))):
+            pred_scatter = axes[0, ix].scatter(
+                np_x[:, 0],
+                np_x[:, 1],
+                c=np_predictions,
+                cmap="PiYG",
+                alpha=0.5,
+                norm=CenteredNorm(),
+            )
         axes[0, ix].set_title(f"{critic_name} Prediction")
 
         # error
-        error_scatter = axes[1, ix].scatter(
-            np_x[:, 0],
-            np_x[:, 1],
-            c=np_error,
-            cmap="bwr",
-            alpha=0.5,
-            norm=CenteredNorm(),
-        )
+        if np.any(~np.equal(np_error, np.zeros_like(np_error))):
+            error_scatter = axes[1, ix].scatter(
+                np_x[:, 0],
+                np_x[:, 1],
+                c=np_error,
+                cmap="bwr",
+                alpha=0.5,
+                norm=CenteredNorm(),
+            )
         axes[1, ix].set_title(f"{critic_name} Error")
+
     fig.colorbar(
         pred_scatter, ax=axes[0, :].ravel().tolist(), shrink=0.95, label=colorbar_label
     )

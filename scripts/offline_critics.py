@@ -77,9 +77,9 @@ for iteration in range(tot_iter):
         os.makedirs(save_path)
 
     plot_pendulum_single_critic(
-        x=data["critic_obs"][-1],
-        predictions=data["values"][-1],
-        targets=data["returns"][-1],
+        x=data["critic_obs"][0],
+        predictions=data["values"][0],
+        targets=data["returns"][0],
         title=f"{critic_name}_iteration{iteration}",
         fn=save_path + f"/{critic_name}_it{iteration}",
     )
