@@ -3,29 +3,41 @@ import os
 import copy
 
 
-def create_MLP(num_inputs, num_outputs, hidden_dims, activation, dropouts=None):
-    activation = get_activation(activation)
-
+def create_MLP(
+    num_inputs, num_outputs, hidden_dims, activations, dropouts=None, just_list=False
+):
+    if not isinstance(activations, list):
+        activations = [activations] * len(hidden_dims)
     if dropouts is None:
         dropouts = [0] * len(hidden_dims)
-
+    elif not isinstance(dropouts, list):
+        dropouts = [dropouts] * len(hidden_dims)
     layers = []
-    if not hidden_dims:  # handle no hidden layers
-        add_layer(layers, num_inputs, num_outputs)
+    # first layer
+    add_layer(layers, num_inputs, hidden_dims[0], activations[0], dropouts[0])
+    for i in range(len(hidden_dims) - 1):
+        add_layer(
+            layers,
+            hidden_dims[i],
+            hidden_dims[i + 1],
+            activations[i + 1],
+            dropouts[i + 1],
+        )
     else:
-        add_layer(layers, num_inputs, hidden_dims[0], activation, dropouts[0])
-        for i in range(len(hidden_dims)):
-            if i == len(hidden_dims) - 1:
-                add_layer(layers, hidden_dims[i], num_outputs)
-            else:
-                add_layer(
-                    layers,
-                    hidden_dims[i],
-                    hidden_dims[i + 1],
-                    activation,
-                    dropouts[i + 1],
-                )
-    return torch.nn.Sequential(*layers)
+        add_layer(layers, hidden_dims[-1], num_outputs)
+
+    if just_list:
+        return layers
+    else:
+        return torch.nn.Sequential(*layers)
+
+
+def add_layer(layer_list, num_inputs, num_outputs, activation=None, dropout=0):
+    layer_list.append(torch.nn.Linear(num_inputs, num_outputs))
+    if dropout > 0:
+        layer_list.append(torch.nn.Dropout(p=dropout))
+    if activation is not None:
+        layer_list.append(get_activation(activation))
 
 
 def get_activation(act_name):
@@ -43,17 +55,19 @@ def get_activation(act_name):
         return torch.nn.Tanh()
     elif act_name == "sigmoid":
         return torch.nn.Sigmoid()
+    elif act_name == "softplus":
+        return torch.nn.Softplus()
+    elif act_name == "softmax":
+        return torch.nn.Softmax(dim=-1)
+    elif act_name == "randrelu":
+        return torch.nn.RReLU()
+    elif act_name == "softsign":
+        return torch.nn.Softsign()
+    elif act_name == "mish":
+        return torch.nn.Mish()
     else:
         print("invalid activation function!")
         return None
-
-
-def add_layer(layer_list, num_inputs, num_outputs, activation=None, dropout=0):
-    layer_list.append(torch.nn.Linear(num_inputs, num_outputs))
-    if dropout > 0:
-        layer_list.append(torch.nn.Dropout(p=dropout))
-    if activation is not None:
-        layer_list.append(activation)
 
 
 def export_network(network, network_name, path, num_inputs):

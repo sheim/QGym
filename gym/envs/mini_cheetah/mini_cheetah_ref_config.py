@@ -72,7 +72,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class actor:
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = ["elu", "elu", "tanh"]
         obs = [
             "base_ang_vel",
             "projected_gravity",
