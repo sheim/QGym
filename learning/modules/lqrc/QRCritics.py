@@ -68,17 +68,20 @@ class CholeskyInput(nn.Module):
         )
         # self.lower_diag_NN.apply(init_weights)
 
-    def forward(self, x):
+    def forward(self, x, return_all=False):
         output = self.lower_diag_NN(x)
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
 
         value = self.sign * quadratify_xAx(x, A)
         with torch.no_grad():
-            # do not affect value offset in this part of the loss
             value += self.value_offset
         value *= self.scaling_quadratic
-        return value
+
+        if return_all:
+            return value, A, L
+        else:
+            return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
 
     def evaluate(self, obs):
@@ -129,7 +132,7 @@ class CholeskyLatent(CholeskyInput):
             num_obs, latent_dim, latent_hidden_dims, latent_activation
         )
 
-    def forward(self, x):
+    def forward(self, x, return_all=False):
         z = self.latent_NN(x)
         output = self.lower_diag_NN(x)
         L = create_lower_diagonal(output, self.latent_dim, self.device)
@@ -140,8 +143,11 @@ class CholeskyLatent(CholeskyInput):
             # do not affect value offset in this part of the loss
             value += self.value_offset
         value *= self.scaling_quadratic
-        return value
-        # return self.sign * quadratify_xAx(x, A) + self.value_offset
+
+        if return_all:
+            return value, A, L, z
+        else:
+            return value
 
     def evaluate(self, obs):
         return self.forward(obs)
