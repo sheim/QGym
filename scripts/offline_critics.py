@@ -1,7 +1,7 @@
 import time
 
 # from learning.modules.lqrc import Cholesky  # noqa F401
-from learning.modules.lqrc import PosDefInput  # noqa F401
+from learning.modules.lqrc import CholeskyInput, CholeskyLatent  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
@@ -21,20 +21,33 @@ log_dir = os.path.join(
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
 # create fresh critic
+# test_critic_params = {
+#     "num_obs": 2,
+#     "hidden_dims": [128, 128, 64],
+#     "activation": "elu",
+#     "normalize_obs": True,
+#     "output_size": 1,
+#     "device": DEVICE,
+# }
+
 test_critic_params = {
     "num_obs": 2,
-    "hidden_dims": [128, 128, 64],
-    "activation": "elu",
+    "hidden_dims": [512, 128, 64],
+    "activation": ["elu", "elu", "tanh"],
     "normalize_obs": True,
-    "output_size": 1,
+    "latent_dim": None,  # 16,
+    "minimize": False,
+    "latent_hidden_dims": [512, 64],
+    "latent_activation": ["elu", "tanh"],
     "device": DEVICE,
 }
-learning_rate = 1.0e-4
-critic_name = "PosDefInput"
-test_critic = PosDefInput(**test_critic_params).to(DEVICE)
+
+learning_rate = 0.005415828580992768
+critic_name = "CholeskyInput"
+test_critic = CholeskyInput(**test_critic_params).to(DEVICE)
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 gamma = 0.99
-lam = 0.99
+lam = 0.95
 tot_iter = 200
 
 for iteration in range(199, tot_iter, 50):
@@ -45,15 +58,17 @@ for iteration in range(199, tot_iter, 50):
     episode_rollouts = compute_MC_returns(data, gamma)
 
     # train new critic
-    data["values"] = test_critic.evaluate(data["critic_obs"])
     data["advantages"] = compute_generalized_advantages(data, gamma, lam, test_critic)
     data["returns"] = data["advantages"] + data["values"]
 
     mean_value_loss = 0
     counter = 0
-    max_gradient_steps = 100
+    max_gradient_steps = 1000
     # max_grad_norm = 1.0
-    batch_size = 2**16
+    batch_size = 1000
+
+    with torch.no_grad():
+        test_critic.value_offset.copy_(3.295910835894283)
     generator = create_uniform_generator(
         data,
         batch_size,
@@ -67,6 +82,7 @@ for iteration in range(199, tot_iter, 50):
         critic_optimizer.step()
         mean_value_loss += value_loss.item()
         print("Value loss: ", value_loss.item())
+        # print("Value Offset: ", test_critic.value_offset.item())
         counter += 1
     mean_value_loss /= counter
 
@@ -79,8 +95,17 @@ for iteration in range(199, tot_iter, 50):
 
     plot_pendulum_single_critic(
         x=data["critic_obs"][0],
-        predictions=data["values"][0],
-        targets=data["returns"][0],
+        predictions=test_critic.evaluate(data["critic_obs"][0]),
+        targets=episode_rollouts[0],
         title=f"{critic_name}_iteration{iteration}",
         fn=save_path + f"/{critic_name}_it{iteration}",
     )
+    # plot_pendulum_multiple_critics(
+    #     graphing_data["critic_obs"],
+    #     graphing_data["values"],
+    #     graphing_data["returns"],
+    #     title=f"iteration{iteration}",
+    #     fn=save_path + f"/{len(critic_names)}_critics_it{iteration}",
+    # )
+    # print value_offset
+    print("Value Offset: ", test_critic.value_offset.item())

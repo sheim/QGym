@@ -1,4 +1,12 @@
 import time
+from learning.modules.critic import Critic  # noqa F401
+from learning.modules.lqrc import (  # noqa F401
+    CustomCriticBaseline,  # noqa F401
+    Cholesky,  # noqa F401
+    CholeskyPlusConst,  # noqa F401
+    CholeskyOffset1,  # noqa F401
+    CholeskyOffset2,  # noqa F401
+)  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
@@ -10,7 +18,8 @@ from learning.modules.lqrc.plotting import (
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
-from torch import nn
+from torch import nn  # noqa F401
+from learning.modules.lqrc import CholeskyInput, CholeskyLatent  # noqa F401
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
@@ -20,62 +29,87 @@ log_dir = os.path.join(
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
-# create fresh critic
-custom_critic_params = {
-    "num_obs": 2,
-    "hidden_dims": None,
-    "activation": "elu",
-    "normalize_obs": False,
-    "output_size": 1,
-    "device": DEVICE,
-}
-vanilla_critic_params = {
-    "num_obs": 2,
-    "hidden_dims": [128, 64, 32],
-    "activation": "elu",
-    "normalize_obs": False,
-    "output_size": 1,
-    "device": DEVICE,
-}
-learning_rate = 1.0e-4
-critic_names = [
-    "Critic",
-    "Cholesky",
-    "CholeskyPlusConst",
-    "CholeskyOffset1",
-    "CholeskyOffset2",
-]
-test_critics = {
-    name: eval(f"{name}(**custom_critic_params).to(DEVICE)")
-    if not name == "Critic"
-    else eval(f"{name}(**vanilla_critic_params).to(DEVICE)")
-    for name in critic_names
+# Parameters for different critics
+critic_params = {
+    "CholeskyInput": {
+        "num_obs": 2,
+        "hidden_dims": [128, 64, 32],
+        "activation": ["elu", "elu", "tanh"],
+        "normalize_obs": True,
+        "latent_dim": None,  # 16,
+        "minimize": False,
+        "device": DEVICE,
+    },
+    "CholeskyLatent": {
+        "num_obs": 2,
+        "hidden_dims": [128, 64, 32],
+        "activation": ["elu", "elu", "tanh"],
+        "normalize_obs": False,
+        "latent_dim": 8,
+        "minimize": False,
+        "latent_hidden_dims": [128, 64],
+        "latent_activation": ["elu", "tanh"],
+        "device": DEVICE,
+    },
+    "Critic": {
+        "num_obs": 2,
+        "hidden_dims": [128, 64, 32],
+        "activation": "elu",
+        "normalize_obs": False,
+        "output_size": 1,
+        "device": DEVICE,
+    },
 }
 
+learning_rate = 0.005415828580992768
+critic_names = [
+    "Critic",
+    "CholeskyInput",
+    "CholeskyLatent",
+]
+# "Cholesky",
+# "CholeskyPlusConst",
+# "CholeskyOffset1",
+# "CholeskyOffset2",
+# ]
+# Instantiate the critics and add them to test_critics
+test_critics = {}
+for name in critic_names:
+    params = critic_params[name]
+    critic_class = globals()[name]
+    test_critics[name] = critic_class(**params).to(DEVICE)
+    if hasattr(test_critics[name], "value_offset"):
+        with torch.no_grad():
+            test_critics[name].value_offset.copy_(3.3 / 100.0)
 critic_optimizers = {
     name: torch.optim.Adam(critic.parameters(), lr=learning_rate)
     for name, critic in test_critics.items()
 }
 gamma = 0.99
-lam = 1.0
+lam = 0.95
 tot_iter = 200
 
-for iteration in range(0, tot_iter, 50):
+for iteration in range(1, tot_iter, 10):
     # load data
-    data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(DEVICE)
+    base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
+        DEVICE
+    )
 
     # compute ground-truth
     graphing_data = {data_name: {} for data_name in ["critic_obs", "values", "returns"]}
 
-    episode_rollouts = compute_MC_returns(data, gamma)
-    graphing_data["critic_obs"]["Ground Truth MC Returns"] = data[0, :]["critic_obs"]
+    episode_rollouts = compute_MC_returns(base_data, gamma)
+    graphing_data["critic_obs"]["Ground Truth MC Returns"] = (
+        base_data[0, :]["critic_obs"].detach().clone()
+    )
     graphing_data["values"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
     graphing_data["returns"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
 
     for name, test_critic in test_critics.items():
         critic_optimizer = critic_optimizers[name]
+        data = base_data.detach().clone()
         # train new critic
-        data["values"] = test_critic.evaluate(data["critic_obs"])
+        # data["values"] = test_critic.evaluate(data["critic_obs"])
         data["advantages"] = compute_generalized_advantages(
             data, gamma, lam, test_critic
         )
@@ -83,9 +117,9 @@ for iteration in range(0, tot_iter, 50):
 
         mean_value_loss = 0
         counter = 0
-        max_gradient_steps = 24
-        max_grad_norm = 1.0
-        batch_size = 2**16
+        max_gradient_steps = 500
+        # max_grad_norm = 1.0
+        batch_size = 10 * 4096
         generator = create_uniform_generator(
             data,
             batch_size,
@@ -95,11 +129,11 @@ for iteration in range(0, tot_iter, 50):
             value_loss = test_critic.loss_fn(batch["critic_obs"], batch["returns"])
             critic_optimizer.zero_grad()
             value_loss.backward()
-            nn.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
+            # # noqa F401.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
             critic_optimizer.step()
             mean_value_loss += value_loss.item()
-            print(f"{name} value loss: ", value_loss.item())
             counter += 1
+        print(f"{name} value loss: ", value_loss.item())
         mean_value_loss /= counter
 
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]

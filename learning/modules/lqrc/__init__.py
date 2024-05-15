@@ -3,4 +3,4 @@ from .utils import benchmark_args
 from .custom_critics import CustomCriticBaseline, Cholesky, CholeskyPlusConst, CholeskyOffset1, CholeskyOffset2
 from .autoencoder import Autoencoder
 
-from .QRCritics import PosDefInput
+from .QRCritics import CholeskyInput, CholeskyLatent
