@@ -45,10 +45,10 @@ critic_params = {
         "hidden_dims": [128, 64, 32],
         "activation": ["elu", "elu", "tanh"],
         "normalize_obs": False,
-        "latent_dim": 8,
         "minimize": False,
-        "latent_hidden_dims": [128, 64],
-        "latent_activation": ["elu", "tanh"],
+        "latent_dim": 16,
+        "latent_hidden_dims": [4, 8],
+        "latent_activation": ["elu", "elu"],
         "device": DEVICE,
     },
     "Critic": {
@@ -117,7 +117,7 @@ for iteration in range(1, tot_iter, 10):
 
         mean_value_loss = 0
         counter = 0
-        max_gradient_steps = 500
+        max_gradient_steps = 100
         # max_grad_norm = 1.0
         batch_size = 10 * 4096
         generator = create_uniform_generator(

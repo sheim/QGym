@@ -55,6 +55,8 @@ class CholeskyInput(nn.Module):
         else:
             self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        # V = x'Ax + b = a* x'Ax + b, and add a regularization for det(A) ~= 1
+        self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
 
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
@@ -75,6 +77,7 @@ class CholeskyInput(nn.Module):
         with torch.no_grad():
             # do not affect value offset in this part of the loss
             value += self.value_offset
+        value *= self.scaling_quadratic
         return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
 
@@ -83,11 +86,15 @@ class CholeskyInput(nn.Module):
 
     def loss_fn(self, obs, target):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
+
         if self.minimize:
             loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
         else:
             loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
-        return loss_NN + loss_offset
+
+        loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
+
+        return loss_NN + loss_offset + loss_scaling
 
 
 class CholeskyLatent(CholeskyInput):
@@ -131,7 +138,8 @@ class CholeskyLatent(CholeskyInput):
         value = self.sign * quadratify_xAx(z, A)
         with torch.no_grad():
             # do not affect value offset in this part of the loss
-            value += self.value_offset * 100.0
+            value += self.value_offset
+        value *= self.scaling_quadratic
         return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
 

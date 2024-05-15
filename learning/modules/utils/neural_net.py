@@ -48,7 +48,7 @@ def get_activation(act_name):
     elif act_name == "relu":
         return torch.nn.ReLU()
     elif act_name == "crelu":
-        return torch.nn.ReLU()
+        return torch.nn.CELU()
     elif act_name == "lrelu":
         return torch.nn.LeakyReLU()
     elif act_name == "tanh":
