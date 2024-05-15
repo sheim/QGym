@@ -182,7 +182,7 @@ class RolloutStorage(BaseStorage):
         trajectory_lengths = done_indices[1:] - done_indices[:-1]
         return trajectory_lengths.float().mean(), self.rewards.mean()
 
-    def mini_batch_generator(self, num_mini_batches, num_epochs=8):
+    def mini_batch_generator(self, num_mini_batches=1, num_epochs=8):
         batch_size = self.num_envs * self.num_transitions_per_env
         mini_batch_size = batch_size // num_mini_batches
         indices = torch.randperm(

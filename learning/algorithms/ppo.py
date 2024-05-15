@@ -36,7 +36,6 @@ import torch.optim as optim
 
 from learning.modules import ActorCritic
 from learning.storage import RolloutStorage
-from learning.modules.lqrc import CustomCholeskyPlusConstLoss
 
 
 class PPO:
@@ -58,8 +57,6 @@ class PPO:
         schedule="fixed",
         desired_kl=0.01,
         device="cpu",
-        standard_loss=True,
-        plus_c_penalty=0.0,
         **kwargs,
     ):
         self.device = device
@@ -72,7 +69,12 @@ class PPO:
         self.actor_critic = actor_critic
         self.actor_critic.to(self.device)
         self.storage = None  # initialized later
-        self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=learning_rate)
+        self.optimizer = optim.Adam(
+            self.actor_critic.actor.parameters(), lr=learning_rate
+        )
+        self.crit_optimizer = optim.Adam(
+            self.actor_critic.critic.parameters(), lr=learning_rate
+        )
         self.transition = RolloutStorage.Transition()
 
         # * PPO parameters
@@ -85,10 +87,6 @@ class PPO:
         self.lam = lam
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
-
-        # * custom NN parameters
-        self.standard_loss = standard_loss
-        self.plus_c_penalty = plus_c_penalty
 
     def init_storage(
         self,
@@ -128,6 +126,11 @@ class PPO:
         return self.transition.actions
 
     def process_env_step(self, rewards, dones, timed_out=None):
+        if self.storage is None:
+            raise AttributeError(
+                "This version of PPO is deprecated and only works with OldPolicyRunner."
+                "Use PPO2 instead."
+            )
         self.transition.rewards = rewards.clone()
         self.transition.dones = dones
         # * Bootstrapping on time outs
@@ -163,7 +166,6 @@ class PPO:
             actions_log_prob_batch = self.actor_critic.get_actions_log_prob(
                 actions_batch
             )
-            value_batch = self.actor_critic.evaluate(critic_obs_batch)
             mu_batch = self.actor_critic.action_mean
             sigma_batch = self.actor_critic.action_std
             entropy_batch = self.actor_critic.entropy
@@ -202,52 +204,37 @@ class PPO:
             surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
             # * Value function loss
+            value_batch = self.actor_critic.evaluate(critic_obs_batch)
             if self.use_clipped_value_loss:
                 value_clipped = target_values_batch + (
                     value_batch - target_values_batch
                 ).clamp(-self.clip_param, self.clip_param)
-                if self.standard_loss:
-                    value_losses = (value_batch - returns_batch).pow(2)
-                    value_losses_clipped = (value_clipped - returns_batch).pow(2)
-                else:
-                    value_losses = CustomCholeskyPlusConstLoss(
-                        const_penalty=self.plus_c_penalty
-                    ).forward(
-                        value_batch,
-                        returns_batch,
-                        self.actor_critic.critic.NN.intermediates,
-                    )
-                    value_losses_clipped = CustomCholeskyPlusConstLoss(
-                        const_penalty=self.plus_c_penalty
-                    ).forward(
-                        value_clipped,
-                        returns_batch,
-                        self.actor_critic.critic.NN.intermediates,
-                    )
+                value_losses = (value_batch - returns_batch).pow(2)
+                value_losses_clipped = (value_clipped - returns_batch).pow(2)
                 value_loss = torch.max(value_losses, value_losses_clipped).mean()
             else:
-                if self.standard_loss:
-                    value_loss = (returns_batch - value_batch).pow(2).mean()
-                else:
-                    value_losses = CustomCholeskyPlusConstLoss(
-                        const_penalty=self.plus_c_penalty
-                    ).forward(
-                        value_batch,
-                        returns_batch,
-                        self.actor_critic.critic.NN.intermediates,
-                    )
+                value_loss = (returns_batch - value_batch).pow(2).mean()
 
             loss = (
                 surrogate_loss
-                + self.value_loss_coef * value_loss
+                # + self.value_loss_coef * value_loss
                 - self.entropy_coef * entropy_batch.mean()
             )
 
             # * Gradient step
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
+            nn.utils.clip_grad_norm_(
+                self.actor_critic.actor.parameters(), self.max_grad_norm
+            )
             self.optimizer.step()
+
+            self.crit_optimizer.zero_grad()
+            value_loss.backward()
+            nn.utils.clip_grad_norm_(
+                self.actor_critic.critic.parameters(), self.max_grad_norm
+            )
+            self.crit_optimizer.step()
 
             self.mean_value_loss += value_loss.item()
             self.mean_surrogate_loss += surrogate_loss.item()

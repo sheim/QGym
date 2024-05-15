@@ -5,13 +5,23 @@ from tensordict import TensorDict
 from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
+from learning.algorithms import *  # noqa: F403
+from learning.modules import Actor, Critic  # noqa: F401
+from learning.modules.lqrc import (
+    CustomCriticBaseline,
+    Cholesky,
+    CholeskyPlusConst,
+    CholeskyOffset1,
+    CholeskyOffset2,
+)  # noqa F401
 from learning.storage import DictStorage
+from learning.utils import export_to_numpy
 
 logger = Logger()
 storage = DictStorage()
 
 
-class OnPolicyRunner(BaseRunner):
+class DataLoggingRunner(BaseRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
@@ -20,6 +30,16 @@ class OnPolicyRunner(BaseRunner):
             self.cfg["max_iterations"],
             self.device,
         )
+
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        critic_class_name = self.critic_cfg["critic_class_name"]
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def learn(self):
         self.set_up_logger()
@@ -30,7 +50,6 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
-        self.save()
 
         # * start up storage
         transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
@@ -54,9 +73,11 @@ class OnPolicyRunner(BaseRunner):
             device=self.device,
         )
 
+        self.save()
         # burn in observation normalization.
         if self.actor_cfg["normalize_obs"] or self.critic_cfg["normalize_obs"]:
             self.burn_in_normalization()
+        self.env.reset()
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
@@ -113,6 +134,7 @@ class OnPolicyRunner(BaseRunner):
             logger.toc("collection")
 
             logger.tic("learning")
+            self.save()
             self.alg.update(storage.data)
             storage.clear()
             logger.toc("learning")
@@ -123,9 +145,10 @@ class OnPolicyRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-            if self.it % self.save_interval == 0:
-                self.save()
-        self.save()
+            # if self.it % self.save_interval == 0:
+            #     self.save()
+        # self.save()
+        # print(f"Saved data from LQR Pendulum run to {dict_save_path}")
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -182,6 +205,9 @@ class OnPolicyRunner(BaseRunner):
             },
             path,
         )
+        path_data = os.path.join(self.log_dir, "data_{}".format(self.it))
+        torch.save(storage.data.cpu(), path_data + ".pt")
+        export_to_numpy(storage.data, path_data + ".npz")
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)

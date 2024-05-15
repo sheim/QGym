@@ -112,6 +112,58 @@ def critic_eval_args():
     return args
 
 
+def autoencoder_args():
+    parser = argparse.ArgumentParser(
+        description="Toggle between autoencoder training settings."
+    )
+    parser.add_argument(
+        "--input_dim",
+        action="store",
+        type=int,
+        nargs="?",
+        default=1,
+        help="Dimenison of the input variables",
+    )
+    parser.add_argument(
+        "--latent_dim",
+        action="store",
+        type=int,
+        nargs="?",
+        default=1,
+        help="Dimenison of the input variables",
+    )
+    parser.add_argument(
+        "--epochs",
+        action="store",
+        type=int,
+        nargs="?",
+        default=1000,
+        help="Number of training epochs",
+    )
+    parser.add_argument(
+        "--batches",
+        action="store",
+        type=int,
+        nargs="?",
+        default=4,
+        help="Number of randomly generated batches per epoch.",
+    )
+    parser.add_argument(
+        "--n",
+        action="store",
+        type=int,
+        nargs="?",
+        default=100,
+        help="Number of training epochs",
+    )
+    parser.add_argument("--save_model", action="store_true", help="Save the model")
+    try:
+        args = parser.parse_args()
+    except SystemExit:
+        print("Exception occurred! You've likely mispelled a key.")
+    return args
+
+
 def get_load_path(name, load_run=-1, checkpoint=-1):
     root = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", name)
     run_path = select_run(root, load_run)

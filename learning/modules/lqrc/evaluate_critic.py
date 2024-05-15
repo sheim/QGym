@@ -1,14 +1,17 @@
 import os
 
-from learning import LEGGED_GYM_LQRC_DIR
+from learning import LEGGED_GYM_ROOT_DIR
 
 from utils import critic_eval_args, get_load_path
 from plotting import (
-    plot_custom_critic,
     plot_critic_prediction_only,
 )
 from learning.modules import Critic
-
+from learning.modules.lqrc.custom_critics import (
+    CholeskyPlusConst,
+    CholeskyOffset1,
+    CholeskyOffset2,
+)
 import torch
 
 
@@ -32,10 +35,14 @@ def filter_state_dict(state_dict):
 
 
 def model_switch(args):
-    if args["model_type"] == "CholeskyPlusConst":
-        return Critic(2, standard_nn=False).to(DEVICE)
-    elif args["model_type"] == "StandardMLP":
-        return Critic(2, [512, 256, 128], "elu", standard_nn=True).to(DEVICE)
+    if args["model_type"] == "StandardMLP":
+        return Critic(2, [128, 64, 32], "tanh").to(DEVICE)
+    elif args["model_type"] == "CholeskyPlusConst":
+        return CholeskyPlusConst(2).to(DEVICE)
+    elif args["model_type"] == "CholeskyOffset1":
+        return CholeskyOffset1(2).to(DEVICE)
+    elif args["model_type"] == "CholeskyOffset2":
+        return CholeskyOffset2(2).to(DEVICE)
     else:
         raise KeyError("Specified model type is not supported for critic evaluation.")
 
@@ -46,55 +53,26 @@ if __name__ == "__main__":
     path = get_load_path(args["experiment_name"], args["load_run"], args["checkpoint"])
     model = model_switch(args)
 
-    loaded_dict = torch.load(path)
-    critic_state_dict = filter_state_dict(loaded_dict["model_state_dict"])
+    critic_state_dict = torch.load(path)["critic_state_dict"]
     model.load_state_dict(critic_state_dict)
 
-    lb = [0.0, -100.0]
-    ub = [2.0 * torch.pi, 100.0]
+    lb = [-torch.pi, -8.0]
+    ub = [torch.pi, 8.0]
     x = generate_data(lb, ub)
-    x_norm = model.normalize(x)
+    # x_norm = model.normalize(x)
     y_pred = []
-    A_pred = []
-    c_pred = []
 
     model.eval()
-    t_c = 0
-    p_c = 0
     for X_batch in x:
         y_hat = model.evaluate(X_batch.unsqueeze(0))
         y_pred.append(y_hat)
-        if model_type == "CholeskyPlusConst":
-            A_pred.append(model.NN.intermediates["A"])
-            c_pred.append(model.NN.intermediates["c"])
 
-    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "logs")
+    save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "lqrc")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
     fn = args["fn"]
 
-    if model_type == "CholeskyPlusConst":
-        plot_custom_critic(
-            x,
-            torch.vstack(y_pred),
-            (
-                x.unsqueeze(2)
-                .transpose(1, 2)
-                .bmm(torch.vstack(A_pred))
-                .bmm(x.unsqueeze(2))
-            ).squeeze(2),
-            torch.vstack(c_pred),
-            save_path + f"/{fn}.png",
-            contour=args["contour"],
-        )
-        plot_critic_prediction_only(
-            x,
-            torch.vstack(y_pred),
-            save_path + f"/{fn}_prediction_only.png",
-            contour=args["contour"],
-        )
-    else:
-        plot_critic_prediction_only(
-            x, torch.vstack(y_pred), save_path + f"/{fn}.png", contour=args["contour"]
-        )
+    plot_critic_prediction_only(
+        x, torch.vstack(y_pred), save_path + f"/{fn}.png", contour=args["contour"]
+    )

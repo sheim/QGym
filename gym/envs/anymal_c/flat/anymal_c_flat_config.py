@@ -85,6 +85,7 @@ class AnymalCFlatCfg(LeggedRobotCfg):
         toggle = True
         interval_s = 1
         max_push_vel_xy = 0.5
+        push_box_dims = [0.2, 0.2, 0.2]
 
     class domain_rand(LeggedRobotCfg.domain_rand):
         randomize_base_mass = True
@@ -120,25 +121,14 @@ class AnymalCFlatCfg(LeggedRobotCfg):
 
 class AnymalCFlatRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
+    runner_class_name = "OldPolicyRunner"
 
-    class policy(LeggedRobotRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 256]
-        critic_hidden_dims = [256, 256, 256]
+    class actor(LeggedRobotRunnerCfg.actor):
+        hidden_dims = [256, 256, 256]
         # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 
-        actor_obs = [
-            "base_height",
-            "base_lin_vel",
-            "base_ang_vel",
-            "projected_gravity",
-            "commands",
-            "dof_pos_obs",
-            "dof_vel",
-            "dof_pos_history",
-        ]
-
-        critic_obs = [
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -152,13 +142,28 @@ class AnymalCFlatRunnerCfg(LeggedRobotRunnerCfg):
         actions = ["dof_pos_target"]
 
         class noise:
-            dof_pos_obs = 0.005  # can be made very low
+            dof_pos_obs = 0.005
             dof_vel = 0.005
             base_ang_vel = 0.05  # 0.027, 0.14, 0.37
             projected_gravity = 0.02
 
-        class reward(LeggedRobotRunnerCfg.policy.reward):
-            class weights(LeggedRobotRunnerCfg.policy.reward.weights):
+    class critic(LeggedRobotRunnerCfg.critic):
+        hidden_dims = [256, 256, 256]
+        # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            "dof_pos_obs",
+            "dof_vel",
+            "dof_pos_history",
+        ]
+
+        class reward:
+            class weights:
                 tracking_lin_vel = 3.0
                 tracking_ang_vel = 1.0
                 lin_vel_z = 0.0

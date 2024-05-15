@@ -32,4 +32,8 @@
 
 from .on_policy_runner import OnPolicyRunner
 from .my_runner import MyRunner
-from .data_logging_runner import DataLoggingRunner
+from .old_policy_runner import OldPolicyRunner
+from .custom_critic_runner import CustomCriticRunner
+from .critic_only_runner import CriticOnlyRunner
+from .lqr_data_gen_runner import LQRDataGenRunner
+from .datalogging_runner import DataLoggingRunner

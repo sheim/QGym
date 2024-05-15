@@ -30,14 +30,14 @@ def test_PBRS():
     logger.initialize(num_envs=1, episode_dt=0.1, total_iterations=100, device="cpu")
     self_env = MyTask()
 
-    # let's create a dummy policy_cfg with just the reward weights
-    policy_cfg = {"reward": {"weights": {"dummy": 1}}}
-    policy_cfg["reward"]["pbrs_weights"] = {"first": 1, "second": 2}
+    # let's create a dummy critic_cfg with just the reward weights
+    critic_cfg = {"reward": {"weights": {"dummy": 1}}}
+    critic_cfg["reward"]["pbrs_weights"] = {"first": 1, "second": 2}
 
     # and a dummy env
 
     PBRS = PotentialBasedRewardShaping(
-        policy_cfg["reward"]["pbrs_weights"], device="cpu"
+        critic_cfg["reward"]["pbrs_weights"], device="cpu"
     )
     assert PBRS.get_reward_keys() == ["PBRS_first", "PBRS_second"]
 

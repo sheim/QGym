@@ -1,6 +1,6 @@
 import torch
 from learning.algorithms import *  # noqa: F403
-from learning.modules import ActorCritic
+from learning.modules import Actor, Critic
 from learning.utils import remove_zero_weighted_rewards
 
 
@@ -10,31 +10,32 @@ class BaseRunner:
         self.env = env
         self.parse_train_cfg(train_cfg)
 
-        num_actor_obs = self.get_obs_size(self.policy_cfg["actor_obs"])
-        num_critic_obs = self.get_obs_size(self.policy_cfg["critic_obs"])
-        num_actions = self.get_action_size(self.policy_cfg["actions"])
-        actor_critic = ActorCritic(
-            num_actor_obs, num_critic_obs, num_actions, **self.policy_cfg
-        ).to(self.device)
-
-        alg_class = eval(self.cfg["algorithm_class_name"])
-        self.alg = alg_class(actor_critic, device=self.device, **self.alg_cfg)
-
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
         self.num_learning_iterations = self.cfg["max_iterations"]
         self.tot_timesteps = 0
         self.it = 0
-
-        # * init storage and model
-        self.init_storage()
         self.log_dir = train_cfg["log_dir"]
+        self._set_up_alg()
+
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic = Critic(num_critic_obs, **self.critic_cfg)
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def parse_train_cfg(self, train_cfg):
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
-        remove_zero_weighted_rewards(train_cfg["policy"]["reward"]["weights"])
-        self.policy_cfg = train_cfg["policy"]
+        remove_zero_weighted_rewards(train_cfg["critic"]["reward"]["weights"])
+        remove_zero_weighted_rewards(
+            train_cfg["critic"]["reward"]["termination_weight"]
+        )
+        self.actor_cfg = train_cfg["actor"]
+        self.critic_cfg = train_cfg["critic"]
 
     def init_storage(self):
         raise NotImplementedError

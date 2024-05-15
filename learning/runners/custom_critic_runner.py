@@ -1,17 +1,21 @@
 import os
+import numpy as np
 import torch
 from tensordict import TensorDict
 
+from gym import LEGGED_GYM_ROOT_DIR
+from learning.algorithms import *  # noqa: F403
+from learning.modules import Actor
 from learning.utils import Logger
 
-from .BaseRunner import BaseRunner
+from .on_policy_runner import OnPolicyRunner
 from learning.storage import DictStorage
 
 logger = Logger()
 storage = DictStorage()
 
 
-class OnPolicyRunner(BaseRunner):
+class CustomCriticRunner(OnPolicyRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
@@ -20,6 +24,16 @@ class OnPolicyRunner(BaseRunner):
             self.cfg["max_iterations"],
             self.device,
         )
+
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])  # noqa: F841
+        critic_class_name = self.critic_cfg["critic_class_name"]
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def learn(self):
         self.set_up_logger()
@@ -30,6 +44,8 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
+        self.all_obs = torch.zeros(self.env.num_envs * (tot_iter - self.it + 1), 2)
+        self.all_obs[: self.env.num_envs, :] = actor_obs
         self.save()
 
         # * start up storage
@@ -37,14 +53,10 @@ class OnPolicyRunner(BaseRunner):
         transition.update(
             {
                 "actor_obs": actor_obs,
-                "next_actor_obs": actor_obs,
-                "actions": self.alg.act(actor_obs),
+                "actions": self.alg.act(actor_obs, critic_obs),
                 "critic_obs": critic_obs,
-                "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
-                "timed_out": self.get_timed_out(),
-                "terminated": self.get_terminated(),
-                "dones": self.get_timed_out() | self.get_terminated(),
+                "dones": self.get_timed_out(),
             }
         )
         storage.initialize(
@@ -54,10 +66,6 @@ class OnPolicyRunner(BaseRunner):
             device=self.device,
         )
 
-        # burn in observation normalization.
-        if self.actor_cfg["normalize_obs"] or self.critic_cfg["normalize_obs"]:
-            self.burn_in_normalization()
-
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
@@ -65,7 +73,7 @@ class OnPolicyRunner(BaseRunner):
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    actions = self.alg.act(actor_obs)
+                    actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],
                         actions,
@@ -86,6 +94,9 @@ class OnPolicyRunner(BaseRunner):
                         self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
                     critic_obs = self.get_obs(self.critic_cfg["obs"])
+                    start = self.env.num_envs * self.it
+                    end = self.env.num_envs * (self.it + 1)
+                    self.all_obs[start:end, :] = actor_obs
 
                     # * get time_outs
                     timed_out = self.get_timed_out()
@@ -97,11 +108,8 @@ class OnPolicyRunner(BaseRunner):
 
                     transition.update(
                         {
-                            "next_actor_obs": actor_obs,
-                            "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
                             "timed_out": timed_out,
-                            "terminated": terminated,
                             "dones": dones,
                         }
                     )
@@ -125,22 +133,22 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-        self.save()
+        self.all_obs = self.all_obs.detach().cpu().numpy()
+        save_path = os.path.join(
+            LEGGED_GYM_ROOT_DIR,
+            "logs",
+            "lqrc",
+            "standard_training_data.npy"
+            if "Cholesky" not in self.critic_cfg["critic_class_name"]
+            else "custom_training_data.npy",
+        )
 
-    @torch.no_grad
-    def burn_in_normalization(self, n_iterations=100):
-        actor_obs = self.get_obs(self.actor_cfg["obs"])
-        critic_obs = self.get_obs(self.critic_cfg["obs"])
-        for _ in range(n_iterations):
-            actions = self.alg.act(actor_obs)
-            self.set_actions(self.actor_cfg["actions"], actions)
-            self.env.step()
-            actor_obs = self.get_noisy_obs(
-                self.actor_cfg["obs"], self.actor_cfg["noise"]
-            )
-            critic_obs = self.get_obs(self.critic_cfg["obs"])
-            self.alg.critic.evaluate(critic_obs)
-        self.env.reset()
+        dir_path = os.path.dirname(save_path)
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        np.save(save_path, self.all_obs)
+        print(f"Saved training observations to {save_path}")
+        self.save()
 
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(
@@ -168,39 +176,3 @@ class OnPolicyRunner(BaseRunner):
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
-
-    def save(self):
-        os.makedirs(self.log_dir, exist_ok=True)
-        path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
-        torch.save(
-            {
-                "actor_state_dict": self.alg.actor.state_dict(),
-                "critic_state_dict": self.alg.critic.state_dict(),
-                "optimizer_state_dict": self.alg.optimizer.state_dict(),
-                "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
-                "iter": self.it,
-            },
-            path,
-        )
-
-    def load(self, path, load_optimizer=True):
-        loaded_dict = torch.load(path)
-        self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
-        self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
-        if load_optimizer:
-            self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
-            self.alg.critic_optimizer.load_state_dict(
-                loaded_dict["critic_optimizer_state_dict"]
-            )
-        self.it = loaded_dict["iter"]
-
-    def switch_to_eval(self):
-        self.alg.actor.eval()
-        self.alg.critic.eval()
-
-    def get_inference_actions(self):
-        obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
-        return self.alg.actor.act_inference(obs)
-
-    def export(self, path):
-        self.alg.actor.export(path)

@@ -2,31 +2,10 @@ import torch
 import torch.nn as nn
 
 
-def get_mean_var_with_masks(values, masks):
-    """
-    Applies a mask to the input values and calculates
-    the mean and variance over the valid entries, as specified
-    by the mask.
-    """
-    sum_mask = masks.sum()
-    masked_vals = values * masks
-    values_mean = masked_vals.sum() / sum_mask
-    min_sqr = (((masked_vals) ** 2) / sum_mask).sum() - (
-        (masked_vals / sum_mask).sum()
-    ) ** 2
-    values_var = min_sqr * sum_mask / (sum_mask - 1)
-    return values_mean, values_var
-
-
 class RunningMeanStd(nn.Module):
-    """
-    Keeps a running mean to normalize tensor of choice.
-    """
-
-    def __init__(self, num_items, axis=0, epsilon=1e-05):
-        super(RunningMeanStd, self).__init__()
+    def __init__(self, num_items, epsilon=1e-05):
+        super().__init__()
         self.num_items = num_items
-        self.axis = axis
         self.epsilon = epsilon
 
         self.register_buffer(
@@ -44,11 +23,6 @@ class RunningMeanStd(nn.Module):
         batch_var,
         batch_count,
     ):
-        """
-        Implements parallel algorithm for combining arbitrary sets A and B
-        https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
-        #Parallel_algorithm
-        """
         tot_count = running_count + batch_count
         delta = batch_mean - running_mean
 
@@ -64,16 +38,10 @@ class RunningMeanStd(nn.Module):
         new_var = M2 / (tot_count - 1)
         return new_mean, new_var, tot_count
 
-    def forward(self, input, mask=None):
-        """
-        Returns the normalized version of the input.
-        """
+    def forward(self, input):
         if self.training:
-            if mask is not None:
-                mean, var = get_mean_var_with_masks(input, mask)
-            else:
-                mean = input.mean(self.axis)
-                var = input.var(self.axis)
+            mean = input.mean(tuple(range(input.dim() - 1)))
+            var = input.var(tuple(range(input.dim() - 1)))
             (
                 self.running_mean,
                 self.running_var,
@@ -89,8 +57,6 @@ class RunningMeanStd(nn.Module):
 
         current_mean = self.running_mean
         current_var = self.running_var
-        # current_mean = torch.tensor([torch.pi, 0.0], device="cuda:0")
-        # current_var = torch.tensor([((200.0)**2.0/12.0), ((2.0*torch.pi)/12.0)], device="cuda:0")
 
         y = (input - current_mean.float()) / torch.sqrt(
             current_var.float() + self.epsilon

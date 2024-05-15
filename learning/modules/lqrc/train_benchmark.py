@@ -1,6 +1,8 @@
 import os
 import time
+import numpy as np
 import torch
+from learning.modules.utils.neural_net import create_MLP
 from torchviz import make_dot
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
@@ -11,8 +13,10 @@ from custom_nn import (
     CustomCholeskyLoss,
     CholeskyPlusConst,
     CustomCholeskyPlusConstLoss,
+    CholeskyOffset1,
+    CholeskyOffset2,
 )
-from learning import LEGGED_GYM_LQRC_DIR
+from learning import LEGGED_GYM_ROOT_DIR
 from utils import benchmark_args
 from plotting import (
     plot_loss,
@@ -100,6 +104,26 @@ def generate_bounded_rosenbrock(n, lb, ub, steps):
     return X, y
 
 
+def load_ground_truth(*args, **kwargs):
+    fn = f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/ground_truth.npy"
+    data = torch.from_numpy(np.load(fn)).to(DEVICE).type(torch.float32)
+    return data[:, :-1], data[:, -1].unsqueeze(1)
+
+
+def ground_truth_numerial_gradients():
+    fn = f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/ground_truth.npy"
+    data = np.load(fn)
+    sq_size = int(np.sqrt(data.shape[0]).item())
+    gridded_data = data[:, -1].reshape((sq_size, sq_size))
+    h_theta = abs(data[0, 0] - data[sq_size, 0]).item()
+    h_omega = abs(data[0, 1] - data[1, 1]).item()
+    theta_grad, theta_omega = np.gradient(gridded_data, h_theta, h_omega)
+    return np.concatenate(
+        (theta_grad.flatten().reshape(-1, 1), theta_omega.flatten().reshape(-1, 1)),
+        axis=1,
+    )
+
+
 def model_switch(input_dim, model_name=None):
     if model_name == "QuadraticNetCholesky":
         return QuadraticNetCholesky(input_dim, device=DEVICE).to(
@@ -109,10 +133,24 @@ def model_switch(input_dim, model_name=None):
         return CholeskyPlusConst(input_dim, device=DEVICE).to(
             DEVICE
         ), CustomCholeskyPlusConstLoss(const_penalty=0.1)
-    else:
-        return BaselineMLP(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
+    elif model_name == "VanillaCritic":
+        num_obs = input_dim
+        hidden_dims = [128, 64, 32]
+        activation = "tanh"
+        return create_MLP(num_obs, 1, hidden_dims, activation).to(
+            DEVICE
+        ), torch.nn.MSELoss(reduction="mean")
+    elif model_name == "CholeskyOffset1":
+        return CholeskyOffset1(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
             reduction="mean"
         )
+    elif model_name == "CholeskyOffset2":
+        return CholeskyOffset2(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
+            reduction="mean"
+        )
+    return BaselineMLP(input_dim, device=DEVICE).to(DEVICE), torch.nn.MSELoss(
+        reduction="mean"
+    )
 
 
 def test_case_switch(case_name=None):
@@ -122,8 +160,17 @@ def test_case_switch(case_name=None):
         return generate_cos
     elif case_name == "quadratic":
         return generate_nD_quadratic
-    else:
-        assert case_name is not None, "Please specify a valid test case when running."
+    elif case_name == "ground_truth":
+        return load_ground_truth
+    assert case_name is not None, "Please specify a valid test case when running."
+
+
+def gradient_switch(test_case, **kwargs):
+    if test_case == "rosenbrock":
+        return generate_rosenbrock_grad(torch.vstack(kwargs["all_inputs"]))
+    elif test_case == "ground_truth":
+        return ground_truth_numerial_gradients()
+    return None
 
 
 if __name__ == "__main__":
@@ -163,11 +210,7 @@ if __name__ == "__main__":
 
     model, loss_fn = model_switch(input_dim, model_type)
     print(model)
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        betas=(0.75, 0.9),
-        weight_decay=2.074821225483474e-07,
-    )
+    optimizer = torch.optim.Adam(model.parameters())
 
     # train
     model.train()
@@ -180,9 +223,9 @@ if __name__ == "__main__":
             X_batch.requires_grad_()
             y_pred = model(X_batch)
             loss = (
-                loss_fn(y_pred, y_batch)
-                if model_type == "BaselineMLP"
-                else loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+                loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+                if model_type == "CholeskyPlusConst"
+                else loss_fn(y_pred, y_batch)
             )
             loss_per_batch.append(loss.item())
             optimizer.zero_grad()
@@ -213,6 +256,13 @@ if __name__ == "__main__":
             batch_size=1,
             shuffle=False,
         )
+    if args["test_case"] == "ground_truth":
+        graphing_data = LQRCDataset(*load_ground_truth())
+        test_dataloader = DataLoader(
+            torch.utils.data.Subset(graphing_data, range(len(graphing_data))),
+            batch_size=1,
+            shuffle=False,
+        )
 
     for X_batch, y_batch in test_dataloader:
         # give X_batch a grad_fn
@@ -220,11 +270,10 @@ if __name__ == "__main__":
         X_batch = X_batch + 0
         y_pred = model(X_batch)
         loss = (
-            loss_fn(y_pred, y_batch)
-            if model_type == "BaselineMLP"
-            else loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+            loss_fn(y_pred, y_batch, intermediates=model.intermediates)
+            if model_type == "CholeskyPlusConst"
+            else loss_fn(y_pred, y_batch)
         )
-        # could wrap BaselineMLP in a loss that ignores intermediates to eliminate if/else
 
         if model_type == "QuadraticNetCholesky":  # ! do we want this anymore?
             A_pred = model.intermediates["A"]
@@ -252,7 +301,7 @@ if __name__ == "__main__":
     print(f"Total training time: {timer.get_time('total training')}")
 
     time_str = time.strftime("%Y%m%d_%H%M%S")
-    save_path = os.path.join(LEGGED_GYM_LQRC_DIR, "logs", save_str)
+    save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", save_str)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     if save_model:
@@ -265,8 +314,10 @@ if __name__ == "__main__":
             params=dict(model.named_parameters()),
             show_attrs=True,
             show_saved=True,
-        ).render(f"{LEGGED_GYM_LQRC_DIR}/logs/model_viz", format="png")
+        ).render(f"{LEGGED_GYM_ROOT_DIR}/logs/lqrc/model_viz", format="png")
         print("Saving to", save_path)
+
+    grad_kwargs = {"all_inputs": all_inputs} if test_case == "rosenbrock" else {}
 
     plot_predictions_and_gradients(
         input_dim + 1,
@@ -277,9 +328,7 @@ if __name__ == "__main__":
         f"{save_path}/{time_str}_grad_graph",
         colormap_diff=args["colormap_diff"],
         colormap_values=args["colormap_values"],
-        actual_grad=generate_rosenbrock_grad(torch.vstack(all_inputs))
-        if test_case == "rosenbrock"
-        else None,
+        actual_grad=gradient_switch(test_case, **grad_kwargs),
     )
 
     plot_loss(training_losses, f"{save_path}/{time_str}_loss")
