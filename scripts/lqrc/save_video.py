@@ -14,13 +14,15 @@ def extract_iteration(filename):
 
 image_folder = (
     os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph")
-    + "/20240512_205525"
+    + "/20240512_223831"
 )
-video_name = f"{image_folder}/video.avi"
+video_name = f"{image_folder}/video_100.avi"
 img_names = os.listdir(image_folder)
 # Sort the list using the custom key function
 img_names = sorted(img_names, key=extract_iteration)
-images = [img for img in img_names if img.endswith(".png")]
+images = [
+    img for img in img_names if img.endswith(".png") and extract_iteration(img) > 60
+]
 frame = cv2.imread(os.path.join(image_folder, images[0]))
 height, width, layers = frame.shape
 

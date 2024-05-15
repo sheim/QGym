@@ -125,6 +125,6 @@ for iteration in range(tot_iter):
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
-        title=f"iteration{iteration}",
+        title=f"Neural Network Training Iteration {iteration}",
         fn=save_path + f"/{len(critic_names)}_critics_it{iteration}",
     )

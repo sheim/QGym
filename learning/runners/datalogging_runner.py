@@ -5,6 +5,15 @@ from tensordict import TensorDict
 from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
+from learning.algorithms import *  # noqa: F403
+from learning.modules import Actor, Critic  # noqa: F401
+from learning.modules.lqrc import (
+    CustomCriticBaseline,
+    Cholesky,
+    CholeskyPlusConst,
+    CholeskyOffset1,
+    CholeskyOffset2,
+)  # noqa F401
 from learning.storage import DictStorage
 from learning.utils import export_to_numpy
 
@@ -21,6 +30,16 @@ class DataLoggingRunner(BaseRunner):
             self.cfg["max_iterations"],
             self.device,
         )
+
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        critic_class_name = self.critic_cfg["critic_class_name"]
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def learn(self):
         self.set_up_logger()

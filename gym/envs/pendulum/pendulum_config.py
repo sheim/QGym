@@ -79,7 +79,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             dof_vel = 0.0
 
     class critic:
-        critic_class_name = ""
+        critic_class_name = "CholeskyOffset1"
         normalize_obs = True
         obs = [
             "dof_pos",

@@ -21,7 +21,6 @@ def plot_pendulum_multiple_critics(
         num_critics >= 1
     ), "This function requires at least two critics for graphing. To graph a single critic please use its corresponding graphing function."
     fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
-    error = {}
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
