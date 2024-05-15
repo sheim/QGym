@@ -13,6 +13,16 @@ def create_lower_diagonal(x, n, device):
     return L
 
 
+def create_PD_lower_diagonal(x, n, device):
+    tril_indices = torch.tril_indices(row=n, col=n, offset=0)
+    diag_indices = (tril_indices[0] == tril_indices[1]).nonzero(as_tuple=True)[0]
+    x[..., diag_indices] = torch.nn.functional.softplus(x[..., diag_indices])
+    L = torch.zeros((*x.shape[:-1], n, n), device=device, requires_grad=False)
+    rows, cols = tril_indices
+    L[..., rows, cols] = x
+    return L
+
+
 def compose_cholesky(L):
     return torch.einsum("...ij, ...jk -> ...ik", L, L.transpose(-2, -1))
 
@@ -66,13 +76,12 @@ class CholeskyInput(nn.Module):
         self.lower_diag_NN = create_MLP(
             num_obs, num_lower_diag_elements, hidden_dims, activation, dropouts
         )
-        # self.lower_diag_NN.apply(init_weights)
+        self.lower_diag_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
         output = self.lower_diag_NN(x)
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
-
         value = self.sign * quadratify_xAx(x, A)
         with torch.no_grad():
             value += self.value_offset
@@ -132,6 +141,8 @@ class CholeskyLatent(CholeskyInput):
             num_obs, latent_dim, latent_hidden_dims, latent_activation
         )
 
+        self.latent_NN.apply(init_weights)
+
     def forward(self, x, return_all=False):
         z = self.latent_NN(x)
         output = self.lower_diag_NN(x)
@@ -151,3 +162,39 @@ class CholeskyLatent(CholeskyInput):
 
     def evaluate(self, obs):
         return self.forward(obs)
+
+
+class PDCholeskyInput(CholeskyInput):
+    def forward(self, x, return_all=False):
+        output = self.lower_diag_NN(x)
+        L = create_PD_lower_diagonal(output, self.latent_dim, self.device)
+        A = compose_cholesky(L)
+        # assert (torch.linalg.eigvals(A).real > 0).all()
+        value = self.sign * quadratify_xAx(x, A)
+        with torch.no_grad():
+            value += self.value_offset
+        value *= self.scaling_quadratic
+
+        if return_all:
+            return value, A, L
+        else:
+            return value
+        # return self.sign * quadratify_xAx(x, A) + self.value_offset
+
+
+class PDCholeskyLatent(CholeskyLatent):
+    def forward(self, x, return_all=False):
+        z = self.latent_NN(x)
+        output = self.lower_diag_NN(x)
+        L = create_PD_lower_diagonal(output, self.latent_dim, self.device)
+        A = compose_cholesky(L)
+        # assert (torch.linalg.eigvals(A).real > 0).all()
+        value = self.sign * quadratify_xAx(z, A)
+        with torch.no_grad():
+            value += self.value_offset
+        value *= self.scaling_quadratic
+
+        if return_all:
+            return value, A, L
+        else:
+            return value

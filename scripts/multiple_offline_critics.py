@@ -1,26 +1,17 @@
 import time
 from learning.modules.critic import Critic  # noqa F401
-from learning.modules.lqrc import (  # noqa F401
-    CustomCriticBaseline,  # noqa F401
-    Cholesky,  # noqa F401
-    CholeskyPlusConst,  # noqa F401
-    CholeskyOffset1,  # noqa F401
-    CholeskyOffset2,  # noqa F401
-)  # noqa F401
+from learning.modules.lqrc import *  # noqa F401
+from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import (
-    plot_pendulum_single_critic,
-    plot_pendulum_multiple_critics,
-)
+from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
 from torch import nn  # noqa F401
-from learning.modules.lqrc import CholeskyInput, CholeskyLatent  # noqa F401
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
@@ -41,10 +32,30 @@ critic_params = {
         "minimize": False,
         "device": DEVICE,
     },
+    "PDCholeskyInput": {
+        "num_obs": 2,
+        "hidden_dims": [128, 64, 32],
+        "activation": ["elu", "elu", "elu"],
+        "normalize_obs": True,
+        "latent_dim": None,  # 16,
+        "minimize": False,
+        "device": DEVICE,
+    },
     "CholeskyLatent": {
         "num_obs": 2,
         "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "tanh"],
+        "activation": ["elu", "elu", "elu"],
+        "normalize_obs": False,
+        "minimize": False,
+        "latent_dim": 16,
+        "latent_hidden_dims": [4, 8],
+        "latent_activation": ["elu", "elu"],
+        "device": DEVICE,
+    },
+    "PDCholeskyLatent": {
+        "num_obs": 2,
+        "hidden_dims": [128, 64, 32],
+        "activation": ["elu", "elu", "elu"],
         "normalize_obs": False,
         "minimize": False,
         "latent_dim": 16,
@@ -99,11 +110,13 @@ critic_names = [
     "Critic",
     "CholeskyInput",
     "CholeskyLatent",
+    "PDCholeskyInput",
+    "PDCholeskyLatent",
     # ]
-    "Cholesky",
-    "CholeskyPlusConst",
-    "CholeskyOffset1",
-    "CholeskyOffset2",
+    # "Cholesky",
+    # "CholeskyPlusConst",
+    # "CholeskyOffset1",
+    # "CholeskyOffset2",
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}

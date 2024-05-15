@@ -1,7 +1,7 @@
 import time
 
 # from learning.modules.lqrc import Cholesky  # noqa F401
-from learning.modules.lqrc import CholeskyInput, CholeskyLatent  # noqa F401
+from learning.modules.lqrc import CholeskyInput, CholeskyLatent, PDCholeskyInput  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
@@ -14,7 +14,7 @@ import torch
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -33,8 +33,8 @@ test_critic_params = {
 }
 
 learning_rate = 0.005415828580992768
-critic_name = "CholeskyInput"
-test_critic = CholeskyInput(**test_critic_params).to(DEVICE)
+critic_name = "PDCholeskyInput"
+test_critic = PDCholeskyInput(**test_critic_params).to(DEVICE)
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 gamma = 0.99
 lam = 0.95
