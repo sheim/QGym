@@ -23,7 +23,7 @@ from learning.modules.lqrc import CholeskyInput, CholeskyLatent  # noqa F401
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -59,6 +59,38 @@ critic_params = {
         "output_size": 1,
         "device": DEVICE,
     },
+    "Cholesky": {
+        "num_obs": 2,
+        "hidden_dims": None,
+        "activation": "elu",
+        "normalize_obs": False,
+        "output_size": 1,
+        "device": DEVICE,
+    },
+    "CholeskyPlusConst": {
+        "num_obs": 2,
+        "hidden_dims": None,
+        "activation": "elu",
+        "normalize_obs": False,
+        "output_size": 1,
+        "device": DEVICE,
+    },
+    "CholeskyOffset1": {
+        "num_obs": 2,
+        "hidden_dims": None,
+        "activation": "elu",
+        "normalize_obs": False,
+        "output_size": 1,
+        "device": DEVICE,
+    },
+    "CholeskyOffset2": {
+        "num_obs": 2,
+        "hidden_dims": None,
+        "activation": "elu",
+        "normalize_obs": False,
+        "output_size": 1,
+        "device": DEVICE,
+    },
 }
 
 learning_rate = 0.005415828580992768
@@ -66,12 +98,12 @@ critic_names = [
     "Critic",
     "CholeskyInput",
     "CholeskyLatent",
+    # ]
+    "Cholesky",
+    "CholeskyPlusConst",
+    "CholeskyOffset1",
+    "CholeskyOffset2",
 ]
-# "Cholesky",
-# "CholeskyPlusConst",
-# "CholeskyOffset1",
-# "CholeskyOffset2",
-# ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}
 for name in critic_names:

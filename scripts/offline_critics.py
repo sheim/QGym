@@ -100,12 +100,5 @@ for iteration in range(199, tot_iter, 50):
         title=f"{critic_name}_iteration{iteration}",
         fn=save_path + f"/{critic_name}_it{iteration}",
     )
-    # plot_pendulum_multiple_critics(
-    #     graphing_data["critic_obs"],
-    #     graphing_data["values"],
-    #     graphing_data["returns"],
-    #     title=f"iteration{iteration}",
-    #     fn=save_path + f"/{len(critic_names)}_critics_it{iteration}",
-    # )
-    # print value_offset
+
     print("Value Offset: ", test_critic.value_offset.item())

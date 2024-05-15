@@ -143,7 +143,7 @@ class CholeskyPlusConst(Cholesky):
             torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A),
             x.unsqueeze(-1),
         ) + c.unsqueeze(-1).unsqueeze(-1)
-        return y_pred.squeeze(-1)
+        return y_pred.squeeze()
 
     def save_intermediate(self):
         def hook(module, input, output):
@@ -201,8 +201,8 @@ class CholeskyOffset1(Cholesky):
                 "...ij, ...jk -> ...ik", x_bar.unsqueeze(-1).transpose(-2, -1), A
             ),
             x_bar.unsqueeze(-1),
-        ).squeeze(-1)
-        return y_pred
+        )
+        return y_pred.squeeze()
 
     def save_intermediate(self):
         def hook(module, input, output):
@@ -246,8 +246,8 @@ class CholeskyOffset2(Cholesky):
                 "...ij, ...jk -> ...ik", xhat.unsqueeze(-1).transpose(-2, -1), A
             ),
             xhat.unsqueeze(-1),
-        ).squeeze(-1)
-        return y_pred
+        )
+        return y_pred.squeeze()
 
     def save_intermediate(self):
         def hook(module, input, output):
