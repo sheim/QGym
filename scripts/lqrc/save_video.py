@@ -14,7 +14,7 @@ def extract_iteration(filename):
 
 image_folder = (
     os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph")
-    + "/20240515_170656"
+    + "/20240515_171218"
 )
 video_name = f"{image_folder}/video.mp4"
 img_names = os.listdir(image_folder)

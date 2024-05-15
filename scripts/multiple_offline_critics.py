@@ -13,6 +13,7 @@ from learning.utils import (
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import (
+    plot_pendulum_single_critic,
     plot_pendulum_multiple_critics,
 )
 from gym import LEGGED_GYM_ROOT_DIR

@@ -71,17 +71,20 @@ def plot_pendulum_single_critic(
     error = predictions - targets
 
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
+
+    # prediction values
+    pred_scatter = axes[1].scatter(
+        x[:, 0], x[:, 1], c=predictions, cmap="PiYG", alpha=0.5, norm=CenteredNorm()
+    )
     # error
-    scatter = axes[0].scatter(
+    error_scatter = axes[0].scatter(
         x[:, 0], x[:, 1], c=error, cmap="bwr", alpha=0.5, norm=CenteredNorm()
     )
-    # prediction values
-    scatter = axes[1].scatter(
-        x[:, 0], x[:, 1], c=predictions, cmap="bwr", alpha=0.5, norm=CenteredNorm()
-    )
+
     axes[0].set_title("Error")
     axes[1].set_title("Predictions")
-    fig.colorbar(scatter, ax=axes.ravel().tolist(), shrink=0.95, label=colorbar_label)
+    fig.colorbar(pred_scatter, ax=axes[1], shrink=0.95, label=colorbar_label)
+    fig.colorbar(error_scatter, ax=axes[0], shrink=0.95, label=colorbar_label)
     fig.suptitle(title, fontsize=16)
     plt.savefig(f"{fn}.png")
     print(f"Saved to {fn}.png")
