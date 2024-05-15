@@ -169,7 +169,9 @@ for iteration in range(1, tot_iter, 10):
         mean_value_loss /= counter
 
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
-        graphing_data["values"][name] = data[0, :]["values"]
+        graphing_data["values"][name] = test_critic.evaluate(
+            data[0, :]["critic_obs"]
+        )  # data[0, :]["values"]
         graphing_data["returns"][name] = data[0, :]["returns"]
 
     # compare new and old critics

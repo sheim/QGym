@@ -14,21 +14,11 @@ import torch
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
-
-# create fresh critic
-# test_critic_params = {
-#     "num_obs": 2,
-#     "hidden_dims": [128, 128, 64],
-#     "activation": "elu",
-#     "normalize_obs": True,
-#     "output_size": 1,
-#     "device": DEVICE,
-# }
 
 test_critic_params = {
     "num_obs": 2,
