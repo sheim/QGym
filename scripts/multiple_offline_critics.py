@@ -15,7 +15,7 @@ from torch import nn  # noqa F401
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -63,6 +63,18 @@ critic_params = {
         "latent_activation": ["elu", "elu"],
         "device": DEVICE,
     },
+    "SpectralLatent": {
+        "num_obs": 2,
+        "hidden_dims": [128, 64, 32],
+        "activation": ["elu", "elu", "elu"],
+        "normalize_obs": False,
+        "minimize": False,
+        "relative_dim": 4,
+        "latent_dim": 16,
+        "latent_hidden_dims": [4, 8],
+        "latent_activation": ["elu", "elu"],
+        "device": DEVICE,
+    },
     "Critic": {
         "num_obs": 2,
         "hidden_dims": [128, 64, 32],
@@ -105,13 +117,14 @@ critic_params = {
     },
 }
 
-learning_rate = 0.005415828580992768
+learning_rate = 0.001
 critic_names = [
     "Critic",
-    "CholeskyInput",
-    "CholeskyLatent",
-    "PDCholeskyInput",
-    "PDCholeskyLatent",
+    # "CholeskyInput",
+    # "CholeskyLatent",
+    # "PDCholeskyInput",
+    # "PDCholeskyLatent",
+    "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
@@ -135,7 +148,7 @@ gamma = 0.99
 lam = 0.95
 tot_iter = 200
 
-for iteration in range(1, tot_iter, 10):
+for iteration in range(1, tot_iter, 1):
     # load data
     base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
         DEVICE

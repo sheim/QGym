@@ -1,7 +1,7 @@
 import time
 
 # from learning.modules.lqrc import Cholesky  # noqa F401
-from learning.modules.lqrc import CholeskyInput, CholeskyLatent, PDCholeskyInput  # noqa F401
+from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
     compute_MC_returns,
@@ -24,8 +24,9 @@ test_critic_params = {
     "num_obs": 2,
     "hidden_dims": [512, 128, 64],
     "activation": ["elu", "elu", "tanh"],
+    "relative_dim": 3,
     "normalize_obs": True,
-    "latent_dim": None,  # 16,
+    "latent_dim": 4,  # 16,
     "minimize": False,
     "latent_hidden_dims": [512, 64],
     "latent_activation": ["elu", "tanh"],
@@ -34,7 +35,7 @@ test_critic_params = {
 
 learning_rate = 0.005415828580992768
 critic_name = "PDCholeskyInput"
-test_critic = PDCholeskyInput(**test_critic_params).to(DEVICE)
+test_critic = SpectralLatent(**test_critic_params).to(DEVICE)  # noqa F405
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 gamma = 0.99
 lam = 0.95
