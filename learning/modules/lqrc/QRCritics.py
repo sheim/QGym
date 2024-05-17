@@ -385,7 +385,7 @@ class NN_wRiccati(nn.Module):
 
     def loss_fn(self, obs, target, actions, **kwargs):
         value_loss = self.critic.loss_fn(obs, target, actions=actions)
-        z = obs if self.has_latent is None else self.critic.latent_NN(obs)
+        z = obs if self.has_latent is False else self.critic.latent_NN(obs)
         riccati_loss = self.QR_network.loss_fn(z, target, actions=actions)
         return value_loss + riccati_loss
 

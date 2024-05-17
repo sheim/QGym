@@ -116,18 +116,8 @@ critic_params = {
         "device": DEVICE,
     },
     "NN_wRiccati": {
-        "critic_name": "SpectralLatent",
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": False,
-        "minimize": False,
-        "relative_dim": 4,
-        "latent_dim": 16,
+        "critic_name": "PDCholeskyInput",
         "action_dim": 2,
-        "latent_hidden_dims": [4, 8],
-        "latent_activation": ["elu", "elu"],
-        "device": DEVICE,
     },
 }
 
@@ -136,9 +126,9 @@ critic_names = [
     # "Critic",
     # "CholeskyInput",
     # "CholeskyLatent",
-    # "PDCholeskyInput",
+    "PDCholeskyInput",
     # "PDCholeskyLatent",
-    "SpectralLatent",
+    # "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
@@ -150,6 +140,8 @@ critic_names = [
 test_critics = {}
 for name in critic_names:
     params = critic_params[name]
+    if "critic_name" in params.keys():
+        params.update(critic_params[params["critic_name"]])
     critic_class = globals()[name]
     test_critics[name] = critic_class(**params).to(DEVICE)
     if hasattr(test_critics[name], "value_offset"):
