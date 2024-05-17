@@ -116,7 +116,7 @@ critic_params = {
         "device": DEVICE,
     },
     "NN_wRiccati": {
-        "critic_name": "PDCholeskyInput",
+        "critic_name": "CholeskyInput",
         "action_dim": 2,
     },
 }
@@ -124,9 +124,9 @@ critic_params = {
 learning_rate = 0.001
 critic_names = [
     # "Critic",
-    # "CholeskyInput",
+    "CholeskyInput",
     # "CholeskyLatent",
-    "PDCholeskyInput",
+    # "PDCholeskyInput",
     # "PDCholeskyLatent",
     # "SpectralLatent",
     # ]
@@ -175,7 +175,7 @@ for iteration in range(1, tot_iter, 1):
         critic_optimizer = critic_optimizers[name]
         data = base_data.detach().clone()
         # train new critic
-        # data["values"] = test_critic.evaluate(data["critic_obs"])
+        data["values"] = test_critic.evaluate(data["critic_obs"])
         data["advantages"] = compute_generalized_advantages(
             data, gamma, lam, test_critic
         )
@@ -205,9 +205,9 @@ for iteration in range(1, tot_iter, 1):
         mean_value_loss /= counter
 
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
-        graphing_data["values"][name] = test_critic.evaluate(
-            data[0, :]["critic_obs"]
-        )  # data[0, :]["values"]
+        graphing_data["values"][name] = data[0, :][
+            "values"
+        ]  # test_critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["returns"][name] = data[0, :]["returns"]
 
     # compare new and old critics
