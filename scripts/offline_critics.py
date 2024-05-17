@@ -14,7 +14,7 @@ import torch
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -66,7 +66,9 @@ for iteration in range(199, tot_iter, 50):
         max_gradient_steps=max_gradient_steps,
     )
     for batch in generator:
-        value_loss = test_critic.loss_fn(batch["critic_obs"], batch["returns"])
+        value_loss = test_critic.loss_fn(
+            batch["critic_obs"], batch["returns"], actions=batch["actions"]
+        )
         critic_optimizer.zero_grad()
         value_loss.backward()
         # nn.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)

@@ -96,7 +96,7 @@ class CholeskyInput(nn.Module):
     def evaluate(self, obs):
         return self.forward(obs)
 
-    def loss_fn(self, obs, target):
+    def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
 
         if self.minimize:
@@ -280,7 +280,7 @@ class SpectralLatent(nn.Module):
     def evaluate(self, obs):
         return self.forward(obs)
 
-    def loss_fn(self, obs, target):
+    def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
 
         if self.minimize:
@@ -291,3 +291,130 @@ class SpectralLatent(nn.Module):
         loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
 
         return loss_NN + loss_offset + loss_scaling
+
+
+class QR(nn.Module):
+    def __init__(
+        self,
+        num_obs,
+        hidden_dims,
+        action_dim,
+        latent_dim=None,
+        activation="elu",
+        dropouts=None,
+        normalize_obs=False,
+        minimize=False,
+        device="cuda",
+        **kwargs,
+    ):
+        super().__init__()
+        self.device = device
+        if latent_dim is None:
+            latent_dim = num_obs
+        self.latent_dim = latent_dim
+        self.action_dim = action_dim
+        self.minimize = minimize
+        if minimize:
+            self.sign = torch.ones(1, device=device)
+        else:
+            self.sign = -torch.ones(1, device=device)
+
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_obs)
+
+        # Make Q estimator
+        num_lower_diag_elements_Q = sum(range(self.latent_dim + 1))
+        self.lower_diag_NN_Q = create_MLP(
+            latent_dim, num_lower_diag_elements_Q, hidden_dims, activation, dropouts
+        )
+        self.lower_diag_NN_Q.apply(init_weights)
+
+        # Make R estimator
+        num_lower_diag_elements_R = sum(range(action_dim + 1))
+        self.lower_diag_NN_R = create_MLP(
+            latent_dim, num_lower_diag_elements_R, hidden_dims, activation, dropouts
+        )
+        self.lower_diag_NN_R.apply(init_weights)
+
+    def forward(self, z, u, return_all=False):
+        Q_lower_diag = self.lower_diag_NN_Q(z)
+        L_Q = create_lower_diagonal(Q_lower_diag, self.latent_dim, self.device)
+        Q = compose_cholesky(L_Q)
+
+        R_lower_diag = self.lower_diag_NN_R(z)
+        L_R = create_lower_diagonal(R_lower_diag, self.action_dim, self.device)
+        R = compose_cholesky(L_R)
+
+        if return_all:
+            return Q, L_Q, R, L_R
+        else:
+            return Q, R
+
+    def evaluate(self, obs):
+        return self.forward(obs)
+
+    def loss_fn(self, z, target, actions, **kwargs):
+        Q, R = self.forward(z, target)
+        Q_value = self.sign * quadratify_xAx(z, Q)
+        R_value = self.sign * quadratify_xAx(actions, R)
+
+        riccati_loss = F.mse_loss(Q_value + R_value, target, reduction="mean")
+
+        return riccati_loss
+
+
+class NN_wRiccati(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        # assert (
+        #     "critic_name" in kwargs.keys()
+        # ), "Name of custom critic not specified in NN with Riccati init"
+        # assert "action_dim" in kwargs.keys(), "Dimension of NN actions not specified."
+        critic_name = kwargs["critic_name"]
+        device = kwargs["device"]
+        self.has_latent = False if kwargs["latent_dim"] is None else True
+        self.critic = eval(f"{critic_name}(**kwargs).to(device)")
+        self.QR_network = QR(**kwargs).to(device)
+
+    def forward(self, x, return_all=False):
+        return self.critic.forward(x, return_all)
+
+    def evaluate(self, obs):
+        return self.forward(obs)
+
+    def loss_fn(self, obs, target, actions, **kwargs):
+        value_loss = self.critic.loss_fn(obs, target, actions=actions)
+        z = obs if self.has_latent is None else self.critic.latent_NN(obs)
+        riccati_loss = self.QR_network.loss_fn(z, target, actions=actions)
+        return value_loss + riccati_loss
+
+
+# ! torch activaton functions don't like operating on parameters
+# class QR_RiccatiNN(SpectralLatent):
+#     """
+#     Goal is to write this such that we can switch out the NN class it's
+#     inheriting from without any further modification
+#     """
+
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         assert (
+#             "action_dim" in kwargs.keys()
+#         ), "Please indicate your action dimensions as part of NN initializaion kwargs"
+#         self.action_dim = kwargs["action_dim"]
+#         self.Q_input = nn.Parameter(
+#             torch.ones((self.latent_dim, self.latent_dim), device=self.device)
+#         )
+#         self.R_input = nn.Parameter(
+#             torch.ones((self.action_dim, self.action_dim), device=self.device)
+#         )
+
+#     def loss_fn(self, obs, target, actions, **kwargs):
+#         prediction_loss = super().loss_fn(obs, target)
+#         Q = create_PD_lower_diagonal(self.Q_input, self.latent_dim, device=self.device)
+#         R = create_PD_lower_diagonal(self.R_input, self.action_dim, device=self.device)
+#         riccati_loss = torch.mean(
+#             quadratify_xAx(self.latent_NN(obs), Q) + quadratify_xAx(actions, R)
+#         )
+#         return prediction_loss + riccati_loss

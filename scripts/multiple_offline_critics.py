@@ -15,7 +15,7 @@ from torch import nn  # noqa F401
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -115,11 +115,25 @@ critic_params = {
         "output_size": 1,
         "device": DEVICE,
     },
+    "NN_wRiccati": {
+        "critic_name": "SpectralLatent",
+        "num_obs": 2,
+        "hidden_dims": [128, 64, 32],
+        "activation": ["elu", "elu", "elu"],
+        "normalize_obs": False,
+        "minimize": False,
+        "relative_dim": 4,
+        "latent_dim": 16,
+        "action_dim": 2,
+        "latent_hidden_dims": [4, 8],
+        "latent_activation": ["elu", "elu"],
+        "device": DEVICE,
+    },
 }
 
 learning_rate = 0.001
 critic_names = [
-    "Critic",
+    # "Critic",
     # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
@@ -130,6 +144,7 @@ critic_names = [
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
+    "NN_wRiccati",
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}
@@ -185,7 +200,9 @@ for iteration in range(1, tot_iter, 1):
             max_gradient_steps=max_gradient_steps,
         )
         for batch in generator:
-            value_loss = test_critic.loss_fn(batch["critic_obs"], batch["returns"])
+            value_loss = test_critic.loss_fn(
+                batch["critic_obs"], batch["returns"], actions=batch["actions"]
+            )
             critic_optimizer.zero_grad()
             value_loss.backward()
             # # noqa F401.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
