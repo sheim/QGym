@@ -412,8 +412,16 @@ class NN_wRiccati(nn.Module):
 
 #     def loss_fn(self, obs, target, actions, **kwargs):
 #         prediction_loss = super().loss_fn(obs, target)
-#         Q = create_PD_lower_diagonal(self.Q_input, self.latent_dim, device=self.device)
-#         R = create_PD_lower_diagonal(self.R_input, self.action_dim, device=self.device)
+#         Q = create_PD_lower_diagonal(
+#             self.Q_input,
+#             self.latent_dim,
+#             device=self.device,
+#         )
+#         R = create_PD_lower_diagonal(
+#             self.R_input,
+#             self.action_dim,
+#             device=self.device,
+#         )
 #         riccati_loss = torch.mean(
 #             quadratify_xAx(self.latent_NN(obs), Q) + quadratify_xAx(actions, R)
 #         )

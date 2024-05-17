@@ -4,3 +4,5 @@ from .custom_critics import CustomCriticBaseline, Cholesky, CholeskyPlusConst, C
 from .autoencoder import Autoencoder
 
 from .QRCritics import *  # noqa: F401
+
+from .Losses import *  # noqa: F401
