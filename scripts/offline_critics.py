@@ -12,9 +12,10 @@ from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
 
+
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -26,22 +27,22 @@ test_critic_params = {
     "activation": ["elu", "elu", "tanh"],
     "relative_dim": 3,
     "normalize_obs": True,
-    "latent_dim": 4,  # 16,
+    "latent_dim": 16,  # 16,
     "minimize": False,
-    "latent_hidden_dims": [512, 64],
+    "latent_hidden_dims": [256, 64],
     "latent_activation": ["elu", "tanh"],
     "device": DEVICE,
 }
 
 learning_rate = 0.005415828580992768
-critic_name = "PDCholeskyInput"
+critic_name = "SpectralLatent"
 test_critic = SpectralLatent(**test_critic_params).to(DEVICE)  # noqa F405
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 gamma = 0.99
 lam = 0.95
 tot_iter = 200
 
-for iteration in range(199, tot_iter, 50):
+for iteration in range(1, tot_iter, 10):
     # load data
     data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(DEVICE)
 
@@ -60,11 +61,24 @@ for iteration in range(199, tot_iter, 50):
 
     with torch.no_grad():
         test_critic.value_offset.copy_(3.295910835894283)
+
     generator = create_uniform_generator(
-        data,
-        batch_size,
-        max_gradient_steps=max_gradient_steps,
+        data, batch_size, max_gradient_steps=max_gradient_steps
     )
+
+    # first train the latent representation for a bit
+    lat_generator = create_uniform_generator(
+        data, batch_size=1000, max_gradient_steps=100
+    )
+
+    latent_optimizer = torch.optim.Adam(test_critic.latent_NN.parameters(), lr=0.001)
+
+    for batch in lat_generator:
+        latent_loss = linear_latent_loss_fn(batch, test_critic.latent_NN)  # noqa F405
+        latent_optimizer.zero_grad()
+        latent_loss.backward()
+        latent_optimizer.step()
+
     for batch in generator:
         value_loss = test_critic.loss_fn(
             batch["critic_obs"], batch["returns"], actions=batch["actions"]
