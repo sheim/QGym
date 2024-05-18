@@ -14,7 +14,7 @@ import torch
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -88,7 +88,7 @@ def objective(trial):
     return final_loss.item()
 
 
-study = optuna.create_study(direction="minimize")
+study = optuna.create_study(storage="sqlite:///db.sqlite3", direction="minimize")
 study.optimize(objective, n_trials=1000)
 
 print("Number of finished trials: ", len(study.trials))

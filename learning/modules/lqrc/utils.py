@@ -201,3 +201,72 @@ def select_model(load_run, checkpoint):
     else:
         model = "model_{}.pt".format(checkpoint)
     return model
+
+
+def train(critic, optimizer, generator):
+    mean_value_loss = 0
+    counter = 0
+    for batch in generator:
+        value_loss = critic.loss_fn(
+            batch["critic_obs"], batch["returns"], actions=batch["actions"]
+        )
+        optimizer.zero_grad()
+        value_loss.backward()
+        # # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
+        optimizer.step()
+        mean_value_loss += value_loss.item()
+        counter += 1
+    mean_value_loss /= counter
+
+    return mean_value_loss
+
+
+def train_sequentially(critic, value_opt, reg_opt, value_generator, reg_generator):
+    mean_reg_loss = 0
+    reg_counter = 0
+    # regularize
+    for batch in reg_generator:
+        reg_loss = critic.reg_loss(
+            batch["critic_obs"], batch["returns"], batch["actions"]
+        )
+        reg_opt.zero_grad()
+        reg_loss.backward()
+        reg_opt.step()
+        mean_reg_loss += reg_loss.item()
+        reg_counter += 1
+    mean_reg_loss /= reg_counter
+    # train value output
+    mean_value_loss = train(critic.critic, value_opt, value_generator)
+    return mean_value_loss, mean_reg_loss
+
+
+def train_interleaved(critic, value_opt, reg_opt, value_generator, **kwargs):
+    mean_value_loss = 0
+    val_counter = 0
+    mean_reg_loss = 0
+    reg_counter = 0
+
+    for batch in value_generator:
+        # value loss
+        value_loss = critic.critic.loss_fn(
+            batch["critic_obs"], batch["returns"], actions=batch["actions"]
+        )
+        value_opt.zero_grad()
+        value_loss.backward()
+        # # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
+        value_opt.step()
+        mean_value_loss += value_loss.item()
+        val_counter += 1
+
+        # regularization loss
+        reg_loss = critic.reg_loss(
+            batch["critic_obs"], batch["returns"], batch["actions"]
+        )
+        reg_opt.zero_grad()
+        reg_loss.backward()
+        reg_opt.step()
+        mean_reg_loss += reg_loss.item()
+        reg_counter += 1
+    mean_value_loss /= val_counter
+    mean_reg_loss /= reg_counter
+    return mean_value_loss, mean_reg_loss
