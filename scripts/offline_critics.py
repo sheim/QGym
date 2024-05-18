@@ -15,7 +15,7 @@ import torch
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -50,6 +50,7 @@ for iteration in range(1, tot_iter, 10):
     episode_rollouts = compute_MC_returns(data, gamma)
 
     # train new critic
+    data["values"] = test_critic.evaluate(data["critic_obs"])
     data["advantages"] = compute_generalized_advantages(data, gamma, lam, test_critic)
     data["returns"] = data["advantages"] + data["values"]
 
@@ -88,7 +89,7 @@ for iteration in range(1, tot_iter, 10):
         # nn.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
         critic_optimizer.step()
         mean_value_loss += value_loss.item()
-        print("Value loss: ", value_loss.item())
+        # print("Value loss: ", value_loss.item())
         # print("Value Offset: ", test_critic.value_offset.item())
         counter += 1
     mean_value_loss /= counter
@@ -102,7 +103,7 @@ for iteration in range(1, tot_iter, 10):
 
     plot_pendulum_single_critic(
         x=data["critic_obs"][0],
-        predictions=test_critic.evaluate(data["critic_obs"][0]),
+        predictions=data["values"][0],
         targets=episode_rollouts[0],
         title=f"{critic_name}_iteration{iteration}",
         fn=save_path + f"/{critic_name}_it{iteration}",

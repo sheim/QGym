@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from learning.modules.utils import RunningMeanStd, create_MLP
+from learning.modules.lqrc.Losses import least_squares_fit, forward_affine
 
 
 def create_lower_diagonal(x, n, device):
@@ -384,45 +385,42 @@ class NN_wRiccati(nn.Module):
         return self.forward(obs)
 
     def loss_fn(self, obs, target, actions, **kwargs):
-        value_loss = self.critic.loss_fn(obs, target, actions=actions)
+        return self.value_loss(obs, target, actions) + self.reg_loss(
+            obs, target, actions
+        )
+
+    def value_loss(self, obs, target, actions, **kwargs):
+        return self.critic.loss_fn(obs, target, actions=actions)
+
+    def reg_loss(self, obs, target, actions, **kwargs):
         z = obs if self.has_latent is False else self.critic.latent_NN(obs)
-        riccati_loss = self.QR_network.loss_fn(z, target, actions=actions)
-        return value_loss + riccati_loss
+        return self.QR_network.loss_fn(z, target, actions=actions)
 
 
-# ! torch activaton functions don't like operating on parameters
-# class QR_RiccatiNN(SpectralLatent):
-#     """
-#     Goal is to write this such that we can switch out the NN class it's
-#     inheriting from without any further modification
-#     """
+class NN_wLinearLatent(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        critic_name = kwargs["critic_name"]
+        device = kwargs["device"]
+        self.critic = eval(f"{critic_name}(**kwargs).to(device)")
 
-#     def __init__(self, **kwargs):
-#         super().__init__(**kwargs)
-#         assert (
-#             "action_dim" in kwargs.keys()
-#         ), "Please indicate your action dimensions as part of NN initializaion kwargs"
-#         self.action_dim = kwargs["action_dim"]
-#         self.Q_input = nn.Parameter(
-#             torch.ones((self.latent_dim, self.latent_dim), device=self.device)
-#         )
-#         self.R_input = nn.Parameter(
-#             torch.ones((self.action_dim, self.action_dim), device=self.device)
-#         )
+    def forward(self, x, return_all=False):
+        return self.critic.forward(x, return_all)
 
-#     def loss_fn(self, obs, target, actions, **kwargs):
-#         prediction_loss = super().loss_fn(obs, target)
-#         Q = create_PD_lower_diagonal(
-#             self.Q_input,
-#             self.latent_dim,
-#             device=self.device,
-#         )
-#         R = create_PD_lower_diagonal(
-#             self.R_input,
-#             self.action_dim,
-#             device=self.device,
-#         )
-#         riccati_loss = torch.mean(
-#             quadratify_xAx(self.latent_NN(obs), Q) + quadratify_xAx(actions, R)
-#         )
-#         return prediction_loss + riccati_loss
+    def evaluate(self, obs):
+        return self.forward(obs)
+
+    def loss_fn(self, obs, target, actions, **kwargs):
+        return self.value_loss(obs, target, actions) + self.reg_loss(
+            obs, target, actions
+        )
+
+    def value_loss(self, obs, target, actions, **kwargs):
+        return self.critic.loss_fn(obs, target, actions=actions)
+
+    def reg_loss(self, obs, target, actions, **kwargs):
+        z = self.critic.latent_NN(obs)
+        u = actions.detach().clone()
+        u = u.view(-1, u.shape[-1])
+        K, z_offset = least_squares_fit(z, u)
+        return F.mse_loss(forward_affine(z, K, z_offset), target=u, reduction="mean")
