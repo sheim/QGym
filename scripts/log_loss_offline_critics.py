@@ -148,8 +148,8 @@ critic_names = [
     # "CholeskyOffset1",
     # "CholeskyOffset2",
     # "NN_wQR",
-    # "NN_wLinearLatent",
-    "NN_wRiccati",
+    "NN_wLinearLatent",
+    # "NN_wRiccati", # ! WIP
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}

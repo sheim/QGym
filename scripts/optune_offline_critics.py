@@ -190,7 +190,7 @@ def objective(trial):
 
     latest_loss = 0
     # train critic
-    for iteration in range(100, tot_iter, 1):
+    for iteration in range(1, tot_iter, 20):
         # load data and empty log
         base_data = torch.load(
             os.path.join(log_dir, "data_{}.pt".format(iteration))
@@ -261,5 +261,5 @@ for name in critic_names:
         storage=f"sqlite:///{save_path}/{name}_db.sqlite3",
         direction="minimize",
     )
-    study.optimize(objective, n_trials=10)
+    study.optimize(objective, n_trials=100)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
