@@ -89,7 +89,8 @@ class CholeskyInput(nn.Module):
         value *= self.scaling_quadratic
 
         if return_all:
-            return value, A, L
+            # return value, A, L
+            return {"value": value, "A": A, "L": L}
         else:
             return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
@@ -157,7 +158,8 @@ class CholeskyLatent(CholeskyInput):
         value *= self.scaling_quadratic
 
         if return_all:
-            return value, A, L, z
+            # return value, A, L, z
+            return {"value": value, "A": A, "L": L, "z": z}
         else:
             return value
 
@@ -177,7 +179,8 @@ class PDCholeskyInput(CholeskyInput):
         value *= self.scaling_quadratic
 
         if return_all:
-            return value, A, L
+            # return value, A, L
+            return {"value": value, "A": A, "L": L}
         else:
             return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
@@ -196,7 +199,8 @@ class PDCholeskyLatent(CholeskyLatent):
         value *= self.scaling_quadratic
 
         if return_all:
-            return value, A, L
+            # return value, A, L
+            return {"value": value, "A": A, "L": L}
         else:
             return value
 
@@ -274,7 +278,14 @@ class SpectralLatent(nn.Module):
             value += self.value_offset
 
         if return_all:
-            return value, z, torch.diag(A_diag), L, A
+            # return value, z, torch.diag(A_diag), L, A
+            return {
+                "value": value,
+                "z": z,
+                # "A_diag": torch.diag(A_diag), #! throws shape error
+                "L": L,
+                "A": A,
+            }
         else:
             return value
 
@@ -348,7 +359,8 @@ class QR(nn.Module):
         R = compose_cholesky(L_R)
 
         if return_all:
-            return Q, L_Q, R, L_R
+            # return Q, L_Q, R, L_R
+            return {"Q": Q, "L_Q": L_Q, "R": R, "L_R": L_R}
         else:
             return Q, R
 
@@ -359,13 +371,88 @@ class QR(nn.Module):
         Q, R = self.forward(z, target)
         Q_value = self.sign * quadratify_xAx(z, Q)
         R_value = self.sign * quadratify_xAx(actions, R)
+        gae_loss = F.mse_loss(Q_value + R_value, target, reduction="mean")
+        return gae_loss
 
-        riccati_loss = F.mse_loss(Q_value + R_value, target, reduction="mean")
+    def riccati_loss_fn(self, z, target, P, **kwargs):
+        Q, R = self.forward(z, target)
+        A, B = self.linearize_pendulum_dynamics()
+        A = A.to(self.device)
+        B = B.to(self.device)
+        AT_P_A = torch.einsum(
+            "...ij, ...ik -> ...ik",
+            torch.einsum("...ij, ...jk -> ...ik", A.transpose(-1, -2), P),
+            A,
+        )
+        AT_P_B = torch.einsum(
+            "...ij, ...ik -> ...ik",
+            torch.einsum("...ij, ...jk -> ...ik", A.transpose(-1, -2), P),
+            B,
+        )
+        R_BT_B = R + torch.einsum("...ij, ...jk -> ...ik", B.transpose(-1, -2), B)
+        BT_P_A = torch.einsum(
+            "...ij, ...ik -> ...ik",
+            torch.einsum("...ij, ...jk -> ...ik", B.transpose(-1, -2), P),
+            A,
+        )
+        final_term = torch.einsum(
+            "...ij, ...jk -> ...ik",
+            torch.einsum("...ij, ...jk -> ...ik", AT_P_B, torch.linalg.inv(R_BT_B)),
+            BT_P_A,
+        )
+        riccati_loss = Q + AT_P_A - P - final_term
+        return F.mse_loss(riccati_loss, target=0.0, reduction="mean")
 
-        return riccati_loss
+    def linearize_pendulum_dynamics(self, x_desired=torch.tensor([0.0, 0.0])):
+        m = 1.0
+        b = 0.1
+        length = 1.0
+        g = 9.81
+        ml2 = m * length**2
+
+        A = torch.tensor(
+            [[0.0, 1.0], [g / length * torch.cos(x_desired[0]), -b / ml2]],
+            device=self.device,
+        )
+        B = torch.tensor([[0.0], [(1.0 / ml2)]], device=self.device)
+        return A, B
 
 
 class NN_wRiccati(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        # assert (
+        #     "critic_name" in kwargs.keys()
+        # ), "Name of custom critic not specified in NN with Riccati init"
+        # assert "action_dim" in kwargs.keys(), "Dimension of NN actions not specified."
+        critic_name = kwargs["critic_name"]
+        device = kwargs["device"]
+        self.has_latent = False if kwargs["latent_dim"] is None else True
+        self.critic = eval(f"{critic_name}(**kwargs).to(device)")
+        self.QR_network = QR(**kwargs).to(device)
+
+    def forward(self, x, return_all=False):
+        return self.critic.forward(x, return_all)
+
+    def evaluate(self, obs):
+        return self.forward(obs)
+
+    def loss_fn(self, obs, target, actions, **kwargs):
+        return self.value_loss(obs, target, actions) + self.reg_loss(
+            obs, target, actions
+        )
+
+    def value_loss(self, obs, target, actions, **kwargs):
+        return self.critic.loss_fn(obs, target, actions=actions)
+
+    def reg_loss(self, obs, target, actions, **kwargs):
+        with torch.no_grad():
+            P = self.critic(obs, return_all=True)["A"]
+        z = obs if self.has_latent is False else self.critic.latent_NN(obs)
+        return self.QR_network.riccati_loss_fn(z, target, P=P)
+
+
+class NN_wQR(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
         # assert (

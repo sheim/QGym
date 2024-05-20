@@ -115,7 +115,7 @@ critic_params = {
         "output_size": 1,
         "device": DEVICE,
     },
-    "NN_wRiccati": {
+    "NN_wQR": {
         "critic_name": "CholeskyInput",
         "action_dim": 2,
     },
@@ -134,7 +134,7 @@ critic_names = [
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    "NN_wRiccati",
+    "NN_wQR",
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}

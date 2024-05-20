@@ -117,12 +117,17 @@ critic_params = {
         "output_size": 1,
         "device": DEVICE,
     },
-    "NN_wRiccati": {
+    "NN_wQR": {
         "critic_name": "CholeskyInput",
         "action_dim": 2,
         "regularization": "sequential",  # alternative is "interleaved"
     },
     "NN_wLinearLatent": {
+        "critic_name": "SpectralLatent",
+        "action_dim": 2,
+        "regularization": "sequential",  # alternative is "interleaved"
+    },
+    "NN_wRiccati": {
         "critic_name": "SpectralLatent",
         "action_dim": 2,
         "regularization": "sequential",  # alternative is "interleaved"
@@ -142,8 +147,9 @@ critic_names = [
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    # "NN_wRiccati",
-    "NN_wLinearLatent",
+    # "NN_wQR",
+    # "NN_wLinearLatent",
+    "NN_wRiccati",
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}
@@ -157,7 +163,7 @@ for name in critic_names:
     if hasattr(test_critics[name], "value_offset"):
         with torch.no_grad():
             test_critics[name].value_offset.copy_(3.3 / 100.0)
-    if name == "NN_wRiccati":
+    if name == "NN_wQR" or name == "NN_wRiccati":
         critic_optimizers[name] = {
             "value": torch.optim.Adam(
                 test_critics[name].critic.parameters(), lr=learning_rate
@@ -183,9 +189,9 @@ for name in critic_names:
 gamma = 0.99
 lam = 0.95
 tot_iter = 200
-wandb_run = wandb.init(
-    project="lqrc", entity="biomimetics", name="_".join(critic_names)
-)
+# wandb_run = wandb.init(
+#     project="lqrc", entity="biomimetics", name="_".join(critic_names)
+# )
 
 for iteration in range(1, tot_iter, 1):
     # load data and empty log
@@ -260,7 +266,7 @@ for iteration in range(1, tot_iter, 1):
         graphing_data["values"][name] = data[0, :]["values"]
         graphing_data["returns"][name] = data[0, :]["returns"]
 
-    wandb_run.log(logging_dict)
+    # wandb_run.log(logging_dict)
     # plot
     save_path = os.path.join(
         LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str

@@ -118,7 +118,7 @@ critic_params = {
         "output_size": 1,
         "device": DEVICE,
     },
-    "NN_wRiccati": {
+    "NN_wQR": {
         "critic_name": "CholeskyInput",
         "action_dim": 2,
         "regularization": "sequential",  # alternative is "interleaved"
@@ -130,7 +130,6 @@ critic_params = {
     },
 }
 
-learning_rate = 0.001
 critic_names = [
     # "Critic",
     # "CholeskyInput",
@@ -143,12 +142,12 @@ critic_names = [
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    # "NN_wRiccati",
+    # "NN_wQR",
     "NN_wLinearLatent",
 ]
 
 
-tot_iter = 2
+tot_iter = 120
 
 
 def objective(trial):
@@ -161,7 +160,7 @@ def objective(trial):
     if hasattr(test_critic, "value_offset"):
         with torch.no_grad():
             test_critic.value_offset.copy_(3.3 / 100.0)
-    if name == "NN_wRiccati":
+    if name == "NN_wQR":
         critic_optimizer = {
             "value": torch.optim.Adam(
                 test_critic.critic.parameters(),
@@ -191,7 +190,7 @@ def objective(trial):
 
     latest_loss = 0
     # train critic
-    for iteration in range(1, tot_iter, 1):
+    for iteration in range(100, tot_iter, 1):
         # load data and empty log
         base_data = torch.load(
             os.path.join(log_dir, "data_{}.pt".format(iteration))
@@ -253,9 +252,14 @@ for name in critic_names:
     print("params", params)
     critic_class = eval(name)
     test_critic = critic_class(**params).to(DEVICE)
-    study = optuna.create_study(storage="sqlite:///db.sqlite3", direction="minimize")
-    study.optimize(objective, n_trials=1)
+
+    # save results
     save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "optuna", time_str)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+    study = optuna.create_study(
+        storage=f"sqlite:///{save_path}/{name}_db.sqlite3",
+        direction="minimize",
+    )
+    study.optimize(objective, n_trials=10)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
