@@ -3,6 +3,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import CenteredNorm
+import matplotlib as mpl
+import matplotlib.colors as mcolors
 
 matplotlib.rcParams["pdf.fonttype"] = 42
 matplotlib.rcParams["ps.fonttype"] = 42
@@ -13,15 +15,101 @@ font = {"size": 12}
 matplotlib.rc("font", **font)
 
 
+def plot_pendulum_multiple_critics2(
+    x, predictions, targets, title, fn, colorbar_label="f(x)"
+):
+    num_critics = len(x.keys())
+    fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
+
+    # Determine global min and max error for consistent scaling
+    global_min_error = float("inf")
+    global_max_error = float("-inf")
+    global_min_prediction = float("inf")
+    global_max_prediction = float("-inf")
+    prediction_cmap = mpl.cm.get_cmap("viridis")
+    error_cmap = mpl.cm.get_cmap("bwr")
+
+    for critic_name in x:
+        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = (
+            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+        )
+        np_error = np_predictions - np_targets
+        global_min_error = min(global_min_error, np.min(np_error))
+        global_max_error = max(global_max_error, np.max(np_error))
+        global_min_prediction = min(global_min_prediction, np.min(np_predictions))
+        global_max_prediction = max(global_max_prediction, np.max(np_predictions))
+    offset_error = mcolors.TwoSlopeNorm(
+        vmin=global_min_error, vcenter=0, vmax=global_max_error
+    )
+    # offset_prediction = mcolors.BoundaryNorm(
+    #     [global_min_prediction, global_max_prediction], 256
+    # )
+    offset_prediction = mcolors.CenteredNorm(
+        vcenter=(global_max_prediction + global_min_prediction) / 2,
+        halfrange=(global_max_prediction - global_min_prediction) / 2,
+    )
+    for ix, critic_name in enumerate(x):
+        np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
+        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = (
+            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+        )
+        np_error = np_predictions - np_targets
+
+        # predictions
+        if np.any(~np.equal(np_predictions, np.zeros_like(np_predictions))):
+            axes[0, ix].scatter(
+                np_x[:, 0],
+                np_x[:, 1],
+                c=offset_prediction(np_predictions),
+                cmap=prediction_cmap,
+                alpha=0.5,
+                # norm=CenteredNorm(),
+            )
+        axes[0, ix].set_title(f"{critic_name} Prediction")
+
+        # error
+        if np.any(~np.equal(np_error, np.zeros_like(np_error))):
+            axes[1, ix].scatter(
+                np_x[:, 0],
+                np_x[:, 1],
+                c=offset_error(np_error),
+                cmap=error_cmap,
+                alpha=0.5,
+            )
+        axes[1, ix].set_title(f"{critic_name} Error")
+
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=offset_prediction, cmap=prediction_cmap),
+        ax=axes[0, :].ravel().tolist(),
+        shrink=0.95,
+        label=colorbar_label,
+    )
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=offset_error, cmap=error_cmap),
+        ax=axes[1, :].ravel().tolist(),
+        shrink=0.95,
+        label=colorbar_label,
+    )
+    fig.suptitle(title, fontsize=16)
+    plt.savefig(f"{fn}.png")
+    print(f"Saved to {fn}.png")
+
+
 def plot_pendulum_multiple_critics(
     x, predictions, targets, title, fn, colorbar_label="f(x)"
 ):
     num_critics = len(x.keys())
     fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
+
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
-        np_targets = targets[critic_name].detach().cpu().numpy().reshape(-1)
+        # np_targets = targets[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = (
+            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+        )
         np_error = np_predictions - np_targets
 
         # predictions

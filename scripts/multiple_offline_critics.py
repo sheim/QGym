@@ -7,13 +7,21 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
+from learning.modules.lqrc.plotting import (
+    plot_pendulum_multiple_critics,
+    plot_pendulum_multiple_critics2,
+)
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
 from torch import nn  # noqa F401
+from critic_params import critic_params
 
 DEVICE = "cuda:0"
+for critic_param in critic_params.values():
+    critic_param["device"] = DEVICE
+
+
 # handle some bookkeeping
 run_name = (
     "May22_11-11-03_standard_critic"
@@ -23,105 +31,6 @@ log_dir = os.path.join(
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
-# Parameters for different critics
-critic_params = {
-    "CholeskyInput": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "tanh"],
-        "normalize_obs": True,
-        "latent_dim": None,  # 16,
-        "minimize": False,
-        "device": DEVICE,
-    },
-    "PDCholeskyInput": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": True,
-        "latent_dim": None,  # 16,
-        "minimize": False,
-        "device": DEVICE,
-    },
-    "CholeskyLatent": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": False,
-        "minimize": False,
-        "latent_dim": 16,
-        "latent_hidden_dims": [64, 32],
-        "latent_activation": ["elu", "elu"],
-        "device": DEVICE,
-    },
-    "PDCholeskyLatent": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": False,
-        "minimize": False,
-        "latent_dim": 16,
-        "latent_hidden_dims": [64, 32],
-        "latent_activation": ["elu", "elu"],
-        "device": DEVICE,
-    },
-    "SpectralLatent": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": False,
-        "minimize": False,
-        "relative_dim": 2,
-        "latent_dim": 5,
-        "latent_hidden_dims": [64, 32],
-        "latent_activation": ["elu", "elu"],
-        "device": DEVICE,
-    },
-    "Critic": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "Cholesky": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "CholeskyPlusConst": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "CholeskyOffset1": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "CholeskyOffset2": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "NN_wQR": {
-        "critic_name": "SpectralLatent",
-        "action_dim": 2,
-    },
-}
 
 learning_rate = 0.001
 critic_names = [
@@ -129,7 +38,7 @@ critic_names = [
     # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
-    # "PDCholeskyLatent",
+    "PDCholeskyLatent",
     "SpectralLatent",
     # ]
     # "Cholesky",
@@ -148,7 +57,7 @@ for name in critic_names:
     test_critics[name] = critic_class(**params).to(DEVICE)
     if hasattr(test_critics[name], "value_offset"):
         with torch.no_grad():
-            test_critics[name].value_offset.copy_(3.3 / 100.0)
+            test_critics[name].value_offset.copy_(3.25)
 critic_optimizers = {
     name: torch.optim.Adam(critic.parameters(), lr=learning_rate)
     for name, critic in test_critics.items()
@@ -157,7 +66,7 @@ gamma = 0.95
 lam = 0.95
 tot_iter = 200
 
-for iteration in range(50, tot_iter, 10):
+for iteration in range(100, tot_iter, 10):
     # load data
     base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
         DEVICE
@@ -185,9 +94,9 @@ for iteration in range(50, tot_iter, 10):
         counter = 0
         max_gradient_steps = 100
         # max_grad_norm = 1.0
-        batch_size = 64
+        batch_size = 256
         generator = create_uniform_generator(
-            data,
+            data[:50, 0:-1:200],
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
@@ -205,9 +114,7 @@ for iteration in range(50, tot_iter, 10):
         mean_value_loss /= counter
 
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
-        graphing_data["values"][name] = data[0, :][
-            "values"
-        ]  # critic.evaluate(data[0, :]["critic_obs"])
+        graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["returns"][name] = data[0, :]["returns"]
 
     # compare new and old critics
@@ -223,4 +130,11 @@ for iteration in range(50, tot_iter, 10):
         graphing_data["returns"],
         title=f"iteration{iteration}",
         fn=save_path + f"/{len(critic_names)}_critics_it{iteration}",
+    )
+    plot_pendulum_multiple_critics2(
+        graphing_data["critic_obs"],
+        graphing_data["values"],
+        graphing_data["returns"],
+        title=f"iteration{iteration}",
+        fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
     )
