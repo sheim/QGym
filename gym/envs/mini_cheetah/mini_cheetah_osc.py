@@ -100,7 +100,6 @@ class MiniCheetahOsc(MiniCheetah):
         # self.grf = self._compute_grf()
         if not self.cfg.osc.randomize_osc_params:
             self.compute_osc_slope()
-
     def compute_osc_slope(self):
         cmd_x = torch.abs(self.commands[:, 0:1]) - self.cfg.osc.stop_threshold
         stop = cmd_x < 0
@@ -451,7 +450,7 @@ class MiniCheetahOsc(MiniCheetah):
         similarity *= self._sqrdexp(angle - torch.pi, torch.pi)
         return similarity
 
-    def _reward_asymettric(self):
+    def _reward_asymmetric(self):
         # ! hind legs
         angle = self.angle_difference(self.oscillators[:, 2], self.oscillators[:, 3])
         similarity = 1 - self._sqrdexp(angle, torch.pi)

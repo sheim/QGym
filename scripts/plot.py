@@ -235,14 +235,24 @@ print(data_names)
 
 for d in data_names:
     print(data[d].shape)
-# for d in data_names[0:5]:
-#     print(d)
-#     plot_data(d, data, data['oscillators'])
-#     #check_means(d, data, data['oscillators']) #ONLY WORKS FOR data with all 12 dof
-# time_plot(data, data['oscillators'])
-# phase_plot(data, data['oscillators'])
-# for d in data_names[5:-1]:
-#     print(d)
-#     reorg_plot_data(d, data)
+for d in data_names[0:5]:
+    print(d)
+    plot_data(d, data, data['oscillators'])
+    #check_means(d, data, data['oscillators']) #ONLY WORKS FOR data with all 12 dof
+time_plot(data, data['oscillators'])
+phase_plot(data, data['oscillators'])
+for d in data_names[5:-1]:
+    print(d)
+    reorg_plot_data(d, data)
 
 
+# data = dict(np.load("pca_scalings.npz"))
+# data_names = list(data.keys())
+# fig = plt.figure(figsize=(10,10))
+# #plt.plot(data['pca_scalings'][:,0])
+# #plt.plot(data['pca_scalings'][:,1])
+# plt.plot(data['pca_scalings'][:,2])
+# plt.axhline(y = 1, color = 'r', linestyle = '-') 
+# plt.axhline(y = -1, color = 'r', linestyle = '-') 
+
+# plt.show()

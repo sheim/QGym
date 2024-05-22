@@ -14,7 +14,7 @@ class Actor(nn.Module):
         hidden_dims,
         activation="elu",
         init_noise_std=1.0,
-        normalize_obs=True,
+        normalize_obs=False,
         **kwargs,
     ):
         if kwargs:
@@ -64,6 +64,7 @@ class Actor(nn.Module):
         return self.distribution.log_prob(actions).sum(dim=-1)
 
     def act_inference(self, observations):
+        #print(observations)
         if self._normalize_obs:
             observations = self.normalize(observations)
         actions_mean = self.NN(observations)

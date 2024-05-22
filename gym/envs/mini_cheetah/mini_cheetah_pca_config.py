@@ -2,7 +2,8 @@ from gym.envs.mini_cheetah.mini_cheetah_config import (
     MiniCheetahCfg,
     MiniCheetahRunnerCfg,
 )
-
+import torch
+import numpy as np
 BASE_HEIGHT_REF = 0.33
 
 
@@ -13,8 +14,14 @@ class MiniCheetahPcaCfg(MiniCheetahCfg):
         lookat = [0.0, 1.0, 0.5]  # [m]
 
     class pca:
-        mode = "one_leg"
+        mode = "symmetries"
         torques = False
+        eigenvectors = torch.from_numpy(
+                            np.load("/home/aileen/QGym/scripts/pca_components_ref_withpcascaling.npy")).to("cuda").T
+        haa_flip_indexes = [3,9]
+        symmetry_eigvec_ref_index = [0,4,5]
+        num_pcs = 9#4*len(symmetry_eigvec_ref_index)
+
 
     class env(MiniCheetahCfg.env):
         num_envs = 4096
@@ -72,36 +79,34 @@ class MiniCheetahPcaCfg(MiniCheetahCfg):
         desired_sim_frequency = 500
 
     class osc:
-        process_noise_std = 0.25
+        process_noise_std = 0.0
         # oscillator parameters
-        omega = 3  # 0.5 #3.5  # in Hz
-        coupling = 1  # 0.02
+        omega = 3
+        coupling = 0
         osc_bool = False
         grf_bool = False
+        init_to = "trot"
+        init_w_offset = True
         randomize_osc_params = False
-        grf_threshold = 0.1  # 20. # Normalized to body weight
-        omega_range = [1.0, 4.0]  # [0.0, 10.]
-        coupling_range = [
-            0.0,
-            1.0,
-        ]  # with normalized grf, can have omega/coupling on same scale
+        grf_threshold = 0.1
+        omega_range = [1,3]
+        coupling_range = [0.0, 0.0]
         offset_range = [0.0, 0.0]
+
+        # ignore the below, not used when randomize_osc_params=True
         stop_threshold = 0.5
         omega_stop = 1.0
         omega_step = 2.0
         omega_slope = 1.0
         omega_max = 4.0
         omega_var = 0.25
-        # coupling_step = 0.
-        # coupling_stop = 0.
         coupling_stop = 4.0
         coupling_step = 1.0
         coupling_slope = 0.0
         coupling_max = 1.0
         offset = 1.0
-        coupling_var = 0.25
+        coupling_var = 0.0
 
-        init_to = "random"
         init_w_offset = True
 
     class commands(MiniCheetahCfg.commands):
@@ -169,8 +174,8 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
 
     class policy(MiniCheetahRunnerCfg.policy):
         disable_actions = False
-        actor_hidden_dims = [200, 200, 100]
-        critic_hidden_dims = [200, 200, 100]
+        actor_hidden_dims = [11, 11, 1] #[256, 256, 128]
+        critic_hidden_dims = [11, 11, 1] #[256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         #normalize_obs = True
@@ -182,9 +187,10 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "oscillator_obs",
+            "oscillators_vel",
+            "base_height",
             "dof_pos_target",
         ]
-
         critic_obs = [
             "base_height",
             "base_lin_vel",
@@ -206,29 +212,53 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
 
         class reward:
             class weights:
-                tracking_lin_vel = 4.0
-                tracking_ang_vel = 2.0
-                # lin_vel_z = 0.0
-                #ang_vel_xy = 0.01
-                orientation = 1.0
-                torques = 5.0e-7
-                # dof_vel = 0.0
+                tracking_lin_vel = 6.0
+                tracking_ang_vel = 2.5
+                lin_vel_z = 0.
+                ang_vel_xy = 0.
+                orientation = 2.1
+                torques = 5.e-7
+                dof_vel = 0.
                 min_base_height = 1.5
-                # collision = 0
-                action_rate = 0.01  # -0.01
-                action_rate2 = 0.001  # -0.001
-                # stand_still = 0.0
-                # dof_pos_limits = 0.0#1.0
-                # feet_contact_forces = 0.0
-                # dof_near_home = 0.0 #0.5
-                swing_grf = 5.0
-                stance_grf = 5.0
-                # swing_velocity = 0.0
-                # stance_velocity = 0.0
-                # coupled_grf = 0.0  # 8.
-                # enc_pace = 0.0
-                # cursorial = 0 #.25
-                # standing_torques = 0.0  # 1.e-5
+                collision = 0
+                action_rate = 0.003  # -0.01
+                action_rate2 = 0.0003 # -0.001
+                stand_still = 0.
+                dof_pos_limits = 0.
+                feet_contact_forces = 0.
+                dof_near_home = 0.
+                swing_grf = 5.
+                stance_grf = 5.
+                swing_velocity = 0.
+                stance_velocity = 0.
+                coupled_grf = 0.  # 8.
+                enc_pace = 0.
+                cursorial = 0.25
+                standing_torques = 0.  # 1.e-5
+                pca = 0.2
+                # tracking_lin_vel = 4.0
+                # tracking_ang_vel = 2.0
+                # # lin_vel_z = 0.0
+                # #ang_vel_xy = 0.01
+                # orientation = 1.0
+                # torques = 5.0e-7
+                # # dof_vel = 0.0
+                # min_base_height = 1.5
+                # # collision = 0
+                # action_rate = 0.01  # -0.01
+                # action_rate2 = 0.001  # -0.001
+                # # stand_still = 0.0
+                # # dof_pos_limits = 0.0#1.0
+                # # feet_contact_forces = 0.0
+                # # dof_near_home = 0.0 #0.5
+                # swing_grf = 5.0
+                # stance_grf = 5.0
+                # # swing_velocity = 0.0
+                # # stance_velocity = 0.0
+                # # coupled_grf = 0.0  # 8.
+                # # enc_pace = 0.0
+                # # cursorial = 0.25
+                # # standing_torques = 0.0  # 1.e-5
 
             class termination_weight:
                 termination = 15.0 / 100.0

@@ -68,36 +68,34 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         desired_sim_frequency = 500
 
     class osc:
-        process_noise_std = 0.25
+        process_noise_std = 0.0
         # oscillator parameters
-        omega = 3  # 0.5 #3.5  # in Hz
-        coupling = 1  # 0.02
+        omega = 3
+        coupling = 0
         osc_bool = False
         grf_bool = False
+        init_to = "trot"
+        init_w_offset = True
         randomize_osc_params = False
-        grf_threshold = 0.1  # 20. # Normalized to body weight
-        omega_range = [1.0, 4.0]  # [0.0, 10.]
-        coupling_range = [
-            0.0,
-            1.0,
-        ]  # with normalized grf, can have omega/coupling on same scale
+        grf_threshold = 0.1
+        omega_range = [1.0, 3.0]
+        coupling_range = [0.0, 0.0]
         offset_range = [0.0, 0.0]
+
+        # ignore the below, not used when randomize_osc_params=True
         stop_threshold = 0.5
         omega_stop = 1.0
         omega_step = 2.0
         omega_slope = 1.0
         omega_max = 4.0
         omega_var = 0.25
-        # coupling_step = 0.
-        # coupling_stop = 0.
         coupling_stop = 4.0
         coupling_step = 1.0
         coupling_slope = 0.0
         coupling_max = 1.0
         offset = 1.0
-        coupling_var = 0.25
+        coupling_var = 0.0
 
-        init_to = "random"
         init_w_offset = True
 
     class commands(MiniCheetahCfg.commands):
@@ -157,13 +155,13 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
     class scaling(MiniCheetahCfg.scaling):
         pass
 
-
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
 
     class policy(MiniCheetahRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [256, 256, 128]
+        disable_actions = False
+        actor_hidden_dims = [13, 13, 4] #[256, 256, 128]
+        critic_hidden_dims = [13, 13, 4] #[256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 
@@ -190,6 +188,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_target",
         ]
 
+        #actions = ["pca_scalings"]
         actions = ["dof_pos_target"]
 
         class noise:
@@ -199,27 +198,50 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             class weights:
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
-                lin_vel_z = 0.0
-                ang_vel_xy = 0.01
+                lin_vel_z = 0.
+                ang_vel_xy = 0.
                 orientation = 1.0
-                torques = 5.0e-7
-                dof_vel = 0.0
+                torques = 5.e-7
+                dof_vel = 0.
                 min_base_height = 1.5
                 collision = 0
                 action_rate = 0.01  # -0.01
                 action_rate2 = 0.001  # -0.001
-                stand_still = 0.0
-                dof_pos_limits = 0.0
-                feet_contact_forces = 0.0
-                dof_near_home = 0.0
-                swing_grf = 5.0
-                stance_grf = 5.0
-                swing_velocity = 0.0
-                stance_velocity = 0.0
-                coupled_grf = 0.0  # 8.
-                enc_pace = 0.0
+                stand_still = 0.
+                dof_pos_limits = 0.
+                feet_contact_forces = 0.
+                dof_near_home = 0.
+                swing_grf = 5.
+                stance_grf = 5.
+                swing_velocity = 0.
+                stance_velocity = 0.
+                coupled_grf = 0.  # 8.
+                enc_pace = 0.
                 cursorial = 0.25
-                standing_torques = 0.0  # 1.e-5
+                standing_torques = 0.  # 1.e-5
+                # tracking_lin_vel = 4.0
+                # tracking_ang_vel = 2.0
+                # lin_vel_z = 0.
+                # ang_vel_xy = 0.
+                # orientation = 1.0
+                # torques = 5.e-7
+                # dof_vel = 0.
+                # min_base_height = 1.5
+                # collision = 0
+                # action_rate = 0.01  # -0.01
+                # action_rate2 = 0.001  # -0.001
+                # stand_still = 0.
+                # dof_pos_limits = 0.
+                # feet_contact_forces = 0.
+                # dof_near_home = 0.
+                # swing_grf = 5.
+                # stance_grf = 5.
+                # swing_velocity = 0.
+                # stance_velocity = 0.
+                # coupled_grf = 0.  # 8.
+                # enc_pace = 0.
+                # cursorial = 0.25
+                # standing_torques = 0.  # 1.e-5
 
             class termination_weight:
                 termination = 15.0 / 100.0

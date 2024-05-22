@@ -3,6 +3,7 @@ import torch
 from learning.utils import Logger
 from learning.utils import PotentialBasedRewardShaping
 from learning.utils import remove_zero_weighted_rewards
+import numpy as np
 
 from .on_policy_runner import OnPolicyRunner
 
@@ -20,6 +21,7 @@ class MyRunner(OnPolicyRunner):
         )
 
     def learn(self):
+        #log = {'pca_scalings':[]}
         self.set_up_logger()
         remove_zero_weighted_rewards(self.policy_cfg["reward"]["pbrs_weights"])
         PBRS = PotentialBasedRewardShaping(
@@ -66,6 +68,9 @@ class MyRunner(OnPolicyRunner):
                     rewards_dict.update(PBRS.post_step(self.env, dones))
                     total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
 
+                    #log['pca_scalings'] += [self.env.pca_scalings.tolist()[0]]
+
+
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
                     logger.finish_step(dones)
@@ -86,6 +91,7 @@ class MyRunner(OnPolicyRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
+        #np.savez("pca_scalings_training_myrunner", **log)
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):

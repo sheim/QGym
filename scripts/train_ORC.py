@@ -1,8 +1,7 @@
-from gym.envs import __init__
 from gym.utils import get_args, task_registry
-from gym.utils.logging_and_saving \
-    import local_code_save_helper, wandb_singleton
+from gym.utils.logging_and_saving import local_code_save_helper, wandb_singleton
 from ORC import adjust_settings
+
 
 def setup():
     args = get_args()
@@ -10,9 +9,9 @@ def setup():
 
     # * prepare environment
     env_cfg, train_cfg = task_registry.create_cfgs(args)
-    env_cfg, train_cfg = adjust_settings(toggle="111",
-                                         env_cfg=env_cfg,
-                                         train_cfg=train_cfg)
+    env_cfg, train_cfg = adjust_settings(
+        toggle="111", env_cfg=env_cfg, train_cfg=train_cfg
+    )
     task_registry.set_log_dir_name(train_cfg)
 
     task_registry.make_gym_and_sim()
@@ -37,6 +36,6 @@ def train(train_cfg, policy_runner):
     wandb_helper.close_wandb()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     train_cfg, policy_runner = setup()
     train(train_cfg=train_cfg, policy_runner=policy_runner)

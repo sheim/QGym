@@ -3,7 +3,6 @@ from gym.utils import get_args, task_registry, randomize_episode_counters
 from gym.utils.logging_and_saving import wandb_singleton
 from gym.utils.logging_and_saving import local_code_save_helper
 
-
 def setup():
     args = get_args()
     wandb_helper = wandb_singleton.WandbSingleton()
@@ -18,7 +17,7 @@ def setup():
 
     local_code_save_helper.save_local_files_to_logs(train_cfg.log_dir)
 
-    return train_cfg, policy_runner
+    return train_cfg, policy_runner, env
 
 
 def train(train_cfg, policy_runner):
@@ -30,5 +29,5 @@ def train(train_cfg, policy_runner):
 
 
 if __name__ == "__main__":
-    train_cfg, policy_runner = setup()
+    train_cfg, policy_runner, env = setup()
     train(train_cfg=train_cfg, policy_runner=policy_runner)

@@ -4,6 +4,7 @@ from gym.envs.mini_cheetah.mini_cheetah_config import (
     MiniCheetahCfg,
     MiniCheetahRunnerCfg,
 )
+import torch
 
 BASE_HEIGHT_REF = 0.33
 
@@ -17,6 +18,11 @@ class MiniCheetahRefPcaCfg(MiniCheetahCfg):
     class pca:
         mode = "symmetries"
         torques = False
+        eigenvectors = torch.from_numpy(
+                            np.load("/home/aileen/QGym/scripts/pca_components_ref_withpcascaling.npy")).to("cuda").T
+        haa_flip_indexes = [3,9]
+        symmetry_eigvec_ref_index = [0,4]
+        num_pcs = 4*len(symmetry_eigvec_ref_index)
 
     class terrain(MiniCheetahCfg.terrain):
         pass
@@ -68,7 +74,7 @@ class MiniCheetahRefPcaCfg(MiniCheetahCfg):
         tracking_sigma = 0.25
 
     class scaling(MiniCheetahCfg.scaling):
-        pca_scalings = 1 #list(np.load("/home/aileen/QGym/scripts/eigvals.npy"))[0:6]  #[1/6, 1/2, 1/2, 1, 1, 1/2]
+        pca_scalings = 1#list(np.load("/home/aileen/QGym/scripts/eigvals.npy"))[0:12] 
         # TODO: n-dim list where n  is number of components
         # TODO: scale PCA output by eigenvalue
 
@@ -92,7 +98,7 @@ class MiniCheetahRefPcaRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "phase_obs",
         ]
-
+        #omega 
         critic_obs = [
             "base_height",
             "base_lin_vel",
@@ -131,6 +137,7 @@ class MiniCheetahRefPcaRunnerCfg(MiniCheetahRunnerCfg):
                 reference_traj = 0.0
                 swing_grf = 1.5
                 stance_grf = 1.5
+                pca = 0.2
 
             class pbrs_weights:
                 reference_traj = 0.0

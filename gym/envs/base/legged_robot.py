@@ -52,7 +52,6 @@ class LeggedRobot(BaseTask):
     def step(self):
         self._reset_buffers()
         self._pre_decimation_step()
-        # * step physics and render each frame
         self._render()
         for _ in range(self.cfg.control.decimation):
             self._pre_compute_torques()

@@ -2,7 +2,7 @@ import os
 import torch
 
 from learning.utils import Logger
-
+import numpy as np
 from .BaseRunner import BaseRunner
 
 logger = Logger()
@@ -19,6 +19,7 @@ class OnPolicyRunner(BaseRunner):
         )
 
     def learn(self):
+        #log = {'pca_scalings':[]}
         self.set_up_logger()
 
         rewards_dict = {}
@@ -55,6 +56,8 @@ class OnPolicyRunner(BaseRunner):
                     terminated = self.get_terminated()
                     dones = timed_out | terminated
 
+                    #log['pca_scalings'] += [self.env.pca_scalings.tolist()[0]]
+
                     self.update_rewards(rewards_dict, terminated)
                     total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
 
@@ -78,6 +81,7 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
+        #np.save("pca_scalings_training", log)
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):
@@ -106,10 +110,14 @@ class OnPolicyRunner(BaseRunner):
         logger.register_category(
             "actor", self.alg.actor_critic, ["action_std", "entropy"]
         )
+        # logger.register_category(
+        #     "pca", self.env, ["pca_scalings"]
+        # )
 
         logger.attach_torch_obj_to_wandb(
             (self.alg.actor_critic.actor, self.alg.actor_critic.critic)
         )
+
 
     def save(self):
         os.makedirs(self.log_dir, exist_ok=True)
