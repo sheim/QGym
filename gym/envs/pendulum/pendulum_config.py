@@ -7,7 +7,7 @@ class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 1  # 1 for theta connecting base and pole
-        episode_length_s = 5.0
+        episode_length_s = 10.0
 
     class terrain(FixedRobotCfg.terrain):
         pass
@@ -103,8 +103,8 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
     class algorithm(FixedRobotCfgPPO.algorithm):
         # both
-        gamma = 0.99
-        discount_horizon = 2.0
+        gamma = 0.95
+        # discount_horizon = 2.0
         lam = 0.98
         # shared
         max_gradient_steps = 24
@@ -126,4 +126,4 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         experiment_name = "pendulum"
         max_iterations = 200  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 50
+        num_steps_per_env = 100

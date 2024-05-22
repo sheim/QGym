@@ -61,9 +61,7 @@ def compute_generalized_advantages(data, gamma, lam, critic):
 
 # todo change num_epochs to num_batches
 @torch.no_grad
-def create_uniform_generator(
-    data, batch_size, num_epochs=1, max_gradient_steps=None, keys=None
-):
+def create_uniform_generator(data, batch_size, max_gradient_steps=100):
     n, m = data.shape
     total_data = n * m
 
@@ -71,12 +69,19 @@ def create_uniform_generator(
         batch_size = total_data
 
     num_batches_per_epoch = total_data // batch_size
-    if max_gradient_steps:
-        num_epochs = max_gradient_steps // num_batches_per_epoch
-        num_epochs = max(num_epochs, 1)
-    for epoch in range(num_epochs):
+    num_epochs = max_gradient_steps // num_batches_per_epoch
+    last_epoch_batches = max_gradient_steps - num_epochs * num_batches_per_epoch
+
+    for epoch in range(num_epochs - 1):
         indices = torch.randperm(total_data, device=data.device)
         for i in range(num_batches_per_epoch):
+            batched_data = data.flatten(0, 1)[
+                indices[i * batch_size : (i + 1) * batch_size]
+            ]
+            yield batched_data
+    else:
+        indices = torch.randperm(total_data, device=data.device)
+        for i in range(last_epoch_batches):
             batched_data = data.flatten(0, 1)[
                 indices[i * batch_size : (i + 1) * batch_size]
             ]

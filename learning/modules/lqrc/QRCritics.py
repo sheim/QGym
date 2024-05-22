@@ -488,7 +488,7 @@ class NN_wLinearLatent(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
         critic_name = kwargs["critic_name"]
-        device = kwargs["device"]
+        device = kwargs["device"]  # noqa
         self.critic = eval(f"{critic_name}(**kwargs).to(device)")
 
     def forward(self, x, return_all=False):

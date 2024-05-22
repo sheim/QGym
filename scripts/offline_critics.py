@@ -15,7 +15,9 @@ import torch
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = (
+    "May22_10-54-14_standard_critic"
+)  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -56,9 +58,9 @@ for iteration in range(1, tot_iter, 10):
 
     mean_value_loss = 0
     counter = 0
-    max_gradient_steps = 1000
+    max_gradient_steps = 10
     # max_grad_norm = 1.0
-    batch_size = 1000
+    batch_size = 64
 
     with torch.no_grad():
         test_critic.value_offset.copy_(3.295910835894283)
@@ -69,7 +71,7 @@ for iteration in range(1, tot_iter, 10):
 
     # first train the latent representation for a bit
     lat_generator = create_uniform_generator(
-        data, batch_size=1000, max_gradient_steps=100
+        data, batch_size=256, max_gradient_steps=100
     )
 
     latent_optimizer = torch.optim.Adam(test_critic.latent_NN.parameters(), lr=0.001)

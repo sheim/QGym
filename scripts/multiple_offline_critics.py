@@ -15,7 +15,9 @@ from torch import nn  # noqa F401
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = (
+    "May22_11-11-03_standard_critic"
+)  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -48,7 +50,7 @@ critic_params = {
         "normalize_obs": False,
         "minimize": False,
         "latent_dim": 16,
-        "latent_hidden_dims": [4, 8],
+        "latent_hidden_dims": [64, 32],
         "latent_activation": ["elu", "elu"],
         "device": DEVICE,
     },
@@ -59,7 +61,7 @@ critic_params = {
         "normalize_obs": False,
         "minimize": False,
         "latent_dim": 16,
-        "latent_hidden_dims": [4, 8],
+        "latent_hidden_dims": [64, 32],
         "latent_activation": ["elu", "elu"],
         "device": DEVICE,
     },
@@ -69,9 +71,9 @@ critic_params = {
         "activation": ["elu", "elu", "elu"],
         "normalize_obs": False,
         "minimize": False,
-        "relative_dim": 4,
-        "latent_dim": 16,
-        "latent_hidden_dims": [4, 8],
+        "relative_dim": 2,
+        "latent_dim": 5,
+        "latent_hidden_dims": [64, 32],
         "latent_activation": ["elu", "elu"],
         "device": DEVICE,
     },
@@ -116,19 +118,19 @@ critic_params = {
         "device": DEVICE,
     },
     "NN_wQR": {
-        "critic_name": "CholeskyInput",
+        "critic_name": "SpectralLatent",
         "action_dim": 2,
     },
 }
 
 learning_rate = 0.001
 critic_names = [
-    # "Critic",
-    "CholeskyInput",
+    "Critic",
+    # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
     # "PDCholeskyLatent",
-    # "SpectralLatent",
+    "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
@@ -151,11 +153,11 @@ critic_optimizers = {
     name: torch.optim.Adam(critic.parameters(), lr=learning_rate)
     for name, critic in test_critics.items()
 }
-gamma = 0.99
+gamma = 0.95
 lam = 0.95
 tot_iter = 200
 
-for iteration in range(1, tot_iter, 1):
+for iteration in range(50, tot_iter, 10):
     # load data
     base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
         DEVICE
@@ -171,33 +173,31 @@ for iteration in range(1, tot_iter, 1):
     graphing_data["values"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
     graphing_data["returns"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
 
-    for name, test_critic in test_critics.items():
+    for name, critic in test_critics.items():
         critic_optimizer = critic_optimizers[name]
         data = base_data.detach().clone()
         # train new critic
-        data["values"] = test_critic.evaluate(data["critic_obs"])
-        data["advantages"] = compute_generalized_advantages(
-            data, gamma, lam, test_critic
-        )
+        data["values"] = critic.evaluate(data["critic_obs"])
+        data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
         data["returns"] = data["advantages"] + data["values"]
 
         mean_value_loss = 0
         counter = 0
         max_gradient_steps = 100
         # max_grad_norm = 1.0
-        batch_size = 10 * 4096
+        batch_size = 64
         generator = create_uniform_generator(
             data,
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
         for batch in generator:
-            value_loss = test_critic.loss_fn(
+            value_loss = critic.loss_fn(
                 batch["critic_obs"], batch["returns"], actions=batch["actions"]
             )
             critic_optimizer.zero_grad()
             value_loss.backward()
-            # # noqa F401.utils.clip_grad_norm_(test_critic.parameters(), max_grad_norm)
+            # # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
             critic_optimizer.step()
             mean_value_loss += value_loss.item()
             counter += 1
@@ -207,7 +207,7 @@ for iteration in range(1, tot_iter, 1):
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
         graphing_data["values"][name] = data[0, :][
             "values"
-        ]  # test_critic.evaluate(data[0, :]["critic_obs"])
+        ]  # critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["returns"][name] = data[0, :]["returns"]
 
     # compare new and old critics
