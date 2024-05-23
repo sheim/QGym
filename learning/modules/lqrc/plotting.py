@@ -2,7 +2,7 @@ from math import sqrt
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import CenteredNorm
+from matplotlib.colors import CenteredNorm, ListedColormap
 import matplotlib as mpl
 import matplotlib.colors as mcolors
 
@@ -13,6 +13,30 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 font = {"size": 12}
 matplotlib.rc("font", **font)
+
+
+def create_custom_bwr_colormap():
+    # Define the colors for each segment
+    dark_blue = [0, 0, 0.5, 1]
+    light_blue = [0.5, 0.5, 1, 1]
+    white = [1, 1, 1, 1]
+    light_red = [1, 0.5, 0.5, 1]
+    dark_red = [0.5, 0, 0, 1]
+
+    # Number of bins for each segment
+    n_bins = 128
+    mid_band = 5
+
+    # Create the colormap segments
+    blue_segment = np.linspace(dark_blue, light_blue, n_bins // 2)
+    white_segment = np.tile(white, (mid_band, 1))
+    red_segment = np.linspace(light_red, dark_red, n_bins // 2)
+
+    # Stack segments to create the full colormap
+    colors = np.vstack((blue_segment, white_segment, red_segment))
+    custom_bwr = ListedColormap(colors, name="custom_bwr")
+
+    return custom_bwr
 
 
 def plot_pendulum_multiple_critics2(
@@ -27,7 +51,7 @@ def plot_pendulum_multiple_critics2(
     global_min_prediction = float("inf")
     global_max_prediction = float("-inf")
     prediction_cmap = mpl.cm.get_cmap("viridis")
-    error_cmap = mpl.cm.get_cmap("bwr")
+    error_cmap = create_custom_bwr_colormap()
 
     for critic_name in x:
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
@@ -39,13 +63,13 @@ def plot_pendulum_multiple_critics2(
         global_max_error = max(global_max_error, np.max(np_error))
         global_min_prediction = min(global_min_prediction, np.min(np_predictions))
         global_max_prediction = max(global_max_prediction, np.max(np_predictions))
-    offset_error = mcolors.TwoSlopeNorm(
+    error_norm = mcolors.TwoSlopeNorm(
         vmin=global_min_error, vcenter=0, vmax=global_max_error
     )
-    # offset_prediction = mcolors.BoundaryNorm(
+    # prediction_norm = mcolors.BoundaryNorm(
     #     [global_min_prediction, global_max_prediction], 256
     # )
-    offset_prediction = mcolors.CenteredNorm(
+    prediction_norm = mcolors.CenteredNorm(
         vcenter=(global_max_prediction + global_min_prediction) / 2,
         halfrange=(global_max_prediction - global_min_prediction) / 2,
     )
@@ -58,36 +82,38 @@ def plot_pendulum_multiple_critics2(
         np_error = np_predictions - np_targets
 
         # predictions
-        if np.any(~np.equal(np_predictions, np.zeros_like(np_predictions))):
-            axes[0, ix].scatter(
-                np_x[:, 0],
-                np_x[:, 1],
-                c=offset_prediction(np_predictions),
-                cmap=prediction_cmap,
-                alpha=0.5,
-                # norm=CenteredNorm(),
-            )
+        # if np.any(~np.equal(np_predictions, np.zeros_like(np_predictions))):
+        axes[0, ix].scatter(
+            np_x[:, 0],
+            np_x[:, 1],
+            c=np_predictions,
+            cmap=prediction_cmap,
+            norm=prediction_norm,
+            alpha=0.5,
+            # norm=CenteredNorm(),
+        )
         axes[0, ix].set_title(f"{critic_name} Prediction")
 
         # error
-        if np.any(~np.equal(np_error, np.zeros_like(np_error))):
-            axes[1, ix].scatter(
-                np_x[:, 0],
-                np_x[:, 1],
-                c=offset_error(np_error),
-                cmap=error_cmap,
-                alpha=0.5,
-            )
+        # if np.any(~np.equal(np_error, np.zeros_like(np_error))):
+        axes[1, ix].scatter(
+            np_x[:, 0],
+            np_x[:, 1],
+            c=np_error,
+            cmap=error_cmap,
+            norm=error_norm,
+            alpha=0.5,
+        )
         axes[1, ix].set_title(f"{critic_name} Error")
 
     fig.colorbar(
-        mpl.cm.ScalarMappable(norm=offset_prediction, cmap=prediction_cmap),
+        mpl.cm.ScalarMappable(norm=prediction_norm, cmap=prediction_cmap),
         ax=axes[0, :].ravel().tolist(),
         shrink=0.95,
         label=colorbar_label,
     )
     fig.colorbar(
-        mpl.cm.ScalarMappable(norm=offset_error, cmap=error_cmap),
+        mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap),
         ax=axes[1, :].ravel().tolist(),
         shrink=0.95,
         label=colorbar_label,
