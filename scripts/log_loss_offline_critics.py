@@ -8,7 +8,10 @@ from learning.utils import (
     create_uniform_generator,
 )
 from learning.modules.lqrc.utils import train, train_sequentially, train_interleaved
-from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
+from learning.modules.lqrc.plotting import (
+    plot_pendulum_multiple_critics,
+    plot_state_data_dist,
+)
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -25,6 +28,10 @@ log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
+
+save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
 
 learning_rate = 0.001
 critic_names = [
@@ -115,13 +122,16 @@ for iteration in range(100, tot_iter, 10):
         max_gradient_steps = 100
         # max_grad_norm = 1.0
         batch_size = 256
-        num_steps = 1  # ! want this at 1
+        num_steps = 50  # ! want this at 1
         n_trajs = 50
         traj_idx = torch.randperm(data.shape[1])[0:n_trajs]
         generator = create_uniform_generator(
             data[:num_steps, traj_idx],
             batch_size,
             max_gradient_steps=max_gradient_steps,
+        )
+        plot_state_data_dist(
+            data[:num_steps, 0:-1:200]["critic_obs"], save_path + "/data_dist"
         )
 
         # perform backprop
@@ -133,7 +143,7 @@ for iteration in range(100, tot_iter, 10):
                 else train_interleaved
             )
             reg_generator = create_uniform_generator(
-                data[1:num_steps, 0:-1:200], batch_size=1000, max_gradient_steps=100
+                data[:num_steps, 0:-1:200], batch_size=1000, max_gradient_steps=100
             )
             (
                 logging_dict[name]["mean_value_loss"],
@@ -156,11 +166,6 @@ for iteration in range(100, tot_iter, 10):
 
     # wandb_run.log(logging_dict)
     # plot
-    save_path = os.path.join(
-        LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str
-    )
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
 
     plot_pendulum_multiple_critics(
         graphing_data["critic_obs"],

@@ -66,6 +66,7 @@ def plot_pendulum_multiple_critics(
     error_norm = mcolors.TwoSlopeNorm(
         vmin=global_min_error, vcenter=0, vmax=global_max_error
     )
+    # error_norm = mcolors.TwoSlopeNorm(vmin=-2.50, vcenter=0, vmax=2.50)
     # prediction_norm = mcolors.BoundaryNorm(
     #     [global_min_prediction, global_max_prediction], 256
     # )
@@ -73,6 +74,10 @@ def plot_pendulum_multiple_critics(
         vcenter=(global_max_prediction + global_min_prediction) / 2,
         halfrange=(global_max_prediction - global_min_prediction) / 2,
     )
+    # prediction_norm = mcolors.CenteredNorm(
+    #     vcenter=0.0,
+    #     halfrange=2.5,
+    # )
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
@@ -148,6 +153,24 @@ def plot_pendulum_single_critic(
     fig.colorbar(pred_scatter, ax=axes[1], shrink=0.95, label=colorbar_label)
     fig.colorbar(error_scatter, ax=axes[0], shrink=0.95, label=colorbar_label)
     fig.suptitle(title, fontsize=16)
+    plt.savefig(f"{fn}.png")
+    print(f"Saved to {fn}.png")
+
+
+def plot_state_data_dist(data, fn):
+    data = data.detach().cpu().numpy()
+    theta = data[:, :, 0]
+    omega = data[:, :, 1]
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 6))
+    _, _, _, hist = ax.hist2d(
+        theta.flatten(), omega.flatten(), bins=64, cmap="Blues", alpha=0.9
+    )
+    ax.plot(theta, omega, lw=1)
+
+    ax.set_xlabel("theta")
+    ax.set_ylabel("theta_dot")
+    ax.set_title("State Space Data Density")
+    fig.colorbar(hist, label="Data Density")
     plt.savefig(f"{fn}.png")
     print(f"Saved to {fn}.png")
 
