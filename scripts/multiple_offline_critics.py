@@ -91,9 +91,9 @@ for iteration in range(100, tot_iter, 10):
         max_gradient_steps = 100
         # max_grad_norm = 1.0
         batch_size = 256
-        num_steps = 50
+        num_steps = 1  # ! want this at 1
         generator = create_uniform_generator(
-            data[:num_steps, 0:-1:200],  # ! make sure you're indexing this way
+            data[:num_steps, 0:-1:200],
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
