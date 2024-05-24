@@ -131,7 +131,7 @@ for iteration in range(100, tot_iter, 10):
             max_gradient_steps=max_gradient_steps,
         )
         plot_state_data_dist(
-            data[:num_steps, 0:-1:200]["critic_obs"], save_path + "/data_dist"
+            data[:num_steps, traj_idx]["critic_obs"], save_path + "/data_dist"
         )
 
         # perform backprop
