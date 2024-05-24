@@ -115,9 +115,11 @@ for iteration in range(100, tot_iter, 10):
         max_gradient_steps = 100
         # max_grad_norm = 1.0
         batch_size = 256
-        num_steps = 2  # ! want this at 1
+        num_steps = 1  # ! want this at 1
+        n_trajs = 50
+        traj_idx = torch.randperm(data.shape[1])[0:n_trajs]
         generator = create_uniform_generator(
-            data[1:num_steps, 0:-1:200],
+            data[:num_steps, traj_idx],
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
