@@ -1,5 +1,4 @@
 import time
-import wandb
 from learning.modules.critic import Critic  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
 from learning.modules.lqrc import *  # noqa F401

@@ -7,7 +7,7 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
+from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics2
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -20,7 +20,7 @@ for critic_param in critic_params.values():
 
 
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"
+run_name = "May15_16-20-21_standard_critic"  # May22_11-11-03_standard_critic
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -33,7 +33,7 @@ critic_names = [
     # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
-    "PDCholeskyLatent",
+    # "PDCholeskyLatent",
     "SpectralLatent",
     # ]
     # "Cholesky",
@@ -92,8 +92,10 @@ for iteration in range(100, tot_iter, 10):
         # max_grad_norm = 1.0
         batch_size = 256
         num_steps = 1  # ! want this at 1
+        n_trajs = 50
+        traj_idx = torch.randperm(data.shape[1])[0:n_trajs]
         generator = create_uniform_generator(
-            data[:num_steps, 0:-1:200],
+            data[:num_steps, traj_idx],
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
@@ -107,7 +109,11 @@ for iteration in range(100, tot_iter, 10):
             critic_optimizer.step()
             mean_value_loss += value_loss.item()
             counter += 1
-        print(f"{name} value loss: ", value_loss.item())
+        ground_truth_loss = (
+            (episode_rollouts[0] - critic.evaluate(data["critic_obs"][0])).pow(2).mean()
+        ).to("cpu")
+        print(f"{name} ground truth loss: ", ground_truth_loss.item())
+        # print(f"{name} value loss: ", value_loss.item())
         mean_value_loss /= counter
 
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
@@ -121,7 +127,7 @@ for iteration in range(100, tot_iter, 10):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    plot_pendulum_multiple_critics(
+    plot_pendulum_multiple_critics2(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],

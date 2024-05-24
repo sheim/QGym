@@ -3,11 +3,7 @@ critic_params = {
     "CholeskyInput": {
         "num_obs": 2,
         "hidden_dims": [128, 32],
-        "activation": [
-            "elu",
-            "elu",
-            "tanh",
-        ],  #! revisit why this was the only one with tanh last layer
+        "activation": ["elu", "elu", "elu"],
         "normalize_obs": True,
         "latent_dim": None,  # 16,
         "minimize": False,
@@ -46,9 +42,9 @@ critic_params = {
         "activation": ["elu", "elu", "elu"],
         "normalize_obs": False,
         "minimize": False,
-        "relative_dim": 2,
-        "latent_dim": 5,
-        "latent_hidden_dims": [32],
+        "relative_dim": 4,
+        "latent_dim": 16,
+        "latent_hidden_dims": [128, 64],
         "latent_activation": ["elu", "elu"],
     },
     "Critic": {
