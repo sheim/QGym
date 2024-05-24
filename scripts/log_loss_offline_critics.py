@@ -14,140 +14,33 @@ from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
 from torch import nn  # noqa F401
+from critic_params import critic_params
 
 DEVICE = "cuda:0"
+for critic_param in critic_params.values():
+    critic_param["device"] = DEVICE
+
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
-# Parameters for different critics
-critic_params = {
-    "CholeskyInput": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "tanh"],
-        "normalize_obs": True,
-        "latent_dim": None,  # 16,
-        "minimize": False,
-        "device": DEVICE,
-    },
-    "PDCholeskyInput": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": True,
-        "latent_dim": None,  # 16,
-        "minimize": False,
-        "device": DEVICE,
-    },
-    "CholeskyLatent": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": False,
-        "minimize": False,
-        "latent_dim": 16,
-        "latent_hidden_dims": [4, 8],
-        "latent_activation": ["elu", "elu"],
-        "device": DEVICE,
-    },
-    "PDCholeskyLatent": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": False,
-        "minimize": False,
-        "latent_dim": 16,
-        "latent_hidden_dims": [4, 8],
-        "latent_activation": ["elu", "elu"],
-        "device": DEVICE,
-    },
-    "SpectralLatent": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": ["elu", "elu", "elu"],
-        "normalize_obs": False,
-        "minimize": False,
-        "relative_dim": 4,
-        "latent_dim": 16,
-        "latent_hidden_dims": [4, 8],
-        "latent_activation": ["elu", "elu"],
-        "device": DEVICE,
-    },
-    "Critic": {
-        "num_obs": 2,
-        "hidden_dims": [128, 64, 32],
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "Cholesky": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "CholeskyPlusConst": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "CholeskyOffset1": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "CholeskyOffset2": {
-        "num_obs": 2,
-        "hidden_dims": None,
-        "activation": "elu",
-        "normalize_obs": False,
-        "output_size": 1,
-        "device": DEVICE,
-    },
-    "NN_wQR": {
-        "critic_name": "CholeskyInput",
-        "action_dim": 2,
-        "regularization": "sequential",  # alternative is "interleaved"
-    },
-    "NN_wLinearLatent": {
-        "critic_name": "SpectralLatent",
-        "action_dim": 2,
-        "regularization": "sequential",  # alternative is "interleaved"
-    },
-    "NN_wRiccati": {
-        "critic_name": "SpectralLatent",
-        "action_dim": 2,
-        "regularization": "sequential",  # alternative is "interleaved"
-    },
-}
-
 learning_rate = 0.001
 critic_names = [
-    # "Critic",
+    "Critic",
     # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
-    # "PDCholeskyLatent",
+    "PDCholeskyLatent",
     "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    # "NN_wQR",
+    "NN_wQR",
     "NN_wLinearLatent",
     # "NN_wRiccati", # ! WIP
 ]
@@ -162,7 +55,7 @@ for name in critic_names:
     test_critics[name] = critic_class(**params).to(DEVICE)
     if hasattr(test_critics[name], "value_offset"):
         with torch.no_grad():
-            test_critics[name].value_offset.copy_(3.3 / 100.0)
+            test_critics[name].value_offset.copy_(3.25)
     if name == "NN_wQR" or name == "NN_wRiccati":
         critic_optimizers[name] = {
             "value": torch.optim.Adam(
@@ -186,14 +79,14 @@ for name in critic_names:
             test_critics[name].parameters(), lr=learning_rate
         )
 
-gamma = 0.99
+gamma = 0.95
 lam = 0.95
 tot_iter = 200
 # wandb_run = wandb.init(
 #     project="lqrc", entity="biomimetics", name="_".join(critic_names)
 # )
 
-for iteration in range(1, tot_iter, 1):
+for iteration in range(100, tot_iter, 10):
     # load data and empty log
     base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
         DEVICE
@@ -212,21 +105,20 @@ for iteration in range(1, tot_iter, 1):
     graphing_data["values"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
     graphing_data["returns"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
 
-    for name, test_critic in test_critics.items():
-        # load data and set hyperparameters
+    for name, critic in test_critics.items():
         critic_optimizer = critic_optimizers[name]
         data = base_data.detach().clone()
-        data["values"] = test_critic.evaluate(data["critic_obs"])
-        data["advantages"] = compute_generalized_advantages(
-            data, gamma, lam, test_critic
-        )
+        # train new critic
+        data["values"] = critic.evaluate(data["critic_obs"])
+        data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
         data["returns"] = data["advantages"] + data["values"]
 
         max_gradient_steps = 100
         # max_grad_norm = 1.0
-        batch_size = 10 * 4096
+        batch_size = 256
+        num_steps = 50
         generator = create_uniform_generator(
-            data,
+            data[:num_steps, 0:-1:200],  # ! make sure you're indexing this way
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
@@ -239,31 +131,26 @@ for iteration in range(1, tot_iter, 1):
                 if regularization == "sequential"
                 else train_interleaved
             )
-            val_generator = create_uniform_generator(
-                data,
-                batch_size,
-                max_gradient_steps=max_gradient_steps,
-            )
             reg_generator = create_uniform_generator(
-                data, batch_size=1000, max_gradient_steps=100
+                data[:num_steps, 0:-1:200], batch_size=1000, max_gradient_steps=100
             )
             (
                 logging_dict[name]["mean_value_loss"],
                 logging_dict[name]["mean_regularization_loss"],
             ) = train_func(
-                test_critic,
+                critic,
                 critic_optimizer["value"],
                 critic_optimizer["regularization"],
-                val_generator,
+                generator,
                 reg_generator,
             )
         else:
             logging_dict[name]["mean value loss"] = train(
-                test_critic, critic_optimizer, generator
+                critic, critic_optimizer, generator
             )
         # prepare data for graphing
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
-        graphing_data["values"][name] = data[0, :]["values"]
+        graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["returns"][name] = data[0, :]["returns"]
 
     # wandb_run.log(logging_dict)
@@ -279,5 +166,5 @@ for iteration in range(1, tot_iter, 1):
         graphing_data["values"],
         graphing_data["returns"],
         title=f"iteration{iteration}",
-        fn=save_path + f"/{len(critic_names)}_critics_it{iteration}",
+        fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
     )

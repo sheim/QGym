@@ -39,7 +39,7 @@ def create_custom_bwr_colormap():
     return custom_bwr
 
 
-def plot_pendulum_multiple_critics2(
+def plot_pendulum_multiple_critics(
     x, predictions, targets, title, fn, colorbar_label="f(x)"
 ):
     num_critics = len(x.keys())
@@ -123,59 +123,10 @@ def plot_pendulum_multiple_critics2(
     print(f"Saved to {fn}.png")
 
 
-def plot_pendulum_multiple_critics(
-    x, predictions, targets, title, fn, colorbar_label="f(x)"
-):
-    num_critics = len(x.keys())
-    fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
-
-    for ix, critic_name in enumerate(x):
-        np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
-        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
-        # np_targets = targets[critic_name].detach().cpu().numpy().reshape(-1)
-        np_targets = (
-            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
-        )
-        np_error = np_predictions - np_targets
-
-        # predictions
-        if np.any(~np.equal(np_predictions, np.zeros_like(np_predictions))):
-            pred_scatter = axes[0, ix].scatter(
-                np_x[:, 0],
-                np_x[:, 1],
-                c=np_predictions,
-                cmap="PiYG",
-                alpha=0.5,
-                norm=CenteredNorm(),
-            )
-        axes[0, ix].set_title(f"{critic_name} Prediction")
-
-        # error
-        if np.any(~np.equal(np_error, np.zeros_like(np_error))):
-            error_scatter = axes[1, ix].scatter(
-                np_x[:, 0],
-                np_x[:, 1],
-                c=np_error,
-                cmap="bwr",
-                alpha=0.5,
-                norm=CenteredNorm(),
-            )
-        axes[1, ix].set_title(f"{critic_name} Error")
-
-    fig.colorbar(
-        pred_scatter, ax=axes[0, :].ravel().tolist(), shrink=0.95, label=colorbar_label
-    )
-    fig.colorbar(
-        error_scatter, ax=axes[1, :].ravel().tolist(), shrink=0.95, label=colorbar_label
-    )
-    fig.suptitle(title, fontsize=16)
-    plt.savefig(f"{fn}.png")
-    print(f"Saved to {fn}.png")
-
-
 def plot_pendulum_single_critic(
     x, predictions, targets, title, fn, colorbar_label="f(x)"
 ):
+    assert False, "Single pendulum plotter is deprecated"
     x = x.detach().cpu().numpy().reshape(-1, 2)
     predictions = predictions.detach().cpu().numpy().reshape(-1)
     targets = targets.detach().cpu().numpy().reshape(-1)

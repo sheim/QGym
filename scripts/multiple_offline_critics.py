@@ -7,10 +7,7 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import (
-    plot_pendulum_multiple_critics,
-    plot_pendulum_multiple_critics2,
-)
+from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -23,9 +20,7 @@ for critic_param in critic_params.values():
 
 
 # handle some bookkeeping
-run_name = (
-    "May22_11-11-03_standard_critic"
-)  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May15_16-20-21_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -46,6 +41,7 @@ critic_names = [
     # "CholeskyOffset1",
     # "CholeskyOffset2",
     "NN_wQR",
+    "NN_wLinearLatent",
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}
@@ -95,8 +91,9 @@ for iteration in range(100, tot_iter, 10):
         max_gradient_steps = 100
         # max_grad_norm = 1.0
         batch_size = 256
+        num_steps = 50
         generator = create_uniform_generator(
-            data[:50, 0:-1:200],
+            data[:num_steps, 0:-1:200],  # ! make sure you're indexing this way
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
@@ -125,13 +122,6 @@ for iteration in range(100, tot_iter, 10):
         os.makedirs(save_path)
 
     plot_pendulum_multiple_critics(
-        graphing_data["critic_obs"],
-        graphing_data["values"],
-        graphing_data["returns"],
-        title=f"iteration{iteration}",
-        fn=save_path + f"/{len(critic_names)}_critics_it{iteration}",
-    )
-    plot_pendulum_multiple_critics2(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
