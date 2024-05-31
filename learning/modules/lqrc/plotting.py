@@ -161,15 +161,15 @@ def plot_state_data_dist(data, fn):
     data = data.detach().cpu().numpy()
     theta = data[:, :, 0]
     omega = data[:, :, 1]
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 6))
-    _, _, _, hist = ax.hist2d(
-        theta.flatten(), omega.flatten(), bins=64, cmap="Blues", alpha=0.9
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
+    _, _, _, hist = axes[0].hist2d(
+        theta.flatten(), omega.flatten(), bins=64, cmap="Blues"
     )
-    ax.plot(theta, omega, lw=1)
+    axes[1].plot(theta, omega, lw=1)
 
-    ax.set_xlabel("theta")
-    ax.set_ylabel("theta_dot")
-    ax.set_title("State Space Data Density")
+    axes[0].set_xlabel("theta")
+    axes[0].set_ylabel("theta_dot")
+    fig.suptitle("State Space Data Density")
     fig.colorbar(hist, label="Data Density")
     plt.savefig(f"{fn}.png")
     print(f"Saved to {fn}.png")
