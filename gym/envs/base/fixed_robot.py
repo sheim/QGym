@@ -568,11 +568,11 @@ class FixedRobot(BaseTask):
 
     # ------------ reward functions----------------
 
-    def _sqrdexp(self, x, scale=1.0):
+    def _sqrdexp(self, x, sigma=None):
         """shorthand helper for squared exponential"""
-        return torch.exp(
-            -torch.square(x / scale) / self.cfg.reward_settings.tracking_sigma
-        )
+        if sigma is None:
+            sigma = self.cfg.reward_settings.tracking_sigma
+        return torch.exp(-torch.square(x) / sigma)
 
     def _reward_torques(self):
         """Penalize torques"""
