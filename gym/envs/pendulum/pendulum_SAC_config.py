@@ -9,7 +9,7 @@ class PendulumSACCfg(PendulumCfg):
         episode_length_s = 2.5
 
     class init_state(PendulumCfg.init_state):
-        reset_mode = "reset_to_basic"
+        reset_mode = "reset_to_range"
         default_joint_angles = {"theta": 0.0}
         dof_pos_range = {
             "theta": [-torch.pi / 2, torch.pi / 2],
