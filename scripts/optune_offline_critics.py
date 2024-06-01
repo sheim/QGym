@@ -1,5 +1,6 @@
 import time
 import optuna
+import csv
 
 from learning.modules.critic import Critic  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
@@ -14,7 +15,6 @@ from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
 from torch import nn  # noqa F401
-
 from critic_params import critic_params
 
 DEVICE = "cuda:0"
@@ -26,7 +26,7 @@ run_name = "May15_16-20-21_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
-
+import pandas as pd
 
 critic_names = [
     "Critic",
@@ -176,3 +176,8 @@ for name in critic_names:
     )
     study.optimize(objective, n_trials=100)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
+    best_trials = [trial.params for trial in study.best_trials]
+    with open(save_path + f"/{name}_best_trials.csv", 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=best_trials[0].keys())
+        writer.writeheader()
+        writer.writerows(best_trials)
