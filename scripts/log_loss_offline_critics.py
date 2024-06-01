@@ -17,6 +17,7 @@ import os
 import torch
 from torch import nn  # noqa F401
 from critic_params import critic_params
+import wandb # noqa F401
 
 DEVICE = "cuda:0"
 for critic_param in critic_params.values():
@@ -122,7 +123,7 @@ for iteration in range(100, tot_iter, 10):
         max_gradient_steps = 100
         # max_grad_norm = 1.0
         batch_size = 256
-        num_steps = 50  # ! want this at 1
+        num_steps = 50
         n_trajs = 50
         traj_idx = torch.randperm(data.shape[1])[0:n_trajs]
         generator = create_uniform_generator(
@@ -131,10 +132,10 @@ for iteration in range(100, tot_iter, 10):
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
-        plot_state_data_dist(
-            data[:num_steps, traj_idx]["critic_obs"], save_path + "/data_dist"
-            # data[:num_steps, 0:-1:200]["critic_obs"], save_path + "/data_dist"
-        )
+        # plot_state_data_dist(
+        #     data[:num_steps, traj_idx]["critic_obs"], save_path + "/data_dist"
+        #     # data[:num_steps, 0:-1:200]["critic_obs"], save_path + "/data_dist"
+        # )
 
         # perform backprop
         regularization = critic_params[name].get("regularization")
@@ -145,7 +146,7 @@ for iteration in range(100, tot_iter, 10):
                 else train_interleaved
             )
             reg_generator = create_uniform_generator(
-                data[:num_steps, 0:-1:200], batch_size=1000, max_gradient_steps=100
+                data[:num_steps, traj_idx], batch_size=1000, max_gradient_steps=100
             )
             (
                 logging_dict[name]["mean_value_loss"],
@@ -166,9 +167,9 @@ for iteration in range(100, tot_iter, 10):
         graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["returns"][name] = data[0, :]["returns"]
 
+    # print("logging dict", logging_dict)
     # wandb_run.log(logging_dict)
     # plot
-
     plot_pendulum_multiple_critics(
         graphing_data["critic_obs"],
         graphing_data["values"],

@@ -22,38 +22,37 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 # handle some bookkeeping
-run_name = "May22_11-11-03_standard_critic"
+run_name = "May15_16-20-21_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
 
 
 critic_names = [
-    # "Critic",
+    "Critic",
     # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
-    # "PDCholeskyLatent",
+    "PDCholeskyLatent",
     "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    # "NN_wQR",
-    # "NN_wLinearLatent",
+    "NN_wQR",
+    "NN_wLinearLatent",
+    # "NN_wRiccati", # ! WIP
 ]
 
-
-tot_iter = 120
-
+tot_iter = 200
 
 def objective(trial):
-    gamma = 0.99
+    gamma = 0.95
     lam = trial.suggest_float("lam", 0.5, 1.0)
-    max_gradient_steps = 100
-    batch_size = 256
-    # batch_size = trial.suggest_categorical("batch_size", [10**x for x in range(4, 6)])
+    max_gradient_steps = trial.suggest_categorical("max_grad_steps", [10**x for x in range(2, 4)])
+    # batch_size = 256
+    batch_size = trial.suggest_categorical("batch_size", [2**x for x in range(6,10)])
 
     # critic set up
     if hasattr(test_critic, "value_offset"):
@@ -89,7 +88,7 @@ def objective(trial):
         )
 
     # train critic
-    for iteration in range(1, tot_iter, 20):
+    for iteration in range(100, tot_iter, 10):
         # load data and empty log
         base_data = torch.load(
             os.path.join(log_dir, "data_{}.pt".format(iteration))
@@ -102,8 +101,13 @@ def objective(trial):
             data, gamma, lam, test_critic
         )
         data["returns"] = data["advantages"] + data["values"]
+
+        num_steps = 50
+        n_trajs = 50
+        traj_idx = torch.randperm(data.shape[1])[0:n_trajs]
         generator = create_uniform_generator(
-            data,
+            data[:num_steps, traj_idx],
+            # data[:num_steps, 0:-1:200],
             batch_size,
             max_gradient_steps=max_gradient_steps,
         )
@@ -111,6 +115,7 @@ def objective(trial):
         # perform backprop
         regularization = params.get("regularization")
         if regularization is not None:
+            reg_batch_size = trial.suggest_categorical("reg_batch_size", [2**x for x in range(6,10)])
             train_func = (
                 train_sequentially
                 if regularization == "sequential"
@@ -134,10 +139,10 @@ def objective(trial):
                 val_generator,
                 reg_generator,
             )
-            trial.report(mean_value_loss + regularization_loss, iteration)
+            # trial.report(mean_value_loss + regularization_loss, iteration) # not supported for multi-obj
         else:
             mean_value_loss = train(test_critic, critic_optimizer, generator)
-            trial.report(mean_value_loss, iteration)
+            # trial.report(mean_value_loss, iteration) # not supported for multi-obj
     episode_rollouts = compute_MC_returns(data, gamma)
     actual_mean_error = (
         (test_critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0])
@@ -145,7 +150,7 @@ def objective(trial):
         .mean()
         .item()
     )
-    return actual_mean_error
+    return actual_mean_error, lam
 
 
 time_str = time.strftime("%Y%m%d_%H%M%S")
@@ -167,7 +172,7 @@ for name in critic_names:
         os.makedirs(save_path)
     study = optuna.create_study(
         storage=f"sqlite:///{save_path}/{name}_db.sqlite3",
-        direction="minimize",
+        directions=["minimize", "minimize"],
     )
     study.optimize(objective, n_trials=100)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
