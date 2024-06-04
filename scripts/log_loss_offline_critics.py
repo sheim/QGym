@@ -11,6 +11,7 @@ from learning.modules.lqrc.utils import train, train_sequentially, train_interle
 from learning.modules.lqrc.plotting import (
     plot_pendulum_multiple_critics,
     plot_state_data_dist,
+    plot_pendulum_multiple_critics_w_data,
 )
 from gym import LEGGED_GYM_ROOT_DIR
 import os
@@ -40,14 +41,14 @@ critic_names = [
     # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
-    "PDCholeskyLatent",
+    # "PDCholeskyLatent",
     "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    "NN_wQR",
+    # "NN_wQR",
     "NN_wLinearLatent",
     # "NN_wRiccati", # ! WIP
 ]
@@ -75,10 +76,10 @@ for name in critic_names:
     elif name == "NN_wLinearLatent":
         critic_optimizers[name] = {
             "value": torch.optim.Adam(
-                test_critics[name].critic.parameters(), lr=learning_rate
+                test_critics[name].critic.parameters(), lr=0.0035155648350750773  # learning_rate
             ),
             "regularization": torch.optim.Adam(
-                test_critics[name].critic.latent_NN.parameters(), lr=learning_rate
+                test_critics[name].critic.latent_NN.parameters(), lr=0.00619911552327558 #learning_rate
             ),
         }
     else:
@@ -87,7 +88,7 @@ for name in critic_names:
         )
 
 gamma = 0.95
-lam = 0.95
+lam = 0.5080185484279778  # 0.95
 tot_iter = 200
 # wandb_run = wandb.init(
 #     project="lqrc", entity="biomimetics", name="_".join(critic_names)
@@ -120,7 +121,7 @@ for iteration in range(100, tot_iter, 10):
         data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
         data["returns"] = data["advantages"] + data["values"]
 
-        max_gradient_steps = 100
+        max_gradient_steps = 1000 # 100
         # max_grad_norm = 1.0
         batch_size = 256
         num_steps = 50
@@ -146,7 +147,8 @@ for iteration in range(100, tot_iter, 10):
                 else train_interleaved
             )
             reg_generator = create_uniform_generator(
-                data[:num_steps, traj_idx], batch_size=1000, max_gradient_steps=100
+                data[:num_steps, traj_idx], batch_size=64,  # 1000,
+                max_gradient_steps=100
             )
             (
                 logging_dict[name]["mean_value_loss"],
@@ -170,10 +172,18 @@ for iteration in range(100, tot_iter, 10):
     # print("logging dict", logging_dict)
     # wandb_run.log(logging_dict)
     # plot
-    plot_pendulum_multiple_critics(
+    # plot_pendulum_multiple_critics(
+    #     graphing_data["critic_obs"],
+    #     graphing_data["values"],
+    #     graphing_data["returns"],
+    #     title=f"iteration{iteration}",
+    #     fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
+    # )
+    plot_pendulum_multiple_critics_w_data(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
         title=f"iteration{iteration}",
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
+        data=data[:num_steps, traj_idx]["critic_obs"]
     )

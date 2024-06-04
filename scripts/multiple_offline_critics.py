@@ -7,7 +7,7 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics2
+from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
@@ -59,7 +59,7 @@ critic_optimizers = {
     for name, critic in test_critics.items()
 }
 gamma = 0.95
-lam = 0.95
+lam = 0.5080185484279778 #0.95
 tot_iter = 200
 
 for iteration in range(100, tot_iter, 10):
@@ -127,7 +127,7 @@ for iteration in range(100, tot_iter, 10):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    plot_pendulum_multiple_critics2(
+    plot_pendulum_multiple_critics(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
