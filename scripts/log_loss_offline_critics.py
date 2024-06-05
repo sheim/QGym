@@ -9,8 +9,8 @@ from learning.utils import (
 )
 from learning.modules.lqrc.utils import train, train_sequentially, train_interleaved
 from learning.modules.lqrc.plotting import (
-    plot_pendulum_multiple_critics,
-    plot_state_data_dist,
+    plot_pendulum_multiple_critics,  # noqa F401
+    plot_state_data_dist,  # noqa F401
     plot_pendulum_multiple_critics_w_data,
 )
 from gym import LEGGED_GYM_ROOT_DIR
@@ -18,7 +18,7 @@ import os
 import torch
 from torch import nn  # noqa F401
 from critic_params import critic_params
-import wandb # noqa F401
+import wandb  # noqa F401
 
 DEVICE = "cuda:0"
 for critic_param in critic_params.values():
@@ -48,7 +48,7 @@ critic_names = [
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    "QPNet"
+    "QPNet",
     # "NN_wQR",
     # "NN_wLinearLatent",
     # "NN_wRiccati", # ! WIP
@@ -77,10 +77,12 @@ for name in critic_names:
     elif name == "NN_wLinearLatent":
         critic_optimizers[name] = {
             "value": torch.optim.Adam(
-                test_critics[name].critic.parameters(), lr=0.0035155648350750773  # learning_rate
+                test_critics[name].critic.parameters(),
+                lr=0.0035155648350750773,  # learning_rate
             ),
             "regularization": torch.optim.Adam(
-                test_critics[name].critic.latent_NN.parameters(), lr=0.00619911552327558 #learning_rate
+                test_critics[name].critic.latent_NN.parameters(),
+                lr=0.00619911552327558,  # learning_rate
             ),
         }
     else:
@@ -122,7 +124,7 @@ for iteration in range(100, tot_iter, 10):
         data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
         data["returns"] = data["advantages"] + data["values"]
 
-        max_gradient_steps = 1000 # 100
+        max_gradient_steps = 1000  # 100
         # max_grad_norm = 1.0
         batch_size = 256
         num_steps = 50
@@ -148,8 +150,9 @@ for iteration in range(100, tot_iter, 10):
                 else train_interleaved
             )
             reg_generator = create_uniform_generator(
-                data[:num_steps, traj_idx], batch_size=64,  # 1000,
-                max_gradient_steps=100
+                data[:num_steps, traj_idx],
+                batch_size=64,  # 1000,
+                max_gradient_steps=100,
             )
             (
                 logging_dict[name]["mean_value_loss"],
@@ -186,5 +189,5 @@ for iteration in range(100, tot_iter, 10):
         graphing_data["returns"],
         title=f"iteration{iteration}",
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
-        data=data[:num_steps, traj_idx]["critic_obs"]
+        data=data[:num_steps, traj_idx]["critic_obs"],
     )

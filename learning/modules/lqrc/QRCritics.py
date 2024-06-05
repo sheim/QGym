@@ -42,6 +42,92 @@ def init_weights(m):
         m.bias.data.fill_(0.01)
 
 
+class Critic(nn.Module):
+    def __init__(
+        self,
+        num_obs,
+        hidden_dims=None,
+        activation="elu",
+        normalize_obs=True,
+        device="cuda",
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.NN = create_MLP(num_obs, 1, hidden_dims, activation)
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_obs)
+        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+
+    def forward(self, x):
+        if self._normalize_obs:
+            with torch.no_grad():
+                x = self.obs_rms(x)
+        return self.NN(x).squeeze() + self.value_offset
+
+    def evaluate(self, critic_observations):
+        return self.forward(critic_observations)
+
+    def loss_fn(self, obs, target, **kwargs):
+        return nn.functional.mse_loss(self.forward(obs), target, reduction="mean")
+
+
+class OuterProduct(nn.Module):
+    def __init__(
+        self,
+        num_obs,
+        hidden_dims,
+        latent_dim=None,
+        activation="elu",
+        dropouts=None,
+        normalize_obs=False,
+        minimize=False,
+        device="cuda",
+        **kwargs,
+    ):
+        super().__init__()
+        self.device = device
+        if latent_dim is None:
+            latent_dim = num_obs
+        self.latent_dim = latent_dim
+        self.minimize = minimize
+        if minimize:
+            self.sign = torch.ones(1, device=device)
+        else:
+            self.sign = -torch.ones(1, device=device)
+        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_obs)
+
+        self.NN = create_MLP(num_obs, latent_dim, hidden_dims, activation, dropouts)
+        # todo: have a linear NN to automatically coord-shift input
+
+    def forward(self, x, return_all=False):
+        z = self.NN(x)
+        # outer product. Both of these are equivalent
+        A = z.unsqueeze(-1) @ z.unsqueeze(-2)
+        # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
+        value = self.sign * quadratify_xAx(x, A)
+        value += self.value_offset
+
+        if return_all:
+            # return value, A, L
+            return {"value": value, "A": A, "z": z}
+        else:
+            return value
+
+    def evaluate(self, obs):
+        return self.forward(obs)
+
+    def loss_fn(self, obs, target, **kwargs):
+        loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
+
+        return loss_NN
+
+
 class CholeskyInput(nn.Module):
     def __init__(
         self,
@@ -67,7 +153,7 @@ class CholeskyInput(nn.Module):
             self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
         # V = x'Ax + b = a* x'Ax + b, and add a regularization for det(A) ~= 1
-        self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
+        # self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
 
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
@@ -86,7 +172,7 @@ class CholeskyInput(nn.Module):
         value = self.sign * quadratify_xAx(x, A)
         with torch.no_grad():
             value += self.value_offset
-        value *= self.scaling_quadratic
+        # value *= self.scaling_quadratic
 
         if return_all:
             # return value, A, L
@@ -106,9 +192,9 @@ class CholeskyInput(nn.Module):
         else:
             loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
 
-        loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
+        # loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
 
-        return loss_NN + loss_offset + loss_scaling
+        return loss_NN + loss_offset  #  + loss_scaling
 
 
 class CholeskyLatent(CholeskyInput):
@@ -155,7 +241,7 @@ class CholeskyLatent(CholeskyInput):
         with torch.no_grad():
             # do not affect value offset in this part of the loss
             value += self.value_offset
-        value *= self.scaling_quadratic
+        # value *= self.scaling_quadratic
 
         if return_all:
             # return value, A, L, z
@@ -176,7 +262,7 @@ class PDCholeskyInput(CholeskyInput):
         value = self.sign * quadratify_xAx(x, A)
         with torch.no_grad():
             value += self.value_offset
-        value *= self.scaling_quadratic
+        # value *= self.scaling_quadratic
 
         if return_all:
             # return value, A, L
@@ -196,7 +282,7 @@ class PDCholeskyLatent(CholeskyLatent):
         value = self.sign * quadratify_xAx(z, A)
         with torch.no_grad():
             value += self.value_offset
-        value *= self.scaling_quadratic
+        # value *= self.scaling_quadratic
 
         if return_all:
             # return value, A, L
@@ -238,7 +324,7 @@ class SpectralLatent(nn.Module):
         else:
             self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
-        self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
+        # self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
 
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
@@ -274,8 +360,8 @@ class SpectralLatent(nn.Module):
         # assert (torch.linalg.eigvals(A).real >= -1e-6).all()
         # ! This fails, but so far with just -e-10, so really really small...
         value = self.sign * quadratify_xAx(z, A)
-        with torch.no_grad():
-            value += self.value_offset
+        # with torch.no_grad():
+        value += self.value_offset
 
         if return_all:
             # return value, z, torch.diag(A_diag), L, A
@@ -295,14 +381,123 @@ class SpectralLatent(nn.Module):
     def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
 
-        if self.minimize:
-            loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
+        # if self.minimize:
+        #     loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
+        # else:
+        #     loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
+
+        # loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
+
+        return loss_NN  # + loss_offset  # + loss_scaling
+
+
+class DenseSpectralLatent(nn.Module):
+    def __init__(
+        self,
+        num_obs,
+        hidden_dims,
+        activation="elu",
+        dropouts=None,
+        normalize_obs=False,
+        relative_dim=None,
+        latent_dim=None,
+        latent_hidden_dims=[64],
+        latent_activation="tanh",
+        latent_dropouts=None,
+        minimize=False,
+        device="cuda",
+        **kwargs,
+    ):
+        super().__init__()
+        self.device = device
+        if relative_dim is None:
+            relative_dim = num_obs
+        if latent_dim is None:
+            latent_dim = num_obs
+
+        self.num_obs = num_obs
+        self.relative_dim = relative_dim
+        self.latent_dim = latent_dim
+        self.minimize = minimize
+        if minimize:
+            self.sign = torch.ones(1, device=device)
         else:
-            loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
+            self.sign = -torch.ones(1, device=device)
+        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        # self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
 
-        loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_obs)
+        # TODO up to here, same as Cholesky, can be refactored
+        n_zeros = sum(range(relative_dim))
+        n_outputs = relative_dim + relative_dim * latent_dim - n_zeros
+        self.rel_fill = n_zeros
+        # n_outputs = (
+        #     relative_dim * latent_dim
+        #     - torch.tril_indices(self.relative_dim, self.latent_dim).shape[1]
+        #     + relative_dim
+        # )
+        self.spectral_NN = create_MLP(
+            num_obs, n_outputs, hidden_dims, activation, dropouts
+        )
+        self.latent_NN = create_MLP(
+            num_obs, latent_dim, latent_hidden_dims, latent_activation
+        )
 
-        return loss_NN + loss_offset + loss_scaling
+    def forward(self, x, return_all=False):
+        z = self.latent_NN(x)
+        y = self.spectral_NN(x)
+        A_diag = torch.diag_embed(F.softplus(y[..., : self.relative_dim]))
+        # tril_indices = torch.tril_indices(self.latent_dim, self.relative_dim)
+        tril_indices = torch.tril_indices(self.relative_dim, self.latent_dim)
+        L = torch.zeros(
+            (*x.shape[:-1], self.relative_dim, self.latent_dim), device=self.device
+        )
+        L[..., tril_indices[0], tril_indices[1]] = y[
+            ..., self.relative_dim : self.relative_dim + tril_indices.shape[1]
+        ]
+        L[..., :, self.relative_dim :] = y[
+            ..., self.relative_dim + tril_indices.shape[1] :
+        ].view(L[..., :, self.relative_dim :].shape)
+        # Compute (L^T A_diag) L
+        A = torch.einsum(
+            "...ij,...jk->...ik",
+            torch.einsum("...ik,...kj->...ij", L.transpose(-1, -2), A_diag),
+            L,
+        )
+        # assert (torch.linalg.eigvals(A).real >= -1e-6).all()
+        # ! This fails, but so far with just -e-10, so really really small...
+        value = self.sign * quadratify_xAx(z, A)
+        # with torch.no_grad():
+        value += self.value_offset
+
+        if return_all:
+            # return value, z, torch.diag(A_diag), L, A
+            return {
+                "value": value,
+                "z": z,
+                # "A_diag": torch.diag(A_diag), #! throws shape error
+                "L": L,
+                "A": A,
+            }
+        else:
+            return value
+
+    def evaluate(self, obs):
+        return self.forward(obs)
+
+    def loss_fn(self, obs, target, **kwargs):
+        loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
+
+        # if self.minimize:
+        #     loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
+        # else:
+        #     loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
+
+        # loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
+
+        return loss_NN  # + loss_offset  # + loss_scaling
 
 
 class QR(nn.Module):
@@ -418,7 +613,7 @@ class QR(nn.Module):
         return A, B
 
 
-class QPNet(nn.Module): # based on regular Cholesky rather than latent since the paper used latent only for RGB data
+class QPNet(nn.Module):
     def __init__(
         self,
         num_obs,
@@ -451,18 +646,23 @@ class QPNet(nn.Module): # based on regular Cholesky rather than latent since the
 
         self.num_lower_diag_elements = sum(range(latent_dim + 1))
         self.lower_diag_NN = create_MLP(
-            num_obs, self.num_lower_diag_elements + num_obs, hidden_dims, activation, dropouts
-        ) # ! num_obs added to output to create c for c.T@x
+            num_obs,
+            self.num_lower_diag_elements + num_obs,
+            hidden_dims,
+            activation,
+            dropouts,
+        )  # ! num_obs added to output to create c for c.T@x
         self.lower_diag_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
         res = self.lower_diag_NN(x)
-        output = res[..., :self.num_lower_diag_elements]
-        c = res[..., self.num_lower_diag_elements:]
+        output = res[..., : self.num_lower_diag_elements]
+        c = res[..., self.num_lower_diag_elements :]
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(nn.ReLU()(L))
-        value = self.sign * quadratify_xAx(x, A) + \
-            torch.einsum("...ij, ...ij -> ...i", c, x)
+        value = self.sign * quadratify_xAx(x, A) + torch.einsum(
+            "...ij, ...ij -> ...i", c, x
+        )
         with torch.no_grad():
             value += self.value_offset
         value *= self.scaling_quadratic
@@ -488,6 +688,7 @@ class QPNet(nn.Module): # based on regular Cholesky rather than latent since the
         loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
 
         return loss_NN + loss_offset + loss_scaling
+
 
 class NN_wRiccati(nn.Module):
     def __init__(self, **kwargs):

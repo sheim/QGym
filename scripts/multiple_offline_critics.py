@@ -10,6 +10,8 @@ from learning.utils import (
 from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
 from gym import LEGGED_GYM_ROOT_DIR
 import os
+import shutil
+
 import torch
 from torch import nn  # noqa F401
 from critic_params import critic_params
@@ -20,28 +22,33 @@ for critic_param in critic_params.values():
 
 
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"  # May22_11-11-03_standard_critic
+# run_name = "May22_11-11-03_standard_critic"
+run_name = "May15_16-20-21_standard_critic"
+
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
 
-learning_rate = 0.001
+learning_rate = 9.732513210622285e-05
 critic_names = [
     "Critic",
     # "CholeskyInput",
     # "CholeskyLatent",
+    "OuterProduct",
     # "PDCholeskyInput",
     # "PDCholeskyLatent",
+    "QPNet",
     "SpectralLatent",
+    "DenseSpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    "NN_wQR",
-    "NN_wLinearLatent",
+    # "NN_wQR",
+    # "NN_wLinearLatent",
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}
@@ -51,18 +58,20 @@ for name in critic_names:
         params.update(critic_params[params["critic_name"]])
     critic_class = globals()[name]
     test_critics[name] = critic_class(**params).to(DEVICE)
-    if hasattr(test_critics[name], "value_offset"):
-        with torch.no_grad():
-            test_critics[name].value_offset.copy_(3.25)
 critic_optimizers = {
     name: torch.optim.Adam(critic.parameters(), lr=learning_rate)
     for name, critic in test_critics.items()
 }
 gamma = 0.95
-lam = 0.5080185484279778 #0.95
+lam = 1.0
 tot_iter = 200
+max_gradient_steps = 1000
+# max_grad_norm = 1.0
+batch_size = 512
+num_steps = 1  # ! want this at 1
+n_trajs = 512
 
-for iteration in range(100, tot_iter, 10):
+for iteration in range(199, tot_iter, 1):
     # load data
     base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
         DEVICE
@@ -72,6 +81,7 @@ for iteration in range(100, tot_iter, 10):
     graphing_data = {data_name: {} for data_name in ["critic_obs", "values", "returns"]}
 
     episode_rollouts = compute_MC_returns(base_data, gamma)
+    print(f"Initializing value offset to: {episode_rollouts.mean().item()}")
     graphing_data["critic_obs"]["Ground Truth MC Returns"] = (
         base_data[0, :]["critic_obs"].detach().clone()
     )
@@ -79,6 +89,11 @@ for iteration in range(100, tot_iter, 10):
     graphing_data["returns"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
 
     for name, critic in test_critics.items():
+        print("")
+        if hasattr(test_critics[name], "value_offset"):
+            with torch.no_grad():
+                critic.value_offset.copy_(episode_rollouts.mean())
+
         critic_optimizer = critic_optimizers[name]
         data = base_data.detach().clone()
         # train new critic
@@ -88,11 +103,6 @@ for iteration in range(100, tot_iter, 10):
 
         mean_value_loss = 0
         counter = 0
-        max_gradient_steps = 100
-        # max_grad_norm = 1.0
-        batch_size = 256
-        num_steps = 1  # ! want this at 1
-        n_trajs = 50
         traj_idx = torch.randperm(data.shape[1])[0:n_trajs]
         generator = create_uniform_generator(
             data[:num_steps, traj_idx],
@@ -109,11 +119,12 @@ for iteration in range(100, tot_iter, 10):
             critic_optimizer.step()
             mean_value_loss += value_loss.item()
             counter += 1
-        ground_truth_loss = (
-            (episode_rollouts[0] - critic.evaluate(data["critic_obs"][0])).pow(2).mean()
+        error = (
+            (episode_rollouts[0] - critic.evaluate(data["critic_obs"][0])).pow(2)
         ).to("cpu")
-        print(f"{name} ground truth loss: ", ground_truth_loss.item())
-        # print(f"{name} value loss: ", value_loss.item())
+        print(f"{name} average error: ", error.mean().item())
+        print(f"{name} max error: ", error.max().item())
+        print(f"{name} offset:", critic.value_offset.item())
         mean_value_loss /= counter
 
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
@@ -134,3 +145,8 @@ for iteration in range(100, tot_iter, 10):
         title=f"iteration{iteration}",
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
     )
+
+this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_critics.py")
+params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
+shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
+shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))

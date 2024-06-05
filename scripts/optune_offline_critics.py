@@ -22,73 +22,91 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 # handle some bookkeeping
-run_name = "May15_16-20-21_standard_critic"
+run_name = "May22_11-11-03_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
-import pandas as pd
 
 critic_names = [
     "Critic",
     # "CholeskyInput",
     # "CholeskyLatent",
     # "PDCholeskyInput",
-    "PDCholeskyLatent",
+    # "PDCholeskyLatent",
     "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    "NN_wQR",
+    # "NN_wQR",
     "NN_wLinearLatent",
     # "NN_wRiccati", # ! WIP
 ]
 
 tot_iter = 200
 
-def objective(trial):
+
+def objective(trial, name):
     gamma = 0.95
-    lam = trial.suggest_float("lam", 0.5, 1.0)
-    max_gradient_steps = trial.suggest_categorical("max_grad_steps", [10**x for x in range(2, 4)])
-    # batch_size = 256
-    batch_size = trial.suggest_categorical("batch_size", [2**x for x in range(6,10)])
+    lam = trial.suggest_float("lam", 0.1, 1.0)
+    max_gradient_steps = 100
+    # trial.suggest_categorical("max_grad_steps", [10**x for x in range(2, 4)])
+    batch_size = 512
+    # batch_size = trial.suggest_categorical("batch_size", [2**x for x in range(7, 10)])
 
     # critic set up
+    params = critic_params[name]
+    if "critic_name" in params.keys():
+        params.update(critic_params[params["critic_name"]])
+
+    if ("NN_" in name) or ("Latent" in name):
+        relative_dim = trial.suggest_int("relative_dim", 5, 16)
+        latent_dim = relative_dim + trial.suggest_int("latent_dim_diff", 0, 16)
+        params["latent_dim"] = latent_dim
+        params["relative_dim"] = relative_dim
+    print("params", params)
+    critic_class = eval(name)
+
+    # if "relative_dim" in params.keys():
+    #     params["relative_dim"] = trial.suggest_int("relative_dim", 1, 5)
+    test_critic = critic_class(**params).to(DEVICE)
+
     if hasattr(test_critic, "value_offset"):
-        initial_offset = trial.suggest_float("initial_offset", 0.0, 5.0)
+        initial_offset = trial.suggest_float("initial_offset", -1.0, 1.75)
         with torch.no_grad():
             test_critic.value_offset.copy_(initial_offset)
+
     if name == "NN_wQR":
         critic_optimizer = {
             "value": torch.optim.Adam(
                 test_critic.critic.parameters(),
-                lr=trial.suggest_float("lr_critic", 1.0e-7, 1.0e-2, log=True),
+                lr=trial.suggest_float("lr_critic", 1.0e-7, 1.0e-5, log=True),
             ),
             "regularization": torch.optim.Adam(
                 test_critic.QR_network.parameters(),
-                lr=trial.suggest_float("lr_QR", 1.0e-7, 1.0e-2, log=True),
+                lr=5e-7,  # trial.suggest_float("lr_QR", 1.0e-7, 1.0e-2, log=True),
             ),
         }
     elif name == "NN_wLinearLatent":
         critic_optimizer = {
             "value": torch.optim.Adam(
                 test_critic.critic.parameters(),
-                lr=trial.suggest_float("lr_critic", 1.0e-7, 1.0e-2, log=True),
+                lr=trial.suggest_float("lr_critic", 1.0e-7, 1.0e-4, log=True),
             ),
             "regularization": torch.optim.Adam(
                 test_critic.critic.latent_NN.parameters(),
-                lr=trial.suggest_float("lr_latent", 1.0e-7, 1.0e-2, log=True),
+                lr=5e-7,  # trial.suggest_float("lr_latent", 1.0e-7, 1.0e-2, log=True),
             ),
         }
     else:
         critic_optimizer = torch.optim.Adam(
             test_critic.parameters(),
-            lr=trial.suggest_float("lr_critic", 1.0e-7, 1.0e-2, log=True),
+            lr=trial.suggest_float("lr_critic", 1.0e-7, 1.0e-4, log=True),
         )
 
     # train critic
-    for iteration in range(100, tot_iter, 10):
+    for iteration in range(199, tot_iter, 1):
         # load data and empty log
         base_data = torch.load(
             os.path.join(log_dir, "data_{}.pt".format(iteration))
@@ -102,8 +120,8 @@ def objective(trial):
         )
         data["returns"] = data["advantages"] + data["values"]
 
-        num_steps = 50
-        n_trajs = 50
+        num_steps = 1
+        n_trajs = trial.suggest_int("n_trajs", 201, data.shape[1], step=23)
         traj_idx = torch.randperm(data.shape[1])[0:n_trajs]
         generator = create_uniform_generator(
             data[:num_steps, traj_idx],
@@ -115,7 +133,6 @@ def objective(trial):
         # perform backprop
         regularization = params.get("regularization")
         if regularization is not None:
-            reg_batch_size = trial.suggest_categorical("reg_batch_size", [2**x for x in range(6,10)])
             train_func = (
                 train_sequentially
                 if regularization == "sequential"
@@ -130,7 +147,7 @@ def objective(trial):
                 data, batch_size=1000, max_gradient_steps=100
             )
             (
-                mean_value_loss,
+                mean_val_loss,
                 regularization_loss,
             ) = train_func(
                 test_critic,
@@ -139,45 +156,34 @@ def objective(trial):
                 val_generator,
                 reg_generator,
             )
-            # trial.report(mean_value_loss + regularization_loss, iteration) # not supported for multi-obj
         else:
-            mean_value_loss = train(test_critic, critic_optimizer, generator)
-            # trial.report(mean_value_loss, iteration) # not supported for multi-obj
+            mean_val_loss = train(test_critic, critic_optimizer, generator)  # noqa F405
+
     episode_rollouts = compute_MC_returns(data, gamma)
-    actual_mean_error = (
-        (test_critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0])
-        .pow(2)
-        .mean()
-        .item()
-    )
-    return actual_mean_error, lam
+    actual_error = (
+        test_critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0]
+    ).pow(2)
+    return actual_error.mean().item(), actual_error.max().item(), n_trajs
+    # return actual_error.mean().item(), actual_error.max().item()
 
 
 time_str = time.strftime("%Y%m%d_%H%M%S")
 for name in critic_names:
-    params = critic_params[name]
-    if "critic_name" in params.keys():
-        params.update(critic_params[params["critic_name"]])
-    print("params", params)
-    critic_class = eval(name)
-
-    # if "relative_dim" in params.keys():
-    #     params["relative_dim"] = trial.suggest_int("relative_dim", 1, 5)
-
-    test_critic = critic_class(**params).to(DEVICE)
-
-    # save results
     save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "optuna", time_str)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     study = optuna.create_study(
         storage=f"sqlite:///{save_path}/{name}_db.sqlite3",
-        directions=["minimize", "minimize"],
+        directions=["minimize", "minimize", "minimize"],
     )
-    study.optimize(objective, n_trials=100)
+    if name == "critic":
+        n_trials = 1000
+    else:
+        n_trials = 10000
+    study.optimize(lambda trial: objective(trial, name), n_trials=n_trials)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
     best_trials = [trial.params for trial in study.best_trials]
-    with open(save_path + f"/{name}_best_trials.csv", 'w', newline='') as file:
+    with open(save_path + f"/{name}_best_trials.csv", "w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=best_trials[0].keys())
         writer.writeheader()
         writer.writerows(best_trials)

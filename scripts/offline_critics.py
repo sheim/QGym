@@ -15,9 +15,8 @@ import torch
 
 DEVICE = "cuda:0"
 # handle some bookkeeping
-run_name = (
-    "May22_10-54-14_standard_critic"
-)  # "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
+run_name = "May22_10-54-14_standard_critic"
+# "May13_10-52-30_standard_critic"  # "May13_10-52-30_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -41,7 +40,7 @@ critic_name = "SpectralLatent"
 test_critic = SpectralLatent(**test_critic_params).to(DEVICE)  # noqa F405
 critic_optimizer = torch.optim.Adam(test_critic.parameters(), lr=learning_rate)
 gamma = 0.99
-lam = 0.95
+lam = 0.867
 tot_iter = 200
 
 for iteration in range(1, tot_iter, 10):
@@ -63,7 +62,7 @@ for iteration in range(1, tot_iter, 10):
     batch_size = 64
 
     with torch.no_grad():
-        test_critic.value_offset.copy_(3.295910835894283)
+        test_critic.value_offset.copy_(1.5653120779642644)
 
     generator = create_uniform_generator(
         data, batch_size, max_gradient_steps=max_gradient_steps

@@ -127,6 +127,7 @@ def plot_pendulum_multiple_critics(
     plt.savefig(f"{fn}.png")
     print(f"Saved to {fn}.png")
 
+
 def plot_pendulum_multiple_critics_w_data(
     x, predictions, targets, title, fn, data, colorbar_label="f(x)"
 ):
@@ -189,7 +190,7 @@ def plot_pendulum_multiple_critics_w_data(
 
         # error
         # if np.any(~np.equal(np_error, np.zeros_like(np_error))):
-        if ix == 0: 
+        if ix == 0:
             continue
         axes[1, ix].scatter(
             np_x[:, 0],
