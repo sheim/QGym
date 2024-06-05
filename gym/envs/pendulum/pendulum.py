@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from gym.envs.base.fixed_robot import FixedRobot
 
@@ -23,12 +24,16 @@ class Pendulum(FixedRobot):
         self.terminated = self.timed_out
 
     def _reward_theta(self):
-        theta_rwd = torch.cos(self.dof_pos[:, 0]) / self.scales["dof_pos"]
-        return self._sqrdexp(theta_rwd.squeeze(dim=-1))
+        theta_norm = self._normalize_theta()
+        return -theta_norm.pow(2).item()
+        # theta_rwd = torch.cos(self.dof_pos[:, 0]) / self.scales["dof_pos"]
+        # return self._sqrdexp(theta_rwd.squeeze(dim=-1))
 
     def _reward_omega(self):
-        omega_rwd = torch.square(self.dof_vel[:, 0] / self.scales["dof_vel"])
-        return self._sqrdexp(omega_rwd.squeeze(dim=-1))
+        omega = self.dof_vel[:, 0]
+        return -omega.pow(2).item()
+        # omega_rwd = torch.square(self.dof_vel[:, 0] / self.scales["dof_vel"])
+        # return self._sqrdexp(omega_rwd.squeeze(dim=-1))
 
     def _reward_equilibrium(self):
         error = torch.abs(self.dof_state)
@@ -41,7 +46,8 @@ class Pendulum(FixedRobot):
 
     def _reward_torques(self):
         """Penalize torques"""
-        return self._sqrdexp(torch.mean(torch.square(self.torques), dim=1), sigma=0.2)
+        return -self.torques.pow(2).item()
+        # return self._sqrdexp(torch.mean(torch.square(self.torques), dim=1), sigma=0.2)
 
     def _reward_energy(self):
         kinetic_energy = (
@@ -59,3 +65,7 @@ class Pendulum(FixedRobot):
         desired_energy = self.cfg.asset.mass * 9.81 * self.cfg.asset.length
         energy_error = kinetic_energy + potential_energy - desired_energy
         return self._sqrdexp(energy_error / desired_energy)
+
+    def _normalize_theta(self):
+        theta = self.dof_pos[:, 0]
+        return ((theta + np.pi) % (2 * np.pi)) - np.pi

@@ -183,10 +183,10 @@ class SAC:
             # * self._sample_action(actor_next_obs)
             mean, std = self.actor.forward(next_actor_obs, deterministic=False)
             distribution = torch.distributions.Normal(mean, std)
-            actions = distribution.rsample()
+            next_actions = distribution.rsample()
 
             ## * self._scale_actions(actions, intermediate=True)
-            actions_normalized = torch.tanh(actions)
+            actions_normalized = torch.tanh(next_actions)
             # RSL also does a resahpe(-1, self.action_size), not sure why
             actions_scaled = (
                 actions_normalized * self.action_delta + self.action_offset
@@ -196,7 +196,7 @@ class SAC:
             #     1.0 - actions_normalized.pow(2) + 1e-6
             # ).sum(-1)
             action_logp = (
-                distribution.log_prob(actions)
+                distribution.log_prob(next_actions)
                 - torch.log(1.0 - actions_normalized.pow(2) + 1e-6)
             ).sum(-1)
 
@@ -253,8 +253,9 @@ class SAC:
             actions_normalized * self.action_delta + self.action_offset
         ).clamp(self.action_min, self.action_max)
         ## *
-        action_logp = distribution.log_prob(actions).sum(-1) - torch.log(
-            1.0 - actions_normalized.pow(2) + 1e-6
+        action_logp = (
+            distribution.log_prob(actions)
+            - torch.log(1.0 - actions_normalized.pow(2) + 1e-6)
         ).sum(-1)
 
         # * returns target_action = actions_scaled, target_action_logp = action_logp

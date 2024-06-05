@@ -94,7 +94,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
                 theta = 0.0
                 omega = 0.0
                 equilibrium = 1.0
-                energy = 0.0
+                energy = 0.5
                 dof_vel = 0.0
                 torques = 0.025
 
