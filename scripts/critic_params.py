@@ -82,6 +82,14 @@ critic_params = {
         "normalize_obs": False,
         "output_size": 1,
     },
+    "QPNet": {
+        "num_obs": 2,
+        "hidden_dims": [128, 32],
+        "activation": ["elu", "elu", "elu"],
+        "normalize_obs": True,
+        "latent_dim": None,  # 16,
+        "minimize": False,
+    },
     "NN_wQR": {
         "critic_name": "SpectralLatent",
         "action_dim": 2,

@@ -418,6 +418,77 @@ class QR(nn.Module):
         return A, B
 
 
+class QPNet(nn.Module): # based on regular Cholesky rather than latent since the paper used latent only for RGB data
+    def __init__(
+        self,
+        num_obs,
+        hidden_dims,
+        latent_dim=None,
+        activation="elu",
+        dropouts=None,
+        normalize_obs=False,
+        minimize=False,
+        device="cuda",
+        **kwargs,
+    ):
+        super().__init__()
+        self.device = device
+        if latent_dim is None:
+            latent_dim = num_obs
+        self.latent_dim = latent_dim
+        self.minimize = minimize
+        if minimize:
+            self.sign = torch.ones(1, device=device)
+        else:
+            self.sign = -torch.ones(1, device=device)
+        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        # V = x'Ax + b = a* x'Ax + b, and add a regularization for det(A) ~= 1
+        self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
+
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_obs)
+
+        self.num_lower_diag_elements = sum(range(latent_dim + 1))
+        self.lower_diag_NN = create_MLP(
+            num_obs, self.num_lower_diag_elements + num_obs, hidden_dims, activation, dropouts
+        ) # ! num_obs added to output to create c for c.T@x
+        self.lower_diag_NN.apply(init_weights)
+
+    def forward(self, x, return_all=False):
+        res = self.lower_diag_NN(x)
+        output = res[..., :self.num_lower_diag_elements]
+        c = res[..., self.num_lower_diag_elements:]
+        L = create_lower_diagonal(output, self.latent_dim, self.device)
+        A = compose_cholesky(nn.ReLU()(L))
+        value = self.sign * quadratify_xAx(x, A) + \
+            torch.einsum("...ij, ...ij -> ...i", c, x)
+        with torch.no_grad():
+            value += self.value_offset
+        value *= self.scaling_quadratic
+
+        if return_all:
+            # return value, A, L
+            return {"value": value, "A": A, "L": L, "c": c}
+        else:
+            return value
+        # return self.sign * quadratify_xAx(x, A) + self.value_offset
+
+    def evaluate(self, obs):
+        return self.forward(obs)
+
+    def loss_fn(self, obs, target, **kwargs):
+        loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
+
+        if self.minimize:
+            loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
+        else:
+            loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
+
+        loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
+
+        return loss_NN + loss_offset + loss_scaling
+
 class NN_wRiccati(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()

@@ -42,14 +42,15 @@ critic_names = [
     # "CholeskyLatent",
     # "PDCholeskyInput",
     # "PDCholeskyLatent",
-    "SpectralLatent",
+    # "SpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
+    "QPNet"
     # "NN_wQR",
-    "NN_wLinearLatent",
+    # "NN_wLinearLatent",
     # "NN_wRiccati", # ! WIP
 ]
 # Instantiate the critics and add them to test_critics
