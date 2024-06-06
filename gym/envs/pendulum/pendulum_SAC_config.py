@@ -6,7 +6,7 @@ from gym.envs.pendulum.pendulum_config import PendulumCfg
 class PendulumSACCfg(PendulumCfg):
     class env(PendulumCfg.env):
         num_envs = 1
-        episode_length_s = 4
+        episode_length_s = 10
 
     class init_state(PendulumCfg.init_state):
         reset_mode = "reset_to_range"
@@ -100,13 +100,13 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         polyak = 0.995  # flipped compared to stable-baselines3 (polyak == 1-tau)
         gamma = 0.99
         alpha_lr = 1e-4
-        actor_lr = 5e-4
-        critic_lr = 5e-4
+        actor_lr = 1e-3
+        critic_lr = 1e-3
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "sac_pendulum"
-        max_iterations = 30_000  # number of policy updates
+        max_iterations = 40_000  # number of policy updates
         algorithm_class_name = "SAC"
         save_interval = 5000
         num_steps_per_env = 1
