@@ -7,7 +7,7 @@ from learning.utils import (
     compute_MC_returns,
     create_uniform_generator,
 )
-from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics
+from learning.modules.lqrc.plotting import plot_pendulum_multiple_critics, plot_pendulum_multiple_critics_w_data
 from gym import LEGGED_GYM_ROOT_DIR
 import os
 import shutil
@@ -23,7 +23,8 @@ for critic_param in critic_params.values():
 
 # handle some bookkeeping
 # run_name = "May22_11-11-03_standard_critic"
-run_name = "May15_16-20-21_standard_critic"
+# run_name = "May15_16-20-21_standard_critic"
+run_name = "Jun06_00-51-58_standard_critic"
 
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
@@ -31,7 +32,7 @@ log_dir = os.path.join(
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
 
-learning_rate = 9.732513210622285e-05
+learning_rate = 0.0001 #9.732513210622285e-05
 critic_names = [
     "Critic",
     # "CholeskyInput",
@@ -65,13 +66,19 @@ critic_optimizers = {
 gamma = 0.95
 lam = 1.0
 tot_iter = 200
+iter_offset = 100
+iter_step = 2
+cvg_eps = 0.001
 max_gradient_steps = 1000
 # max_grad_norm = 1.0
 batch_size = 512
-num_steps = 1  # ! want this at 1
+num_steps = 50  # ! want this at 1
 n_trajs = 512
 
-for iteration in range(199, tot_iter, 1):
+last_loss = {name: float('inf') for name in critic_names}
+cvg_critics = {}
+
+for iteration in range(iter_offset, tot_iter, iter_step):
     # load data
     base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
         DEVICE
@@ -89,7 +96,6 @@ for iteration in range(199, tot_iter, 1):
     graphing_data["returns"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
 
     for name, critic in test_critics.items():
-        print("")
         if hasattr(test_critics[name], "value_offset"):
             with torch.no_grad():
                 critic.value_offset.copy_(episode_rollouts.mean())
@@ -122,14 +128,20 @@ for iteration in range(199, tot_iter, 1):
         error = (
             (episode_rollouts[0] - critic.evaluate(data["critic_obs"][0])).pow(2)
         ).to("cpu")
-        print(f"{name} average error: ", error.mean().item())
-        print(f"{name} max error: ", error.max().item())
-        print(f"{name} offset:", critic.value_offset.item())
+        # print(f"{name} average error: ", error.mean().item())
+        # print(f"{name} max error: ", error.max().item())
+        # print(f"{name} offset:", critic.value_offset.item())
         mean_value_loss /= counter
 
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
         graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["returns"][name] = data[0, :]["returns"]
+        if abs(mean_value_loss - last_loss[name]) <= cvg_eps:
+            if not name in cvg_critics.keys():
+                print(f"{name} converged after {(iteration - iter_offset)/iter_step} iterations")
+                cvg_critics[name] = (iteration - iter_offset)/iter_step
+        last_loss[name] = mean_value_loss
+        
 
     # compare new and old critics
     save_path = os.path.join(
@@ -138,13 +150,26 @@ for iteration in range(199, tot_iter, 1):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    plot_pendulum_multiple_critics(
+    # plot_pendulum_multiple_critics(
+    #     graphing_data["critic_obs"],
+    #     graphing_data["values"],
+    #     graphing_data["returns"],
+    #     title=f"iteration{iteration}_lr{learning_rate}",
+    #     fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
+    # )
+    plot_pendulum_multiple_critics_w_data(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
-        title=f"iteration{iteration}",
+        title=f"iteration{iteration}_lr{learning_rate}",
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
+        data=data[:num_steps, traj_idx]["critic_obs"],
     )
+
+for name in critic_names:
+    if name not in cvg_critics.keys():
+        cvg_critics[name] = f"Did not converge within epsilon of {cvg_eps}"
+print("Iterations at which convergence occurred", cvg_critics)
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_critics.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")

@@ -35,23 +35,24 @@ save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", t
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
-learning_rate = 0.001
+learning_rate = 9.732513210622285e-05
 critic_names = [
     "Critic",
     # "CholeskyInput",
     # "CholeskyLatent",
+    "OuterProduct",
     # "PDCholeskyInput",
     # "PDCholeskyLatent",
-    # "SpectralLatent",
+    "QPNet",
+    "SpectralLatent",
+    "DenseSpectralLatent",
     # ]
     # "Cholesky",
     # "CholeskyPlusConst",
     # "CholeskyOffset1",
     # "CholeskyOffset2",
-    "QPNet",
     # "NN_wQR",
     # "NN_wLinearLatent",
-    # "NN_wRiccati", # ! WIP
 ]
 # Instantiate the critics and add them to test_critics
 test_critics = {}
