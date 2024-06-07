@@ -631,3 +631,57 @@ def plot_loss(loss_arr, fn, title="Training Loss Across Epochs"):
     ax.set_xlabel("Epoch")
     ax.set_title(title)
     plt.savefig(f"{fn}.png")
+
+
+# def plot_learning_progress(test_error, fn="test_error"):
+#     _, ax = plt.subplots()
+#     for name, error in test_error.items():
+#         error_mean = [x.mean() for x in error]
+#         error_std = [x.std() for x in error]
+
+#         # plot shaded error region
+#         ax.plot(error_mean, label=name)
+#         ax.fill_between(
+#             range(len(error_mean)),
+#             [x - y for x, y in zip(error_mean, error_std)],
+#             [x + y for x, y in zip(error_mean, error_std)],
+#             alpha=0.3,
+#         )
+#     ax.set_ylabel("Average Test Error")
+#     plt.savefig(f"{fn}.png")
+
+
+def moving_average(data, window_size):
+    return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
+
+
+def plot_learning_progress(test_error, fn="test_error", smoothing_window=30):
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+
+    for name, error in test_error.items():
+        error_mean = np.array([x.mean() for x in error])
+        error_std = np.array([x.std() for x in error])
+        error_change = np.abs(np.diff(moving_average(error_mean, smoothing_window)))
+        # smoothed_error_change = moving_average(error_change, smoothing_window)
+
+        # plot shaded error region
+        ax1.plot(error_mean, label=name)
+        ax1.fill_between(
+            range(len(error_mean)),
+            [x - y for x, y in zip(error_mean, error_std)],
+            [x + y for x, y in zip(error_mean, error_std)],
+            alpha=0.3,
+        )
+        # plot change in error
+        ax2.plot(moving_average(error_change, smoothing_window), label=name)
+
+    ax1.set_ylabel("Average Test Error")
+    ax2.set_ylabel("Change in Error")
+    ax2.set_xlabel("Iteration")
+    ax2.set_yscale("log")
+    ax1.legend()
+    ax2.legend()
+
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(f"{fn}.png")
