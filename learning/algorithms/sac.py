@@ -27,26 +27,14 @@ class SAC:
         max_grad_norm=1.0,
         polyak=0.995,
         gamma=0.99,
-        # clip_param=0.2,  # * PPO
-        # gamma=0.998,
-        # lam=0.95,
-        # entropy_coef=0.0,
         actor_lr=1e-4,
         critic_lr=1e-4,
-        # max_grad_norm=1.0,
-        # use_clipped_value_loss=True,
-        # schedule="fixed",
-        # desired_kl=0.01,
         device="cpu",
         **kwargs,
     ):
         self.device = device
 
-        # self.desired_kl = desired_kl
-        # self.schedule = schedule
-        # self.lr = lr
-
-        # * PPO components
+        # * SAC components
         self.actor = actor.to(self.device)
         self.critic_1 = critic_1.to(self.device)
         self.critic_2 = critic_2.to(self.device)
@@ -74,28 +62,13 @@ class SAC:
             target_entropy if target_entropy else -self.actor.num_actions
         )
 
-        # * PPO parameters
-        # self.clip_param = clip_param
-        # self.batch_size = batch_size
-        self.max_gradient_steps = max_gradient_steps
-        # self.entropy_coef = entropy_coef
-        # self.gamma = gamma
-        # self.lam = lam
-        # self.max_grad_norm = max_grad_norm
-        # self.use_clipped_value_loss = use_clipped_value_loss
         # * SAC parameters
+        self.max_gradient_steps = max_gradient_steps
         self.batch_size = batch_size
         self.polyak = polyak
         self.gamma = gamma
         # self.ent_coef = "fixed"
         # self.target_entropy = "fixed"
-
-        self.test_input = torch.randn(256, 3, device=self.device)
-        self.test_actions = torch.zeros(256, 1, device=self.device)
-        self.test_action_mean = torch.zeros(256, device=self.device)
-        self.test_action_std = torch.zeros(256, device=self.device)
-        self.test_action_max = torch.zeros(256, device=self.device)
-        self.test_action_min = torch.zeros(256, device=self.device)
 
     @property
     def alpha(self):
@@ -163,12 +136,7 @@ class SAC:
         self.mean_alpha_loss /= count
         self.mean_critic_1_loss /= count
         self.mean_critic_2_loss /= count
-        with torch.inference_mode():
-            self.test_actions = self.act_inference(self.test_input).cpu()
-            self.test_action_mean = self.test_actions.mean().item()
-            self.test_action_std = self.test_actions.std().item()
-            self.test_action_max = self.test_actions.max().item()
-            self.test_action_min = self.test_actions.min().item()
+
         return None
 
     def update_critic(self, batch):
@@ -192,9 +160,6 @@ class SAC:
                 actions_normalized * self.action_delta + self.action_offset
             ).clamp(self.action_min, self.action_max)
             ## *
-            # action_logp = distribution.log_prob(actions).sum(-1) - torch.log(
-            #     1.0 - actions_normalized.pow(2) + 1e-6
-            # ).sum(-1)
             action_logp = (
                 distribution.log_prob(next_actions)
                 - torch.log(1.0 - actions_normalized.pow(2) + 1e-6)
@@ -266,13 +231,6 @@ class SAC:
         alpha_loss = -(
             self.log_alpha * (action_logp + self.target_entropy).detach()
         ).mean()
-
-        # alpha_loss = (
-        #     -self.log_alpha * (action_logp + self.target_entropy).detach()
-        # ).mean()
-        # alpha_loss = (
-        #     -(self.log_alpha * (action_logp + self.target_entropy)).detach().mean()
-        # )
 
         self.log_alpha_optimizer.zero_grad()
         alpha_loss.backward()
