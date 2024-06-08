@@ -40,12 +40,12 @@ time_str = time.strftime("%Y%m%d_%H%M%S")
 
 critic_names = [
     "Critic",
-    # "CholeskyInput",
-    # "CholeskyLatent",
-    # "OuterProduct",
+    "CholeskyInput",
+    "CholeskyLatent",
+    "OuterProduct",
     # "PDCholeskyInput",
     # "PDCholeskyLatent",
-    # "QPNet",
+    "QPNet",
     # # "SpectralLatent",
     "DenseSpectralLatent",
     # # ]
