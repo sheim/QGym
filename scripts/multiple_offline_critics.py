@@ -20,6 +20,7 @@ import shutil
 import torch
 from torch import nn  # noqa F401
 from critic_params import critic_params
+from optimizer_params import optimizer_params
 
 DEVICE = "cuda:0"
 for critic_param in critic_params.values():
@@ -57,7 +58,6 @@ critic_names = [
 ]
 # Instantiate the critics and add them to test_critics
 
-learning_rate = 1e-4
 
 test_critics = {}
 for name in critic_names:
@@ -67,7 +67,7 @@ for name in critic_names:
     critic_class = globals()[name]
     test_critics[name] = critic_class(**params).to(DEVICE)
 critic_optimizers = {
-    name: torch.optim.Adam(critic.parameters(), lr=learning_rate)
+    name: torch.optim.Adam(critic.parameters(), lr=optimizer_params[name]["lr"])
     for name, critic in test_critics.items()
 }
 
@@ -76,11 +76,11 @@ lam = 1.0
 tot_iter = 200
 iter_offset = 199
 iter_step = 2
-max_gradient_steps = 10000
+max_gradient_steps = 1000
 # max_grad_norm = 1.0
-batch_size = 1024
-num_steps = 50  # ! want this at 1
-n_trajs = 256
+batch_size = 128
+num_steps = 10  # ! want this at 1
+n_trajs = 64
 rand_perm = torch.randperm(4096)
 traj_idx = rand_perm[0:n_trajs]
 test_idx = rand_perm[n_trajs : n_trajs + 1000]
@@ -109,10 +109,10 @@ for iteration in range(iter_offset, tot_iter, iter_step):
     graphing_data["returns"]["Ground Truth MC Returns"] = episode_rollouts[0, :]
 
     for name, critic in test_critics.items():
-        if hasattr(test_critics[name], "value_offset"):
-            with torch.no_grad():
-                critic.value_offset.copy_(episode_rollouts.mean())
-            print("added offset to ", name)
+        print("")
+        # if hasattr(test_critics[name], "value_offset"):
+        with torch.no_grad():
+            critic.value_offset.copy_(episode_rollouts.mean())
 
         critic_optimizer = critic_optimizers[name]
         data = base_data.detach().clone()
@@ -173,17 +173,18 @@ for iteration in range(iter_offset, tot_iter, iter_step):
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
-        title=f"iteration{iteration}_lr{learning_rate}",
+        title=f"iteration{iteration}",
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
         data=data[:num_steps, traj_idx]["critic_obs"],
     )
 
+    plt.close()
     plot_learning_progress(
         test_error,
         fn=save_path + f"/{len(critic_names)}_error_{iteration}",
         smoothing_window=50,
     )
-
+    # plt.show()
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_critics.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))

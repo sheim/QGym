@@ -170,8 +170,7 @@ class CholeskyInput(nn.Module):
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
         value = self.sign * quadratify_xAx(x, A)
-        with torch.no_grad():
-            value += self.value_offset
+        value += self.value_offset
         # value *= self.scaling_quadratic
 
         if return_all:
@@ -185,16 +184,7 @@ class CholeskyInput(nn.Module):
         return self.forward(obs)
 
     def loss_fn(self, obs, target, **kwargs):
-        loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
-
-        if self.minimize:
-            loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
-        else:
-            loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
-
-        # loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
-
-        return loss_NN + loss_offset  #  + loss_scaling
+        return F.mse_loss(self.forward(obs), target, reduction="mean")
 
 
 class CholeskyLatent(CholeskyInput):
@@ -238,9 +228,8 @@ class CholeskyLatent(CholeskyInput):
         A = compose_cholesky(L)
 
         value = self.sign * quadratify_xAx(z, A)
-        with torch.no_grad():
-            # do not affect value offset in this part of the loss
-            value += self.value_offset
+        # do not affect value offset in this part of the loss
+        value += self.value_offset
         # value *= self.scaling_quadratic
 
         if return_all:
@@ -260,8 +249,7 @@ class PDCholeskyInput(CholeskyInput):
         A = compose_cholesky(L)
         # assert (torch.linalg.eigvals(A).real > 0).all()
         value = self.sign * quadratify_xAx(x, A)
-        with torch.no_grad():
-            value += self.value_offset
+        value += self.value_offset
         # value *= self.scaling_quadratic
 
         if return_all:
@@ -280,8 +268,7 @@ class PDCholeskyLatent(CholeskyLatent):
         A = compose_cholesky(L)
         # assert (torch.linalg.eigvals(A).real > 0).all()
         value = self.sign * quadratify_xAx(z, A)
-        with torch.no_grad():
-            value += self.value_offset
+        value += self.value_offset
         # value *= self.scaling_quadratic
 
         if return_all:
@@ -663,16 +650,14 @@ class QPNet(nn.Module):
         value = self.sign * quadratify_xAx(x, A) + torch.einsum(
             "...ij, ...ij -> ...i", c, x
         )
-        with torch.no_grad():
-            value += self.value_offset
-        value *= self.scaling_quadratic
+        value += self.value_offset
+        # value *= self.scaling_quadratic
 
         if return_all:
             # return value, A, L
             return {"value": value, "A": A, "L": L, "c": c}
         else:
             return value
-        # return self.sign * quadratify_xAx(x, A) + self.value_offset
 
     def evaluate(self, obs):
         return self.forward(obs)
@@ -680,14 +665,9 @@ class QPNet(nn.Module):
     def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
 
-        if self.minimize:
-            loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
-        else:
-            loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
+        # loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
 
-        loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
-
-        return loss_NN + loss_offset + loss_scaling
+        return loss_NN  #  + loss_offset + loss_scaling
 
 
 class NN_wRiccati(nn.Module):

@@ -150,8 +150,10 @@ def plot_pendulum_multiple_critics_w_data(
         np_error = np_predictions - np_targets
         global_min_error = min(global_min_error, np.min(np_error))
         global_max_error = max(global_max_error, np.max(np_error))
-        global_min_prediction = min(global_min_prediction, np.min(np_predictions))
-        global_max_prediction = max(global_max_prediction, np.max(np_predictions))
+        # global_min_prediction = min(global_min_prediction, np.min(np_predictions))
+        # global_max_prediction = max(global_max_prediction, np.max(np_predictions))
+        global_min_prediction = np.min(np_targets)
+        global_max_prediction = np.max(np_targets)
     error_norm = mcolors.TwoSlopeNorm(
         vmin=global_min_error, vcenter=0, vmax=global_max_error
     )
