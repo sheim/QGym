@@ -67,7 +67,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "DataLoggingRunner"
 
     class actor:
         hidden_dims = [256, 256, 128]
@@ -97,7 +97,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             gravity_vec = 0.1
 
     class critic:
-        hidden_dims = [256, 256, 128]
+        hidden_dims = [256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [
