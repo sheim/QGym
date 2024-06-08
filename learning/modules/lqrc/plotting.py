@@ -38,6 +38,29 @@ def create_custom_bwr_colormap():
 
     return custom_bwr
 
+def create_custom_pink_green_colormap():
+    # Define the colors for each segment
+    dark_pink = [0.5, 0, 0.25, 1]
+    light_pink = [1, 0.5, 0.75, 1]
+    white = [1, 1, 1, 1]
+    light_green = [0.5, 1, 0.5, 1]
+    dark_green = [0, 0.5, 0, 1]
+
+    # Number of bins for each segment
+    n_bins = 128
+    mid_band = 5
+
+    # Create the colormap segments
+    pink_segment = np.linspace(dark_pink, light_pink, n_bins // 2)
+    white_segment = np.tile(white, (mid_band, 1))
+    green_segment = np.linspace(light_green, dark_green, n_bins // 2)
+
+    # Stack segments to create the full colormap
+    colors = np.vstack((pink_segment, white_segment, green_segment))
+    custom_pink_green = ListedColormap(colors, name="custom_pink_green")
+
+    return custom_pink_green
+
 
 def plot_pendulum_multiple_critics(
     x, predictions, targets, title, fn, colorbar_label="f(x)"
@@ -213,6 +236,126 @@ def plot_pendulum_multiple_critics_w_data(
     fig.colorbar(
         mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap),
         ax=axes[1, :].ravel().tolist(),
+        shrink=0.95,
+        label=colorbar_label,
+    )
+
+    data = data.detach().cpu().numpy()
+    theta = data[:, :, 0]
+    omega = data[:, :, 1]
+    _, _, _, hist = axes[1, 0].hist2d(
+        theta.flatten(), omega.flatten(), bins=64, cmap="Blues"
+    )
+    axes[1, 0].plot(theta, omega, lw=1)
+
+    axes[1, 0].set_xlabel("theta")
+    axes[1, 0].set_ylabel("theta_dot")
+    fig.suptitle(title, fontsize=16)
+    plt.savefig(f"{fn}.png")
+    print(f"Saved to {fn}.png")
+
+
+def plot_pendulum_multiple_critics_w_data_grad(
+    x, predictions, targets, title, fn, data, pred_grad, analytic_grad, colorbar_label="f(x)"
+):
+    num_critics = len(x.keys())
+    fig, axes = plt.subplots(nrows=3, ncols=num_critics, figsize=(6 * num_critics, 10))
+
+    # Determine global min and max error for consistent scaling
+    global_min_error = float("inf")
+    global_max_error = float("-inf")
+    global_min_prediction = float("inf")
+    global_max_prediction = float("-inf")
+    prediction_cmap = mpl.cm.get_cmap("viridis")
+    error_cmap = create_custom_bwr_colormap()
+    grad_error_cmap = create_custom_pink_green_colormap()
+
+    for critic_name in x:
+        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = (
+            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+        )
+        np_error = np_predictions - np_targets
+        np_pred_grad = pred_grad[critic_name].detach().cpu().numpy()
+        np_analytic_grad = analytic_grad[critic_name].detach().cpu().numpy()
+        np_grad_error = np_pred_grad - np_analytic_grad
+        global_min_error = min(global_min_error, np.min(np_error))
+        global_max_error = max(global_max_error, np.max(np_error))
+        global_min_prediction = np.min(np_targets)
+        global_max_prediction = np.max(np_targets)
+        global_min_grad_error = min(global_min_grad_error, np.min(np_grad_error))
+        global_max_grad_error = max(global_max_grad_error, np.max(np_grad_error))
+    error_norm = mcolors.TwoSlopeNorm(
+        vmin=global_min_error, vcenter=0, vmax=global_max_error
+    )
+    prediction_norm = mcolors.CenteredNorm(
+        vcenter=(global_max_prediction + global_min_prediction) / 2,
+        halfrange=(global_max_prediction - global_min_prediction) / 2,
+    )
+    grad_error_norm = mcolors.TwoSlopeNorm(
+        vmin=global_min_grad_error, vcenter=0, vmax=global_max_error
+    )
+
+    for ix, critic_name in enumerate(x):
+        np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
+        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = (
+            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+        )
+        np_error = np_predictions - np_targets
+        np_pred_grad = pred_grad[critic_name].detach().cpu().numpy()
+        np_analytic_grad = analytic_grad[critic_name].detach().cpu().numpy()
+        np_grad_error = np_pred_grad - np_analytic_grad
+
+        # predictions
+        axes[0, ix].scatter(
+            np_x[:, 0],
+            np_x[:, 1],
+            c=np_predictions,
+            cmap=prediction_cmap,
+            norm=prediction_norm,
+            alpha=0.5,
+        )
+        axes[0, ix].set_title(f"{critic_name} Prediction")
+
+        # error
+        if ix == 0:
+            continue
+        axes[1, ix].scatter(
+            np_x[:, 0],
+            np_x[:, 1],
+            c=np_error,
+            cmap=error_cmap,
+            norm=error_norm,
+            alpha=0.5,
+        )
+        axes[1, ix].set_title(f"{critic_name} Error")
+
+        #pred error
+        axes[2, ix].scatter(
+            np_x[:, 0],
+            np_x[:, 1],
+            c=np_grad_error,
+            cmap=grad_error_cmap,
+            norm=grad_error_norm,
+            alpha=0.5,
+        )
+
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=prediction_norm, cmap=prediction_cmap),
+        ax=axes[0, :].ravel().tolist(),
+        shrink=0.95,
+        label=colorbar_label,
+    )
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap),
+        ax=axes[1, :].ravel().tolist(),
+        shrink=0.95,
+        label=colorbar_label,
+    )
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=grad_error_norm, cmap=grad_error_cmap),
+        ax=axes[2, :].ravel().tolist(),
         shrink=0.95,
         label=colorbar_label,
     )

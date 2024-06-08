@@ -60,14 +60,18 @@ class Critic(nn.Module):
             self.obs_rms = RunningMeanStd(num_obs)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
 
-    def forward(self, x):
+    def forward(self, x, return_all=False):
         if self._normalize_obs:
             with torch.no_grad():
                 x = self.obs_rms(x)
-        return self.NN(x).squeeze() + self.value_offset
+        value = self.NN(x).squeeze() + self.value_offset
+        if return_all:
+            return {"value": value}
+        else:
+            return value
 
-    def evaluate(self, critic_observations):
-        return self.forward(critic_observations)
+    def evaluate(self, critic_observations, return_all=False):
+        return self.forward(critic_observations, return_all=return_all)
 
     def loss_fn(self, obs, target, **kwargs):
         return nn.functional.mse_loss(self.forward(obs), target, reduction="mean")
@@ -119,8 +123,8 @@ class OuterProduct(nn.Module):
         else:
             return value
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
@@ -180,8 +184,8 @@ class CholeskyInput(nn.Module):
             return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
         return F.mse_loss(self.forward(obs), target, reduction="mean")
@@ -238,8 +242,8 @@ class CholeskyLatent(CholeskyInput):
         else:
             return value
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
 
 class PDCholeskyInput(CholeskyInput):
@@ -362,8 +366,8 @@ class SpectralLatent(nn.Module):
         else:
             return value
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
@@ -471,8 +475,8 @@ class DenseSpectralLatent(nn.Module):
         else:
             return value
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
@@ -546,8 +550,8 @@ class QR(nn.Module):
         else:
             return Q, R
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, z, target, actions, **kwargs):
         Q, R = self.forward(z, target)
@@ -659,8 +663,8 @@ class QPNet(nn.Module):
         else:
             return value
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
@@ -686,8 +690,8 @@ class NN_wRiccati(nn.Module):
     def forward(self, x, return_all=False):
         return self.critic.forward(x, return_all)
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, actions, **kwargs):
         return self.value_loss(obs, target, actions) + self.reg_loss(
@@ -720,8 +724,8 @@ class NN_wQR(nn.Module):
     def forward(self, x, return_all=False):
         return self.critic.forward(x, return_all)
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, actions, **kwargs):
         return self.value_loss(obs, target, actions) + self.reg_loss(
@@ -746,8 +750,8 @@ class NN_wLinearLatent(nn.Module):
     def forward(self, x, return_all=False):
         return self.critic.forward(x, return_all)
 
-    def evaluate(self, obs):
-        return self.forward(obs)
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, actions, **kwargs):
         return self.value_loss(obs, target, actions) + self.reg_loss(

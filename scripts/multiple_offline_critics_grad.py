@@ -42,12 +42,12 @@ critic_names = [
     "Critic",
     "CholeskyInput",
     "CholeskyLatent",
-    "OuterProduct",
+    # "OuterProduct",
     # "PDCholeskyInput",
     # "PDCholeskyLatent",
     "QPNet",
     # # "SpectralLatent",
-    "DenseSpectralLatent",
+    # "DenseSpectralLatent",
     # # ]
     # "Cholesky",
     # "CholeskyPlusConst",
@@ -137,15 +137,33 @@ for iteration in range(iter_offset, tot_iter, iter_step):
             # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
             critic_optimizer.step()
             counter += 1
-            with torch.no_grad():
-                error = (
-                    (
-                        episode_rollouts[0, test_idx]
-                        - critic.evaluate(data["critic_obs"][0, test_idx])
-                    ).pow(2)
-                ).to("cpu")
+            # zero-ing out grads again so we can keep grad in result for graphing
+            critic_optimizer.zero_grad()
+            x = data["critic_obs"][0, test_idx]
+            res = critic.evaluate(x, return_all=True)
+            error = (
+                (
+                    episode_rollouts[0, test_idx]
+                    - res["value"]
+                ).pow(2)
+            ).to("cpu")
+            # result book keeping
             mean_training_loss[name].append(value_loss.item())
             test_error[name].append(error.detach().numpy())
+            if name in ["CholeskyInput", "CholeskyLatent", "QPNet"]:
+                x.requires_grad_()
+                x = x + 0
+                print("A shape", res["A"].shape)
+                print("x shape", x.unsqueeze(-1).shape)
+                print('value shape', res["value"].shape)
+                print("value grad", res["value"].requires_grad)
+                print("x grad", x.requires_grad)
+                # exit()
+                analytic_grad = 2.0*torch.einsum( "...ij, ...jk -> ...ik", res["A"], x.unsqueeze(-1))
+                pred_grad = torch.autograd.grad(res["value"], x)[0].view(-1)
+                print("analytic grad shape", analytic_grad.shape)
+                print("pred grad shape", pred_grad.shape)
+                exit()
         print(f"{name} average error: ", error.mean().item())
         print(f"{name} max error: ", error.max().item())
         mean_value_loss /= counter
