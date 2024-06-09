@@ -23,7 +23,7 @@ critic_params = {
         "normalize_obs": False,
         "minimize": False,
         "latent_dim": 32,
-        "latent_hidden_dims": [256, 128],
+        "latent_hidden_dims": [64, 64],
         "latent_activation": "relu",
     },
     "PDCholeskyLatent": {
@@ -33,7 +33,7 @@ critic_params = {
         "normalize_obs": False,
         "minimize": False,
         "latent_dim": 32,
-        "latent_hidden_dims": [256, 128],
+        "latent_hidden_dims": [64, 64],
         "latent_activation": "relu",
     },
     "SpectralLatent": {
@@ -44,7 +44,7 @@ critic_params = {
         "minimize": False,
         "relative_dim": 8,
         "latent_dim": 16,
-        "latent_hidden_dims": [256, 128],
+        "latent_hidden_dims": [64, 64],
         "latent_activation": "relu",
     },
     "DenseSpectralLatent": {
@@ -53,9 +53,9 @@ critic_params = {
         "activation": "relu",
         "normalize_obs": False,
         "minimize": False,
-        "relative_dim": 32,  # 16,
+        "relative_dim": 1,  # 16,
         "latent_dim": 32,  # 18,
-        "latent_hidden_dims": [256, 128],
+        "latent_hidden_dims": [64, 64],
         "latent_activation": "relu",
     },
     "Critic": {
@@ -108,7 +108,7 @@ critic_params = {
         "activation": "relu",
         "normalize_obs": False,
         "latent_dim": 32,
-        "latent_hidden_dims": [256, 128],
+        "latent_hidden_dims": [64, 64],
         "latent_activation": "relu",
     },
     "NN_wQR": {
