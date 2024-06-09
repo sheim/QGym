@@ -1,8 +1,6 @@
 import time
 import matplotlib.pyplot as plt  # noqa F401
 import numpy as np  # noqa F401
-from learning.modules.critic import Critic  # noqa F401
-from learning.modules.lqrc import *  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
     compute_generalized_advantages,
@@ -39,10 +37,11 @@ critic_names = [
     "Critic",
     "CholeskyInput",
     "CholeskyLatent",
+    "PDCholeskyLatent",
     "OuterProduct",
+    "OuterProductLatent",
     # "PDCholeskyInput",
-    # "PDCholeskyLatent",
-    "QPNet",
+    # "QPNet",
     # "SpectralLatent",
     "DenseSpectralLatent",
     # # ]
@@ -73,11 +72,11 @@ lam = 1.0
 tot_iter = 500
 iter_offset = 500
 iter_step = 1
-max_gradient_steps = 100
+max_gradient_steps = 1000
 # max_grad_norm = 1.0
-batch_size = 128
+batch_size = 1024
 num_steps = 32  # ! want this at 1
-n_trajs = 8
+n_trajs = 2048
 rand_perm = torch.randperm(4096)
 traj_idx = rand_perm[0:n_trajs]
 test_idx = rand_perm[n_trajs : n_trajs + 1000]

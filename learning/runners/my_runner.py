@@ -4,6 +4,9 @@ from tensordict import TensorDict
 from learning.utils import Logger
 from .on_policy_runner import OnPolicyRunner
 from learning.storage import DictStorage
+from learning.algorithms import PPO2  # noqa F401
+from learning.modules.actor import Actor
+from learning.modules.lqrc import *  # noqa F401
 
 logger = Logger()
 storage = DictStorage()
@@ -19,14 +22,26 @@ class MyRunner(OnPolicyRunner):
             self.device,
         )
 
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        # critic = DenseSpectralLatent(num_critic_obs, **self.critic_cfg)
+        critic = eval(self.critic_cfg["critic_class_name"])(
+            num_critic_obs, **self.critic_cfg
+        )
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
+
     def learn(self):
         self.set_up_logger()
 
         rewards_dict = {}
 
         self.alg.switch_to_train()
-        actor_obs = self.get_obs(self.actor_cfg["actor_obs"])
-        critic_obs = self.get_obs(self.critic_cfg["critic_obs"])
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
+        critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
         self.save()
 
@@ -35,10 +50,14 @@ class MyRunner(OnPolicyRunner):
         transition.update(
             {
                 "actor_obs": actor_obs,
-                "actions": self.alg.act(actor_obs, critic_obs),
+                "next_actor_obs": actor_obs,
+                "actions": self.alg.act(actor_obs),
                 "critic_obs": critic_obs,
+                "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
-                "dones": self.get_timed_out(),
+                "timed_out": self.get_timed_out(),
+                "terminated": self.get_terminated(),
+                "dones": self.get_timed_out() | self.get_terminated(),
             }
         )
         storage.initialize(
@@ -48,6 +67,9 @@ class MyRunner(OnPolicyRunner):
             device=self.device,
         )
 
+        # burn in observation normalization.
+        self.burn_in_normalization()
+
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
@@ -55,7 +77,7 @@ class MyRunner(OnPolicyRunner):
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    actions = self.alg.act(actor_obs, critic_obs)
+                    actions = self.alg.act(actor_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],
                         actions,
@@ -73,9 +95,9 @@ class MyRunner(OnPolicyRunner):
                     self.env.step()
 
                     actor_obs = self.get_noisy_obs(
-                        self.actor_cfg["actor_obs"], self.actor_cfg["noise"]
+                        self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
-                    critic_obs = self.get_obs(self.critic_cfg["critic_obs"])
+                    critic_obs = self.get_obs(self.critic_cfg["obs"])
                     # * get time_outs
                     timed_out = self.get_timed_out()
                     terminated = self.get_terminated()
@@ -86,8 +108,11 @@ class MyRunner(OnPolicyRunner):
 
                     transition.update(
                         {
+                            "next_actor_obs": actor_obs,
+                            "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
                             "timed_out": timed_out,
+                            "terminated": terminated,
                             "dones": dones,
                         }
                     )
@@ -125,3 +150,20 @@ class MyRunner(OnPolicyRunner):
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
+
+    @torch.no_grad
+    def burn_in_normalization(self, n_iterations=100):
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
+        critic_obs = self.get_obs(self.critic_cfg["obs"])
+        for _ in range(n_iterations):
+            actions = self.alg.act(actor_obs)
+            self.set_actions(self.actor_cfg["actions"], actions)
+            self.env.step()
+            actor_obs = self.get_noisy_obs(
+                self.actor_cfg["obs"], self.actor_cfg["noise"]
+            )
+            critic_obs = self.get_obs(self.critic_cfg["obs"])
+            rewards = self.alg.critic.evaluate(critic_obs)
+        self.alg.critic.value_offset.copy_(rewards.mean())
+        print(f"Value offset: {self.alg.critic.value_offset.item()}")
+        self.env.reset()

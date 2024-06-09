@@ -119,7 +119,7 @@ class OuterProduct(nn.Module):
 
         if return_all:
             # return value, A, L
-            return {"value": value, "A": A, "z": z}
+            return {"value": value, "A": A}
         else:
             return value
 
@@ -130,6 +130,51 @@ class OuterProduct(nn.Module):
         loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
 
         return loss_NN
+
+
+class OuterProductLatent(OuterProduct):
+    def __init__(
+        self,
+        num_obs,
+        hidden_dims,
+        latent_dim=None,
+        activation="elu",
+        dropouts=None,
+        normalize_obs=False,
+        minimize=False,
+        latent_hidden_dims=[128, 128],
+        latent_activation="tanh",
+        device="cuda",
+        **kwargs,
+    ):
+        super().__init__(
+            num_obs,
+            hidden_dims,
+            latent_dim,
+            activation,
+            dropouts,
+            normalize_obs,
+            minimize,
+            device,
+            **kwargs,
+        )
+        self.latent_NN = create_MLP(
+            num_obs, latent_dim, latent_hidden_dims, latent_activation
+        )
+
+    def forward(self, x, return_all=False):
+        z = self.NN(x)
+        # outer product. Both of these are equivalent
+        A = z.unsqueeze(-1) @ z.unsqueeze(-2)
+        # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
+        value = self.sign * quadratify_xAx(self.latent_NN(x), A)
+        value += self.value_offset
+
+        if return_all:
+            # return value, A, L
+            return {"value": value, "A": A, "z": z}
+        else:
+            return value
 
 
 class CholeskyInput(nn.Module):
@@ -167,7 +212,7 @@ class CholeskyInput(nn.Module):
         self.lower_diag_NN = create_MLP(
             num_obs, num_lower_diag_elements, hidden_dims, activation, dropouts
         )
-        self.lower_diag_NN.apply(init_weights)
+        # self.lower_diag_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
         output = self.lower_diag_NN(x)
@@ -223,7 +268,7 @@ class CholeskyLatent(CholeskyInput):
             num_obs, latent_dim, latent_hidden_dims, latent_activation
         )
 
-        self.latent_NN.apply(init_weights)
+        # self.latent_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
         z = self.latent_NN(x)
@@ -526,14 +571,14 @@ class QR(nn.Module):
         self.lower_diag_NN_Q = create_MLP(
             latent_dim, num_lower_diag_elements_Q, hidden_dims, activation, dropouts
         )
-        self.lower_diag_NN_Q.apply(init_weights)
+        # self.lower_diag_NN_Q.apply(init_weights)
 
         # Make R estimator
         num_lower_diag_elements_R = sum(range(action_dim + 1))
         self.lower_diag_NN_R = create_MLP(
             latent_dim, num_lower_diag_elements_R, hidden_dims, activation, dropouts
         )
-        self.lower_diag_NN_R.apply(init_weights)
+        # self.lower_diag_NN_R.apply(init_weights)
 
     def forward(self, z, u, return_all=False):
         Q_lower_diag = self.lower_diag_NN_Q(z)
@@ -643,7 +688,7 @@ class QPNet(nn.Module):
             activation,
             dropouts,
         )  # ! num_obs added to output to create c for c.T@x
-        self.lower_diag_NN.apply(init_weights)
+        # self.lower_diag_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
         res = self.lower_diag_NN(x)
@@ -746,6 +791,10 @@ class NN_wLinearLatent(nn.Module):
         critic_name = kwargs["critic_name"]
         device = kwargs["device"]  # noqa
         self.critic = eval(f"{critic_name}(**kwargs).to(device)")
+
+    @property
+    def value_offset(self):
+        return self.critic.value_offset
 
     def forward(self, x, return_all=False):
         return self.critic.forward(x, return_all)

@@ -40,12 +40,13 @@ time_str = time.strftime("%Y%m%d_%H%M%S")
 
 critic_names = [
     "Critic",
-    "CholeskyInput",
-    "CholeskyLatent",
+    # "CholeskyInput",
+    # "CholeskyLatent",
     "OuterProduct",
-    # "PDCholeskyInput",
-    # "PDCholeskyLatent",
-    "QPNet",
+    "OuterProductLatent",
+    # # "PDCholeskyInput",
+    # # "PDCholeskyLatent",
+    # "QPNet",
     # # "SpectralLatent",
     "DenseSpectralLatent",
     # # ]
@@ -80,7 +81,7 @@ max_gradient_steps = 1000
 # max_grad_norm = 1.0
 batch_size = 128
 num_steps = 10  # ! want this at 1
-n_trajs = 64
+n_trajs = 256
 rand_perm = torch.randperm(4096)
 traj_idx = rand_perm[0:n_trajs]
 test_idx = rand_perm[n_trajs : n_trajs + 1000]

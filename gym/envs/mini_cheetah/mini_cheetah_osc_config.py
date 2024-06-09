@@ -161,7 +161,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "DataLoggingRunner"
+    runner_class_name = "MyRunner"
 
     class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
@@ -184,8 +184,15 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             pass
 
     class critic(MiniCheetahRunnerCfg.critic):
-        hidden_dims = [256, 256, 128]
-        activation = "elu"
+        critic_class_name = "DenseSpectralLatent"
+        hidden_dims = [128, 128]
+        activation = "relu"
+        normalize_obs = False
+        minimize = False
+        relative_dim = 8  # 16
+        latent_dim = 32  # 18,
+        latent_hidden_dims = [128, 128]
+        latent_activation = "relu"
         obs = [
             "base_ang_vel",
             "projected_gravity",
@@ -229,7 +236,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # both
         gamma = 0.99
-        lam = 0.95
+        lam = 0.8
         # shared
         batch_size = 2**15
         max_grad_steps = 10

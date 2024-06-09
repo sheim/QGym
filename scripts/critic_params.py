@@ -102,6 +102,15 @@ critic_params = {
         "activation": "relu",
         "normalize_obs": False,
     },
+    "OuterProductLatent": {
+        "num_obs": 2,
+        "hidden_dims": [64, 64],
+        "activation": "relu",
+        "normalize_obs": False,
+        "latent_dim": 16,
+        "latent_hidden_dims": [64, 64],
+        "latent_activation": "relu",
+    },
     "NN_wQR": {
         "critic_name": "SpectralLatent",
         "action_dim": 2,

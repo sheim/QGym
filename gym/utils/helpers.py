@@ -181,10 +181,10 @@ def update_cfg_from_args(env_cfg, train_cfg, args):
             train_cfg.runner.checkpoint = args.checkpoint
         if args.rl_device is not None:
             train_cfg.runner.device = args.rl_device
-        if args.custom_critic:
-            train_cfg.critic.hidden_dims = None
-        else:
-            train_cfg.critic.critic_class_name = "Critic"
+        # if args.custom_critic:
+        #     train_cfg.critic.hidden_dims = None
+        # else:
+        #     train_cfg.critic.critic_class_name = "Critic"
         if args.train_critic_only:
             train_cfg.runner.algorithm_class_name = "PPO2CriticOnly"
             train_cfg.runner_class_name = "CriticOnlyRunner"
