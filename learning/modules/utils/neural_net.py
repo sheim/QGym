@@ -14,17 +14,20 @@ def create_MLP(
         dropouts = [dropouts] * len(hidden_dims)
     layers = []
     # first layer
-    add_layer(layers, num_inputs, hidden_dims[0], activations[0], dropouts[0])
-    for i in range(len(hidden_dims) - 1):
-        add_layer(
-            layers,
-            hidden_dims[i],
-            hidden_dims[i + 1],
-            activations[i + 1],
-            dropouts[i + 1],
-        )
-    else:
-        add_layer(layers, hidden_dims[-1], num_outputs)
+    if len(hidden_dims) > 0:
+        add_layer(layers, num_inputs, hidden_dims[0], activations[0], dropouts[0])
+        for i in range(len(hidden_dims) - 1):
+            add_layer(
+                layers,
+                hidden_dims[i],
+                hidden_dims[i + 1],
+                activations[i + 1],
+                dropouts[i + 1],
+            )
+        else:
+            add_layer(layers, hidden_dims[-1], num_outputs)
+    else:  # handle no hidden dims, just linear layer
+        add_layer(layers, num_inputs, num_outputs)
 
     if just_list:
         return layers

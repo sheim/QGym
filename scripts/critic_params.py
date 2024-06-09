@@ -53,9 +53,9 @@ critic_params = {
         "activation": "relu",
         "normalize_obs": False,
         "minimize": False,
-        "relative_dim": 6,  # 16,
-        "latent_dim": 16,  # 18,
-        "latent_hidden_dims": [64, 64],
+        "relative_dim": 2,  # 16,
+        "latent_dim": 2,  # 18,
+        "latent_hidden_dims": [],
         "latent_activation": "relu",
     },
     "Critic": {
@@ -107,8 +107,8 @@ critic_params = {
         "hidden_dims": [64, 64],
         "activation": "relu",
         "normalize_obs": False,
-        "latent_dim": 16,
-        "latent_hidden_dims": [64, 64],
+        "latent_dim": 2,
+        "latent_hidden_dims": [],
         "latent_activation": "relu",
     },
     "NN_wQR": {
