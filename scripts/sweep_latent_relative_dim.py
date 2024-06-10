@@ -10,8 +10,6 @@ from learning.utils import (
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import (
-    plot_pendulum_multiple_critics_w_data,
-    plot_learning_progress,
     plot_dim_sweep,
 )
 from gym import LEGGED_GYM_ROOT_DIR
@@ -20,7 +18,8 @@ import shutil
 
 import torch
 from torch import nn  # noqa F401
-from critic_params import critic_params
+# from critic_params import critic_params
+from critic_params_osc import critic_params
 from optimizer_params import optimizer_params
 
 
@@ -31,13 +30,23 @@ for critic_param in critic_params.values():
 
 # handle some bookkeeping
 # run_name = "May15_16-20-21_standard_critic"
-run_name = "Jun06_00-51-58_standard_critic"
+# run_name = "Jun06_00-51-58_standard_critic"
 # run_name = "May22_11-11-03_standard_critic"
+run_name = "Jun08_17-09-48_standard_critic" # oscillator
 
+# log_dir = os.path.join(
+#     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
+# )
 log_dir = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
+    LEGGED_GYM_ROOT_DIR, "logs", "FullSend_standard_critic", run_name
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
+
+save_path = os.path.join(
+    LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str
+)
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
 
 
 gamma = 0.95
@@ -55,8 +64,8 @@ traj_idx = rand_perm[0:n_trajs]
 test_idx = rand_perm[n_trajs : n_trajs + 1000]
 
 
-mean_training_loss = []
-test_error = []
+# mean_training_loss = []
+# test_error = []
 # size = 4
 # rel_range = torch.arange(2, 6)
 # latent_range = torch.arange(0, size)
@@ -67,19 +76,30 @@ test_error = []
 #         relative_dim[i, j] = rel_dim
 #         latent_dim[i, j] = rel_dim + latent_dim_offset
 # graphing_data = torch.zeros(size, size, 2)
-size = 20
-x = torch.arange(1, size + 1)
-y = torch.arange(1, size + 1)
-xx, yy = torch.meshgrid(x, y, indexing="xy")
-graphing_data = torch.zeros(size, size, 2) - float("inf")
+size = 54
+# x = torch.arange(1, size + 1)
+# y = torch.arange(1, size + 1)
+# xx, yy = torch.meshgrid(x, y, indexing="xy")
+# graphing_data = torch.zeros(size, size, 2) - float("inf")
+x = np.arange(1, size + 1)
+y = np.arange(1, size + 1)
+xx, yy = np.meshgrid(x, y, indexing="xy")
+graphing_data = np.zeros((size, size, 2)) - float("inf")
 
 for i in range(size):
     for j in range(size):
+        np.savez(save_path + "/graphing_data.npz",
+                 relative_dim=xx,
+                 latent_dim=yy,
+                 mean=graphing_data[..., 0],
+                 max=graphing_data[..., 1])
+        torch.cuda.empty_cache()
         name = "DenseSpectralLatent"
         params = critic_params[name]
         rel_dim = int(xx[i, j].item())
         lat_dim = int(yy[i, j].item())
-        if rel_dim == 1 or lat_dim < rel_dim:
+        # print("relative dim", rel_dim, "latent dim", lat_dim)
+        if lat_dim < rel_dim:
             continue
 
         params["relative_dim"] = rel_dim
@@ -93,7 +113,10 @@ for i in range(size):
 
         for iteration in range(iter_offset, tot_iter, iter_step):
             # load data
-            base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
+            # base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
+            #     DEVICE
+            # )
+            base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(500))).to(
                 DEVICE
             )
             # compute ground-truth
@@ -108,7 +131,10 @@ for i in range(size):
             data = base_data.detach().clone()
             # train new critic
             data["values"] = critic.evaluate(data["critic_obs"])
-            data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
+            try:
+                data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
+            except Exception as e:
+                print("relative dim", rel_dim, "latent_dim", lat_dim)
             data["returns"] = data["advantages"] + data["values"]
 
             mean_value_loss = 0
@@ -134,8 +160,8 @@ for i in range(size):
                             - critic.evaluate(data["critic_obs"][0, test_idx])
                         ).pow(2)
                     ).to("cpu")
-                mean_training_loss.append(value_loss.item())
-                test_error.append(error.detach().numpy())
+                # mean_training_loss.append(value_loss.item())
+                # test_error.append(error.detach().numpy())
             print(f"{name} average error: ", error.mean().item())
             print(f"{name} max error: ", error.max().item())
             mean_value_loss /= counter
@@ -155,13 +181,7 @@ for i in range(size):
         #     fn=save_path + f"/dim_sweep_error_{iteration}",
         #     smoothing_window=50,
         # )
-# compare new and old critics
-save_path = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str
-)
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-
+# plot
 print(graphing_data[0, 0]) # check that this is tensor([-inf, -inf])
 
 

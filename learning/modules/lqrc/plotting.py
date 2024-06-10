@@ -64,10 +64,10 @@ def create_custom_pink_green_colormap():
 
 def plot_dim_sweep(x, y, mean_error, max_error, fn):
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 5))
-    np_x = x.detach().cpu().numpy()
-    np_y = y.detach().cpu().numpy()
-    np_mean_error = mean_error.detach().cpu().numpy()
-    np_max_error = max_error.detach().cpu().numpy()
+    np_x = x #.detach().cpu().numpy()
+    np_y = y #.detach().cpu().numpy()
+    np_mean_error = mean_error #.detach().cpu().numpy()
+    np_max_error = max_error #.detach().cpu().numpy()
 
     extent = [np_x.min() - 0.5, np_x.max() + 0.5, np_y.min() - 0.5, np_y.max() + 0.5]
 
