@@ -62,6 +62,32 @@ def create_custom_pink_green_colormap():
 
     return custom_pink_green
 
+def plot_binned_errors(data, fn):
+    for lr in data.keys():
+        curr_fn = fn + f"_lr{lr}.png"
+        num_cols = len(data[lr].keys())
+        bins = np.linspace(0.0, 1.5, 50)
+        bin_labels = ["<" + str(np.round(bins[ix], decimals=4)) for ix in range(0, len(bins), 5)]
+        fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(30, 5))
+        fig.suptitle(f"Histogram of Error Values - Learning Rate {lr}")
+        y_min = float("inf")
+        y_max = -float("inf")
+        for ix, critic in enumerate(data[lr].keys()):
+            critic_data = data[lr][critic].detach().cpu().numpy()
+            digitized = np.digitize(critic_data, bins)
+            bincount = np.bincount(digitized)
+            y_min = bincount.min() if bincount.min() < y_min else y_min
+            y_max = bincount.max() if bincount.max() > y_max else y_max
+
+            axes[ix].bar(np.arange(len(bincount)), bincount)
+            axes[ix].set_title(critic)
+            axes[ix].set_xticks(np.arange(0, len(bins), 5), labels=bin_labels, fontsize=7)
+        for ix, critic in enumerate(data[lr].keys()):
+            axes[ix].set_ylim(y_min, y_max)
+
+        plt.savefig(curr_fn, bbox_inches="tight", dpi=300)
+        print(f"Saved to {curr_fn}")
+
 
 def plot_dim_sweep(x, y, mean_error, max_error, fn, step=5):
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 5))

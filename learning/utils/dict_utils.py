@@ -34,7 +34,6 @@ def normalize(input, eps=1e-8):
 @torch.no_grad
 def compute_generalized_advantages(data, gamma, lam, critic):
     data["values"] = critic.evaluate(data["critic_obs"])
-    torch.cuda.empty_cache() 
     last_values = critic.evaluate(data["next_critic_obs"][-1])
     advantages = torch.zeros_like(data["values"])
     if last_values is not None:
