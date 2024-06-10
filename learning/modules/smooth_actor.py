@@ -26,6 +26,8 @@ class SmoothActor(Actor):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        if "beta" in kwargs["exploration"]:
+            print("beta is not used in SmoothActor")
         self.full_std = full_std
         self.use_exp_ln = use_exp_ln
         self.learn_features = learn_features

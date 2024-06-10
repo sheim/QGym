@@ -1,0 +1,16 @@
+{
+    "method": "grid",
+    "metric": {
+        "name": "rewards/total_rewards",
+        "goal": "maximize"
+    },
+    "run_cap": 10,
+    "parameters": {
+        "train_cfg.actor.exploration.beta":{
+            "values": [0.5, 1, 1.5]
+        },
+        "train_cfg.actor.exploration.log_std_init":{
+            "values": [-0.5, 0, 0.5]
+        }
+    }
+}

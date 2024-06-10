@@ -73,9 +73,14 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = False
-        pink_exploration = True
-        exploration_sample_freq = 8
+
+        class exploration:
+            # Type of actor, can be "smooth", "colored" or "white"
+            type = "colored"
+            sample_freq = 16
+            beta = 1
+            # For sweep
+            log_std_init = 0.0
 
         normalize_obs = True
         obs = [

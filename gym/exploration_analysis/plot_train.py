@@ -7,7 +7,7 @@ SMOOTH = True
 SAMPLE_FREQ = 16
 STEPS = 1000
 
-name = "ref_sample_16_len_1000"
+name = "mini_cheetah_ref_colored_0.5"
 data_dir = "./data_train/" + name
 fig_dir = "./figures_train/" + name
 
@@ -29,16 +29,11 @@ def plot_fourier(data, it):
         ft = np.fft.fft(data[:, i])
         ft_half = ft[: len(ft) // 2]
         axs_ft[0].plot(np.abs(ft_half))
-        axs_ft[1].plot(np.angle(ft_half))
 
     axs_ft[0].set_title("FT Amplitude")
     axs_ft[0].set_xlabel("Frequency")
     axs_ft[0].set_ylabel("Amplitude")
     axs_ft[0].legend(["idx 0", "idx 1", "idx 2"])
-    axs_ft[1].set_title("FT Phase")
-    axs_ft[1].set_xlabel("Frequency")
-    axs_ft[1].set_ylabel("Phase")
-    axs_ft[1].legend(["idx 0", "idx 1", "idx 2"])
 
     fig_ft.savefig(fig_dir + "/dof_pos_target_FT_it_" + str(it) + ".png")
 

@@ -1,6 +1,7 @@
 from gym.envs import __init__  # noqa: F401
 from gym.utils import get_args, task_registry, randomize_episode_counters
-from gym.utils.logging_and_saving import wandb_singleton
+
+# from gym.utils.logging_and_saving import wandb_singleton
 from gym.utils.logging_and_saving import local_code_save_helper
 from gym import LEGGED_GYM_ROOT_DIR
 
@@ -9,7 +10,7 @@ import torch
 import os
 import numpy as np
 
-TRAIN_ITERATIONS = 100
+TRAIN_ITERATIONS = 500
 ROLLOUT_TIMESTEPS = 1000
 
 
@@ -49,11 +50,11 @@ def create_logging_dict(runner):
 
 def setup():
     args = get_args()
-    wandb_helper = wandb_singleton.WandbSingleton()
+    # wandb_helper = wandb_singleton.WandbSingleton()
 
     env_cfg, train_cfg = task_registry.create_cfgs(args)
     task_registry.make_gym_and_sim()
-    wandb_helper.setup_wandb(env_cfg=env_cfg, train_cfg=train_cfg, args=args)
+    # wandb_helper.setup_wandb(env_cfg=env_cfg, train_cfg=train_cfg, args=args)
     env = task_registry.make_env(name=args.task, env_cfg=env_cfg)
     randomize_episode_counters(env)
 
@@ -72,7 +73,7 @@ def train(train_cfg, policy_runner):
     log_file_path = os.path.join(
         LEGGED_GYM_ROOT_DIR,
         "gym",
-        "smooth_exploration",
+        "exploration_analysis",
         "data_train",
         protocol_name + ".npz",
     )

@@ -35,4 +35,4 @@ from .state_estimator import StateEstimatorNN
 from .actor import Actor
 from .critic import Critic
 from .smooth_actor import SmoothActor
-from .pink_actor import PinkActor
+from .colored_actor import ColoredActor

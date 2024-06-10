@@ -68,7 +68,7 @@ def play(env, runner, train_cfg):
     log_file_path = os.path.join(
         LEGGED_GYM_ROOT_DIR,
         "gym",
-        "smooth_exploration",
+        "exploration_analysis",
         "data_play",
         protocol_name + ".npz",
     )
