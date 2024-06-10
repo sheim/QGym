@@ -15,6 +15,7 @@ font = {"size": 12}
 matplotlib.rc("font", **font)
 
 
+
 def create_custom_bwr_colormap():
     # Define the colors for each segment
     dark_blue = [0, 0, 0.5, 1]
@@ -61,6 +62,43 @@ def create_custom_pink_green_colormap():
 
     return custom_pink_green
 
+def plot_dim_sweep(x, y, mean_error, max_error, fn):
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 5))
+    np_x = x.detach().cpu().numpy()
+    np_y = y.detach().cpu().numpy()
+    np_mean_error = mean_error.detach().cpu().numpy()
+    np_max_error = max_error.detach().cpu().numpy()
+
+    extent = [np_x.min() - 0.5, np_x.max() + 0.5, np_y.min() - 0.5, np_y.max() + 0.5]
+
+    # mean_err = axes[0].pcolormesh(np_x, np_y, np_mean_error, cmap="YlOrRd", vmin=0.0)
+    mean_err = axes[0].imshow(np_mean_error, cmap='YlOrRd', interpolation="nearest", vmin=0, origin="lower", extent=extent)
+    # max_err = axes[1].pcolormesh(np_x, np_y, np_max_error, cmap="PuBuGn", vmin=0.0)
+    max_err = axes[1].imshow(np_max_error, cmap='PuBuGn', interpolation='nearest', vmin=0, origin="lower", extent=extent)
+
+
+    x_ticks = np.arange(np_x.min(), np_x.max())
+    y_ticks = np.arange(np_y.min(), np_y.max())
+    axes[0].set_xticks(x_ticks)
+    axes[0].set_yticks(y_ticks)
+    axes[0].set_title("Mean Error")
+    axes[0].set_xlabel("Rank(A)")
+    axes[0].set_ylabel("Dim(A)")
+    # axes[0].set_xlim(0.5, None)
+    # axes[0].set_ylim(0.5, None)
+
+    axes[1].set_xticks(x_ticks)
+    axes[1].set_yticks(y_ticks)
+    axes[1].set_title("Max Error")
+    axes[1].set_xlabel("Rank(A)")
+    axes[1].set_ylabel("Dim(A)")
+    # axes[1].set_xlim(0.5, None)
+    # axes[1].set_ylim(0.5, None)
+
+    fig.colorbar(mean_err, ax=axes[0], shrink=0.95, pad=0.1, label="Mean Error")
+    fig.colorbar(max_err, ax=axes[1], shrink=0.95, pad=0.1, label="Max Error")
+    plt.savefig(fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}")
 
 def plot_pendulum_multiple_critics(
     x, predictions, targets, title, fn, colorbar_label="f(x)"

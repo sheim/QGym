@@ -22,6 +22,7 @@ from torch import nn  # noqa F401
 from critic_params import critic_params
 from optimizer_params import optimizer_params
 
+
 DEVICE = "cuda:0"
 for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
@@ -29,8 +30,8 @@ for critic_param in critic_params.values():
 
 # handle some bookkeeping
 # run_name = "May15_16-20-21_standard_critic"
-# run_name = "Jun06_00-51-58_standard_critic"
-run_name = "May22_11-11-03_standard_critic"
+run_name = "Jun06_00-51-58_standard_critic"
+# run_name = "May22_11-11-03_standard_critic"
 
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name

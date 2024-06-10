@@ -24,7 +24,7 @@ critic_params = {
         "minimize": False,
         "latent_dim": 16,
         "latent_hidden_dims": [64, 64],
-        "latent_activation": "relu",
+        "latent_activation": None,
     },
     "PDCholeskyLatent": {
         "num_obs": 2,
@@ -34,7 +34,7 @@ critic_params = {
         "minimize": False,
         "latent_dim": 16,
         "latent_hidden_dims": [64, 64],
-        "latent_activation": "relu",
+        "latent_activation": None,
     },
     "SpectralLatent": {
         "num_obs": 2,
@@ -45,7 +45,7 @@ critic_params = {
         "relative_dim": 8,
         "latent_dim": 16,
         "latent_hidden_dims": [64, 64],
-        "latent_activation": "relu",
+        "latent_activation": None,
     },
     "DenseSpectralLatent": {
         "num_obs": 2,
@@ -56,7 +56,7 @@ critic_params = {
         "relative_dim": 2,  # 16,
         "latent_dim": 2,  # 18,
         "latent_hidden_dims": [],
-        "latent_activation": "relu",
+        "latent_activation": None,
     },
     "Critic": {
         "num_obs": 2,
@@ -109,7 +109,7 @@ critic_params = {
         "normalize_obs": False,
         "latent_dim": 2,
         "latent_hidden_dims": [],
-        "latent_activation": "relu",
+        "latent_activation": None,
     },
     "NN_wQR": {
         "critic_name": "SpectralLatent",

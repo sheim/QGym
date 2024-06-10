@@ -22,7 +22,8 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 # handle some bookkeeping
-run_name = "May22_11-11-03_standard_critic"
+# run_name = "May22_11-11-03_standard_critic"
+run_name = "Jun06_00-51-58_standard_critic"
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
 )
@@ -47,16 +48,17 @@ critic_names = [
 ]
 
 tot_iter = 200
-
+iter_offset = 199
+iter_step = 2
 
 def objective(trial, name):
     gamma = 0.95
     lam = 1.0  # trial.suggest_float("lam", 0.1, 1.0)
-    max_gradient_steps = 1000
-    # trial.suggest_int("max_grad_steps", low=100, high=5000, step=100)
+    # max_gradient_steps = 1000
+    max_gradient_steps = trial.suggest_int("max_gradient_steps", low=100, high=5000, step=100)
     # trial.suggest_categorical("max_grad_steps", [10**x for x in range(2, 4)])
-    batch_size = 128
-    # batch_size = trial.suggest_categorical("batch_size", [2**x for x in range(7, 10)])
+    # batch_size = 128
+    batch_size = trial.suggest_categorical("batch_size", [2**x for x in range(7, 10)])
 
     # critic set up
     params = critic_params[name]
@@ -85,7 +87,7 @@ def objective(trial, name):
     )
 
     # train critic
-    for iteration in range(199, tot_iter, 1):
+    for iteration in range(iter_offset, tot_iter, iter_step):
         # load data and empty log
         base_data = torch.load(
             os.path.join(log_dir, "data_{}.pt".format(iteration))
@@ -111,9 +113,10 @@ def objective(trial, name):
         mean_val_loss = train(test_critic, critic_optimizer, generator)  # noqa F405
 
     episode_rollouts = compute_MC_returns(data, gamma)
-    actual_error = (
-        test_critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0]
-    ).pow(2)
+    with torch.no_grad():
+        actual_error = (
+            test_critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0]
+        ).pow(2)
     return actual_error.mean().item(), actual_error.max().item()
     # return actual_error.mean().item(), actual_error.max().item()
 
@@ -128,9 +131,9 @@ for name in critic_names:
         directions=["minimize", "minimize"],
     )
     if name == "critic":
-        n_trials = 1000
+        n_trials = 100
     else:
-        n_trials = 1000
+        n_trials = 100
     study.optimize(lambda trial: objective(trial, name), n_trials=n_trials)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
     best_trials = [trial.params for trial in study.best_trials]
