@@ -62,7 +62,7 @@ def create_custom_pink_green_colormap():
 
     return custom_pink_green
 
-def plot_dim_sweep(x, y, mean_error, max_error, fn):
+def plot_dim_sweep(x, y, mean_error, max_error, fn, step=5):
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 5))
     np_x = x #.detach().cpu().numpy()
     np_y = y #.detach().cpu().numpy()
@@ -77,8 +77,8 @@ def plot_dim_sweep(x, y, mean_error, max_error, fn):
     max_err = axes[1].imshow(np_max_error, cmap='PuBuGn', interpolation='nearest', vmin=0, origin="lower", extent=extent)
 
 
-    x_ticks = np.arange(np_x.min(), np_x.max())
-    y_ticks = np.arange(np_y.min(), np_y.max())
+    x_ticks = np.arange(np_x.min(), np_x.max(), step)
+    y_ticks = np.arange(np_y.min(), np_y.max(), step)
     axes[0].set_xticks(x_ticks)
     axes[0].set_yticks(y_ticks)
     axes[0].set_title("Mean Error")
@@ -97,6 +97,40 @@ def plot_dim_sweep(x, y, mean_error, max_error, fn):
 
     fig.colorbar(mean_err, ax=axes[0], shrink=0.95, pad=0.1, label="Mean Error")
     fig.colorbar(max_err, ax=axes[1], shrink=0.95, pad=0.1, label="Max Error")
+    plt.savefig(fn, bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}")
+
+def plot_dim_sweep_mean_std(x, y, avg_mean_error, avg_max_error, std_mean_error, std_max_error, fn, trial_num, step=5):
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(25, 15))
+
+    extent = [x.min() - 0.5, x.max() + 0.5, y.min() - 0.5, y.max() + 0.5]
+
+    # avg_mean_err = axes[0, 0].imshow(avg_mean_error, cmap='YlOrRd', interpolation="nearest", vmin=0, origin="lower", extent=extent)
+    # avg_max_err = axes[0, 1].imshow(avg_max_error, cmap='PuBuGn', interpolation='nearest', vmin=0, origin="lower", extent=extent)
+    # std_mean_err = axes[1, 0].imshow(std_mean_error, cmap='YlOrRd', interpolation="nearest", vmin=0, origin="lower", extent=extent)
+    # std_max_err = axes[1, 1].imshow(std_max_error, cmap='PuBuGn', interpolation='nearest', vmin=0, origin="lower", extent=extent)
+    avg_mean_err = axes[0, 0].imshow(avg_mean_error, cmap='YlOrRd', interpolation="nearest", norm=mcolors.LogNorm(), origin="lower", extent=extent)
+    avg_max_err = axes[0, 1].imshow(avg_max_error, cmap='PuBuGn', interpolation='nearest', norm=mcolors.LogNorm(), origin="lower", extent=extent)
+    std_mean_err = axes[1, 0].imshow(std_mean_error, cmap='YlOrRd', interpolation="nearest", norm=mcolors.LogNorm(), origin="lower", extent=extent)
+    std_max_err = axes[1, 1].imshow(std_max_error, cmap='PuBuGn', interpolation='nearest', norm=mcolors.LogNorm(), origin="lower", extent=extent)
+
+
+    x_ticks = np.arange(0, x.max(), step)
+    y_ticks = np.arange(0, y.max(), step)
+    for ax in axes.ravel().tolist():
+        ax.set_xticks(x_ticks)
+        ax.set_yticks(y_ticks)
+        ax.set_xlabel("Rank(A)")
+        ax.set_ylabel("Dim(A)")
+    axes[0, 0].set_title(f"Mean Error (Average Over {trial_num} Trials)")
+    axes[0, 1].set_title(f"Max Error (Average Over {trial_num} Trials)")
+    axes[1, 0].set_title(f"Mean Error (Standard Deviation Over {trial_num} Trials)")
+    axes[1, 1].set_title(f"Max Error (Standard Deviation Over {trial_num} Trials)")
+
+    fig.colorbar(avg_mean_err, ax=axes[0, 0], shrink=0.95, pad=0.1, label=f"Mean Error (Average Over {trial_num} Trials)")
+    fig.colorbar(avg_max_err, ax=axes[0, 1], shrink=0.95, pad=0.1, label=f"Max Error (Average Over {trial_num} Trials)")
+    fig.colorbar(std_mean_err, ax=axes[1, 0], shrink=0.95, pad=0.1, label=f"Mean Error (Standard Deviation Over {trial_num} Trials)")
+    fig.colorbar(std_max_err, ax=axes[1, 1], shrink=0.95, pad=0.1, label=f"Max Error (Standard Deviation Over {trial_num} Trials)")
     plt.savefig(fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}")
 

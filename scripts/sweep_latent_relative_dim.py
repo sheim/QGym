@@ -11,6 +11,7 @@ from learning.utils import (
 )
 from learning.modules.lqrc.plotting import (
     plot_dim_sweep,
+    plot_dim_sweep_mean_std,
 )
 from gym import LEGGED_GYM_ROOT_DIR
 import os
@@ -76,121 +77,136 @@ test_idx = rand_perm[n_trajs : n_trajs + 1000]
 #         relative_dim[i, j] = rel_dim
 #         latent_dim[i, j] = rel_dim + latent_dim_offset
 # graphing_data = torch.zeros(size, size, 2)
-size = 54
+num_trials = 3
+size = 53
+step = 10
 # x = torch.arange(1, size + 1)
 # y = torch.arange(1, size + 1)
 # xx, yy = torch.meshgrid(x, y, indexing="xy")
 # graphing_data = torch.zeros(size, size, 2) - float("inf")
-x = np.arange(1, size + 1)
-y = np.arange(1, size + 1)
+x = np.arange(1, size + 2, step)
+y = np.arange(1, size + 2, step)
 xx, yy = np.meshgrid(x, y, indexing="xy")
-graphing_data = np.zeros((size, size, 2)) - float("inf")
+graphing_data = np.zeros((num_trials, size//step, size//step, 2)) - float("inf")
 
-for i in range(size):
-    for j in range(size):
-        np.savez(save_path + "/graphing_data.npz",
-                 relative_dim=xx,
-                 latent_dim=yy,
-                 mean=graphing_data[..., 0],
-                 max=graphing_data[..., 1])
-        torch.cuda.empty_cache()
-        name = "DenseSpectralLatent"
-        params = critic_params[name]
-        rel_dim = int(xx[i, j].item())
-        lat_dim = int(yy[i, j].item())
-        # print("relative dim", rel_dim, "latent dim", lat_dim)
-        if lat_dim < rel_dim:
-            continue
+for trial in range(num_trials):
+    for i in range(0, size//step):
+        for j in range(0, size//step):
+            np.savez(save_path + "/graphing_data.npz",
+                    relative_dim=xx,
+                    latent_dim=yy,
+                    mean=graphing_data[..., 0],
+                    max=graphing_data[..., 1])
+            torch.cuda.empty_cache()
+            name = "DenseSpectralLatent"
+            params = critic_params[name]
+            rel_dim = int(xx[i, j].item())
+            lat_dim = int(yy[i, j].item())
+            # print("relative dim", rel_dim, "latent dim", lat_dim)
+            if lat_dim < rel_dim:
+                continue
 
-        params["relative_dim"] = rel_dim
-        params["latent_dim"] = lat_dim
-        # set up critic
-        if "critic_name" in params.keys():
-            params.update(critic_params[params["critic_name"]])
-        critic_class = globals()[name]
-        critic = critic_class(**params).to(DEVICE)
-        critic_optimizer = torch.optim.Adam(critic.parameters(), lr=optimizer_params[name]["lr"])
+            params["relative_dim"] = rel_dim
+            params["latent_dim"] = lat_dim
+            # set up critic
+            if "critic_name" in params.keys():
+                params.update(critic_params[params["critic_name"]])
+            critic_class = globals()[name]
+            critic = critic_class(**params).to(DEVICE)
+            critic_optimizer = torch.optim.Adam(critic.parameters(), lr=optimizer_params[name]["lr"])
 
-        for iteration in range(iter_offset, tot_iter, iter_step):
-            # load data
-            # base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
-            #     DEVICE
-            # )
-            base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(500))).to(
-                DEVICE
-            )
-            # compute ground-truth
-            episode_rollouts = compute_MC_returns(base_data, gamma)
-            print(f"Initializing value offset to: {episode_rollouts.mean().item()}")
-
-            print("")
-            # if hasattr(test_critics[name], "value_offset"):
-            with torch.no_grad():
-                critic.value_offset.copy_(episode_rollouts.mean())
-
-            data = base_data.detach().clone()
-            # train new critic
-            data["values"] = critic.evaluate(data["critic_obs"])
-            try:
-                data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
-            except Exception as e:
-                print("relative dim", rel_dim, "latent_dim", lat_dim)
-            data["returns"] = data["advantages"] + data["values"]
-
-            mean_value_loss = 0
-            counter = 0
-            generator = create_uniform_generator(
-                data[:num_steps, traj_idx],
-                batch_size,
-                max_gradient_steps=max_gradient_steps,
-            )
-            for batch in generator:
-                value_loss = critic.loss_fn(
-                    batch["critic_obs"], batch["returns"], actions=batch["actions"]
+            for iteration in range(iter_offset, tot_iter, iter_step):
+                # load data
+                # base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
+                #     DEVICE
+                # )
+                base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(500))).to(
+                    DEVICE
                 )
-                critic_optimizer.zero_grad()
-                value_loss.backward()
-                # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
-                critic_optimizer.step()
-                counter += 1
+                # compute ground-truth
+                episode_rollouts = compute_MC_returns(base_data, gamma)
+                print(f"Initializing value offset to: {episode_rollouts.mean().item()}")
+
+                print("")
+                # if hasattr(test_critics[name], "value_offset"):
                 with torch.no_grad():
-                    error = (
-                        (
-                            episode_rollouts[0, test_idx]
-                            - critic.evaluate(data["critic_obs"][0, test_idx])
-                        ).pow(2)
-                    ).to("cpu")
-                # mean_training_loss.append(value_loss.item())
-                # test_error.append(error.detach().numpy())
-            print(f"{name} average error: ", error.mean().item())
-            print(f"{name} max error: ", error.max().item())
-            mean_value_loss /= counter
-            episode_rollouts = compute_MC_returns(data, gamma)
-            with torch.no_grad():
-                actual_error = (
-                    critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0]
-                ).pow(2)
-            mean_actual_error = actual_error.mean().item()
-            max_actual_error = actual_error.max().item()
-            graphing_data[i, j, 0] = mean_actual_error
-            graphing_data[i, j, 1] = max_actual_error
+                    critic.value_offset.copy_(episode_rollouts.mean())
 
-        # plt.close()
-        # plot_learning_progress(
-        #     test_error,
-        #     fn=save_path + f"/dim_sweep_error_{iteration}",
-        #     smoothing_window=50,
-        # )
-# plot
-print(graphing_data[0, 0]) # check that this is tensor([-inf, -inf])
+                data = base_data.detach().clone()
+                # train new critic
+                data["values"] = critic.evaluate(data["critic_obs"])
+                try:
+                    data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
+                except:
+                    print("relative dim", rel_dim, "latent_dim", lat_dim)
+                data["returns"] = data["advantages"] + data["values"]
 
+                mean_value_loss = 0
+                counter = 0
+                generator = create_uniform_generator(
+                    data[:num_steps, traj_idx],
+                    batch_size,
+                    max_gradient_steps=max_gradient_steps,
+                )
+                for batch in generator:
+                    value_loss = critic.loss_fn(
+                        batch["critic_obs"], batch["returns"], actions=batch["actions"]
+                    )
+                    critic_optimizer.zero_grad()
+                    value_loss.backward()
+                    # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
+                    critic_optimizer.step()
+                    counter += 1
+                    with torch.no_grad():
+                        error = (
+                            (
+                                episode_rollouts[0, test_idx]
+                                - critic.evaluate(data["critic_obs"][0, test_idx])
+                            ).pow(2)
+                        ).to("cpu")
+                    # mean_training_loss.append(value_loss.item())
+                    # test_error.append(error.detach().numpy())
+                print(f"{name} average error: ", error.mean().item())
+                print(f"{name} max error: ", error.max().item())
+                mean_value_loss /= counter
+                episode_rollouts = compute_MC_returns(data, gamma)
+                with torch.no_grad():
+                    actual_error = (
+                        critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0]
+                    ).pow(2)
+                mean_actual_error = actual_error.mean().item()
+                max_actual_error = actual_error.max().item()
+                graphing_data[trial, i, j, 0] = mean_actual_error
+                graphing_data[trial, i, j, 1] = max_actual_error
 
-plot_dim_sweep(
+            # plt.close()
+            # plot_learning_progress(
+            #     test_error,
+            #     fn=save_path + f"/dim_sweep_error_{iteration}",
+            #     smoothing_window=50,
+            # )
+mask = np.isfinite(graphing_data)
+avg_graphing_data = np.where(mask, graphing_data, np.nan).mean(axis=0)
+std_graphing_data = np.where(mask, graphing_data, np.nan).std(axis=0)
+# avg_graphing_data = np.mean(graphing_data, axis=0)
+# std_graphing_data = np.std(graphing_data, axis=0)
+
+# plot_dim_sweep(
+#     xx,
+#     yy,
+#     graphing_data[..., 0],
+#     graphing_data[..., 1],
+#     fn=save_path + "/latent_relative_dim_sweep"
+# )
+plot_dim_sweep_mean_std(
     xx,
     yy,
-    graphing_data[..., 0],
-    graphing_data[..., 1],
-    fn=save_path + "/latent_relative_dim_sweep"
+    avg_graphing_data[..., 0],
+    avg_graphing_data[..., 1],
+    std_graphing_data[..., 0],
+    std_graphing_data[..., 1],
+    fn=save_path + "/latent_relative_dim_sweep",
+    trial_num=num_trials,
 )
 
 
