@@ -62,29 +62,37 @@ def create_custom_pink_green_colormap():
 
     return custom_pink_green
 
+
 def plot_binned_errors(data, fn, title_add_on=""):
     for lr in data.keys():
         curr_fn = fn + f"_lr{lr}.png"
         num_cols = len(data[lr].keys())
         # bins = np.linspace(0.0, 1.5, 50)
         bins = np.linspace(0.0, 20, 40)
-        bin_labels = ["<" + str(np.round(bins[ix], decimals=4)) for ix in range(0, len(bins), 5)]
+        bin_labels = [
+            "<" + str(np.round(bins[ix], decimals=4)) for ix in range(0, len(bins), 5)
+        ]
         fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(30, 5))
         fig.suptitle(f"Histogram of Error Values - Learning Rate {lr} {title_add_on}")
         y_min = float("inf")
         y_max = -float("inf")
-        for ix, critic in enumerate(data[lr].keys()):
-            critic_data = data[lr][critic].detach().cpu().numpy()
+        for ix, critic in enumerate(data[lr]["critic_obs"].keys()):
+            critic_data = data[lr]["error"][critic].detach().cpu().numpy()
             digitized = np.digitize(critic_data, bins)
             bincount = np.bincount(digitized)
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
 
-            print(f"critic name: {critic} | max: {bincount.max()} | min: {bincount.min()} | sum: {np.sum(bincount)}")
+            # print(
+            #     f"critic name: {critic} | max: {bincount.max()}
+            #     | min: {bincount.min()} | sum: {np.sum(bincount)}"
+            # )
 
             axes[ix].bar(np.arange(len(bincount)), bincount)
             axes[ix].set_title(critic)
-            axes[ix].set_xticks(np.arange(0, len(bins), 5), labels=bin_labels, fontsize=7)
+            axes[ix].set_xticks(
+                np.arange(0, len(bins), 5), labels=bin_labels, fontsize=7
+            )
         for ix, critic in enumerate(data[lr].keys()):
             axes[ix].set_ylim(y_min, y_max)
 
@@ -326,7 +334,7 @@ def plot_pendulum_multiple_critics(
 
 
 def plot_pendulum_multiple_critics_w_data(
-    x, predictions, targets, title, fn, data, colorbar_label="f(x)"
+    x, predictions, targets, title, fn, data, colorbar_label="f(x)", grid_size=64
 ):
     num_critics = len(x.keys())
     fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
@@ -359,7 +367,6 @@ def plot_pendulum_multiple_critics_w_data(
     #     vcenter=0.0,
     #     halfrange=2.5,
     # )
-    grid_size = 64
     xcord = np.linspace(-2 * np.pi, 2 * np.pi, grid_size)
     ycord = np.linspace(-5, 5, grid_size)
 
@@ -408,7 +415,7 @@ def plot_pendulum_multiple_critics_w_data(
         #     alpha=0.5,
         # )
         axes[1, ix].imshow(
-            np_error.reshape(64, 64).T,
+            np_error.reshape(grid_size, grid_size).T,
             origin="lower",
             extent=(xcord.min(), xcord.max(), ycord.min(), ycord.max()),
             cmap=error_cmap,
@@ -433,6 +440,126 @@ def plot_pendulum_multiple_critics_w_data(
     for ax in axes.flat:
         ax.set_xlim([xcord.min(), xcord.max()])
         ax.set_ylim([ycord.min(), ycord.max()])
+
+    plt.subplots_adjust(
+        top=0.9, bottom=0.1, left=0.1, right=0.9, hspace=0.4, wspace=0.3
+    )
+
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=prediction_norm, cmap=prediction_cmap),
+        ax=axes[0, :].ravel().tolist(),
+        shrink=0.95,
+        label=colorbar_label,
+    )
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap),
+        ax=axes[1, :].ravel().tolist(),
+        shrink=0.95,
+        label=colorbar_label,
+    )
+
+    plt.savefig(f"{fn}.png")
+    print(f"Saved to {fn}.png")
+
+
+def plot_rosenbrock_multiple_critics_w_data(
+    x, predictions, targets, title, fn, data, colorbar_label="f(x)", grid_size=64
+):
+    num_critics = len(x.keys())
+    fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
+    # Determine global min and max error for consistent scaling
+    global_min_error = float("inf")
+    global_max_error = float("-inf")
+    global_min_prediction = float("inf")
+    global_max_prediction = float("-inf")
+    prediction_cmap = mpl.cm.get_cmap("viridis")
+    error_cmap = create_custom_bwr_colormap()
+
+    data = data.detach().cpu().numpy()
+    x_coord = data[:, 0]
+    y_coord = data[:, 1]
+
+    for critic_name in x:
+        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = (
+            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+        )
+        np_error = np_predictions - np_targets
+        global_min_error = min(global_min_error, np.min(np_error))
+        global_max_error = max(global_max_error, np.max(np_error))
+        global_min_prediction = np.min(np_targets)
+        global_max_prediction = np.max(np_targets)
+    error_norm = mcolors.TwoSlopeNorm(
+        vmin=global_min_error, vcenter=0, vmax=global_max_error
+    )
+    prediction_norm = mcolors.CenteredNorm(
+        vcenter=(global_max_prediction + global_min_prediction) / 2,
+        halfrange=(global_max_prediction - global_min_prediction) / 2,
+    )
+    for ix, critic_name in enumerate(x):
+        np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
+        # rescale (hack), value shardcoded from pendulum_config
+        np_x[:, 0] = np_x[:, 0] * 2 * np.pi
+        np_x[:, 1] = np_x[:, 1] * 5
+        np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
+        np_targets = (
+            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+        )
+        np_error = np_predictions - np_targets
+
+        # todo: clean up this super hacky code
+
+        # predictions
+        # if np.any(~np.equal(np_predictions, np.zeros_like(np_predictions))):
+        # axes[0, ix].scatter(
+        #     np_x[:, 0] * 2 * np.pi,
+        #     np_x[:, 1] * 5,
+        #     c=np_predictions,
+        #     cmap=prediction_cmap,
+        #     norm=prediction_norm,
+        #     alpha=0.5,
+        #     # norm=CenteredNorm(),
+        # )
+        axes[0, ix].imshow(
+            np_predictions.reshape(grid_size, grid_size).T,
+            origin="lower",
+            extent=(x_coord.min(), x_coord.max(), y_coord.min(), y_coord.max()),
+            cmap=prediction_cmap,
+            norm=prediction_norm,
+            # shading="auto",
+        )
+        axes[0, ix].set_title(f"{critic_name} Prediction")
+
+        if ix == 0:
+            continue
+        # axes[1, ix].scatter(
+        #     np_x[:, 0],
+        #     np_x[:, 1],
+        #     c=np_error,
+        #     cmap=error_cmap,
+        #     norm=error_norm,
+        #     alpha=0.5,
+        # )
+        axes[1, ix].imshow(
+            np_error.reshape(grid_size, grid_size).T,
+            origin="lower",
+            extent=(x_coord.min(), x_coord.max(), y_coord.min(), y_coord.max()),
+            cmap=error_cmap,
+            norm=error_norm,
+            # shading="auto",
+        )
+        axes[1, ix].set_title(f"{critic_name} Error")
+
+    axes[1, 0].plot(x_coord, y_coord, lw=1)
+
+    axes[1, 0].set_xlabel("x")
+    axes[1, 0].set_ylabel("y")
+    fig.suptitle(title, fontsize=16)
+
+    # Ensure the axes are the same for all plots
+    for ax in axes.flat:
+        ax.set_xlim([x_coord.min(), x_coord.max()])
+        ax.set_ylim([y_coord.min(), y_coord.max()])
 
     plt.subplots_adjust(
         top=0.9, bottom=0.1, left=0.1, right=0.9, hspace=0.4, wspace=0.3
@@ -1012,26 +1139,27 @@ def plot_learning_progress(test_error, fn="test_error", smoothing_window=30):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     for name, error in test_error.items():
-        error_mean = np.array([x.mean() for x in error])
-        error_std = np.array([x.std() for x in error])
+        # error_mean = np.array([x.mean() for x in error])
+        error_mean = np.array(error)
+        # error_std = np.array([x.std() for x in error])
         error_change = np.abs(np.diff(moving_average(error_mean, smoothing_window)))
         # smoothed_error_change = moving_average(error_change, smoothing_window)
 
         # plot shaded error region
         ax1.plot(error_mean, label=name)
-        ax1.fill_between(
-            range(len(error_mean)),
-            [x - y for x, y in zip(error_mean, error_std)],
-            [x + y for x, y in zip(error_mean, error_std)],
-            alpha=0.3,
-        )
+        # ax1.fill_between(
+        #     range(len(error_mean)),
+        #     [x - y for x, y in zip(error_mean, error_std)],
+        #     [x + y for x, y in zip(error_mean, error_std)],
+        #     alpha=0.3,
+        # )
         # plot change in error
-        ax2.plot(moving_average(error_change, smoothing_window), label=name)
+        ax2.plot(error_change, label=name)
 
     ax1.set_ylabel("Average Test Error")
     ax2.set_ylabel("Change in Error")
     ax2.set_xlabel("Iteration")
-    ax2.set_yscale("log")
+    # ax2.set_yscale("log")
     ax1.legend()
     ax2.legend()
 

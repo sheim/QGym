@@ -31,7 +31,7 @@ for critic_param in critic_params.values():
 # handle some bookkeeping
 # run_name = "May15_16-20-21_standard_critic"
 run_name = "Jun06_00-51-58_standard_critic"
-# run_name = "May22_11-11-03_standard_critic"
+run_name = "May22_11-11-03_standard_critic"
 
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name

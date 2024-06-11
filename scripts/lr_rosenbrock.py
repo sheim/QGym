@@ -4,14 +4,11 @@ import numpy as np  # noqa F401
 from learning.modules.critic import Critic  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
-    compute_generalized_advantages,
-    compute_MC_returns,
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import (
-    plot_pendulum_multiple_critics_w_data,
+    plot_rosenbrock_multiple_critics_w_data,
     plot_learning_progress,
-    plot_binned_errors
 )
 from gym import LEGGED_GYM_ROOT_DIR
 import os
@@ -19,10 +16,11 @@ import shutil
 
 import torch
 from torch import nn  # noqa F401
-import torch.nn.functional as F
+
 # from critic_params import critic_params
 from critic_params_rosenbrock import critic_params
-from torch.utils.data import DataLoader, TensorDataset
+from tensordict import TensorDict
+
 
 def generate_rosenbrock(n, lb, ub, steps):
     """
@@ -36,6 +34,7 @@ def generate_rosenbrock(n, lb, ub, steps):
     term_2 = torch.square(1 - X[:, :-1])
     y = torch.sum(term_1 + term_2, axis=1)
     return X, y.unsqueeze(1)
+
 
 def generate_bounded_rosenbrock(n, lb, ub, steps):
     """
@@ -55,23 +54,12 @@ def generate_bounded_rosenbrock(n, lb, ub, steps):
     y = bound_function_smoothly(y)
     return X, y
 
+
 DEVICE = "cuda:0"
 for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 
-# handle some bookkeeping
-# run_name = "May15_16-20-21_standard_critic"
-# run_name = "Jun06_00-51-58_standard_critic"
-# run_name = "May22_11-11-03_standard_critic"
-run_name = "Jun08_17-09-48_standard_critic" # oscillator
-
-# log_dir = os.path.join(
-#     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
-# )
-log_dir = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "logs", "FullSend_standard_critic", run_name
-)
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
 
@@ -94,103 +82,141 @@ critic_names = [
     # "NN_wQR",
     # "NN_wLinearLatent",
 ]
-# Instantiate the critics and add them to test_critics
 
-gamma = 0.95
-lam = 1.0
-tot_iter = 500
+n_dims = 2
+grid_resolution = 50
+total_data = grid_resolution**n_dims
+
+tot_iter = 1
 iter_offset = 0
 iter_step = 2
-max_gradient_steps = 1000
+max_gradient_steps = 200
 # max_grad_norm = 1.0
 batch_size = 128
-num_steps = 10  # ! want this at 1
-n_trajs = 3096
-rand_perm = torch.randperm(4096)
-traj_idx = rand_perm[0:n_trajs]
-test_idx = rand_perm[n_trajs : n_trajs + 1000]
+n_training_data = int(0.6 * total_data)
+n_validation_data = total_data - n_training_data
+print(f"training data: {n_training_data}, validation data: {n_validation_data}")
+rand_perm = torch.randperm(total_data)
+train_idx = rand_perm[0:n_training_data]
+test_idx = rand_perm[n_training_data:]
+
 
 # last_loss = {name: 0.0 for name in critic_names}
 # mean_training_loss = {name: [] for name in critic_names}
 # test_error = {name: [] for name in critic_names}
-learning_rates = [1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2]
-graphing_data = {lr: {} for lr in learning_rates}
+learning_rates = [1e-3, 1e-4, 1e-5]
+graphing_data = {
+    lr: {
+        data_name: {name: {} for name in critic_names}
+        for data_name in [
+            "critic_obs",
+            "values",
+            "returns",
+            "error",
+        ]
+    }
+    for lr in learning_rates
+}
+
+test_error = {lr: {name: [] for name in critic_names} for lr in learning_rates}
+
+x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
+
+for g_data in graphing_data.values():
+    g_data["critic_obs"]["Ground Truth MC Returns"] = x
+    g_data["values"]["Ground Truth MC Returns"] = target
+    g_data["returns"]["Ground Truth MC Returns"] = target
+
+
+data = TensorDict(
+    {"critic_obs": x.unsqueeze(dim=0), "returns": target.unsqueeze(dim=0)},
+    batch_size=(1, total_data),
+    device=DEVICE,
+)
+
 for lr in learning_rates:
     for iteration in range(iter_offset, tot_iter, iter_step):
-        # load data
-        # base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(500))).to(
-        #     DEVICE
-        # )
         torch.cuda.empty_cache()
-        input, target = generate_bounded_rosenbrock(2, 0.0, 2.0, 64)
-        # print(input.shape)
-        # print(target[traj_idx].shape)
-        # exit()
-        # compute ground-truth
-        # episode_rollouts = compute_MC_returns(base_data, gamma)
-        print(f"Initializing value offset to: {target.mean().item()}")
 
         for name in critic_names:
             print("")
             # if hasattr(test_critics[name], "value_offset"):
             params = critic_params[name]
             if "critic_name" in params.keys():
-                    params.update(critic_params[params["critic_name"]])
-            
+                params.update(critic_params[params["critic_name"]])
+
             critic_class = globals()[name]
             critic = critic_class(**params).to(DEVICE)
             critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr)
 
-            with torch.no_grad():
-                critic.value_offset.copy_(target.mean())
-
-            data = target.detach().clone()
+            # with torch.no_grad():
+            #     critic.value_offset.copy_(data["returns"].mean())
             # train new critic
             mean_value_loss = 0
             counter = 0
-            # generator = create_uniform_generator(
-            #     data[traj_idx],
-            #     batch_size,
-            #     max_gradient_steps=max_gradient_steps,
-            # )
-            
-            training_data = TensorDataset(input[traj_idx], target[traj_idx])
-            dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-            # exit()
-            for X_batch, y_batch in dataloader:
-                pred = critic.evaluate(X_batch)
-                value_loss = F.mse_loss(pred, y_batch, reduction="mean")
+
+            generator = create_uniform_generator(
+                data[:1, train_idx],
+                batch_size,
+                max_gradient_steps=max_gradient_steps,
+            )
+            for batch in generator:
+                value_loss = critic.loss_fn(
+                    batch["critic_obs"].squeeze(), batch["returns"].squeeze()
+                )
+
                 critic_optimizer.zero_grad()
                 value_loss.backward()
-                # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
                 critic_optimizer.step()
                 counter += 1
-
-            with torch.no_grad():
-                actual_error = (
-                    critic.evaluate(input[test_idx]) - target[test_idx].squeeze()
-                ).pow(2)
-                # print("rollout average", episode_rollouts[0].mean())
-            # print(actual_error.shape)
-            # print(critic.evaluate(input[test_idx]).shape)
-            # print(target[test_idx].shape)
-            # exit()
-            graphing_data[lr][name] = actual_error
+                with torch.no_grad():
+                    actual_error = (
+                        (
+                            data["returns"][0, test_idx]
+                            - critic.evaluate(data["critic_obs"][0, test_idx])
+                        ).pow(2)
+                    ).to("cpu")
+                test_error[lr][name].append(actual_error.detach().mean().numpy())
             print(f"{name} average error: ", actual_error.mean().item())
             print(f"{name} max error: ", actual_error.max().item())
 
+            if n_dims == 2:
+                with torch.no_grad():
+                    graphing_data[lr]["error"][name] = actual_error
+                    graphing_data[lr]["critic_obs"][name] = data[0, :]["critic_obs"]
+                    graphing_data[lr]["values"][name] = critic.evaluate(
+                        data[0, :]["critic_obs"]
+                    )
+                    graphing_data[lr]["returns"][name] = data[0, :]["returns"]
 
 # compare new and old critics
-save_path = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str
-)
+save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
 # PLOTS!!
-plot_binned_errors(graphing_data,
-                   save_path + f"/rosenbrock",
-                   title_add_on=f"Rosenbrock")
+# plot_binned_errors(
+#     graphing_data, save_path + f"/rosenbrock", title_add_on=f"Rosenbrock"
+# )
+for lr, t_error in test_error.items():
+    plot_learning_progress(
+        t_error,
+        fn=save_path + f"/{len(critic_names)}_lr {lr}",
+        smoothing_window=50,
+    )
+
+
+if n_dims == 2:
+    for lr, g_data in graphing_data.items():
+        plot_rosenbrock_multiple_critics_w_data(
+            g_data["critic_obs"],
+            g_data["values"],
+            g_data["returns"],
+            title=f"lr: {lr}",
+            fn=save_path + f"/{len(critic_names)}_lr_{lr}",
+            data=data[0, train_idx]["critic_obs"],
+            grid_size=grid_resolution,
+        )
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_osc.py")

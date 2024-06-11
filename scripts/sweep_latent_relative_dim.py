@@ -10,7 +10,6 @@ from learning.utils import (
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import (
-    plot_dim_sweep,
     plot_dim_sweep_mean_std,
 )
 from gym import LEGGED_GYM_ROOT_DIR
@@ -19,6 +18,7 @@ import shutil
 
 import torch
 from torch import nn  # noqa F401
+
 # from critic_params import critic_params
 from critic_params_osc import critic_params
 from optimizer_params import optimizer_params
@@ -33,7 +33,7 @@ for critic_param in critic_params.values():
 # run_name = "May15_16-20-21_standard_critic"
 # run_name = "Jun06_00-51-58_standard_critic"
 # run_name = "May22_11-11-03_standard_critic"
-run_name = "Jun08_17-09-48_standard_critic" # oscillator
+run_name = "Jun08_17-09-48_standard_critic"  # oscillator
 
 # log_dir = os.path.join(
 #     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
@@ -43,9 +43,7 @@ log_dir = os.path.join(
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
-save_path = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str
-)
+save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -87,16 +85,18 @@ step = 10
 x = np.arange(1, size + 2, step)
 y = np.arange(1, size + 2, step)
 xx, yy = np.meshgrid(x, y, indexing="xy")
-graphing_data = np.zeros((num_trials, size//step, size//step, 2)) - float("inf")
+graphing_data = np.zeros((num_trials, size // step, size // step, 2)) - float("inf")
 
 for trial in range(num_trials):
-    for i in range(0, size//step):
-        for j in range(0, size//step):
-            np.savez(save_path + "/graphing_data.npz",
-                    relative_dim=xx,
-                    latent_dim=yy,
-                    mean=graphing_data[..., 0],
-                    max=graphing_data[..., 1])
+    for i in range(0, size // step):
+        for j in range(0, size // step):
+            np.savez(
+                save_path + "/graphing_data.npz",
+                relative_dim=xx,
+                latent_dim=yy,
+                mean=graphing_data[..., 0],
+                max=graphing_data[..., 1],
+            )
             torch.cuda.empty_cache()
             name = "DenseSpectralLatent"
             params = critic_params[name]
@@ -113,16 +113,14 @@ for trial in range(num_trials):
                 params.update(critic_params[params["critic_name"]])
             critic_class = globals()[name]
             critic = critic_class(**params).to(DEVICE)
-            critic_optimizer = torch.optim.Adam(critic.parameters(), lr=optimizer_params[name]["lr"])
+            critic_optimizer = torch.optim.Adam(
+                critic.parameters(), lr=optimizer_params[name]["lr"]
+            )
 
             for iteration in range(iter_offset, tot_iter, iter_step):
-                # load data
-                # base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
-                #     DEVICE
-                # )
-                base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(500))).to(
-                    DEVICE
-                )
+                base_data = torch.load(
+                    os.path.join(log_dir, "data_{}.pt".format(500))
+                ).to(DEVICE)
                 # compute ground-truth
                 episode_rollouts = compute_MC_returns(base_data, gamma)
                 print(f"Initializing value offset to: {episode_rollouts.mean().item()}")
@@ -136,7 +134,9 @@ for trial in range(num_trials):
                 # train new critic
                 data["values"] = critic.evaluate(data["critic_obs"])
                 try:
-                    data["advantages"] = compute_generalized_advantages(data, gamma, lam, critic)
+                    data["advantages"] = compute_generalized_advantages(
+                        data, gamma, lam, critic
+                    )
                 except:
                     print("relative dim", rel_dim, "latent_dim", lat_dim)
                 data["returns"] = data["advantages"] + data["values"]
@@ -154,7 +154,6 @@ for trial in range(num_trials):
                     )
                     critic_optimizer.zero_grad()
                     value_loss.backward()
-                    # noqa F401.utils.clip_grad_norm_(critic.parameters(), max_grad_norm)
                     critic_optimizer.step()
                     counter += 1
                     with torch.no_grad():
