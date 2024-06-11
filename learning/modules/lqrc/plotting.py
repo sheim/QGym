@@ -62,14 +62,15 @@ def create_custom_pink_green_colormap():
 
     return custom_pink_green
 
-def plot_binned_errors(data, fn):
+def plot_binned_errors(data, fn, title_add_on=""):
     for lr in data.keys():
         curr_fn = fn + f"_lr{lr}.png"
         num_cols = len(data[lr].keys())
-        bins = np.linspace(0.0, 1.5, 50)
+        # bins = np.linspace(0.0, 1.5, 50)
+        bins = np.linspace(0.0, 20, 40)
         bin_labels = ["<" + str(np.round(bins[ix], decimals=4)) for ix in range(0, len(bins), 5)]
         fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(30, 5))
-        fig.suptitle(f"Histogram of Error Values - Learning Rate {lr}")
+        fig.suptitle(f"Histogram of Error Values - Learning Rate {lr} {title_add_on}")
         y_min = float("inf")
         y_max = -float("inf")
         for ix, critic in enumerate(data[lr].keys()):
@@ -77,7 +78,9 @@ def plot_binned_errors(data, fn):
             digitized = np.digitize(critic_data, bins)
             bincount = np.bincount(digitized)
             y_min = bincount.min() if bincount.min() < y_min else y_min
-            y_max = bincount.max() if bincount.max() > y_max else y_max
+            y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
+
+            print(f"critic name: {critic} | max: {bincount.max()} | min: {bincount.min()} | sum: {np.sum(bincount)}")
 
             axes[ix].bar(np.arange(len(bincount)), bincount)
             axes[ix].set_title(critic)

@@ -20,7 +20,8 @@ import shutil
 
 import torch
 from torch import nn  # noqa F401
-from critic_params import critic_params
+# from critic_params import critic_params
+from critic_params_osc import critic_params
 
 
 DEVICE = "cuda:0"
@@ -30,11 +31,15 @@ for critic_param in critic_params.values():
 
 # handle some bookkeeping
 # run_name = "May15_16-20-21_standard_critic"
-run_name = "Jun06_00-51-58_standard_critic"
+# run_name = "Jun06_00-51-58_standard_critic"
 # run_name = "May22_11-11-03_standard_critic"
+run_name = "Jun08_17-09-48_standard_critic" # oscillator
 
+# log_dir = os.path.join(
+#     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
+# )
 log_dir = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
+    LEGGED_GYM_ROOT_DIR, "logs", "FullSend_standard_critic", run_name
 )
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
@@ -82,7 +87,10 @@ graphing_data = {lr: {} for lr in learning_rates}
 for lr in learning_rates:
     for iteration in range(iter_offset, tot_iter, iter_step):
         # load data
-        base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
+        # base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(iteration))).to(
+        #     DEVICE
+        # )
+        base_data = torch.load(os.path.join(log_dir, "data_{}.pt".format(500))).to(
             DEVICE
         )
         # compute ground-truth
@@ -116,6 +124,7 @@ for lr in learning_rates:
                 batch_size,
                 max_gradient_steps=max_gradient_steps,
             )
+            
             for batch in generator:
                 value_loss = critic.loss_fn(
                     batch["critic_obs"], batch["returns"], actions=batch["actions"]
@@ -132,7 +141,7 @@ for lr in learning_rates:
                             - critic.evaluate(data["critic_obs"][0, test_idx])
                         ).pow(2)
                     ).to("cpu")
-                    
+                
                 # mean_training_loss[name].append(value_loss.item())
                 # test_error[name].append(error.detach().numpy())
 
@@ -144,7 +153,9 @@ for lr in learning_rates:
                 actual_error = (
                     critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0]
                 ).pow(2)
+                # print("rollout average", episode_rollouts[0].mean())
             graphing_data[lr][name] = actual_error
+
 
 # compare new and old critics
 save_path = os.path.join(
@@ -154,9 +165,11 @@ if not os.path.exists(save_path):
     os.makedirs(save_path)
 
 # PLOTS!!
-plot_binned_errors(graphing_data, save_path + "/gridded_error")
+plot_binned_errors(graphing_data,
+                   save_path + f"/osc_test",
+                   title_add_on=f"Test")
 
-this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_critics.py")
-params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
+this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_osc.py")
+params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_osc.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))

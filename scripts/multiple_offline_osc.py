@@ -107,8 +107,8 @@ for iteration in range(iter_offset, tot_iter + 1, iter_step):
     for name, critic in test_critics.items():
         print("")
         # if hasattr(test_critics[name], "value_offset"):
-        with torch.no_grad():
-            critic.value_offset.copy_(episode_rollouts.mean())
+        # with torch.no_grad():
+        #     critic.value_offset.copy_(episode_rollouts.mean())
 
         critic_optimizer = critic_optimizers[name]
         data = base_data.detach().clone()
