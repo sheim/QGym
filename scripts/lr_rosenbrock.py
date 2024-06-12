@@ -58,10 +58,10 @@ total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
 
 # set up training
-tot_iter = 300
+tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 200
+max_gradient_steps = 1000 #200
 # max_grad_norm = 1.0
 batch_size = 128
 n_training_data = int(0.6 * total_data)
@@ -92,9 +92,9 @@ data = TensorDict(
     device=DEVICE,
 )
 
-num_batches_per_epoch = (data[:1, train_idx].shape[0]* data[:1, train_idx].shape[1]) // batch_size
-num_epochs = max_gradient_steps // num_batches_per_epoch
-print("Total epochs", ((tot_iter - iter_offset)//iter_step)*num_epochs)
+# num_batches_per_epoch = (data[:1, train_idx].shape[0]* data[:1, train_idx].shape[1]) // batch_size
+# num_epochs = max_gradient_steps // num_batches_per_epoch
+# print("Total epochs", ((tot_iter - iter_offset)//iter_step)*num_epochs)
 
 for lr in learning_rates:
     for iteration in range(iter_offset, tot_iter, iter_step):

@@ -46,7 +46,7 @@ if not os.path.exists(save_path):
 
 gamma = 0.95
 lam = 1.0
-tot_iter = 50
+tot_iter = 1
 iter_offset = 0
 iter_step = 1
 max_gradient_steps = 1000
