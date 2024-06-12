@@ -9,6 +9,7 @@ from learning.utils import (
 from learning.modules.lqrc.plotting import (
     plot_rosenbrock_multiple_critics_w_data,
     plot_learning_progress,
+    plot_binned_errors,
 )
 from gym import LEGGED_GYM_ROOT_DIR
 import os
@@ -127,6 +128,7 @@ for g_data in graphing_data.values():
     g_data["critic_obs"]["Ground Truth MC Returns"] = x
     g_data["values"]["Ground Truth MC Returns"] = target
     g_data["returns"]["Ground Truth MC Returns"] = target
+    g_data["error"]["Ground Truth MC Returns"] = torch.zeros_like(target)
 
 
 data = TensorDict(
@@ -173,7 +175,7 @@ for lr in learning_rates:
                 with torch.no_grad():
                     actual_error = (
                         (
-                            data["returns"][0, test_idx]
+                            data["returns"][0, test_idx].squeeze()
                             - critic.evaluate(data["critic_obs"][0, test_idx])
                         ).pow(2)
                     ).to("cpu")
@@ -195,10 +197,7 @@ save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", t
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
-# PLOTS!!
-# plot_binned_errors(
-#     graphing_data, save_path + f"/rosenbrock", title_add_on=f"Rosenbrock"
-# )
+# plots
 for lr, t_error in test_error.items():
     plot_learning_progress(
         t_error,
@@ -206,6 +205,30 @@ for lr, t_error in test_error.items():
         smoothing_window=50,
     )
 
+g_data_no_ground_truth = {
+    lr: {
+        data_name: {name: {} for name in critic_names}
+        for data_name in [
+            "critic_obs",
+            "values",
+            "returns",
+            "error",
+        ]
+    }
+    for lr in learning_rates
+}
+for lr, value in graphing_data.items():
+    for name in all_graphing_names:
+        if name == "Ground Truth MC Returns":
+            continue
+        g_data_no_ground_truth[lr]["critic_obs"][name] = value["critic_obs"][name]
+        g_data_no_ground_truth[lr]["values"][name] = value["values"][name]
+        g_data_no_ground_truth[lr]["returns"][name] = value["returns"][name]
+        g_data_no_ground_truth[lr]["error"][name] = value["error"][name]
+
+plot_binned_errors(g_data_no_ground_truth,
+                    save_path + f"/rosenbrock",
+                    title_add_on=f"Rosenbrock")
 
 if n_dims == 2:
     for lr, g_data in graphing_data.items():
@@ -218,6 +241,7 @@ if n_dims == 2:
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,
         )
+
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_osc.py")

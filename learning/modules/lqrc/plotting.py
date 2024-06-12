@@ -68,7 +68,8 @@ def plot_binned_errors(data, fn, title_add_on=""):
         curr_fn = fn + f"_lr{lr}.png"
         num_cols = len(data[lr].keys())
         # bins = np.linspace(0.0, 1.5, 50)
-        bins = np.linspace(0.0, 20, 40)
+        # bins = np.linspace(0.0, 20, 40)
+        bins = np.arange(0, 500, 10)
         bin_labels = [
             "<" + str(np.round(bins[ix], decimals=4)) for ix in range(0, len(bins), 5)
         ]
@@ -77,9 +78,14 @@ def plot_binned_errors(data, fn, title_add_on=""):
         y_min = float("inf")
         y_max = -float("inf")
         for ix, critic in enumerate(data[lr]["critic_obs"].keys()):
-            critic_data = data[lr]["error"][critic].detach().cpu().numpy()
+            critic_data = data[lr]["error"][critic].squeeze().detach().cpu().numpy()
             digitized = np.digitize(critic_data, bins)
-            bincount = np.bincount(digitized)
+            try:
+                bincount = np.bincount(digitized)
+            except:
+                print("digitized shape", digitized.shape)
+                print("critic data shape", critic_data.shape)
+                print("critic name", critic)
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
 
