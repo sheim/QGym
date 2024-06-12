@@ -14,10 +14,10 @@ class PendulumSACCfg(PendulumCfg):
         dof_pos_range = {
             "theta": [-torch.pi, torch.pi],
         }
-        dof_vel_range = {"theta": [-1, 1]}
+        dof_vel_range = {"theta": [-5, 5]}
 
     class control(PendulumCfg.control):
-        ctrl_frequency = 20
+        ctrl_frequency = 10
         desired_sim_frequency = 100
 
     class asset(PendulumCfg.asset):
@@ -74,12 +74,12 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
 
         class reward:
             class weights:
-                theta = 1.0
-                omega = 0.1
-                equilibrium = 0.0
-                energy = 1.0
+                theta = 0.0
+                omega = 0.0
+                equilibrium = 1.0
+                energy = 0.5
                 dof_vel = 0.0
-                torques = 0.001
+                torques = 0.025
 
             class termination_weight:
                 termination = 0.0
