@@ -20,43 +20,10 @@ from torch import nn  # noqa F401
 
 # from critic_params import critic_params
 from critic_params_rosenbrock import critic_params
+from utils import * # noqa F403
 from tensordict import TensorDict
 
 
-def generate_rosenbrock(n, lb, ub, steps):
-    """
-    Generates data based on Rosenbrock function
-    https://en.wikipedia.org/wiki/Test_functions_for_optimization
-    """
-    assert n > 1, "n must be > 1 for Rosenbrock"
-    all_linspaces = [torch.linspace(lb, ub, steps, device=DEVICE) for i in range(n)]
-    X = torch.cartesian_prod(*all_linspaces)
-    term_1 = 100 * torch.square(X[:, 1:] - torch.square(X[:, :-1]))
-    term_2 = torch.square(1 - X[:, :-1])
-    y = torch.sum(term_1 + term_2, axis=1)
-    return X, y.unsqueeze(1)
-
-
-def generate_bounded_rosenbrock(n, lb, ub, steps):
-    """
-    Generates data based on Rosenbrock function
-    https://en.wikipedia.org/wiki/Test_functions_for_optimization
-    """
-
-    def bound_function_smoothly(y):
-        a = 50.0  # Threshold
-        c = 60.0  # Constant to transition to
-        k = 0.1  # Sharpness of transition
-        return y * (1 - 1 / (1 + torch.exp(-k * (y - a)))) + c * (
-            1 / (1 + torch.exp(-k * (y - a)))
-        )
-
-    X, y = generate_rosenbrock(n, lb, ub, steps)
-    y = bound_function_smoothly(y)
-    return X, y
-
-
-DEVICE = "cuda:0"
 for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
@@ -102,33 +69,19 @@ train_idx = rand_perm[0:n_training_data]
 test_idx = rand_perm[n_training_data:]
 
 
-# last_loss = {name: 0.0 for name in critic_names}
-# mean_training_loss = {name: [] for name in critic_names}
-# test_error = {name: [] for name in critic_names}
-all_graphing_names = ["Ground Truth MC Returns"] + critic_names.copy()
+all_graphing_names = ["Rosenbrock"] + critic_names.copy()
 learning_rates = [1e-3, 1e-4, 1e-5]
-graphing_data = {
-    lr: {
-        data_name: {name: {} for name in all_graphing_names}
-        for data_name in [
-            "critic_obs",
-            "values",
-            "returns",
-            "error",
-        ]
-    }
-    for lr in learning_rates
-}
+graphing_data = generate_rosenbrock_g_data_dict(all_graphing_names, learning_rates)
 
 test_error = {lr: {name: [] for name in critic_names} for lr in learning_rates}
 
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
 
 for g_data in graphing_data.values():
-    g_data["critic_obs"]["Ground Truth MC Returns"] = x
-    g_data["values"]["Ground Truth MC Returns"] = target
-    g_data["returns"]["Ground Truth MC Returns"] = target
-    g_data["error"]["Ground Truth MC Returns"] = torch.zeros_like(target)
+    g_data["critic_obs"]["Rosenbrock"] = x
+    g_data["values"]["Rosenbrock"] = target
+    g_data["returns"]["Rosenbrock"] = target
+    g_data["error"]["Rosenbrock"] = torch.zeros_like(target)
 
 
 data = TensorDict(
@@ -143,7 +96,6 @@ for lr in learning_rates:
 
         for name in critic_names:
             print("")
-            # if hasattr(test_critics[name], "value_offset"):
             params = critic_params[name]
             if "critic_name" in params.keys():
                 params.update(critic_params[params["critic_name"]])
@@ -205,21 +157,10 @@ for lr, t_error in test_error.items():
         smoothing_window=50,
     )
 
-g_data_no_ground_truth = {
-    lr: {
-        data_name: {name: {} for name in critic_names}
-        for data_name in [
-            "critic_obs",
-            "values",
-            "returns",
-            "error",
-        ]
-    }
-    for lr in learning_rates
-}
+g_data_no_ground_truth = generate_rosenbrock_g_data_dict(critic_names, learning_rates)
 for lr, value in graphing_data.items():
     for name in all_graphing_names:
-        if name == "Ground Truth MC Returns":
+        if name == "Rosenbrock":
             continue
         g_data_no_ground_truth[lr]["critic_obs"][name] = value["critic_obs"][name]
         g_data_no_ground_truth[lr]["values"][name] = value["values"][name]
@@ -241,7 +182,6 @@ if n_dims == 2:
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,
         )
-
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_osc.py")

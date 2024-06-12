@@ -488,7 +488,7 @@ def plot_rosenbrock_multiple_critics_w_data(
     for critic_name in x:
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
         np_targets = (
-            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+            targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
         )
         np_error = np_predictions - np_targets
         global_min_error = min(global_min_error, np.min(np_error))
@@ -509,7 +509,7 @@ def plot_rosenbrock_multiple_critics_w_data(
         np_x[:, 1] = np_x[:, 1] * 5
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
         np_targets = (
-            targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+            targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
         )
         np_error = np_predictions - np_targets
 
@@ -556,7 +556,10 @@ def plot_rosenbrock_multiple_critics_w_data(
         )
         axes[1, ix].set_title(f"{critic_name} Error")
 
-    axes[1, 0].plot(x_coord, y_coord, lw=1)
+    # axes[1, 0].plot(x_coord, y_coord, lw=1)
+    axes[1, 0].scatter(x_coord, y_coord, alpha=0.75)
+    axes[1, 0].set_title(f"Data Distribution")
+
 
     axes[1, 0].set_xlabel("x")
     axes[1, 0].set_ylabel("y")
