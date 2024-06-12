@@ -31,7 +31,7 @@ for critic_param in critic_params.values():
 # handle some bookkeeping
 # run_name = "May15_16-20-21_standard_critic"
 run_name = "Jun06_00-51-58_standard_critic"
-run_name = "May22_11-11-03_standard_critic"
+# run_name = "May22_11-11-03_standard_critic"
 
 log_dir = os.path.join(
     LEGGED_GYM_ROOT_DIR, "logs", "pendulum_standard_critic", run_name
@@ -146,6 +146,10 @@ for iteration in range(iter_offset, tot_iter, iter_step):
                         - critic.evaluate(data["critic_obs"][0, test_idx])
                     ).pow(2)
                 ).to("cpu")
+            # print("episode_rollouts[0, test_idx] shape", episode_rollouts[0, test_idx].shape)
+            # print("critic.evaluate(data['critic_obs'][0, test_idx]).shape", critic.evaluate(data["critic_obs"][0, test_idx]).shape)
+            # print("error shape", error.detach().numpy().shape)
+            
             mean_training_loss[name].append(value_loss.item())
             test_error[name].append(error.detach().numpy())
         print(f"{name} average error: ", error.mean().item())

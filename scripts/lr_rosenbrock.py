@@ -119,6 +119,8 @@ for lr in learning_rates:
                 max_gradient_steps=max_gradient_steps,
             )
             for batch in generator:
+                print("batch['critic_obs'].squeeze() shape", batch["critic_obs"].squeeze().shape)
+                print("batch['returns'].squeeze() shape", batch["returns"].squeeze().shape)
                 value_loss = critic.loss_fn(
                     batch["critic_obs"].squeeze(), batch["returns"].squeeze()
                 )
