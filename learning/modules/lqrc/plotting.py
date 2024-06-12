@@ -14,6 +14,15 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 font = {"size": 12}
 matplotlib.rc("font", **font)
 
+def generate_statistics_string(data):
+    mu = data.mean()
+    median = data.median()
+    sigma = data.std()
+    textstr = '\n'.join((
+        r'$\mu=%.2f$' % (mu, ),
+        r'$\mathrm{median}=%.2f$' % (median, ),
+        r'$\sigma=%.2f$' % (sigma, ),))
+    return textstr
 
 def create_custom_bwr_colormap():
     # Define the colors for each segment
@@ -497,13 +506,16 @@ def plot_rosenbrock_multiple_critics_w_data(
         global_max_error = max(global_max_error, np.max(np_error))
         global_min_prediction = np.min(np_targets)
         global_max_prediction = np.max(np_targets)
-    error_norm = mcolors.TwoSlopeNorm(
-        vmin=global_min_error, vcenter=0, vmax=global_max_error
-    )
-    prediction_norm = mcolors.CenteredNorm(
-        vcenter=(global_max_prediction + global_min_prediction) / 2,
-        halfrange=(global_max_prediction - global_min_prediction) / 2,
-    )
+    # error_norm = mcolors.TwoSlopeNorm(
+    #     vmin=global_min_error, vcenter=0, vmax=global_max_error
+    # )
+    # prediction_norm = mcolors.CenteredNorm(
+    #     vcenter=(global_max_prediction + global_min_prediction) / 2,
+    #     halfrange=(global_max_prediction - global_min_prediction) / 2,
+    # )
+    error_norm = mcolors.LogNorm()
+    prediction_norm = mcolors.LogNorm()
+    
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
         # rescale (hack), value shardcoded from pendulum_config
@@ -515,19 +527,6 @@ def plot_rosenbrock_multiple_critics_w_data(
         )
         np_error = np_predictions - np_targets
 
-        # todo: clean up this super hacky code
-
-        # predictions
-        # if np.any(~np.equal(np_predictions, np.zeros_like(np_predictions))):
-        # axes[0, ix].scatter(
-        #     np_x[:, 0] * 2 * np.pi,
-        #     np_x[:, 1] * 5,
-        #     c=np_predictions,
-        #     cmap=prediction_cmap,
-        #     norm=prediction_norm,
-        #     alpha=0.5,
-        #     # norm=CenteredNorm(),
-        # )
         axes[0, ix].imshow(
             np_predictions.reshape(grid_size, grid_size).T,
             origin="lower",
@@ -541,14 +540,7 @@ def plot_rosenbrock_multiple_critics_w_data(
 
         if ix == 0:
             continue
-        # axes[1, ix].scatter(
-        #     np_x[:, 0],
-        #     np_x[:, 1],
-        #     c=np_error,
-        #     cmap=error_cmap,
-        #     norm=error_norm,
-        #     alpha=0.5,
-        # )
+
         axes[1, ix].imshow(
             np_error.reshape(grid_size, grid_size).T,
             origin="lower",
@@ -562,8 +554,6 @@ def plot_rosenbrock_multiple_critics_w_data(
     # axes[1, 0].plot(x_coord, y_coord, lw=1)
     axes[1, 0].scatter(x_coord, y_coord, alpha=0.75)
     axes[1, 0].set_title(f"Data Distribution")
-
-
     axes[1, 0].set_xlabel("x")
     axes[1, 0].set_ylabel("y")
 
@@ -572,9 +562,6 @@ def plot_rosenbrock_multiple_critics_w_data(
         ax.set_xlim([x_coord.min(), x_coord.max()])
         ax.set_ylim([y_coord.min(), y_coord.max()])
 
-    # plt.subplots_adjust(
-    #     top=0.9, bottom=0.1, left=0.1, right=0.9, hspace=0.4, wspace=0.3
-    # )
     asp = np.diff(axes[1, 0].get_xlim())[0] / np.diff(axes[1, 0].get_ylim())[0]
     axes[1, 0].set_aspect(asp)
 

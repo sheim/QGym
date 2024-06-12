@@ -58,9 +58,9 @@ total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
 
 # set up training
-tot_iter = 1
+tot_iter = 300
 iter_offset = 0
-iter_step = 2
+iter_step = 1
 max_gradient_steps = 200
 # max_grad_norm = 1.0
 batch_size = 128
@@ -91,6 +91,10 @@ data = TensorDict(
     batch_size=(1, total_data),
     device=DEVICE,
 )
+
+num_batches_per_epoch = (data[:1, train_idx].shape[0]* data[:1, train_idx].shape[1]) // batch_size
+num_epochs = max_gradient_steps // num_batches_per_epoch
+print("Total epochs", ((tot_iter - iter_offset)//iter_step)*num_epochs)
 
 for lr in learning_rates:
     for iteration in range(iter_offset, tot_iter, iter_step):
@@ -180,7 +184,7 @@ if n_dims == 2:
             g_data["critic_obs"],
             g_data["values"],
             g_data["returns"],
-            title=f"Learning a {n_dims + 1}D Rosenbrock Function \n Learning Rate: {lr}, Without Nonlinear Latent Activation",
+            title=f"Learning a {n_dims}D Rosenbrock Function \n Learning Rate: {lr}, Without Nonlinear Latent Activation",
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,

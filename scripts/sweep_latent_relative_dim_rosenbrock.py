@@ -191,7 +191,7 @@ plot_dim_sweep_mean_std(
     std_graphing_data[..., 1],
     fn=save_path + "/latent_relative_dim_sweep",
     trial_num=num_trials,
-    title=f"Prediction Error on {n_dims + 1}D Rosenbrock Function vs Rank(A) and Dim(A)"
+    title=f"Prediction Error on {n_dims}D Rosenbrock Function vs Rank(A) and Dim(A)"
 )
 
 
