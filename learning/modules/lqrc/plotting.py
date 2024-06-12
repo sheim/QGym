@@ -1148,6 +1148,7 @@ def plot_learning_progress(test_error, fn="test_error", smoothing_window=30):
     for name, error in test_error.items():
         # error_mean = np.array([x.mean() for x in error])
         error_mean = np.array(error)
+        # exit()
         # error_std = np.array([x.std() for x in error])
         error_change = np.abs(np.diff(moving_average(error_mean, smoothing_window)))
         # smoothed_error_change = moving_average(error_change, smoothing_window)

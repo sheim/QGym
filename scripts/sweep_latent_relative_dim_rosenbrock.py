@@ -182,6 +182,14 @@ avg_graphing_data = np.where(mask, graphing_data, np.nan).mean(axis=0)
 std_graphing_data = np.where(mask, graphing_data, np.nan).std(axis=0)
 
 
+np.savez(
+    save_path + "/graphing_data.npz",
+    xx=xx,
+    yy=yy,
+    avg_graphing=avg_graphing_data,
+    std_graphing=std_graphing_data,
+)
+
 plot_dim_sweep_mean_std(
     xx,
     yy,
@@ -194,6 +202,13 @@ plot_dim_sweep_mean_std(
     title=f"Prediction Error on {n_dims}D Rosenbrock Function vs Rank(A) and Dim(A)"
 )
 
+np.savez(
+    save_path + "/graphing_data.npz",
+    xx=xx,
+    yy=yy,
+    avg_graphing=avg_graphing_data,
+    std_graphing=std_graphing_data,
+)
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_critics.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
