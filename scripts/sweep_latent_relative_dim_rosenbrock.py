@@ -100,6 +100,7 @@ for trial in range(num_trials):
             # set up critic
             if "critic_name" in params.keys():
                 params.update(critic_params[params["critic_name"]])
+            params["num_obs"] = n_dims
             critic_class = globals()[name]
             critic = critic_class(**params).to(DEVICE)
             critic_optimizer = torch.optim.Adam(

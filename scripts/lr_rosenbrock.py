@@ -101,6 +101,7 @@ for lr in learning_rates:
             params = critic_params[name]
             if "critic_name" in params.keys():
                 params.update(critic_params[params["critic_name"]])
+            params["num_obs"] = n_dims
 
             critic_class = globals()[name]
             critic = critic_class(**params).to(DEVICE)
@@ -179,7 +180,7 @@ if n_dims == 2:
             g_data["critic_obs"],
             g_data["values"],
             g_data["returns"],
-            title=f"Learning a {n_dims + 1}D Rosenbrock Function \n Learning Rate: {lr}",
+            title=f"Learning a {n_dims + 1}D Rosenbrock Function \n Learning Rate: {lr}, Without Nonlinear Latent Activation",
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,
