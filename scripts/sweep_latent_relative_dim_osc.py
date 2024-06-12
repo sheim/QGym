@@ -63,25 +63,9 @@ traj_idx = rand_perm[0:n_trajs]
 test_idx = rand_perm[n_trajs : n_trajs + 1000]
 
 
-# mean_training_loss = []
-# test_error = []
-# size = 4
-# rel_range = torch.arange(2, 6)
-# latent_range = torch.arange(0, size)
-# relative_dim = torch.zeros(size, size)
-# latent_dim = torch.zeros(size, size)
-# for i, rel_dim in enumerate(rel_range):
-#     for j, latent_dim_offset in enumerate(latent_range):
-#         relative_dim[i, j] = rel_dim
-#         latent_dim[i, j] = rel_dim + latent_dim_offset
-# graphing_data = torch.zeros(size, size, 2)
 num_trials = 3
 size = 53
 step = 10
-# x = torch.arange(1, size + 1)
-# y = torch.arange(1, size + 1)
-# xx, yy = torch.meshgrid(x, y, indexing="xy")
-# graphing_data = torch.zeros(size, size, 2) - float("inf")
 x = np.arange(1, size + 2, step)
 y = np.arange(1, size + 2, step)
 xx, yy = np.meshgrid(x, y, indexing="xy")
@@ -187,8 +171,6 @@ for trial in range(num_trials):
 mask = np.isfinite(graphing_data)
 avg_graphing_data = np.where(mask, graphing_data, np.nan).mean(axis=0)
 std_graphing_data = np.where(mask, graphing_data, np.nan).std(axis=0)
-# avg_graphing_data = np.mean(graphing_data, axis=0)
-# std_graphing_data = np.std(graphing_data, axis=0)
 
 # plot_dim_sweep(
 #     xx,

@@ -167,9 +167,10 @@ def plot_dim_sweep_mean_std(
     std_max_error,
     fn,
     trial_num,
+    title,
     step=5,
 ):
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(25, 15))
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(22, 15))
 
     extent = [x.min() - 0.5, x.max() + 0.5, y.min() - 0.5, y.max() + 0.5]
 
@@ -246,6 +247,7 @@ def plot_dim_sweep_mean_std(
         pad=0.1,
         label=f"Max Error (Standard Deviation Over {trial_num} Trials)",
     )
+    fig.suptitle(title, fontsize=20)
     plt.savefig(fn, bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}")
 
@@ -564,7 +566,6 @@ def plot_rosenbrock_multiple_critics_w_data(
 
     axes[1, 0].set_xlabel("x")
     axes[1, 0].set_ylabel("y")
-    fig.suptitle(title, fontsize=20)
 
     # Ensure the axes are the same for all plots
     for ax in axes.flat:
@@ -589,7 +590,7 @@ def plot_rosenbrock_multiple_critics_w_data(
         shrink=0.95,
         # label="Pointwise Error",
     )
-
+    fig.suptitle(title, fontsize=20)
     plt.savefig(f"{fn}.png")
     print(f"Saved to {fn}.png")
 
@@ -1172,6 +1173,8 @@ def plot_learning_progress(test_error, fn="test_error", smoothing_window=30):
     ax2.set_ylabel("Change in Error")
     ax2.set_xlabel("Iteration")
     # ax2.set_yscale("log")
+    ax1.set_ylim(0.0, 50.0)
+    ax2.set_ylim(0.0, 50.0)
     ax1.legend()
     ax2.legend()
 

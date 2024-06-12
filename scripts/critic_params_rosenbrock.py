@@ -1,7 +1,7 @@
 # Parameters for different critics
 critic_params = {
     "CholeskyInput": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": True,
@@ -9,7 +9,7 @@ critic_params = {
         "minimize": True,
     },
     "PDCholeskyInput": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": True,
@@ -17,7 +17,7 @@ critic_params = {
         "minimize": True,
     },
     "CholeskyLatent": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": False,
@@ -27,7 +27,7 @@ critic_params = {
         "latent_activation": None,
     },
     "PDCholeskyLatent": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": False,
@@ -37,7 +37,7 @@ critic_params = {
         "latent_activation": None,
     },
     "SpectralLatent": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": False,
@@ -48,7 +48,7 @@ critic_params = {
         "latent_activation": None,
     },
     "DenseSpectralLatent": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": False,
@@ -59,14 +59,14 @@ critic_params = {
         "latent_activation": None,
     },
     "OuterProduct": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "minimize": True,
         "activation": "relu",
         "normalize_obs": False,
     },
     "OuterProductLatent": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": False,
@@ -76,37 +76,37 @@ critic_params = {
         "latent_activation": None,
     },
     "Critic": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": False,
     },
     "Cholesky": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": None,
         "activation": "relu",
         "normalize_obs": False,
     },
     "CholeskyPlusConst": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": None,
         "activation": "relu",
         "normalize_obs": False,
     },
     "CholeskyOffset1": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": None,
         "activation": "relu",
         "normalize_obs": False,
     },
     "CholeskyOffset2": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": None,
         "activation": "relu",
         "normalize_obs": False,
     },
     "QPNet": {
-        "num_obs": 2,
+        "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
         "normalize_obs": True,

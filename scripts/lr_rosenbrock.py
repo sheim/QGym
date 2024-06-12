@@ -51,10 +51,13 @@ critic_names = [
     # "NN_wLinearLatent",
 ]
 
+# generate data
 n_dims = 2
 grid_resolution = 50
 total_data = grid_resolution**n_dims
+x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
 
+# set up training
 tot_iter = 1
 iter_offset = 0
 iter_step = 2
@@ -75,7 +78,6 @@ graphing_data = generate_rosenbrock_g_data_dict(all_graphing_names, learning_rat
 
 test_error = {lr: {name: [] for name in critic_names} for lr in learning_rates}
 
-x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
 
 for g_data in graphing_data.values():
     g_data["critic_obs"]["Rosenbrock"] = x
@@ -177,7 +179,7 @@ if n_dims == 2:
             g_data["critic_obs"],
             g_data["values"],
             g_data["returns"],
-            title=f"Learning a {n_dims}D Rosenbrock Function \n Learning Rate: {lr}",
+            title=f"Learning a {n_dims + 1}D Rosenbrock Function \n Learning Rate: {lr}",
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,

@@ -1,48 +1,48 @@
 # Parameters for different critics
 optimizer_params = {
     "CholeskyInput": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "PDCholeskyInput": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "CholeskyLatent": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "PDCholeskyLatent": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "SpectralLatent": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "DenseSpectralLatent": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "Critic": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "Cholesky": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "CholeskyPlusConst": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "CholeskyOffset1": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "CholeskyOffset2": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "QPNet": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "OuterProduct": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "OuterProductLatent": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
     "NN_wLinearLatent": {
-        "lr": 5e-4,
+        "lr": 1e-3,
     },
 }
