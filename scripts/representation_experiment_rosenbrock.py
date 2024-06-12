@@ -128,30 +128,35 @@ save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", t
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
-if n_dims == 2:
-    plot_rosenbrock_multiple_critics_w_data(
-            graphing_data["critic_obs"],
-            graphing_data["values"],
-            graphing_data["returns"],
-            title=f"Learning a {n_dims}D Rosenbrock Function With Different State Represntations \n",
-            fn=save_path + f"/state_representation_rosenbrock",
-            data=data[0, train_idx]["critic_obs"],
-            grid_size=grid_resolution,
-        )
+# if n_dims == 2:
+#     plot_rosenbrock_multiple_critics_w_data(
+#             graphing_data["critic_obs"],
+#             graphing_data["values"],
+#             graphing_data["returns"],
+#             title=f"Learning a {n_dims}D Rosenbrock Function With Different State Represntations \n",
+#             fn=save_path + f"/state_representation_rosenbrock",
+#             data=data[0, train_idx]["critic_obs"],
+#             grid_size=grid_resolution,
+#         )
 
-# g_data_no_ground_truth = generate_rosenbrock_g_data_dict(critic_names, [0.001])
-# for key, value in graphing_data.items():
-#     for name in critic_names:
-#         if name == "Rosenbrock":
-#             continue
-#         g_data_no_ground_truth[0.001]["critic_obs"][name] = value["critic_obs"][name]
-#         g_data_no_ground_truth[0.001]["values"][name] = value["values"][name]
-#         g_data_no_ground_truth[0.001]["returns"][name] = value["returns"][name]
-#         g_data_no_ground_truth[0.001]["error"][name] = value["returns"][name] - value["values"][name]
+critics_no_ground_truth = list(graphing_data["critic_obs"].keys())
+critics_no_ground_truth.remove("Rosenbrock")
+g_data_no_ground_truth = generate_rosenbrock_g_data_dict(critics_no_ground_truth, [0.001])
 
-# plot_binned_errors(g_data_no_ground_truth,
-#                     save_path + f"/rosenbrock",
-#                     title_add_on=f"{n_dims}D Rosenbrock Function")
+for name in list(graphing_data["critic_obs"].keys()):
+    if "Rosenbrock" in name:
+        continue
+    g_data_no_ground_truth[0.001]["critic_obs"][name] = graphing_data["critic_obs"][name]
+    g_data_no_ground_truth[0.001]["values"][name] = graphing_data["values"][name]
+    g_data_no_ground_truth[0.001]["returns"][name] = graphing_data["returns"][name]
+    g_data_no_ground_truth[0.001]["error"][name] = graphing_data["returns"][name].squeeze() - graphing_data["values"][name].squeeze()
+
+plot_binned_errors(g_data_no_ground_truth,
+                   save_path + f"/rosenbrock",
+                   lb=0,
+                   ub=10,
+                   step=1,
+                   title_add_on=f"{n_dims}D Rosenbrock Function")
 
 
 # plot_pendulum_multiple_critics_w_data(

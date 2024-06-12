@@ -80,7 +80,7 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
-def plot_binned_errors(data, fn, title_add_on=""):
+def plot_binned_errors(data, fn, lb=0, ub=500, step=10, tick_step=1, title_add_on=""):
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     num_cols = len(list(data.values())[0].keys())
     fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained")
@@ -89,9 +89,11 @@ def plot_binned_errors(data, fn, title_add_on=""):
     for lr in data.keys():
         # bins = np.linspace(0.0, 1.5, 50)
         # bins = np.linspace(0.0, 20, 40)
-        bins = np.arange(0, 500, 10)
+        # bins = np.arange(lb, ub, step)
+        bins = np.linspace(lb, ub, (ub-lb)//step)
+        print("bins", bins)
         bin_labels = [
-            "<" + str(np.round(bins[ix], decimals=4)) for ix in range(0, len(bins), 5)
+            "<" + str(np.round(bins[ix], decimals=2)) for ix in range(0, len(bins), tick_step)
         ]
         y_min = float("inf")
         y_max = -float("inf")
@@ -109,9 +111,11 @@ def plot_binned_errors(data, fn, title_add_on=""):
             else:
                 axes[ix].bar(np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5)
             axes[ix].set_title(critic)
+            x_ticks = np.arange(0, len(bins), tick_step)
             axes[ix].set_xticks(
-                np.arange(0, len(bins), 5), labels=bin_labels, fontsize=9
+                x_ticks, labels=bin_labels, fontsize=9
             )
+            axes[ix].set_xlim(min(x_ticks) - (tick_step/2.0), max(x_ticks) + (tick_step/2.0))
             if lr > 1e-4:
                 axes[ix].text(0.55, 0.95, generate_statistics_str(critic_data, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=13,
                     verticalalignment='top', bbox=props)
@@ -559,7 +563,7 @@ def plot_rosenbrock_multiple_critics_w_data(
         axes[1, ix].set_title(f"{critic_name} Error")
 
     # axes[1, 0].plot(x_coord, y_coord, lw=1)
-    axes[1, 0].scatter(x_coord, y_coord, alpha=0.75)
+    axes[1, 0].scatter(x_coord, y_coord, alpha=0.75, s=3)
     axes[1, 0].set_title(f"Data Distribution")
     axes[1, 0].set_xlabel("x")
     axes[1, 0].set_ylabel("y")
