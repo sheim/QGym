@@ -177,7 +177,7 @@ if n_dims == 2:
             g_data["critic_obs"],
             g_data["values"],
             g_data["returns"],
-            title=f"lr: {lr}",
+            title=f"Learning a {n_dims}D Rosenbrock Function \n Learning Rate: {lr}",
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,

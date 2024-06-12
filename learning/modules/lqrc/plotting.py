@@ -469,10 +469,10 @@ def plot_pendulum_multiple_critics_w_data(
 
 
 def plot_rosenbrock_multiple_critics_w_data(
-    x, predictions, targets, title, fn, data, colorbar_label="f(x)", grid_size=64
+    x, predictions, targets, title, fn, data, grid_size=64
 ):
     num_critics = len(x.keys())
-    fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(6 * num_critics, 10))
+    fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(5 * num_critics, 10.5), layout="constrained")
     # Determine global min and max error for consistent scaling
     global_min_error = float("inf")
     global_max_error = float("-inf")
@@ -534,7 +534,8 @@ def plot_rosenbrock_multiple_critics_w_data(
             norm=prediction_norm,
             # shading="auto",
         )
-        axes[0, ix].set_title(f"{critic_name} Prediction")
+        ax_title  = f"{critic_name} Ground Truth" if "Rosenbrock" in critic_name else f"{critic_name} Prediction"
+        axes[0, ix].set_title(ax_title)
 
         if ix == 0:
             continue
@@ -563,28 +564,30 @@ def plot_rosenbrock_multiple_critics_w_data(
 
     axes[1, 0].set_xlabel("x")
     axes[1, 0].set_ylabel("y")
-    fig.suptitle(title, fontsize=16)
+    fig.suptitle(title, fontsize=20)
 
     # Ensure the axes are the same for all plots
     for ax in axes.flat:
         ax.set_xlim([x_coord.min(), x_coord.max()])
         ax.set_ylim([y_coord.min(), y_coord.max()])
 
-    plt.subplots_adjust(
-        top=0.9, bottom=0.1, left=0.1, right=0.9, hspace=0.4, wspace=0.3
-    )
+    # plt.subplots_adjust(
+    #     top=0.9, bottom=0.1, left=0.1, right=0.9, hspace=0.4, wspace=0.3
+    # )
+    asp = np.diff(axes[1, 0].get_xlim())[0] / np.diff(axes[1, 0].get_ylim())[0]
+    axes[1, 0].set_aspect(asp)
 
     fig.colorbar(
         mpl.cm.ScalarMappable(norm=prediction_norm, cmap=prediction_cmap),
         ax=axes[0, :].ravel().tolist(),
         shrink=0.95,
-        label=colorbar_label,
+        # label="Pointwise Prediction",
     )
     fig.colorbar(
         mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap),
         ax=axes[1, :].ravel().tolist(),
         shrink=0.95,
-        label=colorbar_label,
+        # label="Pointwise Error",
     )
 
     plt.savefig(f"{fn}.png")
