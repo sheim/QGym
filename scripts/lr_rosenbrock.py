@@ -190,12 +190,3 @@ this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_osc.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))
-
-np.savez(
-    save_path + "/lr_rosenbrock_graphing_data.npz",
-    test_error = test_error,
-    g_data_no_ground_truth = g_data_no_ground_truth,
-    graphing_data = graphing_data,
-    n_dims = np.array(n_dims),
-    grid_resolution=np.array(grid_resolution),
-)

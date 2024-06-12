@@ -200,11 +200,3 @@ params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))
 
-np.savez(
-    save_path + "/sweep_latent_relative_dim_rosenbrock_graphing_data.npz",
-    xx = xx,
-    yy = yy,
-    avg_graphing_data =  avg_graphing_data,
-    std_graphing_data = std_graphing_data,
-    num_trials = np.array(num_trials),
-)

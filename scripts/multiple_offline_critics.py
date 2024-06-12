@@ -193,9 +193,3 @@ params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))
 
-np.savez(
-    save_path + "/multiple_offline_critics_graphing_data.npz",
-    graphing_data = graphing_data,
-    data = data[:num_steps, traj_idx]["critic_obs"],
-    test_error = test_error,
-)
