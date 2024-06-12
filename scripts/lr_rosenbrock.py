@@ -104,10 +104,11 @@ test_idx = rand_perm[n_training_data:]
 # last_loss = {name: 0.0 for name in critic_names}
 # mean_training_loss = {name: [] for name in critic_names}
 # test_error = {name: [] for name in critic_names}
+all_graphing_names = ["Ground Truth MC Returns"] + critic_names.copy()
 learning_rates = [1e-3, 1e-4, 1e-5]
 graphing_data = {
     lr: {
-        data_name: {name: {} for name in critic_names}
+        data_name: {name: {} for name in all_graphing_names}
         for data_name in [
             "critic_obs",
             "values",
