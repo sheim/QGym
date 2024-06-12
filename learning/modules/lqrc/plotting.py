@@ -1173,8 +1173,6 @@ def plot_learning_progress(test_error, fn="test_error", smoothing_window=30):
     ax2.set_ylabel("Change in Error")
     ax2.set_xlabel("Iteration")
     # ax2.set_yscale("log")
-    ax1.set_ylim(0.0, 50.0)
-    ax2.set_ylim(0.0, 50.0)
     ax1.legend()
     ax2.legend()
 
