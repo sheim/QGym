@@ -19,10 +19,6 @@ class Pendulum(FixedRobot):
             [self.dof_pos[env_ids].sin(), self.dof_pos[env_ids].cos()], dim=1
         )
 
-    def _check_terminations_and_timeouts(self):
-        super()._check_terminations_and_timeouts()
-        self.terminated = self.timed_out
-
     def _reward_theta(self):
         theta_rwd = torch.cos(self.dof_pos[:, 0])  # no scaling
         return self._sqrdexp(theta_rwd.squeeze(dim=-1))

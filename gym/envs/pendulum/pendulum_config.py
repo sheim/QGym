@@ -5,9 +5,9 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 2**12
-        num_actuators = 1  # 1 for theta connecting base and pole
-        episode_length_s = 10.0
+        num_envs = 4096
+        num_actuators = 1
+        episode_length_s = 10
 
     class terrain(FixedRobotCfg.terrain):
         pass
@@ -18,7 +18,7 @@ class PendulumCfg(FixedRobotCfg):
         lookat = [0.0, 0.0, 0.0]  # [m]
 
     class init_state(FixedRobotCfg.init_state):
-        default_joint_angles = {"theta": 0.0}  # -torch.pi / 2.0}
+        default_joint_angles = {"theta": 0}  # -torch.pi / 2.0}
 
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
@@ -65,6 +65,8 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"
+
+        # TODO[lm]: Handle normalization in SAC, then also use it here again
         normalize_obs = False
         obs = [
             "dof_pos_obs",
@@ -80,6 +82,8 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
 
     class critic:
         critic_class_name = ""
+
+        # TODO[lm]: Handle normalization in SAC, then also use it here again
         normalize_obs = False
         obs = [
             "dof_pos_obs",
@@ -126,4 +130,4 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         experiment_name = "pendulum"
         max_iterations = 200  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 100
+        num_steps_per_env = 32
