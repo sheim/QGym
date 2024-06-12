@@ -174,7 +174,6 @@ plot_binned_errors(g_data_no_ground_truth,
                     save_path + f"/rosenbrock",
                     title_add_on=f"{n_dims}D Rosenbrock Function")
 
-exit()
 if n_dims == 2:
     for lr, g_data in graphing_data.items():
         plot_rosenbrock_multiple_critics_w_data(
@@ -191,3 +190,12 @@ this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_osc.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))
+
+np.savez(
+    save_path + "/lr_rosenbrock_graphing_data.npz",
+    test_error = test_error,
+    g_data_no_ground_truth = g_data_no_ground_truth,
+    graphing_data = graphing_data,
+    n_dims = np.array(n_dims),
+    grid_resolution=np.array(grid_resolution),
+)
