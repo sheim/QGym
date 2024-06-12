@@ -92,10 +92,6 @@ data = TensorDict(
     device=DEVICE,
 )
 
-# num_batches_per_epoch = (data[:1, train_idx].shape[0]* data[:1, train_idx].shape[1]) // batch_size
-# num_epochs = max_gradient_steps // num_batches_per_epoch
-# print("Total epochs", ((tot_iter - iter_offset)//iter_step)*num_epochs)
-
 for lr in learning_rates:
     for iteration in range(iter_offset, tot_iter, iter_step):
         torch.cuda.empty_cache()
@@ -176,8 +172,9 @@ for lr, value in graphing_data.items():
 
 plot_binned_errors(g_data_no_ground_truth,
                     save_path + f"/rosenbrock",
-                    title_add_on=f"Rosenbrock")
+                    title_add_on=f"{n_dims}D Rosenbrock Function")
 
+exit()
 if n_dims == 2:
     for lr, g_data in graphing_data.items():
         plot_rosenbrock_multiple_critics_w_data(

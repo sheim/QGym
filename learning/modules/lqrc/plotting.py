@@ -14,15 +14,23 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 font = {"size": 12}
 matplotlib.rc("font", **font)
 
-def generate_statistics_string(data):
-    mu = data.mean()
-    median = data.median()
-    sigma = data.std()
-    textstr = '\n'.join((
-        r'$\mu=%.2f$' % (mu, ),
-        r'$\mathrm{median}=%.2f$' % (median, ),
-        r'$\sigma=%.2f$' % (sigma, ),))
+def generate_statistics_str(x, add_on=None):
+    mu = x.mean()
+    median = np.median(x)
+    sigma = x.std()
+    if add_on is not None:
+        textstr = '\n'.join((
+            add_on,
+            r'$\mu=%.2f$' % (mu, ),
+            r'$\mathrm{median}=%.2f$' % (median, ),
+            r'$\sigma=%.2f$' % (sigma, )))
+    else:
+        textstr = '\n'.join((
+            r'$\mu=%.2f$' % (mu, ),
+            r'$\mathrm{median}=%.2f$' % (median, ),
+            r'$\sigma=%.2f$' % (sigma, )))
     return textstr
+
 
 def create_custom_bwr_colormap():
     # Define the colors for each segment
@@ -73,46 +81,45 @@ def create_custom_pink_green_colormap():
 
 
 def plot_binned_errors(data, fn, title_add_on=""):
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    num_cols = len(list(data.values())[0].keys())
+    fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained")
+    fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=20)
+    colors = dict(zip([lr for lr in data.keys()], ["red", "green", "blue"]))
     for lr in data.keys():
-        curr_fn = fn + f"_lr{lr}.png"
-        num_cols = len(data[lr].keys())
         # bins = np.linspace(0.0, 1.5, 50)
         # bins = np.linspace(0.0, 20, 40)
         bins = np.arange(0, 500, 10)
         bin_labels = [
             "<" + str(np.round(bins[ix], decimals=4)) for ix in range(0, len(bins), 5)
         ]
-        fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(30, 5))
-        fig.suptitle(f"Histogram of Error Values - Learning Rate {lr} {title_add_on}")
         y_min = float("inf")
         y_max = -float("inf")
         for ix, critic in enumerate(data[lr]["critic_obs"].keys()):
             critic_data = data[lr]["error"][critic].squeeze().detach().cpu().numpy()
             digitized = np.digitize(critic_data, bins)
-            try:
-                bincount = np.bincount(digitized)
-            except:
-                print("digitized shape", digitized.shape)
-                print("critic data shape", critic_data.shape)
-                print("critic name", critic)
+            bincount = np.bincount(digitized)
+            
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
 
-            # print(
-            #     f"critic name: {critic} | max: {bincount.max()}
-            #     | min: {bincount.min()} | sum: {np.sum(bincount)}"
-            # )
-
-            axes[ix].bar(np.arange(len(bincount)), bincount)
+            # to avoid label repetitions in legend
+            if ix == 0:
+                axes[ix].bar(np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5, label=str(lr))
+            else:
+                axes[ix].bar(np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5)
             axes[ix].set_title(critic)
             axes[ix].set_xticks(
-                np.arange(0, len(bins), 5), labels=bin_labels, fontsize=7
+                np.arange(0, len(bins), 5), labels=bin_labels, fontsize=9
             )
+            if lr > 1e-4:
+                axes[ix].text(0.55, 0.95, generate_statistics_str(critic_data, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=13,
+                    verticalalignment='top', bbox=props)
         for ix, critic in enumerate(data[lr].keys()):
             axes[ix].set_ylim(y_min, y_max)
-
-        plt.savefig(curr_fn, bbox_inches="tight", dpi=300)
-        print(f"Saved to {curr_fn}")
+    fig.legend(title="Learning Rate", loc=" outside upper right")
+    plt.savefig(fn + ".png", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.png")
 
 
 def plot_dim_sweep(x, y, mean_error, max_error, fn, step=5):
