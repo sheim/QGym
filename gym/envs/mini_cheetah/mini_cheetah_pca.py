@@ -288,7 +288,7 @@ class MiniCheetahPca(MiniCheetah):
                 for i in range(len(self.cfg.pca.haa_flip_indexes)):
                     self.eigenvectors[:,self.cfg.pca.haa_flip_indexes[i]:
                                       self.cfg.pca.haa_flip_indexes[i]+1] *= -1
-
+                #np.save('symmetry_eigvec', self.eigenvectors.cpu().numpy())
                 #print(self.eigenvectors)
             if self.cfg.pca.mode == "one_leg":
                 # 4th leg, all actuators

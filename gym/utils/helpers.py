@@ -161,6 +161,8 @@ def update_cfg_from_args(env_cfg, train_cfg, args):
             env_cfg.env.num_envs = args.num_envs
         if args.record is not None:
             env_cfg.viewer.record = args.record
+        if args.ctrl_frequency is not None:
+            env_cfg.control.ctrl_frequency = args.ctrl_frequency
     if train_cfg is not None:
         if args.seed is not None:
             train_cfg.seed = args.seed
@@ -300,6 +302,11 @@ def get_args(custom_parameters=None):
             "action": "store_true",
             "default": False,
             "help": "Use original config file for loaded policy.",
+        },
+        {
+            "name": "--ctrl_frequency",
+            "type": int,
+            "help": "control frequency.",
         },
     ]
     # * parse arguments

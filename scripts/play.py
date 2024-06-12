@@ -65,8 +65,8 @@ def play(env, runner, train_cfg):
         interface = KeyboardInterface(env)
     pca_scalings_logged = torch.zeros((0,2)).to(device=env.device)
     noiseplots = False
-    count=True
-    env.commands[:, :] = 0 
+    count=False
+    env.commands[:, :] = 0
     for i in range(10 * int(env.max_episode_length)):
         #print(env.pca_scalings[0,:])
         #env.pca_scalings = torch.randn(1,6).repeat(env.num_envs, 1)

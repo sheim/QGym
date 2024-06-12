@@ -23,8 +23,8 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         # mesh_type = 'trimesh'  # none, plane, heightfield or trimesh
 
     class init_state(MiniCheetahCfg.init_state):
-        reset_mode = "reset_to_range"
-        timeout_reset_ratio = 0.75
+        reset_mode = "reset_to_basic" #"reset_to_range" #
+        timeout_reset_ratio = 1.0 #0.75 #
         # * default COM for basic initialization
         pos = [0.0, 0.0, 0.35]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
@@ -64,7 +64,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         # * PD Drive parameters:
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
-        ctrl_frequency = 100
+        ctrl_frequency = 150
         desired_sim_frequency = 500
 
     class osc:
@@ -160,8 +160,8 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
 
     class policy(MiniCheetahRunnerCfg.policy):
         disable_actions = False
-        actor_hidden_dims = [13, 13, 4] #[256, 256, 128]
-        critic_hidden_dims = [13, 13, 4] #[256, 256, 128]
+        actor_hidden_dims = [256, 256, 128] #[60, 60, 30] 
+        critic_hidden_dims = [256, 256, 128] #[60, 60, 30] 
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 

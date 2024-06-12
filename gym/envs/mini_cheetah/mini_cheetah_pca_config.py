@@ -34,8 +34,8 @@ class MiniCheetahPcaCfg(MiniCheetahCfg):
         # mesh_type = 'trimesh'  # none, plane, heightfield or trimesh
 
     class init_state(MiniCheetahCfg.init_state):
-        reset_mode = "reset_to_range"
-        timeout_reset_ratio = 0.75
+        reset_mode = "reset_to_basic"
+        timeout_reset_ratio = 1.0
         # * default COM for basic initialization
         pos = [0.0, 0.0, 0.5]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
@@ -75,7 +75,7 @@ class MiniCheetahPcaCfg(MiniCheetahCfg):
         # * PD Drive parameters:
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
-        ctrl_frequency = 100
+        ctrl_frequency = 150
         desired_sim_frequency = 500
 
     class osc:
@@ -174,8 +174,8 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
 
     class policy(MiniCheetahRunnerCfg.policy):
         disable_actions = False
-        actor_hidden_dims = [11, 11, 1] #[256, 256, 128]
-        critic_hidden_dims = [11, 11, 1] #[256, 256, 128]
+        actor_hidden_dims = [32, 32, 16] #[256, 256, 128] #[16, 16]
+        critic_hidden_dims = [32, 32, 16] #[256, 256, 128] #[16, 16] 
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         #normalize_obs = True
@@ -212,17 +212,18 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
 
         class reward:
             class weights:
-                tracking_lin_vel = 6.0
-                tracking_ang_vel = 2.5
+                #PCA Symmetries
+                tracking_lin_vel = 5.5 #5.5
+                tracking_ang_vel = 2.5 #2.0 #2.5
                 lin_vel_z = 0.
                 ang_vel_xy = 0.
-                orientation = 2.1
+                orientation = 2.5 #2.3 #2.5
                 torques = 5.e-7
                 dof_vel = 0.
                 min_base_height = 1.5
                 collision = 0
-                action_rate = 0.003  # -0.01
-                action_rate2 = 0.0003 # -0.001
+                action_rate = 0.01  # -0.01
+                action_rate2 = 0.001  # -0.001
                 stand_still = 0.
                 dof_pos_limits = 0.
                 feet_contact_forces = 0.
@@ -236,6 +237,9 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
                 cursorial = 0.25
                 standing_torques = 0.  # 1.e-5
                 pca = 0.2
+
+                #PCA ALL
+
                 # tracking_lin_vel = 4.0
                 # tracking_ang_vel = 2.0
                 # # lin_vel_z = 0.0
