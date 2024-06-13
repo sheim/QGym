@@ -5,12 +5,9 @@ from learning.modules.critic import Critic  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
-    compute_generalized_advantages,
-    compute_MC_returns,
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import (
-    plot_pendulum_multiple_critics_w_data,
     plot_learning_progress,  # noqa F401
     plot_rosenbrock_multiple_critics_w_data,
     plot_binned_errors,
@@ -22,7 +19,7 @@ import shutil
 import torch
 from torch import nn  # noqa F401
 from representation_experiment_params import experiment_params
-from utils import *
+from utils import DEVICE, generate_bounded_rosenbrock, generate_rosenbrock_g_data_dict
 from tensordict import TensorDict
 
 
@@ -32,7 +29,7 @@ for experiment in experiment_params.values():
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
 # generate data
-n_dims = 3
+n_dims = 2
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
@@ -47,7 +44,7 @@ for name, experiment in experiment_params.items():
     params["num_obs"] = n_dims
     test_critics[name] = critic_class(**params).to(DEVICE)
 critic_optimizers = {
-    name: torch.optim.Adam(critic.parameters(), lr=1e-3) # ! LR fixed?
+    name: torch.optim.Adam(critic.parameters(), lr=1e-3)  # ! LR fixed?
     for name, critic in test_critics.items()
 }
 
@@ -55,10 +52,10 @@ critic_optimizers = {
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 1000 #200
+max_gradient_steps = 1000  # 200
 # max_grad_norm = 1.0
-batch_size = 128
-n_training_data = int(0.6 * total_data)
+batch_size = 50
+n_training_data = int(0.04 * total_data)
 n_validation_data = total_data - n_training_data
 print(f"training data: {n_training_data}, validation data: {n_validation_data}")
 rand_perm = torch.randperm(total_data)
@@ -88,14 +85,11 @@ for name, critic in test_critics.items():
     mean_value_loss = 0
     counter = 0
     generator = create_uniform_generator(
-                data[:1, train_idx],
-                batch_size,
-                max_gradient_steps=max_gradient_steps,
-            )
+        data[:1, train_idx],
+        batch_size,
+        max_gradient_steps=max_gradient_steps,
+    )
     for batch in generator:
-        # print("critic name", name)
-        # print("batch['critic_obs'].squeeze() shape", batch["critic_obs"].squeeze().shape)
-        # print("batch['returns'].squeeze() shape", batch["returns"].squeeze().shape)
         value_loss = critic.loss_fn(
             batch["critic_obs"].squeeze(), batch["returns"].squeeze()
         )
@@ -117,7 +111,6 @@ for name, critic in test_critics.items():
     print(f"{name} max error: ", error.max().item())
     mean_value_loss /= counter
 
-
     with torch.no_grad():
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
         graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
@@ -130,34 +123,43 @@ if not os.path.exists(save_path):
 
 if n_dims == 2:
     plot_rosenbrock_multiple_critics_w_data(
-            graphing_data["critic_obs"],
-            graphing_data["values"],
-            graphing_data["returns"],
-            title=f"Learning a {n_dims}D Rosenbrock Function With Different State Represntations \n",
-            fn=save_path + f"/state_representation_rosenbrock",
-            data=data[0, train_idx]["critic_obs"],
-            grid_size=grid_resolution,
-        )
+        graphing_data["critic_obs"],
+        graphing_data["values"],
+        graphing_data["returns"],
+        title=f"Learning a {n_dims}D Rosenbrock with Different State Represntations \n",
+        fn=save_path + "/state_representation_rosenbrock",
+        data=data[0, train_idx]["critic_obs"],
+        grid_size=grid_resolution,
+    )
 
 critics_no_ground_truth = list(graphing_data["critic_obs"].keys())
 critics_no_ground_truth.remove("Rosenbrock")
-g_data_no_ground_truth = generate_rosenbrock_g_data_dict(critics_no_ground_truth, [0.001])
+g_data_no_ground_truth = generate_rosenbrock_g_data_dict(
+    critics_no_ground_truth, [0.001]
+)
 
 for name in list(graphing_data["critic_obs"].keys()):
     if "Rosenbrock" in name:
         continue
-    g_data_no_ground_truth[0.001]["critic_obs"][name] = graphing_data["critic_obs"][name]
+    g_data_no_ground_truth[0.001]["critic_obs"][name] = graphing_data["critic_obs"][
+        name
+    ]
     g_data_no_ground_truth[0.001]["values"][name] = graphing_data["values"][name]
     g_data_no_ground_truth[0.001]["returns"][name] = graphing_data["returns"][name]
-    g_data_no_ground_truth[0.001]["error"][name] = graphing_data["returns"][name].squeeze() - graphing_data["values"][name].squeeze()
+    g_data_no_ground_truth[0.001]["error"][name] = (
+        graphing_data["returns"][name].squeeze()
+        - graphing_data["values"][name].squeeze()
+    )
 
-plot_binned_errors(g_data_no_ground_truth,
-                   save_path + f"/rosenbrock",
-                   lb=0,
-                   ub=15,
-                   step=1,
-                   tick_step=2,
-                   title_add_on=f"{n_dims}D Rosenbrock Function with Different State Representations")
+plot_binned_errors(
+    g_data_no_ground_truth,
+    save_path + "/rosenbrock",
+    lb=0,
+    ub=15,
+    step=1,
+    tick_step=2,
+    title_add_on=f"{n_dims}D Rosenbrock Function with Different State Representations",
+)
 
 
 # plot_pendulum_multiple_critics_w_data(
@@ -180,4 +182,3 @@ this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_criti
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))
-

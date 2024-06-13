@@ -14,21 +14,28 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 font = {"size": 12}
 matplotlib.rc("font", **font)
 
+
 def generate_statistics_str(x, add_on=None):
     mu = x.mean()
     median = np.median(x)
     sigma = x.std()
     if add_on is not None:
-        textstr = '\n'.join((
-            add_on,
-            r'$\mu=%.2f$' % (mu, ),
-            r'$\mathrm{median}=%.2f$' % (median, ),
-            r'$\sigma=%.2f$' % (sigma, )))
+        textstr = "\n".join(
+            (
+                add_on,
+                r"$\mu=%.2f$" % (mu,),
+                r"$\mathrm{median}=%.2f$" % (median,),
+                r"$\sigma=%.2f$" % (sigma,),
+            )
+        )
     else:
-        textstr = '\n'.join((
-            r'$\mu=%.2f$' % (mu, ),
-            r'$\mathrm{median}=%.2f$' % (median, ),
-            r'$\sigma=%.2f$' % (sigma, )))
+        textstr = "\n".join(
+            (
+                r"$\mu=%.2f$" % (mu,),
+                r"$\mathrm{median}=%.2f$" % (median,),
+                r"$\sigma=%.2f$" % (sigma,),
+            )
+        )
     return textstr
 
 
@@ -80,20 +87,38 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
-def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="pdf", include_text=True):
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+def plot_binned_errors(
+    data,
+    fn,
+    lb=0,
+    ub=500,
+    step=20,
+    tick_step=5,
+    title_add_on="",
+    extension="pdf",
+    include_text=True,
+):
+    props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
     num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
     print("num cols", num_cols)
-    fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained")
+    fig, axes = plt.subplots(
+        nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained"
+    )
     fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
-    colors = dict(zip([lr for lr in data.keys()], ["red", "green", "blue", "purple", "orange"][:num_cols]))
+    colors = dict(
+        zip(
+            [lr for lr in data.keys()],
+            ["red", "green", "blue", "purple", "orange"][:num_cols],
+        )
+    )
     for lr in data.keys():
         # bins = np.linspace(0.0, 1.5, 50)
         # bins = np.linspace(0.0, 20, 40)
         bins = np.arange(lb, ub, step)
         # bins = np.linspace(lb, ub, (ub-lb)//step)
         bin_labels = [
-            "<" + str(np.round(bins[ix], decimals=1)) for ix in range(0, len(bins), tick_step)
+            "<" + str(np.round(bins[ix], decimals=1))
+            for ix in range(0, len(bins), tick_step)
         ]
         y_min = float("inf")
         y_max = -float("inf")
@@ -108,19 +133,37 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
 
             # to avoid label repetitions in legend
             if ix == 0:
-                axes[ix].bar(np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5, label=str(lr))
+                axes[ix].bar(
+                    np.arange(len(bincount)),
+                    bincount,
+                    color=colors[lr],
+                    alpha=0.5,
+                    label=str(lr),
+                )
             else:
-                axes[ix].bar(np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5)
+                axes[ix].bar(
+                    np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5
+                )
             axes[ix].set_title(critic, fontsize=22)
             x_ticks = np.arange(0, len(bins), tick_step)
-            axes[ix].set_xticks(
-                x_ticks, labels=bin_labels
+            axes[ix].set_xticks(x_ticks, labels=bin_labels)
+            axes[ix].set_xlim(
+                -min((tick_step / 2.0), 2.0),
+                min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
             )
-            axes[ix].set_xlim(-min((tick_step/2.0), 2.0), min(len(bins) + (tick_step/2.0), len(bins) + 2.0))
             if lr > 1e-4 and include_text:
-                predictions = data[lr]["values"][critic].squeeze().detach().cpu().numpy()
-                axes[ix].text(0.4, 0.95, generate_statistics_str(predictions, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=22,
-                    verticalalignment='top', bbox=props)
+                predictions = (
+                    data[lr]["values"][critic].squeeze().detach().cpu().numpy()
+                )
+                axes[ix].text(
+                    0.4,
+                    0.95,
+                    generate_statistics_str(predictions, r"0.001 Learning Rate"),
+                    transform=axes[ix].transAxes,
+                    fontsize=22,
+                    verticalalignment="top",
+                    bbox=props,
+                )
         for ix, critic in enumerate(data[lr].keys()):
             axes[ix].set_ylim(y_min, y_max)
     fig.legend(loc=" outside upper right", fontsize=18)
@@ -191,7 +234,7 @@ def plot_dim_sweep_mean_std(
     trial_num,
     title,
     step=5,
-    extension="pdf"
+    extension="pdf",
 ):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(22, 15))
 
@@ -494,10 +537,23 @@ def plot_pendulum_multiple_critics_w_data(
 
 
 def plot_rosenbrock_multiple_critics_w_data(
-    x, predictions, targets, title, fn, data, grid_size=64, extension="pdf", data_title="Test Data Distribution"
+    x,
+    predictions,
+    targets,
+    title,
+    fn,
+    data,
+    grid_size=64,
+    extension="pdf",
+    data_title="Test Data Distribution",
 ):
     num_critics = len(x.keys())
-    fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(5 * num_critics, 10.5), layout="constrained")
+    fig, axes = plt.subplots(
+        nrows=2,
+        ncols=num_critics,
+        figsize=(5 * num_critics, 10.5),
+        layout="constrained",
+    )
     # Determine global min and max error for consistent scaling
     global_min_error = float("inf")
     global_max_error = float("-inf")
@@ -512,33 +568,31 @@ def plot_rosenbrock_multiple_critics_w_data(
 
     for critic_name in x:
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
-        np_targets = (
-            targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
-        )
+        np_targets = targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
         np_error = np_predictions - np_targets
         global_min_error = min(global_min_error, np.min(np_error))
         global_max_error = max(global_max_error, np.max(np_error))
-        global_min_prediction = np.min(np_targets)
-        global_max_prediction = np.max(np_targets)
-    # error_norm = mcolors.TwoSlopeNorm(
-    #     vmin=global_min_error, vcenter=0, vmax=global_max_error
+        global_min_prediction = min(global_min_prediction, np.min(np_predictions))
+        global_max_prediction = max(global_max_prediction, np.max(np_predictions))
+    error_norm = mcolors.TwoSlopeNorm(
+        vmin=global_min_error, vcenter=0, vmax=global_max_error
+    )
+    prediction_norm = mcolors.CenteredNorm(
+        vcenter=(global_max_prediction + global_min_prediction) / 2,
+        halfrange=(global_max_prediction - global_min_prediction) / 2,
+    )
+    # error_norm = mcolors.LogNorm()
+    # prediction_norm = mcolors.LogNorm(
+    #     vmin=global_min_prediction, vmax=global_max_prediction
     # )
-    # prediction_norm = mcolors.CenteredNorm(
-    #     vcenter=(global_max_prediction + global_min_prediction) / 2,
-    #     halfrange=(global_max_prediction - global_min_prediction) / 2,
-    # )
-    error_norm = mcolors.LogNorm()
-    prediction_norm = mcolors.LogNorm()
-    
+
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
         # rescale (hack), value shardcoded from pendulum_config
-        np_x[:, 0] = np_x[:, 0] * 2 * np.pi
-        np_x[:, 1] = np_x[:, 1] * 5
+        np_x[:, 0] = np_x[:, 0]
+        np_x[:, 1] = np_x[:, 1]
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
-        np_targets = (
-            targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
-        )
+        np_targets = targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
         np_error = np_predictions - np_targets
 
         axes[0, ix].imshow(
@@ -549,7 +603,11 @@ def plot_rosenbrock_multiple_critics_w_data(
             norm=prediction_norm,
             # shading="auto",
         )
-        ax_title  = f"{critic_name} Ground Truth" if "Rosenbrock" in critic_name else f"{critic_name} Prediction"
+        ax_title = (
+            f"{critic_name} Ground Truth"
+            if "Rosenbrock" in critic_name
+            else f"{critic_name} Prediction"
+        )
         axes[0, ix].set_title(ax_title)
 
         if ix == 0:
@@ -630,8 +688,8 @@ def plot_pendulum_multiple_critics_w_data_grad(
         np_grad_error = np_pred_grad - np_analytic_grad
         global_min_error = min(global_min_error, np.min(np_error))
         global_max_error = max(global_max_error, np.max(np_error))
-        global_min_prediction = np.min(np_targets)
-        global_max_prediction = np.max(np_targets)
+        global_min_prediction = min(global_min_prediction, np.min(np_targets))
+        global_max_prediction = max(global_max_prediction, np.max(np_targets))
         global_min_grad_error = min(global_min_grad_error, np.min(np_grad_error))  # noqa
         global_max_grad_error = max(global_max_grad_error, np.max(np_grad_error))  # noqa
     error_norm = mcolors.TwoSlopeNorm(
@@ -1149,7 +1207,9 @@ def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
 
 
-def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=30, extension="pdf"):
+def plot_learning_progress(
+    test_error, title, fn="test_error", smoothing_window=30, extension="pdf"
+):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     for name, error in test_error.items():

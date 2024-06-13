@@ -36,6 +36,7 @@ def generate_bounded_rosenbrock(n, lb, ub, steps):
     y = bound_function_smoothly(y)
     return X, y
 
+
 def generate_rosenbrock_g_data_dict(names, learning_rates):
     graphing_data = {
         lr: {

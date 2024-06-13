@@ -20,9 +20,8 @@ from torch import nn  # noqa F401
 
 # from critic_params import critic_params
 from critic_params_rosenbrock import critic_params
-from utils import * # noqa F403
+from utils import DEVICE, generate_bounded_rosenbrock, generate_rosenbrock_g_data_dict
 from tensordict import TensorDict
-
 
 for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
@@ -61,7 +60,7 @@ x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resol
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 1000 #200
+max_gradient_steps = 1000  # 200
 # max_grad_norm = 1.0
 batch_size = 128
 n_training_data = int(0.6 * total_data)
@@ -138,7 +137,6 @@ for lr in learning_rates:
             print(f"{name} average error: ", actual_error.mean().item())
             print(f"{name} max error: ", actual_error.max().item())
 
-            
             with torch.no_grad():
                 graphing_data[lr]["error"][name] = actual_error
                 graphing_data[lr]["critic_obs"][name] = data[0, :]["critic_obs"]
@@ -156,7 +154,7 @@ if not os.path.exists(save_path):
 for lr, t_error in test_error.items():
     plot_learning_progress(
         t_error,
-        title=f"Test Error on {n_dims}D Rosenbrock Function vs Epochs \n Learning Rate {lr}",
+        title=f"Test Error on {n_dims}D Rosenbrock Function \n Learning Rate {lr}",
         fn=save_path + f"/{len(critic_names)}_lr {lr}",
         smoothing_window=50,
     )
@@ -171,9 +169,11 @@ for lr, value in graphing_data.items():
         g_data_no_ground_truth[lr]["returns"][name] = value["returns"][name]
         g_data_no_ground_truth[lr]["error"][name] = value["error"][name]
 
-plot_binned_errors(g_data_no_ground_truth,
-                    save_path + f"/rosenbrock",
-                    title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates")
+plot_binned_errors(
+    g_data_no_ground_truth,
+    save_path + "/rosenbrock",
+    title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates",
+)
 
 if n_dims == 2:
     for lr, g_data in graphing_data.items():
@@ -181,13 +181,16 @@ if n_dims == 2:
             g_data["critic_obs"],
             g_data["values"],
             g_data["returns"],
-            title=f"Learning a {n_dims}D Rosenbrock Function \n Learning Rate: {lr}, Without Nonlinear Latent Activation",
+            title=f"Learning a {n_dims}D Rosenbrock Function \n Learning Rate: {lr},"
+            "Without Nonlinear Latent Activation",
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,
         )
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")
-params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_rosenbrock.py")
+params_file = os.path.join(
+    LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_rosenbrock.py"
+)
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))
