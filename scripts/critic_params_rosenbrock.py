@@ -12,8 +12,8 @@ critic_params = {
         "num_obs": 3,
         "hidden_dims": [256, 128],
         "activation": "relu",
-        "normalize_obs": True,
-        "latent_dim": 16,
+        "normalize_obs": False,
+        "latent_dim": None,
         "minimize": True,
     },
     "CholeskyLatent": {

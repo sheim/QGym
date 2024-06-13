@@ -80,12 +80,13 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
-def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on=""):
+def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="pdf", include_text=True):
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    num_cols = len(list(data.values())[0].keys())
+    num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
+    print("num cols", num_cols)
     fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained")
     fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
-    colors = dict(zip([lr for lr in data.keys()], ["red", "green", "blue"]))
+    colors = dict(zip([lr for lr in data.keys()], ["red", "green", "blue", "purple", "orange"][:num_cols]))
     for lr in data.keys():
         # bins = np.linspace(0.0, 1.5, 50)
         # bins = np.linspace(0.0, 20, 40)
@@ -116,15 +117,15 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                 x_ticks, labels=bin_labels
             )
             axes[ix].set_xlim(-min((tick_step/2.0), 2.0), min(len(bins) + (tick_step/2.0), len(bins) + 2.0))
-            if lr > 1e-4:
+            if lr > 1e-4 and include_text:
                 predictions = data[lr]["values"][critic].squeeze().detach().cpu().numpy()
                 axes[ix].text(0.4, 0.95, generate_statistics_str(predictions, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=22,
                     verticalalignment='top', bbox=props)
         for ix, critic in enumerate(data[lr].keys()):
             axes[ix].set_ylim(y_min, y_max)
     fig.legend(loc=" outside upper right", fontsize=18)
-    plt.savefig(fn + ".pdf", bbox_inches="tight", dpi=300)
-    print(f"Saved to {fn}.pdf")
+    plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.{extension}")
 
 
 def plot_dim_sweep(x, y, mean_error, max_error, fn, step=5):
@@ -190,6 +191,7 @@ def plot_dim_sweep_mean_std(
     trial_num,
     title,
     step=5,
+    extension="pdf"
 ):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(22, 15))
 
@@ -269,8 +271,8 @@ def plot_dim_sweep_mean_std(
         label=f"Max Error (Standard Deviation Over {trial_num} Trials)",
     )
     fig.suptitle(title, fontsize=20)
-    plt.savefig(fn + ".pdf", bbox_inches="tight", dpi=300)
-    print(f"Saved to {fn}.pdf")
+    plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.{extension}")
 
 
 def plot_pendulum_multiple_critics(
@@ -492,7 +494,7 @@ def plot_pendulum_multiple_critics_w_data(
 
 
 def plot_rosenbrock_multiple_critics_w_data(
-    x, predictions, targets, title, fn, data, grid_size=64
+    x, predictions, targets, title, fn, data, grid_size=64, extension="pdf", data_title="Test Data Distribution"
 ):
     num_critics = len(x.keys())
     fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(5 * num_critics, 10.5), layout="constrained")
@@ -565,7 +567,7 @@ def plot_rosenbrock_multiple_critics_w_data(
 
     # axes[1, 0].plot(x_coord, y_coord, lw=1)
     axes[1, 0].scatter(x_coord, y_coord, alpha=0.75, s=3)
-    axes[1, 0].set_title(f"Data Distribution")
+    axes[1, 0].set_title(data_title)
     axes[1, 0].set_xlabel("x")
     axes[1, 0].set_ylabel("y")
 
@@ -589,9 +591,9 @@ def plot_rosenbrock_multiple_critics_w_data(
         shrink=0.95,
         # label="Pointwise Error",
     )
-    fig.suptitle(title, fontsize=20)
-    plt.savefig(f"{fn}.pdf", bbox_inches="tight", dpi=300)
-    print(f"Saved to {fn}.pdf")
+    fig.suptitle(title)
+    plt.savefig(f"{fn}.{extension}", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.{extension}")
 
 
 def plot_pendulum_multiple_critics_w_data_grad(
@@ -1147,7 +1149,7 @@ def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
 
 
-def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=30):
+def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=30, extension="pdf"):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     for name, error in test_error.items():
@@ -1177,4 +1179,4 @@ def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=
     ax2.legend()
     fig.suptitle(title, fontsize=18)
     plt.tight_layout()
-    plt.savefig(f"{fn}.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(f"{fn}.{extension}", dpi=300, bbox_inches="tight")
