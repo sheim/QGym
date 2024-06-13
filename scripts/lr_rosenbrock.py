@@ -52,7 +52,7 @@ critic_names = [
 ]
 
 # generate data
-n_dims = 2
+n_dims = 4
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
@@ -119,8 +119,6 @@ for lr in learning_rates:
                 max_gradient_steps=max_gradient_steps,
             )
             for batch in generator:
-                print("batch['critic_obs'].squeeze() shape", batch["critic_obs"].squeeze().shape)
-                print("batch['returns'].squeeze() shape", batch["returns"].squeeze().shape)
                 value_loss = critic.loss_fn(
                     batch["critic_obs"].squeeze(), batch["returns"].squeeze()
                 )
@@ -140,14 +138,14 @@ for lr in learning_rates:
             print(f"{name} average error: ", actual_error.mean().item())
             print(f"{name} max error: ", actual_error.max().item())
 
-            if n_dims == 2:
-                with torch.no_grad():
-                    graphing_data[lr]["error"][name] = actual_error
-                    graphing_data[lr]["critic_obs"][name] = data[0, :]["critic_obs"]
-                    graphing_data[lr]["values"][name] = critic.evaluate(
-                        data[0, :]["critic_obs"]
-                    )
-                    graphing_data[lr]["returns"][name] = data[0, :]["returns"]
+            
+            with torch.no_grad():
+                graphing_data[lr]["error"][name] = actual_error
+                graphing_data[lr]["critic_obs"][name] = data[0, :]["critic_obs"]
+                graphing_data[lr]["values"][name] = critic.evaluate(
+                    data[0, :]["critic_obs"]
+                )
+                graphing_data[lr]["returns"][name] = data[0, :]["returns"]
 
 # compare new and old critics
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
@@ -189,6 +187,6 @@ if n_dims == 2:
         )
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")
-params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_osc.py")
+params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params_rosenbrock.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))

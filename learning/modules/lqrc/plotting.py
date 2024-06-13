@@ -80,20 +80,19 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
-def plot_binned_errors(data, fn, lb=0, ub=500, step=10, tick_step=1, title_add_on=""):
+def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on=""):
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     num_cols = len(list(data.values())[0].keys())
     fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained")
-    fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=20)
+    fig.suptitle(f"Pointwise Prediction Error for {title_add_on} at Different Learning Rates \n", fontsize=27)
     colors = dict(zip([lr for lr in data.keys()], ["red", "green", "blue"]))
     for lr in data.keys():
         # bins = np.linspace(0.0, 1.5, 50)
         # bins = np.linspace(0.0, 20, 40)
-        # bins = np.arange(lb, ub, step)
-        bins = np.linspace(lb, ub, (ub-lb)//step)
-        print("bins", bins)
+        bins = np.arange(lb, ub, step)
+        # bins = np.linspace(lb, ub, (ub-lb)//step)
         bin_labels = [
-            "<" + str(np.round(bins[ix], decimals=2)) for ix in range(0, len(bins), tick_step)
+            "<" + str(np.round(bins[ix], decimals=1)) for ix in range(0, len(bins), tick_step)
         ]
         y_min = float("inf")
         y_max = -float("inf")
@@ -110,18 +109,18 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=10, tick_step=1, title_add_o
                 axes[ix].bar(np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5, label=str(lr))
             else:
                 axes[ix].bar(np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5)
-            axes[ix].set_title(critic)
+            axes[ix].set_title(critic, fontsize=22)
             x_ticks = np.arange(0, len(bins), tick_step)
             axes[ix].set_xticks(
-                x_ticks, labels=bin_labels, fontsize=9
+                x_ticks, labels=bin_labels
             )
-            axes[ix].set_xlim(min(x_ticks) - (tick_step/2.0), max(x_ticks) + (tick_step/2.0))
+            axes[ix].set_xlim(-min((tick_step/2.0), 2.0), min(len(bins) + (tick_step/2.0), len(bins) + 2.0))
             if lr > 1e-4:
-                axes[ix].text(0.55, 0.95, generate_statistics_str(critic_data, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=13,
+                axes[ix].text(0.4, 0.95, generate_statistics_str(critic_data, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=22,
                     verticalalignment='top', bbox=props)
         for ix, critic in enumerate(data[lr].keys()):
             axes[ix].set_ylim(y_min, y_max)
-    fig.legend(title="Learning Rate", loc=" outside upper right")
+    fig.legend(loc=" outside upper right", fontsize=18)
     plt.savefig(fn + ".png", bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}.png")
 
