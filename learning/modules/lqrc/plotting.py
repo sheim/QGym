@@ -123,8 +123,8 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
         for ix, critic in enumerate(data[lr].keys()):
             axes[ix].set_ylim(y_min, y_max)
     fig.legend(loc=" outside upper right", fontsize=18)
-    plt.savefig(fn + ".png", bbox_inches="tight", dpi=300)
-    print(f"Saved to {fn}.png")
+    plt.savefig(fn + ".pdf", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.pdf")
 
 
 def plot_dim_sweep(x, y, mean_error, max_error, fn, step=5):
@@ -269,8 +269,8 @@ def plot_dim_sweep_mean_std(
         label=f"Max Error (Standard Deviation Over {trial_num} Trials)",
     )
     fig.suptitle(title, fontsize=20)
-    plt.savefig(fn, bbox_inches="tight", dpi=300)
-    print(f"Saved to {fn}")
+    plt.savefig(fn + ".pdf", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.pdf")
 
 
 def plot_pendulum_multiple_critics(
@@ -590,8 +590,8 @@ def plot_rosenbrock_multiple_critics_w_data(
         # label="Pointwise Error",
     )
     fig.suptitle(title, fontsize=20)
-    plt.savefig(f"{fn}.png")
-    print(f"Saved to {fn}.png")
+    plt.savefig(f"{fn}.pdf", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.pdf")
 
 
 def plot_pendulum_multiple_critics_w_data_grad(
@@ -1147,7 +1147,7 @@ def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
 
 
-def plot_learning_progress(test_error, fn="test_error", smoothing_window=30):
+def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=30):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     for name, error in test_error.items():
@@ -1170,12 +1170,11 @@ def plot_learning_progress(test_error, fn="test_error", smoothing_window=30):
         ax2.plot(error_change, label=name)
 
     ax1.set_ylabel("Average Test Error")
-    ax2.set_ylabel("Change in Error")
+    ax2.set_ylabel("Change in Average Test Error")
     ax2.set_xlabel("Iteration")
     # ax2.set_yscale("log")
     ax1.legend()
     ax2.legend()
-
+    fig.suptitle(title, fontsize=18)
     plt.tight_layout()
-    # plt.show()
-    plt.savefig(f"{fn}.png")
+    plt.savefig(f"{fn}.pdf", dpi=300, bbox_inches="tight")

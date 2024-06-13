@@ -52,7 +52,7 @@ critic_names = [
 ]
 
 # generate data
-n_dims = 4
+n_dims = 3
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
@@ -156,6 +156,7 @@ if not os.path.exists(save_path):
 for lr, t_error in test_error.items():
     plot_learning_progress(
         t_error,
+        title=f"Test Error on {n_dims}D Rosenbrock Function vs Epochs \n Learning Rate {lr}",
         fn=save_path + f"/{len(critic_names)}_lr {lr}",
         smoothing_window=50,
     )
