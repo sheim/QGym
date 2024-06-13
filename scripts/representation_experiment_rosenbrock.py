@@ -32,7 +32,7 @@ for experiment in experiment_params.values():
 time_str = time.strftime("%Y%m%d_%H%M%S")
 
 # generate data
-n_dims = 2
+n_dims = 3
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
@@ -117,27 +117,27 @@ for name, critic in test_critics.items():
     print(f"{name} max error: ", error.max().item())
     mean_value_loss /= counter
 
-    if n_dims == 2:
-        with torch.no_grad():
-            graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
-            graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
-            graphing_data["returns"][name] = data[0, :]["returns"]
+
+    with torch.no_grad():
+        graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
+        graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
+        graphing_data["returns"][name] = data[0, :]["returns"]
 
 # compare new and old critics
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
-# if n_dims == 2:
-#     plot_rosenbrock_multiple_critics_w_data(
-#             graphing_data["critic_obs"],
-#             graphing_data["values"],
-#             graphing_data["returns"],
-#             title=f"Learning a {n_dims}D Rosenbrock Function With Different State Represntations \n",
-#             fn=save_path + f"/state_representation_rosenbrock",
-#             data=data[0, train_idx]["critic_obs"],
-#             grid_size=grid_resolution,
-#         )
+if n_dims == 2:
+    plot_rosenbrock_multiple_critics_w_data(
+            graphing_data["critic_obs"],
+            graphing_data["values"],
+            graphing_data["returns"],
+            title=f"Learning a {n_dims}D Rosenbrock Function With Different State Represntations \n",
+            fn=save_path + f"/state_representation_rosenbrock",
+            data=data[0, train_idx]["critic_obs"],
+            grid_size=grid_resolution,
+        )
 
 critics_no_ground_truth = list(graphing_data["critic_obs"].keys())
 critics_no_ground_truth.remove("Rosenbrock")
@@ -154,9 +154,10 @@ for name in list(graphing_data["critic_obs"].keys()):
 plot_binned_errors(g_data_no_ground_truth,
                    save_path + f"/rosenbrock",
                    lb=0,
-                   ub=10,
+                   ub=15,
                    step=1,
-                   title_add_on=f"{n_dims}D Rosenbrock Function")
+                   tick_step=2,
+                   title_add_on=f"{n_dims}D Rosenbrock Function with Different State Representations")
 
 
 # plot_pendulum_multiple_critics_w_data(

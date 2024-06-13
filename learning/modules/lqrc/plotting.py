@@ -84,7 +84,7 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     num_cols = len(list(data.values())[0].keys())
     fig, axes = plt.subplots(nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained")
-    fig.suptitle(f"Pointwise Prediction Error for {title_add_on} at Different Learning Rates \n", fontsize=27)
+    fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
     colors = dict(zip([lr for lr in data.keys()], ["red", "green", "blue"]))
     for lr in data.keys():
         # bins = np.linspace(0.0, 1.5, 50)
@@ -96,11 +96,12 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
         ]
         y_min = float("inf")
         y_max = -float("inf")
+
         for ix, critic in enumerate(data[lr]["critic_obs"].keys()):
             critic_data = data[lr]["error"][critic].squeeze().detach().cpu().numpy()
             digitized = np.digitize(critic_data, bins)
             bincount = np.bincount(digitized)
-            
+
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
 
@@ -116,7 +117,8 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
             )
             axes[ix].set_xlim(-min((tick_step/2.0), 2.0), min(len(bins) + (tick_step/2.0), len(bins) + 2.0))
             if lr > 1e-4:
-                axes[ix].text(0.4, 0.95, generate_statistics_str(critic_data, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=22,
+                predictions = data[lr]["values"][critic].squeeze().detach().cpu().numpy()
+                axes[ix].text(0.4, 0.95, generate_statistics_str(predictions, r"0.001 Learning Rate"), transform=axes[ix].transAxes, fontsize=22,
                     verticalalignment='top', bbox=props)
         for ix, critic in enumerate(data[lr].keys()):
             axes[ix].set_ylim(y_min, y_max)

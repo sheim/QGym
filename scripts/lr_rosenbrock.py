@@ -172,7 +172,7 @@ for lr, value in graphing_data.items():
 
 plot_binned_errors(g_data_no_ground_truth,
                     save_path + f"/rosenbrock",
-                    title_add_on=f"{n_dims}D Rosenbrock Function")
+                    title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates")
 
 if n_dims == 2:
     for lr, g_data in graphing_data.items():

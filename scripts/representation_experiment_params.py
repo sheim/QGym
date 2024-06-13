@@ -15,7 +15,7 @@ experiment_params = {
             "num_obs": 2,
             "hidden_dims": [256, 128],
             "activation": "relu",
-            "normalize_obs": True,
+            "normalize_obs": False,
             "latent_dim": None,
             "minimize": True,
         },
