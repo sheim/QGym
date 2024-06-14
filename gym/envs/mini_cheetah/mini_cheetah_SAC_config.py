@@ -1,4 +1,4 @@
-from gym.envs.base.fixed_robot_config import FixedRobotCfgPPO
+from gym.envs.base.legged_robot_config import LeggedRobotRunnerCfg
 from gym.envs.mini_cheetah.mini_cheetah_ref_config import MiniCheetahRefCfg
 
 BASE_HEIGHT_REF = 0.3
@@ -7,7 +7,6 @@ BASE_HEIGHT_REF = 0.3
 class MiniCheetahSACCfg(MiniCheetahRefCfg):
     class env(MiniCheetahRefCfg.env):
         num_envs = 1
-        num_actuators = 12
         episode_length_s = 4  # TODO
 
     class terrain(MiniCheetahRefCfg.terrain):
@@ -70,7 +69,7 @@ class MiniCheetahSACCfg(MiniCheetahRefCfg):
         commands = [3, 1, 3]
 
 
-class MiniCheetahSACRunnerCfg(FixedRobotCfgPPO):
+class MiniCheetahSACRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OffPolicyRunner"
 
@@ -155,7 +154,7 @@ class MiniCheetahSACRunnerCfg(FixedRobotCfgPPO):
             class termination_weight:
                 termination = 0.15
 
-    class algorithm(FixedRobotCfgPPO.algorithm):
+    class algorithm(LeggedRobotRunnerCfg.algorithm):
         # Taken from SAC pendulum
         initial_fill = 500
         storage_size = 10**6
@@ -175,7 +174,7 @@ class MiniCheetahSACRunnerCfg(FixedRobotCfgPPO):
         actor_lr = 1e-4
         critic_lr = 1e-4
 
-    class runner(FixedRobotCfgPPO.runner):
+    class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
         experiment_name = "sac_mini_cheetah"
         max_iterations = 50_000

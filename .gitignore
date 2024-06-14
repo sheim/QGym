@@ -16,7 +16,6 @@ gym/wandb
 *.npz
 user/wandb_config.json
 *trajectories/
-*smooth_exploration/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
