@@ -52,6 +52,10 @@ class OnPolicyRunner(BaseRunner):
             device=self.device,
         )
 
+        # burn in observation normalization.
+        if self.actor_cfg["normalize_obs"] or self.critic_cfg["normalize_obs"]:
+            self.burn_in_normalization()
+
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
@@ -119,6 +123,21 @@ class OnPolicyRunner(BaseRunner):
             if self.it % self.save_interval == 0:
                 self.save()
         self.save()
+
+    @torch.no_grad
+    def burn_in_normalization(self, n_iterations=100):
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
+        critic_obs = self.get_obs(self.critic_cfg["obs"])
+        for _ in range(n_iterations):
+            actions = self.alg.act(actor_obs)
+            self.set_actions(self.actor_cfg["actions"], actions)
+            self.env.step()
+            actor_obs = self.get_noisy_obs(
+                self.actor_cfg["obs"], self.actor_cfg["noise"]
+            )
+            critic_obs = self.get_obs(self.critic_cfg["obs"])
+            self.alg.critic.evaluate(critic_obs)
+        self.env.reset()
 
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(
