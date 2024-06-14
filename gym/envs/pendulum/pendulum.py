@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from gym.envs.base.fixed_robot import FixedRobot
 
@@ -19,7 +20,7 @@ class Pendulum(FixedRobot):
         )
 
     def _reward_theta(self):
-        theta_rwd = torch.cos(self.dof_pos[:, 0]) / self.scales["dof_pos"]
+        theta_rwd = torch.cos(self.dof_pos[:, 0])  # no scaling
         return self._sqrdexp(theta_rwd.squeeze(dim=-1))
 
     def _reward_omega(self):
@@ -27,24 +28,35 @@ class Pendulum(FixedRobot):
         return self._sqrdexp(omega_rwd.squeeze(dim=-1))
 
     def _reward_equilibrium(self):
-        error = torch.abs(self.dof_state)
-        error[:, 0] /= self.scales["dof_pos"]
-        error[:, 1] /= self.scales["dof_vel"]
+        theta_norm = self._normalize_theta()
+        omega = self.dof_vel[:, 0]
+        error = torch.stack(
+            [theta_norm / self.scales["dof_pos"], omega / self.scales["dof_vel"]], dim=1
+        )
         return self._sqrdexp(torch.mean(error, dim=1), scale=0.01)
-        # return torch.exp(
-        #     -error.pow(2).sum(dim=1) / self.cfg.reward_settings.tracking_sigma
-        # )
+
+    def _reward_torques(self):
+        """Penalize torques"""
+        return self._sqrdexp(torch.mean(torch.square(self.torques), dim=1), scale=0.2)
 
     def _reward_energy(self):
-        m_pendulum = 1.0
-        l_pendulum = 1.0
         kinetic_energy = (
-            0.5 * m_pendulum * l_pendulum**2 * torch.square(self.dof_vel[:, 0])
+            0.5
+            * self.cfg.asset.mass
+            * self.cfg.asset.length**2
+            * torch.square(self.dof_vel[:, 0])
         )
         potential_energy = (
-            m_pendulum * 9.81 * l_pendulum * torch.cos(self.dof_pos[:, 0])
+            self.cfg.asset.mass
+            * 9.81
+            * self.cfg.asset.length
+            * torch.cos(self.dof_pos[:, 0])
         )
-        desired_energy = m_pendulum * 9.81 * l_pendulum
+        desired_energy = self.cfg.asset.mass * 9.81 * self.cfg.asset.length
         energy_error = kinetic_energy + potential_energy - desired_energy
-        return -(energy_error / desired_energy).pow(2)
-        # return self._sqrdexp(energy_error / desired_energy)
+        return self._sqrdexp(energy_error / desired_energy)
+
+    def _normalize_theta(self):
+        # normalize to range [-pi, pi]
+        theta = self.dof_pos[:, 0]
+        return ((theta + np.pi) % (2 * np.pi)) - np.pi

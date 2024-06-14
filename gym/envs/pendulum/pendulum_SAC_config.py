@@ -5,20 +5,20 @@ from gym.envs.pendulum.pendulum_config import PendulumCfg
 
 class PendulumSACCfg(PendulumCfg):
     class env(PendulumCfg.env):
-        num_envs = 256
-        episode_length_s = 2.5
+        num_envs = 1
+        episode_length_s = 10
 
     class init_state(PendulumCfg.init_state):
-        reset_mode = "reset_to_basic"
+        reset_mode = "reset_to_range"
         default_joint_angles = {"theta": 0.0}
         dof_pos_range = {
-            "theta": [-torch.pi / 2, torch.pi / 2],
+            "theta": [-torch.pi, torch.pi],
         }
-        dof_vel_range = {"theta": [-1, 1]}
+        dof_vel_range = {"theta": [-5, 5]}
 
     class control(PendulumCfg.control):
-        ctrl_frequency = 25
-        desired_sim_frequency = 200
+        ctrl_frequency = 10
+        desired_sim_frequency = 100
 
     class asset(PendulumCfg.asset):
         joint_damping = 0.1
@@ -38,9 +38,9 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
 
     class actor:
         hidden_dims = {
-            "latent": [400],
-            "mean": [300],
-            "std": [300],
+            "latent": [128, 64],
+            "mean": [32],
+            "std": [32],
         }
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = {
@@ -66,46 +66,47 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
             "dof_pos_obs",
             "dof_vel",
         ]
-        hidden_dims = [256, 256]
+        hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        normalize_obs = True
+        # TODO[lm]: Current normalization uses torch.no_grad, this should be changed
+        normalize_obs = False
 
         class reward:
             class weights:
                 theta = 0.0
                 omega = 0.0
-                equilibrium = 2.0
-                energy = 1.0
+                equilibrium = 1.0
+                energy = 0.5
                 dof_vel = 0.0
-                torques = 0.01
+                torques = 0.025
 
             class termination_weight:
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        initial_fill = 10**3
+        initial_fill = 500
         storage_size = 10**6  # 17
         batch_size = 256  # 4096
         max_gradient_steps = 1  # 10 # SB3: 1
-        action_max = 1.0
-        action_min = -1.0
+        action_max = 2.0
+        action_min = -2.0
         actor_noise_std = 1.0
         log_std_max = 4.0
         log_std_min = -20.0
-        alpha = 0.8
+        alpha = 0.2
         target_entropy = -1.0
         max_grad_norm = 1.0
-        polyak = 0.98  # flipped compared to stable-baselines3 (polyak == 1-tau)
-        gamma = 0.98
-        alpha_lr = 3e-5
-        actor_lr = 3e-5
-        critic_lr = 3e-5
+        polyak = 0.995  # flipped compared to stable-baselines3 (polyak == 1-tau)
+        gamma = 0.99
+        alpha_lr = 1e-4
+        actor_lr = 1e-3
+        critic_lr = 1e-3
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
-        experiment_name = "pendulum"
-        max_iterations = 10000  # number of policy updates
+        experiment_name = "sac_pendulum"
+        max_iterations = 40_000  # number of policy updates
         algorithm_class_name = "SAC"
-        save_interval = 250
+        save_interval = 5000
         num_steps_per_env = 1
