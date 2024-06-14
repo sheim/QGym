@@ -238,13 +238,12 @@ class LeggedRobotRunnerCfg(BaseConfig):
         hidden_dims = [512, 256, 128]
         # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        normalize_obs = True
-
         obs = [
             "observation_a",
             "observation_b",
             "these_need_to_be_atributes_(states)_of_the_robot_env",
         ]
+        normalize_obs = True
 
         actions = ["q_des"]
         disable_actions = False

@@ -130,7 +130,6 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-
         obs = [
             "base_lin_vel",
             "base_ang_vel",
@@ -140,6 +139,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_target",
         ]
+        normalize_obs = True
         actions = ["dof_pos_target"]
         add_noise = True
         disable_actions = False
@@ -168,6 +168,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_target",
         ]
+        normalize_obs = True
 
         class reward:
             class weights:
