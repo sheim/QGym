@@ -23,7 +23,7 @@ class PendulumCfg(FixedRobotCfg):
         # * default setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_uniform"
 
         # * initial conditions for reset_to_range
         dof_pos_range = {
@@ -129,4 +129,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         experiment_name = "pendulum"
         max_iterations = 200  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 32
+        num_steps_per_env = 100
+        save_interval = 50
+        log_storage = True

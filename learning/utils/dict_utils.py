@@ -4,18 +4,25 @@ from tensordict import TensorDict
 
 @torch.no_grad
 def compute_MC_returns(data: TensorDict, gamma, critic=None):
+    # todo not as accurate as taking
     if critic is None:
         last_values = torch.zeros_like(data["rewards"][0])
     else:
         last_values = critic.evaluate(data["critic_obs"][-1])
 
     returns = torch.zeros_like(data["rewards"])
-    returns[-1] = last_values * ~data["dones"][-1]
+    returns[-1] = data["rewards"][-1] + gamma * last_values * ~data["terminated"][-1]
     for k in reversed(range(data["rewards"].shape[0] - 1)):
         not_done = ~data["dones"][k]
         returns[k] = data["rewards"][k] + gamma * returns[k + 1] * not_done
-
-    return normalize(returns)
+        if critic is not None:
+            returns[k] += (
+                gamma
+                * critic.evaluate(data["critic_obs"][k])
+                * data["timed_out"][k]
+                * ~data["terminated"][k]
+            )
+    return returns
 
 
 @torch.no_grad
