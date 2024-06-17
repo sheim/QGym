@@ -31,7 +31,15 @@ def create_custom_bwr_colormap():
 
 
 def plot_pendulum_multiple_critics_w_data(
-    x, predictions, targets, title, fn, data, colorbar_label="f(x)", grid_size=64
+    x,
+    predictions,
+    targets,
+    title,
+    fn,
+    data,
+    colorbar_label="f(x)",
+    grid_size=64,
+    actions=None,
 ):
     num_critics = len(x.keys())
     fig, axes = plt.subplots(nrows=2, ncols=num_critics, figsize=(4 * num_critics, 6))
@@ -43,6 +51,7 @@ def plot_pendulum_multiple_critics_w_data(
     global_max_prediction = float("-inf")
     prediction_cmap = mpl.cm.get_cmap("viridis")
     error_cmap = create_custom_bwr_colormap()
+    action_cmap = mpl.cm.get_cmap("viridis")
 
     for critic_name in x:
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
@@ -52,15 +61,20 @@ def plot_pendulum_multiple_critics_w_data(
         np_error = np_predictions - np_targets
         global_min_error = min(global_min_error, np.min(np_error))
         global_max_error = max(global_max_error, np.max(np_error))
-        global_min_prediction = np.min(np_targets)
-        global_max_prediction = np.max(np_targets)
+        global_min_prediction = min(
+            global_min_prediction, np.min(np_predictions), np.min(np_targets)
+        )
+        global_max_prediction = max(
+            global_max_prediction, np.max(np_predictions), np.max(np_targets)
+        )
     error_norm = mcolors.TwoSlopeNorm(
-        vmin=global_min_error, vcenter=0, vmax=global_max_error
+        vmin=global_min_error - 1e-5, vcenter=0, vmax=global_max_error + 1e-5
     )
     prediction_norm = mcolors.CenteredNorm(
         vcenter=(global_max_prediction + global_min_prediction) / 2,
         halfrange=(global_max_prediction - global_min_prediction) / 2,
     )
+    action_norm = mcolors.CenteredNorm()
 
     xcord = np.linspace(-2 * np.pi, 2 * np.pi, grid_size)
     ycord = np.linspace(-5, 5, grid_size)
@@ -72,7 +86,7 @@ def plot_pendulum_multiple_critics_w_data(
         )
         np_error = np_predictions - np_targets
 
-        # Predictions
+        # Plot Predictions
         axes[0, ix].imshow(
             np_predictions.reshape(grid_size, grid_size).T,
             origin="lower",
@@ -85,17 +99,32 @@ def plot_pendulum_multiple_critics_w_data(
         if ix == 0:
             continue
 
-        # Errors
-        axes[1, ix].imshow(
-            np_error.reshape(grid_size, grid_size).T,
-            origin="lower",
-            extent=(xcord.min(), xcord.max(), ycord.min(), ycord.max()),
-            cmap=error_cmap,
-            norm=error_norm,
-        )
-        axes[1, ix].set_title(f"{critic_name} Error")
+        if actions is None:
+            # Plot Errors
+            axes[1, ix].imshow(
+                np_error.reshape(grid_size, grid_size).T,
+                origin="lower",
+                extent=(xcord.min(), xcord.max(), ycord.min(), ycord.max()),
+                cmap=error_cmap,
+                norm=error_norm,
+            )
+            axes[1, ix].set_title(f"{critic_name} Error")
+            ax1_mappable = mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap)
 
-    # Trajectories
+        else:
+            # Plot Actions
+            np_actions = actions[critic_name].detach().cpu().numpy().reshape(-1)
+            axes[1, ix].imshow(
+                np_actions.reshape(grid_size, grid_size).T,
+                origin="lower",
+                extent=(xcord.min(), xcord.max(), ycord.min(), ycord.max()),
+                cmap=action_cmap,
+                norm=action_norm,
+            )
+            axes[1, ix].set_title(f"{critic_name} Action")
+            ax1_mappable = mpl.cm.ScalarMappable(norm=action_norm, cmap=action_cmap)
+
+    # Plot MC Trajectories
     data = data.detach().cpu().numpy()
     theta = data[:, :, 0]
     omega = data[:, :, 1]
@@ -120,7 +149,7 @@ def plot_pendulum_multiple_critics_w_data(
         label=colorbar_label,
     )
     fig.colorbar(
-        mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap),
+        ax1_mappable,
         ax=axes[1, :].ravel().tolist(),
         shrink=0.95,
         label=colorbar_label,

@@ -127,8 +127,8 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
-        max_iterations = 200  # number of policy updates
+        max_iterations = 100  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 100
-        save_interval = 50
+        save_interval = 20
         log_storage = True

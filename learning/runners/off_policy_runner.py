@@ -8,6 +8,7 @@ from .BaseRunner import BaseRunner
 from learning.modules import Critic, ChimeraActor
 from learning.storage import ReplayBuffer
 from learning.algorithms import SAC
+from learning.utils import export_to_numpy
 
 logger = Logger()
 storage = ReplayBuffer()
@@ -55,7 +56,6 @@ class OffPolicyRunner(BaseRunner):
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         actions = self.alg.act(actor_obs)
         tot_iter = self.it + self.num_learning_iterations
-        self.save()
 
         # * start up storage
         transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
@@ -67,9 +67,18 @@ class OffPolicyRunner(BaseRunner):
                 "critic_obs": critic_obs,
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
-                "dones": self.get_timed_out(),
+                "timed_out": self.get_timed_out(),
+                "terminated": self.get_terminated(),
+                "dones": self.get_timed_out() | self.get_terminated(),
             }
         )
+        if self.log_storage:
+            transition.update(
+                {
+                    "dof_pos": self.env.dof_pos,
+                    "dof_vel": self.env.dof_vel,
+                }
+            )
         storage.initialize(
             transition,
             self.env.num_envs,
@@ -115,9 +124,17 @@ class OffPolicyRunner(BaseRunner):
                         "next_critic_obs": critic_obs,
                         "rewards": total_rewards,
                         "timed_out": timed_out,
+                        "terminated": terminated,
                         "dones": dones,
                     }
                 )
+                if self.log_storage:
+                    transition.update(
+                        {
+                            "dof_pos": self.env.dof_pos,
+                            "dof_vel": self.env.dof_vel,
+                        }
+                    )
                 storage.add_transitions(transition)
                 # print every 10% of initial fill
                 if (self.alg_cfg["initial_fill"] > 10) and (
@@ -171,6 +188,13 @@ class OffPolicyRunner(BaseRunner):
                             "dones": dones,
                         }
                     )
+                    if self.log_storage:
+                        transition.update(
+                            {
+                                "dof_pos": self.env.dof_pos,
+                                "dof_vel": self.env.dof_vel,
+                            }
+                        )
                     storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
@@ -190,7 +214,8 @@ class OffPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-        self.save()
+
+        # self.save()
 
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(
@@ -244,6 +269,10 @@ class OffPolicyRunner(BaseRunner):
             "iter": self.it,
         }
         torch.save(save_dict, path)
+        if self.log_storage:
+            path_data = os.path.join(self.log_dir, "data_{}".format(self.it))
+            torch.save(storage.data.cpu(), path_data + ".pt")
+            export_to_numpy(storage.data, path_data + ".npz")
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
