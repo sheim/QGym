@@ -15,6 +15,7 @@ class Actor(nn.Module):
         activation="elu",
         init_noise_std=1.0,
         normalize_obs=True,
+        store_pik=False,
         **kwargs,
     ):
         super().__init__()
@@ -32,6 +33,12 @@ class Actor(nn.Module):
         self.distribution = None
         # disable args validation for speedup
         Normal.set_default_validate_args = False
+
+        self.store_pik = store_pik
+        if self.store_pik:
+            self.NN_pik = create_MLP(num_obs, num_actions, hidden_dims, activation)
+            self.std_pik = self.std.detach().clone()
+            self.update_pik_weights()
 
     @property
     def action_mean(self):
@@ -67,3 +74,17 @@ class Actor(nn.Module):
 
     def export(self, path):
         export_network(self, "policy", path, self.num_obs)
+
+    def update_pik_weights(self):
+        nn_state_dict = self.NN.state_dict()
+        self.NN_pik.load_state_dict(nn_state_dict)
+        self.std_pik = self.std.detach().clone()
+
+    def get_pik_log_prob(self, observations, actions):
+        if self._normalize_obs:
+            with torch.no_grad():
+                observations = self.obs_rms(observations)
+        mean_pik = self.NN_pik(observations)
+        std_pik = self.std_pik.to(mean_pik.device)
+        distribution = Normal(mean_pik, mean_pik * 0.0 + std_pik)
+        return distribution.log_prob(actions).sum(dim=-1)

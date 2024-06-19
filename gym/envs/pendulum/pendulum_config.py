@@ -73,6 +73,8 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             "dof_vel",
         ]
 
+        store_pik = True
+
         actions = ["tau_ff"]
         disable_actions = False
 
@@ -123,6 +125,9 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         entropy_coef = 0.01
         schedule = "fixed"  # could be adaptive, fixed
         desired_kl = 0.01
+
+        # GePPO
+        geppo = True
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""

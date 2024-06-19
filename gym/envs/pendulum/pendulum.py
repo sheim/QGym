@@ -33,11 +33,7 @@ class Pendulum(FixedRobot):
         error = torch.stack(
             [theta_norm / self.scales["dof_pos"], omega / self.scales["dof_vel"]], dim=1
         )
-        return self._sqrdexp(torch.mean(error, dim=1), scale=0.01)
-
-    def _reward_torques(self):
-        """Penalize torques"""
-        return self._sqrdexp(torch.mean(torch.square(self.torques), dim=1), scale=0.2)
+        return self._sqrdexp(torch.mean(error, dim=1), scale=0.2)
 
     def _reward_energy(self):
         kinetic_energy = (
