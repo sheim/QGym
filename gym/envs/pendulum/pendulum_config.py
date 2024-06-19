@@ -73,6 +73,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             "dof_vel",
         ]
 
+        # GePPO
         store_pik = True
 
         actions = ["tau_ff"]
@@ -127,11 +128,11 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         desired_kl = 0.01
 
         # GePPO
-        geppo = True
+        is_trunc = 1.0
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 200  # number of policy updates
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "GePPO"
         num_steps_per_env = 32

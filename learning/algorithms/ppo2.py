@@ -5,7 +5,6 @@ import torch.optim as optim
 from learning.utils import (
     create_uniform_generator,
     compute_generalized_advantages,
-    compute_gae_vtrace,
     normalize,
 )
 
@@ -26,8 +25,6 @@ class PPO2:
         use_clipped_value_loss=True,
         schedule="fixed",
         desired_kl=0.01,
-        geppo=False,
-        is_trunc=1.0,
         device="cpu",
         **kwargs,
     ):
@@ -53,10 +50,6 @@ class PPO2:
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
 
-        # * GePPO parameters
-        self.geppo = geppo
-        self.is_trunc = is_trunc
-
     def switch_to_train(self):
         self.actor.train()
         self.critic.train()
@@ -66,34 +59,18 @@ class PPO2:
 
     def update(self, data):
         values = self.critic.evaluate(data["critic_obs"])
-        # handle single env case
+        # Handle single env case
         if values.dim() == 1:
             values = values.unsqueeze(-1)
         data["values"] = values
-
-        if self.geppo:
-            advantages, returns = compute_gae_vtrace(
-                data, self.gamma, self.lam, self.is_trunc, self.actor, self.critic
-            )
-            # handle single env case
-            if advantages.dim() == 1:
-                advantages = advantages.unsqueeze(-1)
-            if returns.dim() == 1:
-                returns = returns.unsqueeze(-1)
-            data["advantages"] = advantages
-            data["returns"] = returns
-        else:
-            data["advantages"] = compute_generalized_advantages(
-                data, self.gamma, self.lam, self.critic
-            )
-            data["returns"] = data["advantages"] + data["values"]
+        data["advantages"] = compute_generalized_advantages(
+            data, self.gamma, self.lam, self.critic
+        )
+        data["returns"] = data["advantages"] + data["values"]
 
         self.update_critic(data)
         data["advantages"] = normalize(data["advantages"])
         self.update_actor(data)
-
-        if self.actor.store_pik:
-            self.actor.update_pik_weights()
 
     def update_critic(self, data):
         self.mean_value_loss = 0
