@@ -5,7 +5,7 @@ from gym.envs.base.fixed_robot_config import FixedRobotCfg, FixedRobotCfgPPO
 
 class PendulumCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
-        num_envs = 4096
+        num_envs = 2048
         num_actuators = 1
         episode_length_s = 10
 
@@ -59,7 +59,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "HybridPolicyRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -72,9 +72,6 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
             "dof_pos_obs",
             "dof_vel",
         ]
-
-        # GePPO
-        store_pik = True
 
         actions = ["tau_ff"]
         disable_actions = False
@@ -135,4 +132,5 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         experiment_name = "pendulum"
         max_iterations = 200  # number of policy updates
         algorithm_class_name = "GePPO"
-        num_steps_per_env = 32
+        num_steps_per_env = 64
+        num_old_policies = 4

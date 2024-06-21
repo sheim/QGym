@@ -55,7 +55,7 @@ def compute_generalized_advantages(data, gamma, lam, critic):
 @torch.no_grad
 def compute_gae_vtrace(data, gamma, lam, is_trunc, actor, critic):
     if actor.store_pik is False:
-        raise NotImplementedError("Need to store pik for V-trace")
+        raise ValueError("Need to store pik for V-trace")
 
     log_prob = actor.get_actions_log_prob(data["actions"])
     log_prob_pik = actor.get_pik_log_prob(data["actor_obs"], data["actions"])
