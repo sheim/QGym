@@ -210,7 +210,7 @@ class HybridPolicyRunner(BaseRunner):
         logger.register_category(
             "GePPO",
             self.alg,
-            ["eps", "adv_mean", "ret_mean", "adv_vtrace_mean", "ret_vtrace_mean"],
+            ["eps", "tv", "adv_mean", "ret_mean", "adv_vtrace_mean", "ret_vtrace_mean"],
         )
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))

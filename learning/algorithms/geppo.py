@@ -19,6 +19,10 @@ class GePPO(PPO2):
         is_trunc=1.0,
         eps_ppo=0.2,
         eps_vary=True,
+        adapt_lr=True,
+        adapt_factor=0.03,
+        adapt_minthresh=0.0,
+        adapt_maxthresh=1.0,
         **kwargs,
     ):
         super().__init__(actor, critic, **kwargs)
@@ -30,6 +34,12 @@ class GePPO(PPO2):
         self.eps_ppo = eps_ppo
         self.eps_vary = eps_vary
         self.eps = self.eps_ppo  # TODO: This should be computed
+
+        # Learning rate
+        self.adapt_lr = adapt_lr
+        self.adapt_factor = adapt_factor
+        self.adapt_minthresh = adapt_minthresh
+        self.adapt_maxthresh = adapt_maxthresh
 
         self.updated = False
 
@@ -113,10 +123,6 @@ class GePPO(PPO2):
         self.mean_surrogate_loss = 0
         counter = 0
 
-        self.actor.act(data["actor_obs"])
-        data["old_sigma_batch"] = self.actor.action_std.detach()
-        data["old_mu_batch"] = self.actor.action_mean.detach()
-
         generator = create_uniform_generator(
             data,
             self.batch_size,
@@ -124,34 +130,7 @@ class GePPO(PPO2):
         )
         for batch in generator:
             self.actor.act(batch["actor_obs"])
-            mu_batch = self.actor.action_mean
-            sigma_batch = self.actor.action_std
             entropy_batch = self.actor.entropy
-
-            # * KL
-            # TODO: Implement GePPO adaptive LR
-            if self.desired_kl is not None and self.schedule == "adaptive":
-                with torch.inference_mode():
-                    kl = torch.sum(
-                        torch.log(sigma_batch / batch["old_sigma_batch"] + 1.0e-5)
-                        + (
-                            torch.square(batch["old_sigma_batch"])
-                            + torch.square(batch["old_mu_batch"] - mu_batch)
-                        )
-                        / (2.0 * torch.square(sigma_batch))
-                        - 0.5,
-                        axis=-1,
-                    )
-                    kl_mean = torch.mean(kl)
-
-                    if kl_mean > self.desired_kl * 2.0:
-                        self.learning_rate = max(1e-5, self.learning_rate / 1.5)
-                    elif kl_mean < self.desired_kl / 2.0 and kl_mean > 0.0:
-                        self.learning_rate = min(1e-2, self.learning_rate * 1.5)
-
-                    for param_group in self.optimizer.param_groups:
-                        # ! check this
-                        param_group["lr"] = self.learning_rate
 
             # * GePPO Surrogate loss
             log_prob_pik = self.actor.get_pik_log_prob(
@@ -188,3 +167,21 @@ class GePPO(PPO2):
             self.mean_surrogate_loss += surrogate_loss.item()
             counter += 1
         self.mean_surrogate_loss /= counter
+
+        # Compute TV, add to self for logging
+        self.actor.act(data["actor_obs"])
+        log_prob = self.actor.get_actions_log_prob(data["actions"])
+        log_prob_pik = self.actor.get_pik_log_prob(data["actor_obs"], data["actions"])
+        ratio = torch.exp(log_prob - data["log_prob"])
+        clip_center = torch.exp(log_prob_pik - data["log_prob"])
+        ratio_diff = torch.abs(ratio - clip_center)
+        self.tv = 0.5 * torch.mean(data["weights"] * ratio_diff)
+
+        # Adapt learning rate
+        if self.adapt_lr:
+            if self.tv > (self.adapt_maxthresh * (0.5 * self.eps)):
+                self.learning_rate /= 1 + self.adapt_factor
+            elif self.tv < (self.adapt_minthresh * (0.5 * self.eps)):
+                self.learning_rate *= 1 + self.adapt_factor
+            for param_group in self.optimizer.param_groups:
+                param_group["lr"] = self.learning_rate
