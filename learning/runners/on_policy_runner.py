@@ -6,7 +6,6 @@ from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
 from learning.storage import DictStorage
-from learning.algorithms import GePPO
 
 logger = Logger()
 storage = DictStorage()
@@ -164,13 +163,6 @@ class OnPolicyRunner(BaseRunner):
             "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
-
-        if isinstance(self.alg, GePPO):
-            logger.register_category(
-                "GePPO",
-                self.alg,
-                ["adv_mean", "ret_mean", "adv_vtrace_mean", "ret_vtrace_mean"],
-            )
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 

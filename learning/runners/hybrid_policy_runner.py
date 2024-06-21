@@ -136,7 +136,7 @@ class HybridPolicyRunner(BaseRunner):
                     logger.finish_step(dones)
             logger.toc("collection")
 
-            # Compute GePPO policy weights
+            # Compute GePPO weights
             n_policies = min(self.it, self.num_old_policies)
             weights_active = self.weights[:n_policies]
             weights_active = weights_active * n_policies / weights_active.sum()
@@ -149,9 +149,9 @@ class HybridPolicyRunner(BaseRunner):
             weights_all = weights_all.repeat_interleave(self.num_steps_per_env)
             weights_all = weights_all.unsqueeze(-1).repeat(1, self.env.num_envs)
 
-            # Update GePPO with policy weights
+            # Update GePPO with weights
             logger.tic("learning")
-            self.alg.update(storage.get_data(), policy_weights=weights_all)
+            self.alg.update(storage.get_data(), weights=weights_all)
             logger.toc("learning")
             logger.log_all_categories()
 
@@ -200,7 +200,9 @@ class HybridPolicyRunner(BaseRunner):
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
-            "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
+            "algorithm",
+            self.alg,
+            ["learning_rate", "mean_value_loss", "mean_surrogate_loss"],
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 

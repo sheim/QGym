@@ -33,7 +33,7 @@ class GePPO(PPO2):
 
         self.updated = False
 
-    def update(self, data, policy_weights):
+    def update(self, data, weights):
         values = self.critic.evaluate(data["critic_obs"])
         # Handle single env case
         if values.dim() == 1:
@@ -62,9 +62,10 @@ class GePPO(PPO2):
             self.updated = True
 
         # Update critic and actor
+        data["weights"] = weights
         self.update_critic(data)
         data["advantages"] = normalize(data["advantages"])
-        self.update_actor(data, policy_weights)
+        self.update_actor(data)
 
         # Update pik weights
         if self.actor.store_pik:
@@ -76,14 +77,37 @@ class GePPO(PPO2):
         self.adv_vtrace_mean = adv_vtrace.mean().item()
         self.ret_vtrace_mean = ret_vtrace.mean().item()
 
-    def update_actor(self, data, policy_weights):
+    def update_critic(self, data):
+        self.mean_value_loss = 0
+        counter = 0
+
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
+        for batch in generator:
+            # GePPO critic loss uses weights
+            value_loss = self.critic.loss_fn(
+                batch["critic_obs"], batch["returns"], batch["weights"]
+            )
+            self.critic_optimizer.zero_grad()
+            value_loss.backward()
+            nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+            self.critic_optimizer.step()
+            self.mean_value_loss += value_loss.item()
+            counter += 1
+        self.mean_value_loss /= counter
+
+    def update_actor(self, data):
+        # Update clipping eps
         if self.eps_vary:
             log_prob_pik = self.actor.get_pik_log_prob(
                 data["actor_obs"], data["actions"]
             )
-            offpol_ratio = torch.exp(data["log_prob"] - log_prob_pik)
+            offpol_ratio = torch.exp(log_prob_pik - data["log_prob"])
             # TODO: I am taking the mean over 2 dims, check if this is correct
-            eps_old = torch.mean(policy_weights * torch.abs(offpol_ratio - 1.0))
+            eps_old = torch.mean(data["weights"] * torch.abs(offpol_ratio - 1.0))
             self.eps = max(self.eps_ppo - eps_old.item(), 0.0)
 
         self.mean_surrogate_loss = 0
@@ -92,12 +116,6 @@ class GePPO(PPO2):
         self.actor.act(data["actor_obs"])
         data["old_sigma_batch"] = self.actor.action_std.detach()
         data["old_mu_batch"] = self.actor.action_mean.detach()
-        data["old_actions_log_prob_batch"] = self.actor.get_actions_log_prob(
-            data["actions"]
-        ).detach()
-
-        # Add policy weights to data
-        data["policy_weights"] = policy_weights
 
         generator = create_uniform_generator(
             data,
@@ -106,7 +124,6 @@ class GePPO(PPO2):
         )
         for batch in generator:
             self.actor.act(batch["actor_obs"])
-            actions_log_prob_batch = self.actor.get_actions_log_prob(batch["actions"])
             mu_batch = self.actor.action_mean
             sigma_batch = self.actor.action_std
             entropy_batch = self.actor.entropy
@@ -140,27 +157,25 @@ class GePPO(PPO2):
             log_prob_pik = self.actor.get_pik_log_prob(
                 batch["actor_obs"], batch["actions"]
             )
-            offpol_ratio = torch.exp(batch["log_prob"] - log_prob_pik)
+            offpol_ratio = torch.exp(log_prob_pik - batch["log_prob"])
             advantages = batch["advantages"]
 
             # TODO: Center/clip advantages (optional)
             # adv_mean = torch.mean(
-            #     offpol_ratio * batch["policy_weights"] * advantages, dim=2
-            # ) / torch.mean(offpol_ratio, batch["policy_weights"], dim=2)
+            #     offpol_ratio * batch["weights"] * advantages, dim=2
+            # ) / torch.mean(offpol_ratio, batch["weights"], dim=2)
             # adv_std = torch.std(
-            #     offpol_ratio * batch["policy_weights"] * advantages, dim=2
+            #     offpol_ratio * batch["weights"] * advantages, dim=2
             # )
 
-            ratio = torch.exp(
-                actions_log_prob_batch
-                - torch.squeeze(batch["old_actions_log_prob_batch"])
-            )
+            log_prob = self.actor.get_actions_log_prob(batch["actions"])
+            ratio = torch.exp(log_prob - batch["log_prob"])
             surrogate = -torch.squeeze(advantages) * ratio
             surrogate_clipped = -torch.squeeze(advantages) * torch.clamp(
                 ratio, offpol_ratio - self.eps, offpol_ratio + self.eps
             )
             surrogate_loss = (
-                torch.max(surrogate, surrogate_clipped) * batch["policy_weights"]
+                torch.max(surrogate, surrogate_clipped) * batch["weights"]
             ).mean()
 
             loss = surrogate_loss - self.entropy_coef * entropy_batch.mean()

@@ -57,12 +57,11 @@ def compute_gae_vtrace(data, gamma, lam, is_trunc, actor, critic):
     if actor.store_pik is False:
         raise ValueError("Need to store pik for V-trace")
 
-    log_prob = actor.get_actions_log_prob(data["actions"])
     log_prob_pik = actor.get_pik_log_prob(data["actor_obs"], data["actions"])
 
     # n: rollout length, e: num envs
     # TODO: Double check GePPO code and paper (they diverge imo)
-    ratio = torch.exp(log_prob - log_prob_pik)  # shape [n, e]
+    ratio = torch.exp(log_prob_pik - data["log_prob"])  # shape [n, e]
 
     n, e = ratio.shape
     ones_U = torch.triu(torch.ones((n, n)), 0).to(data.device)
@@ -86,15 +85,13 @@ def compute_gae_vtrace(data, gamma, lam, is_trunc, actor, critic):
     rate_L = torch.tril(torch.ones((n, n)) * gamma * lam, -1).to(data.device)  # [n, n]
     rates = torch.tril(torch.cumprod(rate_L + ones_U, axis=0), 0)
     rates_repeat = rates.unsqueeze(0).repeat(e, 1, 1)  # [e, n, n]
-    batch_prod = torch.bmm(rates_repeat, ratio_trunc_prods)  # [e, n, n]
 
     # element-wise multiplication:
-    intermediate = batch_prod * delta_repeat  # [e, n, n]
+    intermediate = rates_repeat * ratio_trunc_prods * delta_repeat  # [e, n, n]
     advantages = torch.sum(intermediate, axis=1)  # [e, n]
 
     advantages = advantages.transpose(0, 1)  # [n, e]
     returns = advantages * ratio_trunc + values  # [n, e]
-
     return advantages, returns
 
 
