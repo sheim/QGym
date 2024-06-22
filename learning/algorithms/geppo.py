@@ -18,7 +18,8 @@ class GePPO(PPO2):
         critic,
         is_trunc=1.0,
         eps_ppo=0.2,
-        eps_vary=True,
+        eps_geppo=0.1,
+        eps_vary=False,
         adapt_lr=True,
         adapt_factor=0.03,
         adapt_minthresh=0.0,
@@ -32,8 +33,8 @@ class GePPO(PPO2):
 
         # Clipping parameter
         self.eps_ppo = eps_ppo
+        self.eps_geppo = eps_geppo
         self.eps_vary = eps_vary
-        self.eps = self.eps_ppo  # TODO: This should be computed
 
         # Learning rate
         self.adapt_lr = adapt_lr
@@ -118,7 +119,7 @@ class GePPO(PPO2):
             offpol_ratio = torch.exp(log_prob_pik - data["log_prob"])
             # TODO: I am taking the mean over 2 dims, check if this is correct
             eps_old = torch.mean(data["weights"] * torch.abs(offpol_ratio - 1.0))
-            self.eps = max(self.eps_ppo - eps_old.item(), 0.0)
+            self.eps_geppo = max(self.eps_ppo - eps_old.item(), 0.0)
 
         self.mean_surrogate_loss = 0
         counter = 0
@@ -151,7 +152,7 @@ class GePPO(PPO2):
             ratio = torch.exp(log_prob - batch["log_prob"])
             surrogate = -torch.squeeze(advantages) * ratio
             surrogate_clipped = -torch.squeeze(advantages) * torch.clamp(
-                ratio, offpol_ratio - self.eps, offpol_ratio + self.eps
+                ratio, offpol_ratio - self.eps_geppo, offpol_ratio + self.eps_geppo
             )
             surrogate_loss = (
                 torch.max(surrogate, surrogate_clipped) * batch["weights"]
@@ -179,9 +180,9 @@ class GePPO(PPO2):
 
         # Adapt learning rate
         if self.adapt_lr:
-            if self.tv > (self.adapt_maxthresh * (0.5 * self.eps)):
+            if self.tv > (self.adapt_maxthresh * (0.5 * self.eps_geppo)):
                 self.learning_rate /= 1 + self.adapt_factor
-            elif self.tv < (self.adapt_minthresh * (0.5 * self.eps)):
+            elif self.tv < (self.adapt_minthresh * (0.5 * self.eps_geppo)):
                 self.learning_rate *= 1 + self.adapt_factor
             for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.learning_rate
