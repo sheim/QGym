@@ -146,7 +146,6 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         max_gradient_steps = 10
         # new
         storage_size = 2**17  # new
-        batch_size = 2**15  #  new
 
         clip_param = 0.2
         learning_rate = 1.0e-3
@@ -159,6 +158,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         desired_kl = 0.01
 
         # GePPO
+        vtrace = True
+        normalize_advantages = False  # weighted normalization in GePPO loss
+        recursive_advantages = True  # applies to vtrace
         is_trunc = 1.0
 
     class runner(MiniCheetahRunnerCfg.runner):

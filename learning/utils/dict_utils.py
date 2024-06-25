@@ -53,45 +53,77 @@ def compute_generalized_advantages(data, gamma, lam, critic):
 
 # Implementation based on GePPO repo: https://github.com/jqueeney/geppo
 @torch.no_grad
-def compute_gae_vtrace(data, gamma, lam, is_trunc, actor, critic):
+def compute_gae_vtrace(data, gamma, lam, is_trunc, actor, critic, rec=False):
     if actor.store_pik is False:
         raise ValueError("Need to store pik for V-trace")
 
-    log_prob_pik = actor.get_pik_log_prob(data["actor_obs"], data["actions"])
-
     # n: rollout length, e: num envs
-    # TODO: Double check GePPO code and paper (they diverge imo)
+    n, e = data.shape
+    log_prob_pik = actor.get_pik_log_prob(data["actor_obs"], data["actions"])
     ratio = torch.exp(log_prob_pik - data["log_prob"])  # shape [n, e]
-
-    n, e = ratio.shape
-    ones_U = torch.triu(torch.ones((n, n)), 0).to(data.device)
-
     ratio_trunc = torch.clamp_max(ratio, is_trunc)  # [n, e]
-    ratio_trunc_T = ratio_trunc.transpose(0, 1)  # [e, n]
-    ratio_trunc_repeat = ratio_trunc_T.unsqueeze(-1).repeat(1, 1, n)  # [e, n, n]
-    ratio_trunc_L = torch.tril(ratio_trunc_repeat, -1)
-    # cumprod along axis 1, keep shape [e, n, n]
-    ratio_trunc_prods = torch.tril(torch.cumprod(ratio_trunc_L + ones_U, axis=1), 0)
 
-    # everything in data dict is [n, e]
-    values = critic.evaluate(data["critic_obs"])
-    values_next = critic.evaluate(data["next_critic_obs"])
-    not_done = ~data["dones"]
+    if rec:
+        # Recursive version
+        last_values = critic.evaluate(data["next_critic_obs"][-1])
+        advantages = torch.zeros_like(data["values"])
+        if last_values is not None:
+            # TODO: check this (copied from regular GAE)
+            # since we don't have obs for the last step, need last value plugged in
+            not_done = ~data["dones"][-1]
+            advantages[-1] = (
+                data["rewards"][-1]
+                + gamma * data["values"][-1] * data["timed_out"][-1]
+                + gamma * last_values * not_done
+                - data["values"][-1]
+            )
 
-    delta = data["rewards"] + gamma * values_next * not_done - values  # [n, e]
-    delta_T = delta.transpose(0, 1)  # [e, n]
-    delta_repeat = delta_T.unsqueeze(-1).repeat(1, 1, n)  # [e, n, n]
+        for k in reversed(range(data["values"].shape[0] - 1)):
+            not_done = ~data["dones"][k]
+            td_error = (
+                data["rewards"][k]
+                + gamma * data["values"][k] * data["timed_out"][k]
+                + gamma * data["values"][k + 1] * not_done
+                - data["values"][k]
+            )
+            advantages[k] = (
+                td_error + gamma * lam * not_done * ratio_trunc[k] * advantages[k + 1]
+            )
 
-    rate_L = torch.tril(torch.ones((n, n)) * gamma * lam, -1).to(data.device)  # [n, n]
-    rates = torch.tril(torch.cumprod(rate_L + ones_U, axis=0), 0)
-    rates_repeat = rates.unsqueeze(0).repeat(e, 1, 1)  # [e, n, n]
+        returns = advantages * ratio_trunc + data["values"]
 
-    # element-wise multiplication:
-    intermediate = rates_repeat * ratio_trunc_prods * delta_repeat  # [e, n, n]
-    advantages = torch.sum(intermediate, axis=1)  # [e, n]
+    else:
+        # GePPO paper version
+        ratio_trunc_T = ratio_trunc.transpose(0, 1)  # [e, n]
+        ratio_trunc_repeat = ratio_trunc_T.unsqueeze(-1).repeat(1, 1, n)  # [e, n, n]
+        ratio_trunc_L = torch.tril(ratio_trunc_repeat, -1)
+        ones_U = torch.triu(torch.ones((n, n)), 0).to(data.device)
 
-    advantages = advantages.transpose(0, 1)  # [n, e]
-    returns = advantages * ratio_trunc + values  # [n, e]
+        # cumprod along axis 1, keep shape [e, n, n]
+        ratio_trunc_prods = torch.tril(torch.cumprod(ratio_trunc_L + ones_U, axis=1), 0)
+
+        # everything in data dict is [n, e]
+        values = critic.evaluate(data["critic_obs"])
+        values_next = critic.evaluate(data["next_critic_obs"])
+        not_done = ~data["dones"]
+
+        delta = data["rewards"] + gamma * values_next * not_done - values  # [n, e]
+        delta_T = delta.transpose(0, 1)  # [e, n]
+        delta_repeat = delta_T.unsqueeze(-1).repeat(1, 1, n)  # [e, n, n]
+
+        rate_L = torch.tril(torch.ones((n, n)) * gamma * lam, -1).to(
+            data.device
+        )  # [n, n]
+        rates = torch.tril(torch.cumprod(rate_L + ones_U, axis=0), 0)
+        rates_repeat = rates.unsqueeze(0).repeat(e, 1, 1)  # [e, n, n]
+
+        # element-wise multiplication:
+        intermediate = rates_repeat * ratio_trunc_prods * delta_repeat  # [e, n, n]
+        advantages = torch.sum(intermediate, axis=1)  # [e, n]
+
+        advantages = advantages.transpose(0, 1)  # [n, e]
+        returns = advantages * ratio_trunc + values  # [n, e]
+
     return advantages, returns
 
 

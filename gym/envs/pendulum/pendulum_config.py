@@ -115,7 +115,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         storage_size = 2**17  # new
         batch_size = 2**16  #  new
         clip_param = 0.2
-        learning_rate = 1.0e-4
+        learning_rate = 3e-4
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
@@ -125,6 +125,9 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         desired_kl = 0.01
 
         # GePPO
+        vtrace = True
+        normalize_advantages = False  # weighted normalization in GePPO loss
+        recursive_advantages = True  # applies to vtrace
         is_trunc = 1.0
 
     class runner(FixedRobotCfgPPO.runner):

@@ -38,7 +38,13 @@ class HybridPolicyRunner(BaseRunner):
         # Store pik for the actor
         actor = Actor(num_actor_obs, num_actions, store_pik=True, **self.actor_cfg)
         critic = Critic(num_critic_obs, **self.critic_cfg)
-        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
+        self.alg = alg_class(
+            actor,
+            critic,
+            device=self.device,
+            num_steps_per_env=self.num_steps_per_env,  # GePPO needs this
+            **self.alg_cfg,
+        )
 
     def learn(self):
         self.set_up_logger()

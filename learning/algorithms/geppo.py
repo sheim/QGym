@@ -16,6 +16,10 @@ class GePPO(PPO2):
         self,
         actor,
         critic,
+        num_steps_per_env=32,
+        vtrace=True,
+        normalize_advantages=False,
+        recursive_advantages=True,
         is_trunc=1.0,
         eps_ppo=0.2,
         eps_geppo=0.1,
@@ -27,6 +31,12 @@ class GePPO(PPO2):
         **kwargs,
     ):
         super().__init__(actor, critic, **kwargs)
+        self.num_steps_per_env = num_steps_per_env
+
+        # GAE parameters
+        self.vtrace = vtrace
+        self.normalize_advantages = normalize_advantages
+        self.recursive_advantages = recursive_advantages
 
         # Importance sampling truncation
         self.is_trunc = is_trunc
@@ -52,11 +62,8 @@ class GePPO(PPO2):
         data["values"] = values
 
         # Compute GAE with and without V-trace
-        adv = compute_generalized_advantages(data, self.gamma, self.lam, self.critic)
-        ret = adv + values
-        adv_vtrace, ret_vtrace = compute_gae_vtrace(
-            data, self.gamma, self.lam, self.is_trunc, self.actor, self.critic
-        )
+        adv, ret = self.compute_gae_all(data, vtrace=False)
+        adv_vtrace, ret_vtrace = self.compute_gae_all(data, vtrace=True)
         # Handle single env case
         if adv_vtrace.dim() == 1:
             adv_vtrace = adv_vtrace.unsqueeze(-1)
@@ -64,7 +71,7 @@ class GePPO(PPO2):
             ret_vtrace = ret_vtrace.unsqueeze(-1)
 
         # Only use V-trace if we have updated once already
-        if self.updated:
+        if self.vtrace and self.updated:
             data["advantages"] = adv_vtrace
             data["returns"] = ret_vtrace
         else:
@@ -87,6 +94,35 @@ class GePPO(PPO2):
         self.ret_mean = ret.mean().item()
         self.adv_vtrace_mean = adv_vtrace.mean().item()
         self.ret_vtrace_mean = ret_vtrace.mean().item()
+
+    def compute_gae_all(self, data, vtrace):
+        # Compute GAE for each policy and concatenate
+        adv = torch.zeros_like(data["values"]).to(self.device)
+        ret = torch.zeros_like(data["values"]).to(self.device)
+        steps = self.num_steps_per_env
+        loaded_policies = data["values"].shape[0] // steps
+
+        for i in range(loaded_policies):
+            data_i = data[i * steps : (i + 1) * steps]
+            if vtrace:
+                adv_i, ret_i = compute_gae_vtrace(
+                    data_i,
+                    self.gamma,
+                    self.lam,
+                    self.is_trunc,
+                    self.actor,
+                    self.critic,
+                    rec=self.recursive_advantages,
+                )
+            else:
+                adv_i = compute_generalized_advantages(
+                    data_i, self.gamma, self.lam, self.critic
+                )
+                ret_i = adv_i + data_i["values"]
+            adv[i * steps : (i + 1) * steps] = adv_i
+            ret[i * steps : (i + 1) * steps] = ret_i
+
+        return adv, ret
 
     def update_critic(self, data):
         self.mean_value_loss = 0
@@ -134,22 +170,21 @@ class GePPO(PPO2):
             entropy_batch = self.actor.entropy
 
             # * GePPO Surrogate loss
+            log_prob = self.actor.get_actions_log_prob(batch["actions"])
             log_prob_pik = self.actor.get_pik_log_prob(
                 batch["actor_obs"], batch["actions"]
             )
-            offpol_ratio = torch.exp(log_prob_pik - batch["log_prob"])
-            advantages = batch["advantages"]
-
-            # TODO: Center/clip advantages (optional)
-            # adv_mean = torch.mean(
-            #     offpol_ratio * batch["weights"] * advantages, dim=2
-            # ) / torch.mean(offpol_ratio, batch["weights"], dim=2)
-            # adv_std = torch.std(
-            #     offpol_ratio * batch["weights"] * advantages, dim=2
-            # )
-
-            log_prob = self.actor.get_actions_log_prob(batch["actions"])
             ratio = torch.exp(log_prob - batch["log_prob"])
+            offpol_ratio = torch.exp(log_prob_pik - batch["log_prob"])
+
+            advantages = batch["advantages"]
+            if self.normalize_advantages:
+                adv_mean = torch.mean(
+                    offpol_ratio * batch["weights"] * advantages
+                ) / torch.mean(offpol_ratio * batch["weights"])
+                adv_std = torch.std(offpol_ratio * batch["weights"] * advantages)
+                advantages = (advantages - adv_mean) / (adv_std + 1e-8)
+
             surrogate = -torch.squeeze(advantages) * ratio
             surrogate_clipped = -torch.squeeze(advantages) * torch.clamp(
                 ratio, offpol_ratio - self.eps_geppo, offpol_ratio + self.eps_geppo

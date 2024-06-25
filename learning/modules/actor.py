@@ -82,6 +82,7 @@ class Actor(nn.Module):
 
     def get_pik_log_prob(self, observations, actions):
         if self._normalize_obs:
+            # TODO: Check if this updates the normalization mean/std
             with torch.no_grad():
                 observations = self.obs_rms(observations)
         mean_pik = self.NN_pik(observations)
