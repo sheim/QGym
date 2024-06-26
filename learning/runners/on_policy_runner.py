@@ -162,9 +162,25 @@ class OnPolicyRunner(BaseRunner):
         logger.register_category(
             "algorithm",
             self.alg,
-            ["learning_rate", "mean_value_loss", "mean_surrogate_loss"],
+            [
+                "learning_rate",
+                "mean_value_loss",
+                "mean_surrogate_loss",
+                "adv_mean",
+                "ret_mean",
+            ],
         )
-        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
+        logger.register_category(
+            "actor",
+            self.alg.actor,
+            [
+                "action_mean",
+                "action_std",
+                "entropy",
+                "obs_running_mean",
+                "obs_running_std",
+            ],
+        )
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 

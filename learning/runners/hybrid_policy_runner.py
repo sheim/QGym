@@ -143,13 +143,14 @@ class HybridPolicyRunner(BaseRunner):
             logger.toc("collection")
 
             # Compute GePPO weights
-            n_policies = min(self.it, self.num_old_policies)
-            weights_active = self.weights[:n_policies]
-            weights_active = weights_active * n_policies / weights_active.sum()
+            num_policies = storage.fill_count // self.num_steps_per_env
+            num_policies = min(num_policies, self.num_old_policies)
+            weights_active = self.weights[:num_policies]
+            weights_active = weights_active * num_policies / weights_active.sum()
             idx_newest = (self.it - 1) % self.num_old_policies
             indices_all = [
                 i % self.num_old_policies
-                for i in range(idx_newest, idx_newest - n_policies, -1)
+                for i in range(idx_newest, idx_newest - num_policies, -1)
             ]
             weights_all = weights_active[indices_all]
             weights_all = weights_all.repeat_interleave(self.num_steps_per_env)
@@ -208,21 +209,28 @@ class HybridPolicyRunner(BaseRunner):
         logger.register_category(
             "algorithm",
             self.alg,
-            ["learning_rate", "mean_value_loss", "mean_surrogate_loss"],
-        )
-        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
-
-        # GePPO specific logging
-        logger.register_category(
-            "GePPO",
-            self.alg,
             [
-                "eps_geppo",
-                "tv",
+                "learning_rate",
+                "mean_value_loss",
+                "mean_surrogate_loss",
                 "adv_mean",
                 "ret_mean",
+                # GePPO specific:
                 "adv_vtrace_mean",
                 "ret_vtrace_mean",
+                "eps_geppo",
+                "tv",
+            ],
+        )
+        logger.register_category(
+            "actor",
+            self.alg.actor,
+            [
+                "action_mean",
+                "action_std",
+                "entropy",
+                "obs_running_mean",
+                "obs_running_std",
             ],
         )
 
@@ -245,6 +253,8 @@ class HybridPolicyRunner(BaseRunner):
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
+        # Update pik NN weights
+        self.alg.actor.update_pik_weights()
         self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])

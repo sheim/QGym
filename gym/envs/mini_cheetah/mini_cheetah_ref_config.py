@@ -8,7 +8,7 @@ BASE_HEIGHT_REF = 0.33
 
 class MiniCheetahRefCfg(MiniCheetahCfg):
     class env(MiniCheetahCfg.env):
-        num_envs = 1024
+        num_envs = 1  # Fine tuning
         num_actuators = 12
         episode_length_s = 5.0
 
@@ -87,6 +87,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         disable_actions = False
 
         class noise:
+            noise_multiplier = 10.0  # Fine tuning: multiplies all noise
+
             scale = 1.0
             dof_pos_obs = 0.01
             base_ang_vel = 0.01
@@ -142,7 +144,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 2**15
+        batch_size = 500  # 2**15
         max_gradient_steps = 10
         # new
         storage_size = 2**17  # new
@@ -166,7 +168,11 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 50  # number of policy updates
         algorithm_class_name = "GePPO"
-        num_steps_per_env = 32  # deprecate
+        num_steps_per_env = 500  # deprecate
         num_old_policies = 4
+
+        # Fine tuning
+        resume = True
+        load_run = "rollout_32"  # pretrained PPO run

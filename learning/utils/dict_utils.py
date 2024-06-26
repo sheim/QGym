@@ -103,8 +103,10 @@ def compute_gae_vtrace(data, gamma, lam, is_trunc, actor, critic, rec=False):
         ratio_trunc_prods = torch.tril(torch.cumprod(ratio_trunc_L + ones_U, axis=1), 0)
 
         # everything in data dict is [n, e]
-        values = critic.evaluate(data["critic_obs"])
+        values = data["values"]
         values_next = critic.evaluate(data["next_critic_obs"])
+        if values_next.dim() == 1:
+            values_next = values_next.reshape((n, e))
         not_done = ~data["dones"]
 
         delta = data["rewards"] + gamma * values_next * not_done - values  # [n, e]

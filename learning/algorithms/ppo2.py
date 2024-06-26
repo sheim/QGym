@@ -68,6 +68,10 @@ class PPO2:
         )
         data["returns"] = data["advantages"] + data["values"]
 
+        # Logging: Store mean advantages and returns
+        self.adv_mean = data["advantages"].mean().item()
+        self.ret_mean = data["returns"].mean().item()
+
         self.update_critic(data)
         data["advantages"] = normalize(data["advantages"])
         self.update_actor(data)
