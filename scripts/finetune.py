@@ -134,6 +134,13 @@ def finetune(runner):
     # Perform a single update
     runner.learn()
 
+    # Compare old and new actions
+    scaling = torch.tensor([0.2, 0.3, 0.3], device=DEVICE).repeat(4)
+    actions_old = runner.data_dict["actions"]
+    actions_new = scaling * runner.alg.actor.act(runner.data_dict["actor_obs"])
+    diff = actions_new - actions_old
+    print("Mean action diff per actuator: ", diff.mean(dim=0))
+
     save_path = LOG_DIR + "finetuned_model.pth"
     runner.save(save_path)
 
