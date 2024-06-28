@@ -169,10 +169,10 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
         max_iterations = 50  # number of policy updates
-        algorithm_class_name = "GePPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 500  # deprecate
         num_old_policies = 4
 
         # Fine tuning
         resume = True
-        load_run = "rollout_32"  # pretrained PPO run
+        load_run = "ppo_rollout32"  # pretrained PPO run
