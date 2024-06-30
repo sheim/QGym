@@ -87,18 +87,8 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
-def plot_binned_errors(
-    data,
-    fn,
-    lb=0,
-    ub=500,
-    step=20,
-    tick_step=5,
-    title_add_on="",
-    extension="pdf",
-    include_text=True,
-):
-    props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
+def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", include_text=True):
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
     print("num cols", num_cols)
     fig, axes = plt.subplots(
@@ -234,7 +224,7 @@ def plot_dim_sweep_mean_std(
     trial_num,
     title,
     step=5,
-    extension="pdf",
+    extension="png"
 ):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(22, 15))
 
@@ -537,15 +527,7 @@ def plot_pendulum_multiple_critics_w_data(
 
 
 def plot_rosenbrock_multiple_critics_w_data(
-    x,
-    predictions,
-    targets,
-    title,
-    fn,
-    data,
-    grid_size=64,
-    extension="pdf",
-    data_title="Test Data Distribution",
+    x, predictions, targets, title, fn, data, grid_size=64, extension="png", data_title="Test Data Distribution", log_norm=True
 ):
     num_critics = len(x.keys())
     fig, axes = plt.subplots(
@@ -572,20 +554,18 @@ def plot_rosenbrock_multiple_critics_w_data(
         np_error = np_predictions - np_targets
         global_min_error = min(global_min_error, np.min(np_error))
         global_max_error = max(global_max_error, np.max(np_error))
-        global_min_prediction = min(global_min_prediction, np.min(np_predictions))
-        global_max_prediction = max(global_max_prediction, np.max(np_predictions))
-    error_norm = mcolors.TwoSlopeNorm(
+        global_min_prediction = np.min(np_targets)
+        global_max_prediction = np.max(np_targets)
+        print("global min prediction", global_min_prediction, "global max prediction", global_max_prediction)
+    
+    
+    error_norm = mcolors.LogNorm() if log_norm else mcolors.TwoSlopeNorm(
         vmin=global_min_error, vcenter=0, vmax=global_max_error
     )
-    prediction_norm = mcolors.CenteredNorm(
-        vcenter=(global_max_prediction + global_min_prediction) / 2,
-        halfrange=(global_max_prediction - global_min_prediction) / 2,
-    )
-    # error_norm = mcolors.LogNorm()
-    # prediction_norm = mcolors.LogNorm(
-    #     vmin=global_min_prediction, vmax=global_max_prediction
-    # )
-
+    pred_vcenter = (global_max_prediction + global_min_prediction) / 2
+    pred_halfrange = (global_max_prediction - global_min_prediction) / 2
+    prediction_norm = mcolors.SymLogNorm(linthresh=0.01, linscale=0.01, vmin=pred_vcenter - pred_halfrange, vmax=pred_vcenter + pred_halfrange) if log_norm else mcolors.CenteredNorm(vcenter=pred_vcenter, halfrange=pred_halfrange)
+    
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
         # rescale (hack), value shardcoded from pendulum_config
@@ -1207,9 +1187,7 @@ def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
 
 
-def plot_learning_progress(
-    test_error, title, fn="test_error", smoothing_window=30, extension="pdf"
-):
+def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=30, extension="png"):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     for name, error in test_error.items():

@@ -66,7 +66,7 @@ max_gradient_steps = 1000 #200
 batch_size = 128
 
 all_graphing_names = ["Rosenbrock"] + critic_names.copy()
-training_percentages = [0.005, 0.01, 0.2]
+training_percentages = [0.2, 0.4, 0.6] #[0.005, 0.01, 0.2]
 graphing_data = generate_rosenbrock_g_data_dict(all_graphing_names, training_percentages)
 
 test_error = {percent: {name: [] for name in critic_names} for percent in training_percentages}
@@ -99,6 +99,10 @@ for percent in training_percentages:
             if "critic_name" in params.keys():
                 params.update(critic_params[params["critic_name"]])
             params["num_obs"] = n_dims
+            # maintain full row rank and dim(A) = num_obs
+            if name == "DenseSpectralLatent":
+                params["relative_dim"] = n_dims
+                params["latent_dim"] = n_dims
 
             critic_class = globals()[name]
             critic = critic_class(**params).to(DEVICE)
@@ -185,7 +189,7 @@ if n_dims == 2:
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,
             extension="png",
-            data_title="Train"
+            data_title="Test"
         )
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "data_rosenbrock.py")
