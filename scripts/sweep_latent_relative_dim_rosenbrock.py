@@ -108,29 +108,7 @@ for trial in range(num_trials):
             )
 
             for iteration in range(iter_offset, tot_iter, iter_step):
-                # base_data = torch.load(
-                #     os.path.join(log_dir, "data_{}.pt".format(500))
-                # ).to(DEVICE)
-                # compute ground-truth
-                # episode_rollouts = compute_MC_returns(base_data, gamma)
-                # print(f"Initializing value offset to: {episode_rollouts.mean().item()}")
-
                 print("")
-                # if hasattr(test_critics[name], "value_offset"):
-                # with torch.no_grad():
-                #     critic.value_offset.copy_(episode_rollouts.mean())
-
-                # data = base_data.detach().clone()
-                # # train new critic
-                # data["values"] = critic.evaluate(data["critic_obs"])
-                # try:
-                #     data["advantages"] = compute_generalized_advantages(
-                #         data, gamma, lam, critic
-                #     )
-                # except:
-                #     print("relative dim", rel_dim, "latent_dim", lat_dim)
-                # data["returns"] = data["advantages"] + data["values"]
-
                 mean_value_loss = 0
                 counter = 0
 
@@ -140,9 +118,6 @@ for trial in range(num_trials):
                     max_gradient_steps=max_gradient_steps,
                 )
                 for batch in generator:
-                    # print("batch['critic_obs'].squeeze()",  batch["critic_obs"].squeeze().shape)
-                    # print("batch['returns'].squeeze()", batch["returns"].shape)
-                    # exit()
                     value_loss = critic.loss_fn(
                         batch["critic_obs"].squeeze(), batch["returns"].squeeze()
                     )
@@ -162,11 +137,6 @@ for trial in range(num_trials):
                 print(f"{name} average error: ", actual_error.mean().item())
                 print(f"{name} max error: ", actual_error.max().item())
                 mean_value_loss /= counter
-                # episode_rollouts = compute_MC_returns(data, gamma)
-                # with torch.no_grad():
-                #     actual_error = (
-                #         critic.evaluate(data["critic_obs"][0]) - episode_rollouts[0]
-                #     ).pow(2)
             mean_actual_error = actual_error.mean().item()
             max_actual_error = actual_error.max().item()
             graphing_data[trial, i, j, 0] = mean_actual_error

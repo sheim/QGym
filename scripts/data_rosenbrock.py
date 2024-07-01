@@ -68,7 +68,7 @@ num_trials = 3
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 1000 #200
+max_gradient_steps = 200
 # max_grad_norm = 1.0
 batch_size = 128
 
@@ -95,6 +95,7 @@ data = TensorDict(
 )
 
 for trial in range(num_trials):
+    test_error = {percent: {name: [] for name in critic_names} for percent in training_percentages}
     for percent in training_percentages:
         n_training_data = int(percent * total_data)
         train_idx = rand_perm[0:n_training_data]

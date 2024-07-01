@@ -124,9 +124,11 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                     bincount_by_row[jx, ...] = np.bincount(row, minlength=num_bins)
                 # print out mean error binned and std deviation of error binning across trials
                 print(f"************{critic} at {param}****************")
-                print(bin_labels)
-                print(bincount)
-                print(bincount_by_row.std(axis=0))
+                print("Bins", bins)
+                print(np.vstack((bincount, bincount_by_row.std(axis=0))))
+                # print(bin_labels)
+                # print(bincount)
+                # print(bincount_by_row.std(axis=0))
 
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
@@ -437,6 +439,7 @@ def plot_pendulum_multiple_critics_w_data(
         # rescale (hack), value shardcoded from pendulum_config
         np_x[:, 0] = np_x[:, 0] * 2 * np.pi
         np_x[:, 1] = np_x[:, 1] * 5
+
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
         np_targets = (
             targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
@@ -564,7 +567,6 @@ def plot_rosenbrock_multiple_critics_w_data(
     
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
-        # rescale (hack), value shardcoded from pendulum_config
         np_x[:, 0] = np_x[:, 0]
         np_x[:, 1] = np_x[:, 1]
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
