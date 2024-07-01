@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib.colors import CenteredNorm, ListedColormap
 import matplotlib as mpl
 import matplotlib.colors as mcolors
+from tabulate import tabulate
 
 matplotlib.rcParams["pdf.fonttype"] = 42
 matplotlib.rcParams["ps.fonttype"] = 42
@@ -87,7 +88,7 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
-def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", include_text=True):
+def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", include_text=True, multi_trial=False):
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
     print("num cols", num_cols)
@@ -97,15 +98,12 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
     fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
     colors = dict(
         zip(
-            [lr for lr in data.keys()],
+            [param for param in data.keys()],
             ["red", "green", "blue", "purple", "orange"][:num_cols],
         )
     )
-    for lr in data.keys():
-        # bins = np.linspace(0.0, 1.5, 50)
-        # bins = np.linspace(0.0, 20, 40)
+    for param in data.keys():
         bins = np.arange(lb, ub, step)
-        # bins = np.linspace(lb, ub, (ub-lb)//step)
         bin_labels = [
             "<" + str(np.round(bins[ix], decimals=1))
             for ix in range(0, len(bins), tick_step)
@@ -113,10 +111,20 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
         y_min = float("inf")
         y_max = -float("inf")
 
-        for ix, critic in enumerate(data[lr]["critic_obs"].keys()):
-            critic_data = data[lr]["error"][critic].squeeze().detach().cpu().numpy()
+        for ix, critic in enumerate(data[param]["critic_obs"].keys()):
+            critic_data = data[param]["error"][critic].squeeze().detach().cpu().numpy()
             digitized = np.digitize(critic_data, bins)
-            bincount = np.bincount(digitized)
+            max_digi = np.max(digitized).item()
+            bincount = np.bincount(digitized.mean(axis=0).astype(int), minlength=(max_digi+1))
+
+            if multi_trial:
+                bincount_by_row = np.zeros((digitized.shape[0], max_digi+1))
+                for ix, row in enumerate(digitized):
+                    bincount_by_row[ix, ...] = np.bincount(row, minlength=(max_digi+1))
+                print(bin_labels)
+                print(bincount)
+                print(bincount_by_row.std(axis=0))
+                print("****************************")
 
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
@@ -126,13 +134,13 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                 axes[ix].bar(
                     np.arange(len(bincount)),
                     bincount,
-                    color=colors[lr],
+                    color=colors[param],
                     alpha=0.5,
-                    label=str(lr),
+                    label=str(param),
                 )
             else:
                 axes[ix].bar(
-                    np.arange(len(bincount)), bincount, color=colors[lr], alpha=0.5
+                    np.arange(len(bincount)), bincount, color=colors[param], alpha=0.5
                 )
             axes[ix].set_title(critic, fontsize=22)
             x_ticks = np.arange(0, len(bins), tick_step)
@@ -141,9 +149,9 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                 -min((tick_step / 2.0), 2.0),
                 min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
             )
-            if lr > 1e-4 and include_text:
+            if param > 1e-4 and include_text:
                 predictions = (
-                    data[lr]["values"][critic].squeeze().detach().cpu().numpy()
+                    data[param]["values"][critic].squeeze().detach().cpu().numpy()
                 )
                 axes[ix].text(
                     0.4,
@@ -154,7 +162,7 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                     verticalalignment="top",
                     bbox=props,
                 )
-        for ix, critic in enumerate(data[lr].keys()):
+        for ix, critic in enumerate(data[param].keys()):
             axes[ix].set_ylim(y_min, y_max)
     fig.legend(loc=" outside upper right", fontsize=18)
     plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
@@ -555,9 +563,7 @@ def plot_rosenbrock_multiple_critics_w_data(
         global_min_error = min(global_min_error, np.min(np_error))
         global_max_error = max(global_max_error, np.max(np_error))
         global_min_prediction = np.min(np_targets)
-        global_max_prediction = np.max(np_targets)
-        print("global min prediction", global_min_prediction, "global max prediction", global_max_prediction)
-    
+        global_max_prediction = np.max(np_targets)    
     
     error_norm = mcolors.LogNorm() if log_norm else mcolors.TwoSlopeNorm(
         vmin=global_min_error, vcenter=0, vmax=global_max_error
