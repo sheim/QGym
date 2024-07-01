@@ -64,7 +64,7 @@ n_validation_data = total_data - ideal_training_data
 
 
 # set up training
-num_trials = 2
+num_trials = 3
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
@@ -84,9 +84,9 @@ for g_data in graphing_data.values():
     g_data["returns"]["Rosenbrock"] = target
     g_data["error"]["Rosenbrock"] = torch.zeros_like(target)
 
-# errors
-g_data_no_ground_truth = generate_rosenbrock_g_data_dict(critic_names, training_percentages)
-error_per_trial = torch.zeros(num_trials, *test_idx.shape)
+for g_data in graphing_data.values():
+    for name in critic_names:
+        g_data["error"][name] = torch.zeros(num_trials, *test_idx.shape)
 
 data = TensorDict(
     {"critic_obs": x.unsqueeze(dim=0), "returns": target.unsqueeze(dim=0)},
@@ -147,32 +147,30 @@ for trial in range(num_trials):
 
                 
                 with torch.no_grad():
-                    graphing_data[percent]["error"][name] = actual_error
                     graphing_data[percent]["critic_obs"][name] = data[0, :]["critic_obs"]
                     graphing_data[percent]["values"][name] = critic.evaluate(
                         data[0, :]["critic_obs"]
                     )
                     graphing_data[percent]["returns"][name] = data[0, :]["returns"]
-                    # multi trial
-                    error_per_trial[trial, ...] = graphing_data[percent]["error"][name]
+                    graphing_data[percent]["error"][name][trial, ...] = actual_error
 
 # compare new and old critics
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
+g_data_no_ground_truth = generate_rosenbrock_g_data_dict(critic_names, training_percentages)
 
 for percent, value in graphing_data.items():
     for name in all_graphing_names:
         if name == "Rosenbrock":
             continue
-        g_data_no_ground_truth[percent]["error"][name] = error_per_trial
+        g_data_no_ground_truth[percent]["error"][name] = graphing_data[percent]["error"][name]
 
 plot_binned_errors(g_data_no_ground_truth,
                     save_path + f"/rosenbrock",
-                    title_add_on=f"{n_dims}D Rosenbrock Function Trained With Different Fractions of Total Data",
+                    title_add_on=f"{n_dims}D Rosenbrock Function Trained With Different Fractions of Total Data \n Averaged Across {num_trials} Trials",
                     extension="png",
-                    include_text=False,
                     multi_trial=True)
 
 # plots

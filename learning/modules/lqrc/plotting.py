@@ -88,10 +88,10 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
-def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", include_text=True, multi_trial=False):
+def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", multi_trial=False):
+    # set up figure metadata
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
-    print("num cols", num_cols)
     fig, axes = plt.subplots(
         nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained"
     )
@@ -102,6 +102,7 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
             ["red", "green", "blue", "purple", "orange"][:num_cols],
         )
     )
+    # iterate over the parameter that varies across runs (i.e. learning rate, percentage of training data used, etc.)
     for param in data.keys():
         bins = np.arange(lb, ub, step)
         bin_labels = [
@@ -113,18 +114,19 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
 
         for ix, critic in enumerate(data[param]["critic_obs"].keys()):
             critic_data = data[param]["error"][critic].squeeze().detach().cpu().numpy()
-            digitized = np.digitize(critic_data, bins)
-            max_digi = np.max(digitized).item()
-            bincount = np.bincount(digitized.mean(axis=0).astype(int), minlength=(max_digi+1))
+            num_bins = bins.shape[0] + 1
+            bincount = np.bincount(np.digitize(critic_data.mean(axis=0), bins), minlength=num_bins)
 
             if multi_trial:
-                bincount_by_row = np.zeros((digitized.shape[0], max_digi+1))
-                for ix, row in enumerate(digitized):
-                    bincount_by_row[ix, ...] = np.bincount(row, minlength=(max_digi+1))
+                digitized = np.digitize(critic_data, bins)
+                bincount_by_row = np.zeros((digitized.shape[0], num_bins))
+                for jx, row in enumerate(digitized):
+                    bincount_by_row[jx, ...] = np.bincount(row, minlength=num_bins)
+                # print out mean error binned and std deviation of error binning across trials
+                print(f"************{critic} at {param}****************")
                 print(bin_labels)
                 print(bincount)
                 print(bincount_by_row.std(axis=0))
-                print("****************************")
 
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
@@ -142,6 +144,7 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                 axes[ix].bar(
                     np.arange(len(bincount)), bincount, color=colors[param], alpha=0.5
                 )
+            # axes formatting
             axes[ix].set_title(critic, fontsize=22)
             x_ticks = np.arange(0, len(bins), tick_step)
             axes[ix].set_xticks(x_ticks, labels=bin_labels)
@@ -149,19 +152,6 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                 -min((tick_step / 2.0), 2.0),
                 min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
             )
-            if param > 1e-4 and include_text:
-                predictions = (
-                    data[param]["values"][critic].squeeze().detach().cpu().numpy()
-                )
-                axes[ix].text(
-                    0.4,
-                    0.95,
-                    generate_statistics_str(predictions, r"0.001 Learning Rate"),
-                    transform=axes[ix].transAxes,
-                    fontsize=22,
-                    verticalalignment="top",
-                    bbox=props,
-                )
         for ix, critic in enumerate(data[param].keys()):
             axes[ix].set_ylim(y_min, y_max)
     fig.legend(loc=" outside upper right", fontsize=18)
