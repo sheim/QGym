@@ -399,9 +399,6 @@ class FixedRobot(BaseTask):
         self.default_act_pos = self.default_act_pos.unsqueeze(0)
         # * store indices of actuated joints
         self.act_idx = to_torch(actuated_idx, dtype=torch.long, device=self.device)
-        # * check that init range highs and lows are consistent
-        # * and repopulate to match
-        # if self.cfg.init_state.reset_mode == "reset_to_range":
         self.initialize_ranges_for_initial_conditions()
 
     def initialize_ranges_for_initial_conditions(self):

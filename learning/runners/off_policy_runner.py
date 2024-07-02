@@ -70,15 +70,10 @@ class OffPolicyRunner(BaseRunner):
                 "timed_out": self.get_timed_out(),
                 "terminated": self.get_terminated(),
                 "dones": self.get_timed_out() | self.get_terminated(),
+                "dof_pos": self.env.dof_pos,
+                "dof_vel": self.env.dof_vel,
             }
         )
-        if self.log_storage:
-            transition.update(
-                {
-                    "dof_pos": self.env.dof_pos,
-                    "dof_vel": self.env.dof_vel,
-                }
-            )
         storage.initialize(
             transition,
             self.env.num_envs,
@@ -100,6 +95,8 @@ class OffPolicyRunner(BaseRunner):
                         "actor_obs": actor_obs,
                         "actions": actions,
                         "critic_obs": critic_obs,
+                        "dof_pos": self.env.dof_pos,
+                        "dof_vel": self.env.dof_vel,
                     }
                 )
 
@@ -128,13 +125,7 @@ class OffPolicyRunner(BaseRunner):
                         "dones": dones,
                     }
                 )
-                if self.log_storage:
-                    transition.update(
-                        {
-                            "dof_pos": self.env.dof_pos,
-                            "dof_vel": self.env.dof_vel,
-                        }
-                    )
+
                 storage.add_transitions(transition)
                 # print every 10% of initial fill
                 if (self.alg_cfg["initial_fill"] > 10) and (
@@ -161,6 +152,8 @@ class OffPolicyRunner(BaseRunner):
                             "actor_obs": actor_obs,
                             "actions": actions,
                             "critic_obs": critic_obs,
+                            "dof_pos": self.env.dof_pos,
+                            "dof_vel": self.env.dof_vel,
                         }
                     )
 
@@ -188,13 +181,6 @@ class OffPolicyRunner(BaseRunner):
                             "dones": dones,
                         }
                     )
-                    if self.log_storage:
-                        transition.update(
-                            {
-                                "dof_pos": self.env.dof_pos,
-                                "dof_vel": self.env.dof_vel,
-                            }
-                        )
                     storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
