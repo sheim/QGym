@@ -41,12 +41,8 @@ class RunningMeanStd(nn.Module):
     def forward(self, input):
         if self.training:
             # TODO: check this, it got rid of NaN values in first iteration
-            dim = tuple(range(input.dim() - 1))
-            mean = input.mean(dim)
-            if input.dim() <= 2:
-                var = torch.zeros_like(mean)
-            else:
-                var = input.var(dim)
+            mean = input.mean(tuple(range(input.dim() - 1)))
+            var = torch.nan_to_num(input.var(tuple(range(input.dim() - 1))))
             (
                 self.running_mean,
                 self.running_var,

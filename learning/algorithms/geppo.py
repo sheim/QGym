@@ -55,20 +55,11 @@ class GePPO(PPO2):
         self.updated = False
 
     def update(self, data, weights):
-        values = self.critic.evaluate(data["critic_obs"])
-        # Handle single env case
-        if values.dim() == 1:
-            values = values.unsqueeze(-1)
-        data["values"] = values
+        data["values"] = self.critic.evaluate(data["critic_obs"])
 
         # Compute GAE with and without V-trace
         adv, ret = self.compute_gae_all(data, vtrace=False)
         adv_vtrace, ret_vtrace = self.compute_gae_all(data, vtrace=True)
-        # Handle single env case
-        if adv_vtrace.dim() == 1:
-            adv_vtrace = adv_vtrace.unsqueeze(-1)
-        if ret_vtrace.dim() == 1:
-            ret_vtrace = ret_vtrace.unsqueeze(-1)
 
         # Only use V-trace if we have updated once already
         if self.vtrace and self.updated:
