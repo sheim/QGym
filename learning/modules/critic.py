@@ -24,10 +24,14 @@ class Critic(nn.Module):
         if self._normalize_obs:
             with torch.no_grad():
                 x = self.obs_rms(x)
-        return self.NN(x).squeeze()
+        return self.NN(x).squeeze(-1)
 
     def evaluate(self, critic_observations):
         return self.forward(critic_observations)
 
-    def loss_fn(self, obs, target):
-        return nn.functional.mse_loss(self.forward(obs), target, reduction="mean")
+    def loss_fn(self, obs, target, weights=None):
+        if weights is None:
+            return nn.functional.mse_loss(self.forward(obs), target, reduction="mean")
+
+        # Compute MSE loss with weights
+        return (weights * (self.forward(obs) - target).pow(2)).mean()

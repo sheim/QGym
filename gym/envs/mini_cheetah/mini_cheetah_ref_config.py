@@ -8,7 +8,7 @@ BASE_HEIGHT_REF = 0.33
 
 class MiniCheetahRefCfg(MiniCheetahCfg):
     class env(MiniCheetahCfg.env):
-        num_envs = 4096
+        num_envs = 1  # Fine tuning
         num_actuators = 12
         episode_length_s = 5.0
 
@@ -67,7 +67,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "HybridPolicyRunner"
 
     class actor:
         hidden_dims = [256, 256, 128]
@@ -87,6 +87,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         disable_actions = False
 
         class noise:
+            noise_multiplier = 10.0  # Fine tuning: multiplies all noise
+
             scale = 1.0
             dof_pos_obs = 0.01
             base_ang_vel = 0.01
@@ -138,11 +140,39 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 termination = 0.15
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        pass
+        # both
+        gamma = 0.99
+        lam = 0.95
+        # shared
+        batch_size = 500  # 2**15
+        max_gradient_steps = 10
+        # new
+        storage_size = 2**17  # new
+
+        clip_param = 0.2
+        learning_rate = 1.0e-3
+        max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+
+        # GePPO
+        vtrace = True
+        normalize_advantages = False  # weighted normalization in GePPO loss
+        recursive_advantages = True  # applies to vtrace
+        is_trunc = 1.0
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO2"
-        num_steps_per_env = 32  # deprecate
+        max_iterations = 50  # number of policy updates
+        algorithm_class_name = "GePPO"
+        num_steps_per_env = 500  # deprecate
+        num_old_policies = 4
+
+        # Fine tuning
+        resume = True
+        load_run = "rollout_32"  # pretrained PPO run

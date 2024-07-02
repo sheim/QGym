@@ -59,7 +59,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "HybridPolicyRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -115,7 +115,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         storage_size = 2**17  # new
         batch_size = 2**16  #  new
         clip_param = 0.2
-        learning_rate = 1.0e-4
+        learning_rate = 3e-4
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
@@ -124,9 +124,16 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         schedule = "fixed"  # could be adaptive, fixed
         desired_kl = 0.01
 
+        # GePPO
+        vtrace = True
+        normalize_advantages = False  # weighted normalization in GePPO loss
+        recursive_advantages = True  # applies to vtrace
+        is_trunc = 1.0
+
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 200  # number of policy updates
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "GePPO"
         num_steps_per_env = 32
+        num_old_policies = 4

@@ -49,6 +49,8 @@ class BaseRunner:
                 noise_tensor = torch.ones(obs_size).to(self.device) * torch.tensor(
                     noise_dict[obs]
                 ).to(self.device)
+                if "noise_multiplier" in noise_dict.keys():
+                    noise_tensor *= noise_dict["noise_multiplier"]
                 if obs in self.env.scales.keys():
                     noise_tensor /= self.env.scales[obs]
                 noise_vec[obs_index : obs_index + obs_size] = noise_tensor

@@ -3,6 +3,20 @@ import os
 import copy
 
 
+class StaticNN:
+    """
+    A static neural network wrapper that is used just for inference.
+    """
+
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, x):
+        model = self.model.to(x.device)
+        with torch.no_grad():
+            return model(x)
+
+
 def create_MLP(num_inputs, num_outputs, hidden_dims, activation, dropouts=None):
     activation = get_activation(activation)
 

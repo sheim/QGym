@@ -5,13 +5,15 @@ from tensordict import TensorDict
 from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
-from learning.storage import DictStorage
+from learning.modules import Actor, Critic
+from learning.storage import ReplayBuffer
+from learning.algorithms import GePPO
 
 logger = Logger()
-storage = DictStorage()
+storage = ReplayBuffer()
 
 
-class OnPolicyRunner(BaseRunner):
+class HybridPolicyRunner(BaseRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
@@ -19,6 +21,29 @@ class OnPolicyRunner(BaseRunner):
             self.env.dt,
             self.cfg["max_iterations"],
             self.device,
+        )
+
+        # TODO: Weights hardcoded for 4 policies
+        self.num_old_policies = self.cfg["num_old_policies"]
+        self.weights = torch.tensor([0.4, 0.3, 0.2, 0.1]).to(self.device)
+
+    def _set_up_alg(self):
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        if alg_class != GePPO:
+            raise ValueError("HybridPolicyRunner only supports GePPO")
+
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
+        # Store pik for the actor
+        actor = Actor(num_actor_obs, num_actions, store_pik=True, **self.actor_cfg)
+        critic = Critic(num_critic_obs, **self.critic_cfg)
+        self.alg = alg_class(
+            actor,
+            critic,
+            device=self.device,
+            num_steps_per_env=self.num_steps_per_env,  # GePPO needs this
+            **self.alg_cfg,
         )
 
     def learn(self):
@@ -45,10 +70,11 @@ class OnPolicyRunner(BaseRunner):
                 "dones": self.get_timed_out(),
             }
         )
+        max_storage = self.env.num_envs * self.num_steps_per_env * self.num_old_policies
         storage.initialize(
-            transition,
-            self.env.num_envs,
-            self.env.num_envs * self.num_steps_per_env,
+            dummy_dict=transition,
+            num_envs=self.env.num_envs,
+            max_storage=max_storage,
             device=self.device,
         )
 
@@ -69,12 +95,19 @@ class OnPolicyRunner(BaseRunner):
                         actions,
                         self.actor_cfg["disable_actions"],
                     )
+                    # Store additional data for GePPO
+                    log_prob = self.alg.actor.get_actions_log_prob(actions)
+                    action_mean = self.alg.actor.action_mean
+                    action_std = self.alg.actor.action_std
 
                     transition.update(
                         {
                             "actor_obs": actor_obs,
                             "actions": actions,
                             "critic_obs": critic_obs,
+                            "log_prob": log_prob,
+                            "action_mean": action_mean,
+                            "action_std": action_std,
                         }
                     )
 
@@ -109,9 +142,23 @@ class OnPolicyRunner(BaseRunner):
                     logger.finish_step(dones)
             logger.toc("collection")
 
+            # Compute GePPO weights
+            num_policies = storage.fill_count // self.num_steps_per_env
+            num_policies = min(num_policies, self.num_old_policies)
+            weights_active = self.weights[:num_policies]
+            weights_active = weights_active * num_policies / weights_active.sum()
+            idx_newest = (self.it - 1) % self.num_old_policies
+            indices_all = [
+                i % self.num_old_policies
+                for i in range(idx_newest, idx_newest - num_policies, -1)
+            ]
+            weights_all = weights_active[indices_all]
+            weights_all = weights_all.repeat_interleave(self.num_steps_per_env)
+            weights_all = weights_all.unsqueeze(-1).repeat(1, self.env.num_envs)
+
+            # Update GePPO with weights
             logger.tic("learning")
-            self.alg.update(storage.data)
-            storage.clear()
+            self.alg.update(storage.get_data(), weights=weights_all)
             logger.toc("learning")
             logger.log_all_categories()
 
@@ -168,6 +215,11 @@ class OnPolicyRunner(BaseRunner):
                 "mean_surrogate_loss",
                 "adv_mean",
                 "ret_mean",
+                # GePPO specific:
+                "adv_vtrace_mean",
+                "ret_vtrace_mean",
+                "eps_geppo",
+                "tv",
             ],
         )
         logger.register_category(
@@ -201,6 +253,8 @@ class OnPolicyRunner(BaseRunner):
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
+        # Update pik NN weights
+        self.alg.actor.update_pik_weights()
         self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
