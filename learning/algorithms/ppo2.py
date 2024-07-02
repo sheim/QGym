@@ -58,11 +58,7 @@ class PPO2:
         return self.actor.act(obs).detach()
 
     def update(self, data):
-        values = self.critic.evaluate(data["critic_obs"])
-        # Handle single env case
-        if values.dim() == 1:
-            values = values.unsqueeze(-1)
-        data["values"] = values
+        data["values"] = self.critic.evaluate(data["critic_obs"])
         data["advantages"] = compute_generalized_advantages(
             data, self.gamma, self.lam, self.critic
         )
