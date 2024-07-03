@@ -8,7 +8,7 @@ BASE_HEIGHT_REF = 0.33
 
 class MiniCheetahRefCfg(MiniCheetahCfg):
     class env(MiniCheetahCfg.env):
-        num_envs = 1  # Fine tuning
+        num_envs = 4096
         num_actuators = 12
         episode_length_s = 5.0
 
@@ -67,7 +67,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "HybridPolicyRunner"
+    runner_class_name = "IPGRunner"
 
     class actor:
         hidden_dims = [256, 256, 128]
@@ -144,10 +144,10 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 500  # 2**15
+        batch_size = 2**15
         max_gradient_steps = 10
         # new
-        storage_size = 2**17  # new
+        storage_size = 4 * 32 * 4096  # policies * steps * envs
 
         clip_param = 0.2
         learning_rate = 1.0e-3
@@ -165,14 +165,20 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         recursive_advantages = True  # applies to vtrace
         is_trunc = 1.0
 
+        # IPG
+        polyak = 0.995
+        use_cv = False  # control variate
+        inter_nu = 0.2
+        beta = "off_policy"
+
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 50  # number of policy updates
-        algorithm_class_name = "GePPO"
-        num_steps_per_env = 500  # deprecate
+        max_iterations = 500  # number of policy updates
+        algorithm_class_name = "PPO_IPG"
+        num_steps_per_env = 32  # deprecate
         num_old_policies = 4
 
         # Fine tuning
-        resume = True
-        load_run = "rollout_32"  # pretrained PPO run
+        resume = False
+        # load_run = "ppo_rollout32"  # pretrained PPO run

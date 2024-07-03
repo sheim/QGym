@@ -35,3 +35,4 @@ from .my_runner import MyRunner
 from .old_policy_runner import OldPolicyRunner
 from .off_policy_runner import OffPolicyRunner
 from .hybrid_policy_runner import HybridPolicyRunner
+from .ipg_runner import IPGRunner

@@ -59,7 +59,7 @@ class PendulumCfg(FixedRobotCfg):
 
 class PendulumRunnerCfg(FixedRobotCfgPPO):
     seed = -1
-    runner_class_name = "HybridPolicyRunner"
+    runner_class_name = "IPGRunner"
 
     class actor:
         hidden_dims = [128, 64, 32]
@@ -112,7 +112,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         # shared
         max_gradient_steps = 24
         # new
-        storage_size = 2**17  # new
+        storage_size = 4 * 32 * 4096  # policies * steps * envs
         batch_size = 2**16  #  new
         clip_param = 0.2
         learning_rate = 3e-4
@@ -130,10 +130,16 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         recursive_advantages = True  # applies to vtrace
         is_trunc = 1.0
 
+        # IPG
+        polyak = 0.995
+        use_cv = False  # control variate
+        inter_nu = 0.2
+        beta = "off_policy"
+
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 200  # number of policy updates
-        algorithm_class_name = "GePPO"
+        algorithm_class_name = "PPO_IPG"
         num_steps_per_env = 32
         num_old_policies = 4

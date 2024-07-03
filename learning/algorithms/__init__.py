@@ -33,5 +33,6 @@
 from .ppo import PPO
 from .ppo2 import PPO2
 from .geppo import GePPO
+from .ppo_ipg import PPO_IPG
 from .SE import StateEstimator
 from .sac import SAC
