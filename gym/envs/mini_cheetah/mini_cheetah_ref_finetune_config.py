@@ -1,71 +1,54 @@
-from gym.envs.mini_cheetah.mini_cheetah_config import (
-    MiniCheetahCfg,
-    MiniCheetahRunnerCfg,
+from gym.envs.mini_cheetah.mini_cheetah_ref_config import (
+    MiniCheetahRefCfg,
+    MiniCheetahRefRunnerCfg,
 )
 
 BASE_HEIGHT_REF = 0.33
 
 
-class MiniCheetahRefCfg(MiniCheetahCfg):
-    class env(MiniCheetahCfg.env):
-        num_envs = 4096
+class MiniCheetahRefFinetuneCfg(MiniCheetahRefCfg):
+    class env(MiniCheetahRefCfg.env):
+        num_envs = 1
         num_actuators = 12
-        episode_length_s = 5.0
+        episode_length_s = 20.0
 
-    class terrain(MiniCheetahCfg.terrain):
+    class terrain(MiniCheetahRefCfg.terrain):
         pass
 
-    class init_state(MiniCheetahCfg.init_state):
-        ref_traj = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
-            + "mini_cheetah/trajectories/single_leg.csv"
-        )
+    class init_state(MiniCheetahRefCfg.init_state):
+        pass
 
-    class control(MiniCheetahCfg.control):
+    class control(MiniCheetahRefCfg.control):
         # * PD Drive parameters:
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
         gait_freq = 3.0
-        ctrl_frequency = 100
+        ctrl_frequency = 50
         desired_sim_frequency = 500
 
-    class commands(MiniCheetahCfg.commands):
+    class commands(MiniCheetahRefCfg.commands):
         pass
 
-    class push_robots(MiniCheetahCfg.push_robots):
+    class push_robots(MiniCheetahRefCfg.push_robots):
         pass
 
-    class domain_rand(MiniCheetahCfg.domain_rand):
+    class domain_rand(MiniCheetahRefCfg.domain_rand):
+        randomize_friction = True
+        friction_range = [0.5, 1.0]
+        randomize_base_mass = True
+        added_mass_range = [5, 5]
+
+    class asset(MiniCheetahRefCfg.asset):
         pass
 
-    class asset(MiniCheetahCfg.asset):
-        file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
-            + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
-        )
-        foot_name = "foot"
-        penalize_contacts_on = ["shank"]
-        terminate_after_contacts_on = ["base", "thigh"]
-        collapse_fixed_joints = False
-        fix_base_link = False
-        self_collisions = 1
-        flip_visual_attachments = False
-        disable_gravity = False
-        disable_motors = False
+    class reward_settings(MiniCheetahRefCfg.reward_settings):
+        pass
 
-    class reward_settings(MiniCheetahCfg.reward_settings):
-        soft_dof_pos_limit = 0.9
-        soft_dof_vel_limit = 0.9
-        soft_torque_limit = 0.9
-        max_contact_force = 600.0
-        base_height_target = 0.3
-        tracking_sigma = 0.25
-
-    class scaling(MiniCheetahCfg.scaling):
+    class scaling(MiniCheetahRefCfg.scaling):
         pass
 
 
-class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
+class MiniCheetahRefFinetuneRunnerCfg(MiniCheetahRefRunnerCfg):
     seed = -1
     runner_class_name = "IPGRunner"
 
@@ -132,31 +115,31 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 1.5
+                reference_traj = 0.0  # 1.5
                 swing_grf = 1.5
                 stance_grf = 1.5
 
             class termination_weight:
                 termination = 0.15
 
-    class algorithm(MiniCheetahRunnerCfg.algorithm):
+    class algorithm(MiniCheetahRefRunnerCfg.algorithm):
         # both
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 2**15
+        batch_size = 1000  # same as num_steps_per_env
         max_gradient_steps = 10
         # new
-        storage_size = 4 * 32 * 4096  # policies * steps * envs
+        storage_size = 8 * 1000 * 1  # policies * steps * envs
 
         clip_param = 0.2
-        learning_rate = 1.0e-3
+        learning_rate = 1.0e-4
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
         # Actor
         entropy_coef = 0.01
-        schedule = "adaptive"  # could be adaptive, fixed
+        schedule = "fixed"  # could be adaptive, fixed
         desired_kl = 0.01
 
         # GePPO
@@ -171,16 +154,14 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         inter_nu = 0.2
         beta = "off_policy"
 
-    class runner(MiniCheetahRunnerCfg.runner):
+    class runner(MiniCheetahRefRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 30  # number of policy updates
         algorithm_class_name = "PPO_IPG"
-        num_steps_per_env = 32  # deprecate
-
-        # GePPO
+        num_steps_per_env = 1000  # deprecate
         num_old_policies = 4
 
         # Fine tuning
-        resume = False
-        # load_run = "ppo_rollout32"  # pretrained PPO run
+        resume = True
+        load_run = "Jul03_09-45-30_IPG_4096_32_8"

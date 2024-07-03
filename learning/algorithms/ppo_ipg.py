@@ -83,7 +83,11 @@ class PPO_IPG:
 
     def update(self, data_onpol, data_offpol):
         # On-policy GAE
-        data_onpol["values"] = self.critic_v.evaluate(data_onpol["critic_obs"])
+        values = self.critic_v.evaluate(data_onpol["critic_obs"])
+        # Handle single env case
+        if values.dim() == 1:
+            values = values.unsqueeze(-1)
+        data_onpol["values"] = values
         data_onpol["advantages"] = compute_generalized_advantages(
             data_onpol, self.gamma, self.lam, self.critic_v
         )
@@ -180,13 +184,39 @@ class PPO_IPG:
             max_gradient_steps=self.max_gradient_steps,
         )
         for batch_offpol in generator_offpol:
-            # * On-policy surrogate loss
-            self.actor.act(data_onpol["actor_obs"])
+            self.actor.act(data_onpol["actor_obs"])  # act on entire onpol data
             actions_log_prob_onpol = self.actor.get_actions_log_prob(
                 data_onpol["actions"]
             )
-            adv_onpol = data_onpol["advantages"]
+            mu_onpol = self.actor.action_mean
+            sigma_onpol = self.actor.action_std
 
+            # * KL
+            if self.desired_kl is not None and self.schedule == "adaptive":
+                with torch.inference_mode():
+                    kl = torch.sum(
+                        torch.log(sigma_onpol / data_onpol["old_sigma"] + 1.0e-5)
+                        + (
+                            torch.square(data_onpol["old_sigma"])
+                            + torch.square(data_onpol["old_mu"] - mu_onpol)
+                        )
+                        / (2.0 * torch.square(sigma_onpol))
+                        - 0.5,
+                        axis=-1,
+                    )
+                    kl_mean = torch.mean(kl)
+
+                    if kl_mean > self.desired_kl * 2.0:
+                        self.learning_rate = max(1e-5, self.learning_rate / 1.5)
+                    elif kl_mean < self.desired_kl / 2.0 and kl_mean > 0.0:
+                        self.learning_rate = min(1e-2, self.learning_rate * 1.5)
+
+                    for param_group in self.optimizer.param_groups:
+                        # ! check this
+                        param_group["lr"] = self.learning_rate
+
+            # * On-policy surrogate loss
+            adv_onpol = data_onpol["advantages"]
             if self.use_cv:
                 # TODO: control variate
                 critic_based_adv = 0  # get_control_variate(data_onpol, self.critic_v)
@@ -195,13 +225,13 @@ class PPO_IPG:
                 learning_signals = adv_onpol * (1 - self.inter_nu)
 
             ratio = torch.exp(
-                actions_log_prob_onpol
-                - torch.squeeze(data_onpol["old_actions_log_prob"])
+                actions_log_prob_onpol - data_onpol["old_actions_log_prob"]
             )
-            surrogate = -torch.squeeze(learning_signals) * ratio
-            surrogate_clipped = -torch.squeeze(learning_signals) * torch.clamp(
+            ratio_clipped = torch.clamp(
                 ratio, 1.0 - self.clip_param, 1.0 + self.clip_param
             )
+            surrogate = -learning_signals * ratio
+            surrogate_clipped = -learning_signals * ratio_clipped
             loss_onpol = torch.max(surrogate, surrogate_clipped).mean()
 
             # * Off-policy loss

@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn as nn
 from tensordict import TensorDict
 
 from learning.utils import Logger
@@ -225,9 +226,14 @@ class IPGRunner(BaseRunner):
             path,
         )
 
-    def load(self, path, load_optimizer=True):
+    def load(self, path, load_optimizer=True, load_actor_std=True):
         loaded_dict = torch.load(path)
-        self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
+        if load_actor_std:
+            self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
+        else:
+            std_init = self.alg.actor.std.detach().clone()
+            self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
+            self.alg.actor.std = nn.Parameter(std_init)
         self.alg.critic_v.load_state_dict(loaded_dict["critic_v_state_dict"])
         self.alg.critic_q.load_state_dict(loaded_dict["critic_q_state_dict"])
         if load_optimizer:
