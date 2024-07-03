@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt  # noqa F401
-from learning.modules.critic import Critic  # noqa F401
+import matplotlib.pyplot as plt
+from learning.modules.critic import Critic
 
 from learning.utils import (
     compute_generalized_advantages,
@@ -12,7 +12,6 @@ import shutil
 import numpy as np
 import torch
 
-# DEVICE = "cuda:0"
 DEVICE = "cpu"
 
 # * Setup

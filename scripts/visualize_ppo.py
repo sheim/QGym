@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt  # noqa F401
-from learning.modules.critic import Critic  # noqa F401
+import matplotlib.pyplot as plt
+from learning.modules.critic import Critic
 
 from learning.utils import (
     compute_generalized_advantages,
@@ -12,7 +12,6 @@ import shutil
 
 import torch
 
-# DEVICE = "cuda:0"
 DEVICE = "cpu"
 
 # * Setup
@@ -34,7 +33,7 @@ n_envs = 4096
 # * Params
 gamma = 0.95
 lam = 1.0
-num_steps = 10  # ! want this at 1
+visualize_steps = 10  # just to show rollouts
 n_trajs = 64
 rand_perm = torch.randperm(n_envs)
 traj_idx = rand_perm[0:n_trajs]
@@ -84,7 +83,7 @@ for it in it_range:
         graphing_data["returns"],
         title=f"iteration{it}",
         fn=plot_dir + f"/PPO_CRITIC_it{it}",
-        data=graphing_obs[:num_steps, traj_idx],
+        data=graphing_obs[:visualize_steps, traj_idx],
     )
 
     plt.close()
