@@ -134,13 +134,13 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         exploration_sample_freq = 16
 
         obs = [
-            # "base_lin_vel",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
             "dof_pos_obs",
             "dof_vel",
-            # "dof_pos_target",
+            "dof_pos_target",
         ]
         actions = ["dof_pos_target"]
         add_noise = True
