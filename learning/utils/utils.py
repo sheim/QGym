@@ -17,3 +17,9 @@ def set_discount_from_horizon(dt, horizon):
         discount_factor = 1 - 1 / discrete_time_horizon
 
     return discount_factor
+
+
+def polyak_update(online, target, polyak_factor):
+    for op, tp in zip(online.parameters(), target.parameters()):
+        tp.data.copy_((1.0 - polyak_factor) * op.data + polyak_factor * tp.data)
+    return target

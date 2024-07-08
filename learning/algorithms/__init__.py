@@ -32,4 +32,5 @@
 
 from .ppo import PPO
 from .ppo2 import PPO2
+from .ppo_ipg import PPO_IPG
 from .SE import StateEstimator

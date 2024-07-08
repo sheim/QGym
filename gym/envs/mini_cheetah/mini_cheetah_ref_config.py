@@ -67,13 +67,13 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "IPGRunner"
 
     class actor:
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = True
+        smooth_exploration = False
         exploration_sample_freq = 16
 
         normalize_obs = True
@@ -142,6 +142,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # training params
+        gamma = 0.99
+        lam = 0.95
         value_loss_coef = 1.0  # deprecate for PPO2
         use_clipped_value_loss = True  # deprecate for PPO2
         clip_param = 0.2
@@ -149,22 +151,25 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         num_learning_epochs = 6
         # mini batch size = num_envs*nsteps/nminibatches
         num_mini_batches = 4
-        storage_size = 2**17  # new
         mini_batch_size = 2**15  #  new
-        discount_horizon = 1.0  # [s]
-        lam = 0.95
-        GAE_bootstrap_horizon = 2.0  # [s]
-        desired_kl = 0.02
+
+        desired_kl = 0.02  # 0.02 for smooth-expl, else 0.01
         max_grad_norm = 1.0
-        # * Learning rate
-        learning_rate = 0.002
+        learning_rate = 0.002  # initial value
         schedule = "adaptive"  # can be adaptive or fixed
         lr_range = [3e-4, 1e-2]
-        lr_ratio = 1.3
+        lr_ratio = 1.3  # 1.3 for smooth-expl, else 1.5
+
+        # IPG
+        storage_size = 4 * 32 * 4096  # old_policies*nsteps*num_envs
+        polyak = 0.995
+        use_cv = False
+        inter_nu = 0.2
+        beta = "off_policy"
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 800  # number of policy updates
-        algorithm_class_name = "PPO2"
+        max_iterations = 500  # number of policy updates
+        algorithm_class_name = "PPO_IPG"
         num_steps_per_env = 32

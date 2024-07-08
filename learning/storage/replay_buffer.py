@@ -1,0 +1,54 @@
+import torch
+from tensordict import TensorDict
+
+
+class ReplayBuffer:
+    def __init__(self):
+        self.initialized = False
+
+    def initialize(
+        self,
+        dummy_dict,
+        num_envs=2**12,
+        max_storage=2**17,
+        device="cpu",
+    ):
+        self.device = device
+        self.num_envs = num_envs
+        max_length = max_storage // num_envs
+        self.max_length = max_length
+        self.data = TensorDict({}, batch_size=(max_length, num_envs), device=device)
+        self.fill_count = 0
+        self.add_index = 0
+
+        for key in dummy_dict.keys():
+            if dummy_dict[key].dim() == 1:  # if scalar
+                self.data[key] = torch.zeros(
+                    (max_length, num_envs),
+                    dtype=dummy_dict[key].dtype,
+                    device=self.device,
+                )
+            else:
+                self.data[key] = torch.zeros(
+                    (max_length, num_envs, dummy_dict[key].shape[1]),
+                    dtype=dummy_dict[key].dtype,
+                    device=self.device,
+                )
+
+    @torch.inference_mode
+    def add_transitions(self, transition: TensorDict):
+        if self.fill_count >= self.max_length and self.add_index >= self.max_length:
+            self.add_index = 0
+        self.data[self.add_index] = transition
+        self.fill_count += 1
+        self.add_index += 1
+
+    def get_data(self):
+        return self.data[: min(self.fill_count, self.max_length), :]
+
+    def clear(self):
+        self.fill_count = 0
+        self.add_index = 0
+        with torch.inference_mode():
+            for tensor in self.data:
+                tensor.zero_()
