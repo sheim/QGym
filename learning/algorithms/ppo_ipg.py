@@ -28,6 +28,8 @@ class PPO_IPG:
         use_clipped_value_loss=True,
         schedule="fixed",
         desired_kl=0.01,
+        lr_range=[1e-4, 1e-2],
+        lr_ratio=1.3,
         polyak=0.995,
         use_cv=False,
         inter_nu=0.2,
@@ -40,6 +42,8 @@ class PPO_IPG:
         self.desired_kl = desired_kl
         self.schedule = schedule
         self.learning_rate = learning_rate
+        self.lr_range = lr_range
+        self.lr_ratio = lr_ratio
 
         # * PPO components
         self.actor = actor.to(self.device)
@@ -208,11 +212,16 @@ class PPO_IPG:
                         axis=-1,
                     )
                     kl_mean = torch.mean(kl)
+                    lr_min, lr_max = self.lr_range
 
                     if kl_mean > self.desired_kl * 2.0:
-                        self.learning_rate = max(1e-5, self.learning_rate / 1.5)
+                        self.learning_rate = max(
+                            lr_min, self.learning_rate / self.lr_ratio
+                        )
                     elif kl_mean < self.desired_kl / 2.0 and kl_mean > 0.0:
-                        self.learning_rate = min(1e-2, self.learning_rate * 1.5)
+                        self.learning_rate = min(
+                            lr_max, self.learning_rate * self.lr_ratio
+                        )
 
                     for param_group in self.optimizer.param_groups:
                         # ! check this

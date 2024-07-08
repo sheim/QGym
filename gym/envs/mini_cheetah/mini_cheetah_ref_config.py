@@ -73,7 +73,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = False
+        smooth_exploration = True
         exploration_sample_freq = 16
 
         normalize_obs = True
@@ -151,7 +151,6 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         num_learning_epochs = 6
         # mini batch size = num_envs*nsteps/nminibatches
         num_mini_batches = 4
-        mini_batch_size = 2**15  #  new
 
         desired_kl = 0.02  # 0.02 for smooth-expl, else 0.01
         max_grad_norm = 1.0
@@ -170,6 +169,6 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 700  # number of policy updates
         algorithm_class_name = "PPO_IPG"
         num_steps_per_env = 32

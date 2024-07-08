@@ -25,10 +25,9 @@ class PPO2:
         use_clipped_value_loss=True,
         schedule="fixed",
         desired_kl=0.01,
-        loss_fn="MSE",
-        device="cpu",
         lr_range=[1e-4, 1e-2],
         lr_ratio=1.3,
+        device="cpu",
         **kwargs,
     ):
         self.device = device
