@@ -33,11 +33,11 @@ time_str = time.strftime("%Y%m%d_%H%M%S")
 critic_names = [
     "Critic",
     # "CholeskyInput",
-    # "CholeskyLatent",
     "OuterProduct",
-    "OuterProductLatent",
+    "CholeskyLatent",
+    # "OuterProductLatent",
     # # "PDCholeskyInput",
-    # # "PDCholeskyLatent",
+    # "PDCholeskyLatent",
     # "QPNet",
     # # "SpectralLatent",
     "DenseSpectralLatent",
@@ -57,10 +57,11 @@ total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
 
 # set up training
+num_trials = 1
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 200 #1000
+max_gradient_steps = 1000 #200 #1000
 # max_grad_norm = 1.0
 batch_size = 128
 n_training_data = int(0.6 * total_data)
@@ -84,6 +85,10 @@ for g_data in graphing_data.values():
     g_data["returns"]["Rosenbrock"] = target
     g_data["error"]["Rosenbrock"] = torch.zeros_like(target)
 
+for g_data in graphing_data.values():
+    for name in critic_names:
+        g_data["error"][name] = torch.zeros(num_trials, *test_idx.shape)
+
 
 data = TensorDict(
     {"critic_obs": x.unsqueeze(dim=0), "returns": target.unsqueeze(dim=0)},
@@ -91,59 +96,60 @@ data = TensorDict(
     device=DEVICE,
 )
 
-for lr in learning_rates:
-    for iteration in range(iter_offset, tot_iter, iter_step):
-        torch.cuda.empty_cache()
+for trial in range(num_trials):
+    for lr in learning_rates:
+        for iteration in range(iter_offset, tot_iter, iter_step):
+            torch.cuda.empty_cache()
 
-        for name in critic_names:
-            print("")
-            params = critic_params[name]
-            if "critic_name" in params.keys():
-                params.update(critic_params[params["critic_name"]])
-            params["num_obs"] = n_dims
+            for name in critic_names:
+                print("")
+                params = critic_params[name]
+                if "critic_name" in params.keys():
+                    params.update(critic_params[params["critic_name"]])
+                params["num_obs"] = n_dims
 
-            critic_class = globals()[name]
-            critic = critic_class(**params).to(DEVICE)
-            critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr)
+                critic_class = globals()[name]
+                critic = critic_class(**params).to(DEVICE)
+                critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr)
 
-            # with torch.no_grad():
-            #     critic.value_offset.copy_(data["returns"].mean())
-            # train new critic
-            mean_value_loss = 0
-            counter = 0
+                # with torch.no_grad():
+                #     critic.value_offset.copy_(data["returns"].mean())
+                # train new critic
+                mean_value_loss = 0
+                counter = 0
 
-            generator = create_uniform_generator(
-                data[:1, train_idx],
-                batch_size,
-                max_gradient_steps=max_gradient_steps,
-            )
-            for batch in generator:
-                value_loss = critic.loss_fn(
-                    batch["critic_obs"].squeeze(), batch["returns"].squeeze()
+                generator = create_uniform_generator(
+                    data[:1, train_idx],
+                    batch_size,
+                    max_gradient_steps=max_gradient_steps,
                 )
+                for batch in generator:
+                    value_loss = critic.loss_fn(
+                        batch["critic_obs"].squeeze(), batch["returns"].squeeze()
+                    )
 
-                critic_optimizer.zero_grad()
-                value_loss.backward()
-                critic_optimizer.step()
-                counter += 1
+                    critic_optimizer.zero_grad()
+                    value_loss.backward()
+                    critic_optimizer.step()
+                    counter += 1
+                    with torch.no_grad():
+                        actual_error = (
+                            (
+                                data["returns"][0, test_idx].squeeze()
+                                - critic.evaluate(data["critic_obs"][0, test_idx])
+                            ).pow(2)
+                        ).to("cpu")
+                    test_error[lr][name].append(actual_error.detach().mean().numpy())
+                print(f"{name} average error: ", actual_error.mean().item())
+                print(f"{name} max error: ", actual_error.max().item())
+
                 with torch.no_grad():
-                    actual_error = (
-                        (
-                            data["returns"][0, test_idx].squeeze()
-                            - critic.evaluate(data["critic_obs"][0, test_idx])
-                        ).pow(2)
-                    ).to("cpu")
-                test_error[lr][name].append(actual_error.detach().mean().numpy())
-            print(f"{name} average error: ", actual_error.mean().item())
-            print(f"{name} max error: ", actual_error.max().item())
-
-            with torch.no_grad():
-                graphing_data[lr]["error"][name] = actual_error
-                graphing_data[lr]["critic_obs"][name] = data[0, :]["critic_obs"]
-                graphing_data[lr]["values"][name] = critic.evaluate(
-                    data[0, :]["critic_obs"]
-                )
-                graphing_data[lr]["returns"][name] = data[0, :]["returns"]
+                    graphing_data[lr]["error"][name][trial, ...] = actual_error
+                    graphing_data[lr]["critic_obs"][name] = data[0, :]["critic_obs"]
+                    graphing_data[lr]["values"][name] = critic.evaluate(
+                        data[0, :]["critic_obs"]
+                    )
+                    graphing_data[lr]["returns"][name] = data[0, :]["returns"]
 
 # compare new and old critics
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
@@ -151,29 +157,27 @@ if not os.path.exists(save_path):
     os.makedirs(save_path)
 
 # plots
-for lr, t_error in test_error.items():
-    plot_learning_progress(
-        t_error,
-        title=f"Test Error on {n_dims}D Rosenbrock Function \n Learning Rate {lr}",
-        fn=save_path + f"/{len(critic_names)}_lr {lr}",
-        smoothing_window=50,
-    )
+# for lr, t_error in test_error.items():
+#     plot_learning_progress(
+#         t_error,
+#         title=f"Test Error on {n_dims}D Rosenbrock Function \n Learning Rate {lr}",
+#         fn=save_path + f"/{len(critic_names)}_lr {lr}",
+#         smoothing_window=50,
+#     )
 
 g_data_no_ground_truth = generate_rosenbrock_g_data_dict(critic_names, learning_rates)
 for lr, value in graphing_data.items():
     for name in all_graphing_names:
         if name == "Rosenbrock":
             continue
-        g_data_no_ground_truth[lr]["critic_obs"][name] = value["critic_obs"][name]
-        g_data_no_ground_truth[lr]["values"][name] = value["values"][name]
-        g_data_no_ground_truth[lr]["returns"][name] = value["returns"][name]
-        g_data_no_ground_truth[lr]["error"][name] = value["error"][name]
+        g_data_no_ground_truth[lr]["error"][name] = graphing_data[lr]["error"][name]
 
-plot_binned_errors(
-    g_data_no_ground_truth,
-    save_path + "/rosenbrock",
-    title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates",
-)
+# plot_binned_errors(
+#     g_data_no_ground_truth,
+#     save_path + "/rosenbrock",
+#     title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates \n Averaged Across {num_trials} Trials",
+#     multi_trial=False
+# )
 
 if n_dims == 2:
     for lr, g_data in graphing_data.items():
@@ -182,7 +186,7 @@ if n_dims == 2:
             g_data["values"],
             g_data["returns"],
             title=f"Learning a {n_dims}D Rosenbrock Function \n Learning Rate: {lr},"
-            "Without Nonlinear Latent Activation",
+            "Linear Latent Activation",
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,

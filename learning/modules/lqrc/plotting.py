@@ -90,7 +90,8 @@ def create_custom_pink_green_colormap():
 
 def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", multi_trial=False):
     # set up figure metadata
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    # props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    display_names = {"Rosenbrock": "Rosenbrock", "OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"}
     num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
     fig, axes = plt.subplots(
         nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained"
@@ -147,7 +148,7 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                     np.arange(len(bincount)), bincount, color=colors[param], alpha=0.5
                 )
             # axes formatting
-            axes[ix].set_title(critic, fontsize=22)
+            axes[ix].set_title(display_names[critic], fontsize=22)
             x_ticks = np.arange(0, len(bins), tick_step)
             axes[ix].set_xticks(x_ticks, labels=bin_labels)
             axes[ix].set_xlim(

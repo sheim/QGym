@@ -34,10 +34,10 @@ time_str = time.strftime("%Y%m%d_%H%M%S")
 critic_names = [
     "Critic",
     # "CholeskyInput",
-    # "CholeskyLatent",
-    "PDCholeskyInput",
+    # "PDCholeskyInput",
     "OuterProduct",
-    "OuterProductLatent",
+    "CholeskyLatent",
+    # "OuterProductLatent",
     # # "PDCholeskyLatent",
     # "QPNet",
     # # "SpectralLatent",
@@ -52,7 +52,7 @@ critic_names = [
 ]
 
 # generate data
-n_dims = 2
+n_dims = 3
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
@@ -64,16 +64,16 @@ n_validation_data = total_data - ideal_training_data
 
 
 # set up training
-num_trials = 3
+num_trials = 5
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 200
+max_gradient_steps = 1000
 # max_grad_norm = 1.0
 batch_size = 128
 
 all_graphing_names = ["Rosenbrock"] + critic_names.copy()
-training_percentages = [0.2, 0.4, 0.6] #[0.005, 0.01, 0.2]
+training_percentages = [0.05, 0.1, 0.2] # [0.2, 0.4, 0.6] #[0.005, 0.01, 0.2]
 graphing_data = generate_rosenbrock_g_data_dict(all_graphing_names, training_percentages)
 
 test_error = {percent: {name: [] for name in critic_names} for percent in training_percentages}
