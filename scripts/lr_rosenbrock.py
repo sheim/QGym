@@ -51,17 +51,17 @@ critic_names = [
 ]
 
 # generate data
-n_dims = 2
+n_dims = 3
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
 
 # set up training
-num_trials = 1
+num_trials = 5
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 1000 #200 #1000
+max_gradient_steps = 1000
 # max_grad_norm = 1.0
 batch_size = 128
 n_training_data = int(0.6 * total_data)
@@ -172,12 +172,12 @@ for lr, value in graphing_data.items():
             continue
         g_data_no_ground_truth[lr]["error"][name] = graphing_data[lr]["error"][name]
 
-# plot_binned_errors(
-#     g_data_no_ground_truth,
-#     save_path + "/rosenbrock",
-#     title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates \n Averaged Across {num_trials} Trials",
-#     multi_trial=False
-# )
+plot_binned_errors(
+    g_data_no_ground_truth,
+    save_path + "/rosenbrock",
+    title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates \n Averaged Across {num_trials} Trials",
+    multi_trial=False
+)
 
 if n_dims == 2:
     for lr, g_data in graphing_data.items():

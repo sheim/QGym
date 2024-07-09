@@ -64,16 +64,16 @@ n_validation_data = total_data - ideal_training_data
 
 
 # set up training
-num_trials = 5
+num_trials = 2
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 1000
+max_gradient_steps = 200 #1000
 # max_grad_norm = 1.0
 batch_size = 128
 
 all_graphing_names = ["Rosenbrock"] + critic_names.copy()
-training_percentages = [0.05, 0.1, 0.2] # [0.2, 0.4, 0.6] #[0.005, 0.01, 0.2]
+training_percentages = [0.05, 0.3, 0.6] # [0.2, 0.4, 0.6] #[0.005, 0.01, 0.2]
 graphing_data = generate_rosenbrock_g_data_dict(all_graphing_names, training_percentages)
 
 test_error = {percent: {name: [] for name in critic_names} for percent in training_percentages}
@@ -93,12 +93,13 @@ data = TensorDict(
     batch_size=(1, total_data),
     device=DEVICE,
 )
-
+all_train_idx = {}
 for trial in range(num_trials):
     test_error = {percent: {name: [] for name in critic_names} for percent in training_percentages}
     for percent in training_percentages:
         n_training_data = int(percent * total_data)
         train_idx = rand_perm[0:n_training_data]
+        all_train_idx[percent] = train_idx
         print(f"training data: {n_training_data}, validation data: {n_validation_data}")
         for iteration in range(iter_offset, tot_iter, iter_step):
             for name in critic_names:
@@ -155,6 +156,7 @@ for trial in range(num_trials):
                     graphing_data[percent]["returns"][name] = data[0, :]["returns"]
                     graphing_data[percent]["error"][name][trial, ...] = actual_error
 
+
 # compare new and old critics
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
 if not os.path.exists(save_path):
@@ -175,14 +177,14 @@ plot_binned_errors(g_data_no_ground_truth,
                     multi_trial=True)
 
 # plots
-for percent, t_error in test_error.items():
-    plot_learning_progress(
-        t_error,
-        title=f"Test Error on {n_dims}D Rosenbrock Function vs Epochs \n {percent*100.0} % of Total Data Used in Training",
-        fn=save_path + f"/{len(critic_names)}_percent {percent}",
-        smoothing_window=50,
-        extension="png"
-    )
+# for percent, t_error in test_error.items():
+#     plot_learning_progress(
+#         t_error,
+#         title=f"Test Error on {n_dims}D Rosenbrock Function vs Epochs \n {percent*100.0} % of Total Data Used in Training",
+#         fn=save_path + f"/{len(critic_names)}_percent {percent}",
+#         smoothing_window=50,
+#         extension="png"
+#     )
 
 
 if n_dims == 2:
@@ -191,12 +193,11 @@ if n_dims == 2:
             g_data["critic_obs"],
             g_data["values"],
             g_data["returns"],
-            title=f"Learning a {n_dims}D Rosenbrock Function \n {percent*100.0}% Total Data Used in Training, Without Nonlinear Latent Activation",
+            title=f"Learning a {n_dims}D Rosenbrock Function: {percent*100.0}% Total Data Used in Training, With Linear Latent Activation",
             fn=save_path + f"/{len(critic_names)}_percent_{percent}",
-            data=data[0, train_idx]["critic_obs"],
+            data=data[0, all_train_idx[percent]]["critic_obs"],
             grid_size=grid_resolution,
             extension="png",
-            data_title="Test"
         )
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "data_rosenbrock.py")

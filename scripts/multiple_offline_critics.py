@@ -12,6 +12,7 @@ from learning.utils import (
 from learning.modules.lqrc.plotting import (
     plot_pendulum_multiple_critics_w_data,
     plot_learning_progress,
+    plot_rosenbrock_multiple_critics_w_data
 )
 from gym import LEGGED_GYM_ROOT_DIR
 import os
@@ -42,9 +43,9 @@ time_str = time.strftime("%Y%m%d_%H%M%S")
 critic_names = [
     "Critic",
     # "CholeskyInput",
-    # "CholeskyLatent",
     "OuterProduct",
-    "OuterProductLatent",
+    "CholeskyLatent",
+    # "OuterProductLatent",
     # # "PDCholeskyInput",
     # # "PDCholeskyLatent",
     # "QPNet",
@@ -176,21 +177,30 @@ for iteration in range(iter_offset, tot_iter, iter_step):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    plot_pendulum_multiple_critics_w_data(
+    # plot_pendulum_multiple_critics_w_data(
+    #     graphing_data["critic_obs"],
+    #     graphing_data["values"],
+    #     graphing_data["returns"],
+    #     title=f"iteration{iteration}",
+    #     fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
+    #     data=data[:num_steps, traj_idx]["critic_obs"],
+    # )
+    plot_rosenbrock_multiple_critics_w_data(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
-        title=f"iteration{iteration}",
+        title=f"Learning an Inverted Pendulum's Ground Truth Value Function: Linear Latent Activation",
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
         data=data[:num_steps, traj_idx]["critic_obs"],
+        log_norm=False,
     )
 
     plt.close()
-    plot_learning_progress(
-        test_error,
-        fn=save_path + f"/{len(critic_names)}_error_{iteration}",
-        smoothing_window=50,
-    )
+    # plot_learning_progress(
+    #     test_error,
+    #     fn=save_path + f"/{len(critic_names)}_error_{iteration}",
+    #     smoothing_window=50,
+    # )
     # plt.show()
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_critics.py")
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")

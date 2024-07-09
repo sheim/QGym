@@ -94,7 +94,7 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
     display_names = {"Rosenbrock": "Rosenbrock", "OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"}
     num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
     fig, axes = plt.subplots(
-        nrows=1, ncols=num_cols, figsize=(25, 6), layout="constrained"
+        nrows=num_cols, ncols=1, figsize=(16, 15), layout="constrained"
     )
     fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
     colors = dict(
@@ -148,16 +148,17 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
                     np.arange(len(bincount)), bincount, color=colors[param], alpha=0.5
                 )
             # axes formatting
-            axes[ix].set_title(display_names[critic], fontsize=22)
+            axes[ix].set_title(display_names[critic], fontsize=25)
             x_ticks = np.arange(0, len(bins), tick_step)
             axes[ix].set_xticks(x_ticks, labels=bin_labels)
             axes[ix].set_xlim(
                 -min((tick_step / 2.0), 2.0),
                 min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
             )
+            axes[ix].tick_params(axis="both", which="major", labelsize=15)
         for ix, critic in enumerate(data[param].keys()):
             axes[ix].set_ylim(y_min, y_max)
-    fig.legend(loc=" outside upper right", fontsize=18)
+    fig.legend(loc=" outside upper right", fontsize=20, ncol=3, bbox_to_anchor=(0.85, 0.2))
     plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}.{extension}")
 
@@ -529,8 +530,9 @@ def plot_pendulum_multiple_critics_w_data(
 
 
 def plot_rosenbrock_multiple_critics_w_data(
-    x, predictions, targets, title, fn, data, grid_size=64, extension="png", data_title="Test Data Distribution", log_norm=True
+    x, predictions, targets, title, fn, data, grid_size=64, extension="png", data_title="Training Data Distribution", log_norm=True
 ):
+    display_names = {"Rosenbrock": "Rosenbrock", "OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"}
     num_critics = len(x.keys())
     fig, axes = plt.subplots(
         nrows=2,
@@ -552,7 +554,8 @@ def plot_rosenbrock_multiple_critics_w_data(
 
     for critic_name in x:
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
-        np_targets = targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
+        # np_targets = targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
+        np_targets = targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
         np_error = np_predictions - np_targets
         global_min_error = min(global_min_error, np.min(np_error))
         global_max_error = max(global_max_error, np.max(np_error))
@@ -571,7 +574,9 @@ def plot_rosenbrock_multiple_critics_w_data(
         np_x[:, 0] = np_x[:, 0]
         np_x[:, 1] = np_x[:, 1]
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
-        np_targets = targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
+        np_targets = targets["Ground Truth MC Returns"].detach().cpu().numpy().reshape(-1)
+
+        # np_targets = targets["Rosenbrock"].detach().cpu().numpy().reshape(-1)
         np_error = np_predictions - np_targets
 
         axes[0, ix].imshow(
@@ -582,12 +587,20 @@ def plot_rosenbrock_multiple_critics_w_data(
             norm=prediction_norm,
             # shading="auto",
         )
+        # ax_title = (
+        #     f"{display_names[critic_name]} Ground Truth"
+        #     if "Rosenbrock" in critic_name
+        #     else f"{display_names[critic_name]} Prediction"
+        # )
         ax_title = (
-            f"{critic_name} Ground Truth"
-            if "Rosenbrock" in critic_name
-            else f"{critic_name} Prediction"
+            "Ground Truth MC Returns"
+            if "Ground Truth MC Returns" in critic_name
+            else f"{display_names[critic_name]} Prediction"
         )
-        axes[0, ix].set_title(ax_title)
+        axes[0, ix].set_title(ax_title, fontsize=25)
+
+        axes[0, ix].tick_params(axis="both", which="major", labelsize=15)
+        axes[1, ix].tick_params(axis="both", which="major", labelsize=15)
 
         if ix == 0:
             continue
@@ -600,35 +613,38 @@ def plot_rosenbrock_multiple_critics_w_data(
             norm=error_norm,
             # shading="auto",
         )
-        axes[1, ix].set_title(f"{critic_name} Error")
+        axes[1, ix].set_title(f"{display_names[critic_name]} Error", fontsize=25)
 
     # axes[1, 0].plot(x_coord, y_coord, lw=1)
     axes[1, 0].scatter(x_coord, y_coord, alpha=0.75, s=3)
-    axes[1, 0].set_title(data_title)
-    axes[1, 0].set_xlabel("x")
-    axes[1, 0].set_ylabel("y")
+    axes[1, 0].set_title(data_title, fontsize=25)
+    axes[1, 0].set_xlabel("x", fontsize=25)
+    axes[1, 0].set_ylabel("y", fontsize=25)
 
     # Ensure the axes are the same for all plots
     for ax in axes.flat:
         ax.set_xlim([x_coord.min(), x_coord.max()])
         ax.set_ylim([y_coord.min(), y_coord.max()])
 
-    asp = np.diff(axes[1, 0].get_xlim())[0] / np.diff(axes[1, 0].get_ylim())[0]
-    axes[1, 0].set_aspect(asp)
+    # asp = np.diff(axes[1, 0].get_xlim())[0] / np.diff(axes[1, 0].get_ylim())[0]
+    # axes[1, 0].set_aspect(asp)
+    axes[1, 0].set_aspect('equal', adjustable='box')
 
-    fig.colorbar(
+    pred_cbar = fig.colorbar(
         mpl.cm.ScalarMappable(norm=prediction_norm, cmap=prediction_cmap),
         ax=axes[0, :].ravel().tolist(),
         shrink=0.95,
         # label="Pointwise Prediction",
     )
-    fig.colorbar(
+    pred_cbar.ax.tick_params(labelsize=25)
+    error_cbar = fig.colorbar(
         mpl.cm.ScalarMappable(norm=error_norm, cmap=error_cmap),
         ax=axes[1, :].ravel().tolist(),
         shrink=0.95,
         # label="Pointwise Error",
     )
-    fig.suptitle(title)
+    error_cbar.ax.tick_params(labelsize=25)
+    fig.suptitle(title, fontsize=30)
     plt.savefig(f"{fn}.{extension}", bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}.{extension}")
 
