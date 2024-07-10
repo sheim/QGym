@@ -32,11 +32,6 @@ class OnPolicyRunner(BaseRunner):
         tot_iter = self.it + self.num_learning_iterations
         self.save()
 
-        # todo refactor into actor
-        # * Initialize smooth exploration matrices
-        if self.actor_cfg["smooth_exploration"]:
-            self.alg.actor.sample_weights(batch_size=self.env.num_envs)
-
         # * start up storage
         transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
         transition.update(
@@ -75,14 +70,6 @@ class OnPolicyRunner(BaseRunner):
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    # todo refactor into actor
-                    # * Re-sample noise matrix for smooth exploration
-                    if (
-                        self.actor_cfg["smooth_exploration"]
-                        and i % self.actor_cfg["exploration_sample_freq"] == 0
-                    ):
-                        self.alg.actor.sample_weights(batch_size=self.env.num_envs)
-
                     actions = self.alg.act(actor_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],
@@ -231,17 +218,10 @@ class OnPolicyRunner(BaseRunner):
         # Log states to the dict, as well as whether the env terminated.
         steps = states_to_log_dict["terminated"].shape[2]
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
-        critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
 
         with torch.inference_mode():
             for i in range(steps):
-                sample_freq = self.policy_cfg["exploration_sample_freq"]
-                if self.policy_cfg["smooth_exploration"] and i % sample_freq == 0:
-                    self.alg.actor_critic.actor.sample_weights(
-                        batch_size=self.env.num_envs
-                    )
-
-                actions = self.alg.act(actor_obs, critic_obs)
+                actions = self.alg.act(actor_obs)
                 self.set_actions(
                     self.policy_cfg["actions"],
                     actions,
@@ -253,7 +233,6 @@ class OnPolicyRunner(BaseRunner):
                 actor_obs = self.get_noisy_obs(
                     self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
                 )
-                critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
 
                 # Log states (just for the first env)
                 terminated = self.get_terminated()[0]

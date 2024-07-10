@@ -23,6 +23,7 @@ class SmoothActor(Actor):
         learn_features: bool = True,
         epsilon: float = 1e-6,
         log_std_init: float = 0.0,
+        exploration_sample_freq: int = 16,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -45,13 +46,15 @@ class SmoothActor(Actor):
             log_std = torch.ones(self.latent_dim, 1)
         self.log_std = nn.Parameter(log_std * self.log_std_init, requires_grad=True)
         # Sample an exploration matrix
-        self.sample_weights()
+        self.update_exploration_matrices(batch_size=1)
         self.distribution = None
 
         # Debug mode for plotting
         self.debug = False
+        self.call_counter = 0
+        self.resampling_frequenchy = exploration_sample_freq
 
-    def sample_weights(self, batch_size=1):
+    def update_exploration_matrices(self, batch_size=1):
         # Sample weights for the noise exploration matrix
         std = self.get_std
         self.weights_dist = Normal(torch.zeros_like(std), std)
@@ -97,6 +100,10 @@ class SmoothActor(Actor):
         self.distribution = Normal(mean_actions, torch.sqrt(variance + self.epsilon))
 
     def act(self, observations):
+        if self.call_counter % self.resampling_frequenchy == 0:
+            self.update_exploration_matrices(observations.shape[0])
+        self.call_counter += 1
+
         self.update_distribution(observations)
         mean = self.distribution.mean
         sample = mean + self.get_noise()

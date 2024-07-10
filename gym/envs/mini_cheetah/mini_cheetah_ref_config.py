@@ -73,7 +73,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = False
+        smooth_exploration = True
         exploration_sample_freq = 16
         obs = [
             "base_ang_vel",
@@ -145,6 +145,6 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 1000  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32  # deprecate
