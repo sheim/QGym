@@ -5,8 +5,6 @@ from .utils import create_MLP
 from .utils import export_network
 from .utils import RunningMeanStd
 
-from gym import LEGGED_GYM_ROOT_DIR
-
 
 class Actor(nn.Module):
     def __init__(
@@ -37,9 +35,6 @@ class Actor(nn.Module):
         # disable args validation for speedup
         Normal.set_default_validate_args = False
 
-        # Debug mode for plotting
-        self.debug = False
-
     @property
     def action_mean(self):
         return self.distribution.mean
@@ -62,12 +57,6 @@ class Actor(nn.Module):
 
     def act(self, observations):
         self.update_distribution(observations)
-        if self.debug:
-            mean = self.distribution.mean
-            path = f"{LEGGED_GYM_ROOT_DIR}/plots/distribution_baseline.csv"
-            sample = self.distribution.sample()
-            self.log_actions(mean[0][2], sample[0][2], path)
-            return sample
         return self.distribution.sample()
 
     def get_actions_log_prob(self, actions):

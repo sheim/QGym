@@ -5,8 +5,6 @@ from torch.distributions import Normal
 from .actor import Actor
 from .utils import create_MLP
 
-from gym import LEGGED_GYM_ROOT_DIR
-
 
 # The following implementation is based on the gSDE paper. See code:
 # https://github.com/DLR-RM/stable-baselines3/blob/56f20e40a2206bbb16501a0f600e29ce1b112ef1/stable_baselines3/common/distributions.py#L421C7-L421C38
@@ -49,8 +47,6 @@ class SmoothActor(Actor):
         self.update_exploration_matrices(batch_size=1)
         self.distribution = None
 
-        # Debug mode for plotting
-        self.debug = False
         self.call_counter = 0
         self.resampling_frequenchy = exploration_sample_freq
 
@@ -107,9 +103,6 @@ class SmoothActor(Actor):
         self.update_distribution(observations)
         mean = self.distribution.mean
         sample = mean + self.get_noise()
-        if self.debug:
-            path = f"{LEGGED_GYM_ROOT_DIR}/plots/distribution_smooth.csv"
-            self.log_actions(mean[0][2], sample[0][2], path)
         return sample
 
     def act_inference(self, observations):
