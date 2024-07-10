@@ -238,6 +238,9 @@ class LeggedRobotRunnerCfg(BaseConfig):
         hidden_dims = [512, 256, 128]
         # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        normalize_obs = True
+        smooth_exploration = False
+
         obs = [
             "observation_a",
             "observation_b",
@@ -292,7 +295,7 @@ class LeggedRobotRunnerCfg(BaseConfig):
         lam = 0.95
         # shared
         batch_size = 2**15
-        max_gradient_steps = 10
+        max_gradient_steps = 24
         # new
         storage_size = 2**17  # new
         batch_size = 2**15  #  new
@@ -306,6 +309,8 @@ class LeggedRobotRunnerCfg(BaseConfig):
         entropy_coef = 0.01
         schedule = "adaptive"  # could be adaptive, fixed
         desired_kl = 0.01
+        lr_range = [2e-4, 1e-2]
+        lr_ratio = 1.3
 
     class runner:
         policy_class_name = "ActorCritic"

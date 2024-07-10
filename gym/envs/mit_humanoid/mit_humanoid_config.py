@@ -181,12 +181,13 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class actor:
+    class actor(LeggedRobotRunnerCfg.actor):
         init_noise_std = 1.0
         hidden_dims = [512, 256, 128]
         critic_hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
 
         obs = [
             "base_height",
@@ -212,7 +213,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             projected_gravity = 0.05
             height_measurements = 0.1
 
-    class critic:
+    class critic(LeggedRobotRunnerCfg.critic):
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"

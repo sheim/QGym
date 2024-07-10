@@ -35,3 +35,4 @@ from .state_estimator import StateEstimatorNN
 from .actor import Actor
 from .critic import Critic
 from .chimera_actor import ChimeraActor
+from .smooth_actor import SmoothActor

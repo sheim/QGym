@@ -126,12 +126,11 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class actor:
+    class actor(LeggedRobotRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [
-            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -154,7 +153,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             ang_vel = [0.3, 0.15, 0.4]
             gravity_vec = 0.1
 
-    class critic:
+    class critic(LeggedRobotRunnerCfg.critic):
         hidden_dims = [128, 64]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"

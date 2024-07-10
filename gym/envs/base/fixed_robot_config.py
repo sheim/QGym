@@ -134,7 +134,7 @@ class FixedRobotCfgPPO(BaseConfig):
             "these_need_to_be_atributes_(states)_of_the_robot_env",
         ]
         normalize_obs = True
-
+        smooth_exploration = False
         actions = ["tau_ff"]
         disable_actions = False
 

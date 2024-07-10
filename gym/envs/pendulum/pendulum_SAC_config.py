@@ -36,7 +36,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
     seed = -1
     runner_class_name = "OffPolicyRunner"
 
-    class actor:
+    class actor(FixedRobotCfgPPO.actor):
         hidden_dims = {
             "latent": [128, 64],
             "mean": [32],
@@ -61,7 +61,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
             dof_pos = 0.0
             dof_vel = 0.0
 
-    class critic:
+    class critic(FixedRobotCfgPPO.critic):
         obs = [
             "dof_pos_obs",
             "dof_vel",

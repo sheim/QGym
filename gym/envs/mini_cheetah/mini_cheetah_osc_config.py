@@ -167,6 +167,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
         critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
 
         obs = [
             "base_ang_vel",

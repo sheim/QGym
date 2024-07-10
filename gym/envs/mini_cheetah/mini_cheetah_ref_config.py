@@ -69,10 +69,12 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class actor:
+    class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
+        exploration_sample_freq = 16
         obs = [
             "base_ang_vel",
             "projected_gravity",
@@ -96,7 +98,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             ang_vel = [0.3, 0.15, 0.4]
             gravity_vec = 0.1
 
-    class critic:
+    class critic(MiniCheetahRunnerCfg.critic):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
