@@ -75,7 +75,7 @@ def export_network(network, network_name, path, num_inputs, latent=False):
     model = copy.deepcopy(network).to("cpu")
     # To trace model, must be evaluated once with arbitrary input
     model.eval()
-    dummy_input = torch.rand((1, num_inputs))
+    dummy_input = torch.rand((num_inputs))
     model_traced = torch.jit.trace(model, dummy_input)
     torch.jit.save(model_traced, path_TS)
     torch.onnx.export(model_traced, dummy_input, path_onnx)
@@ -85,7 +85,7 @@ def export_network(network, network_name, path, num_inputs, latent=False):
         path_latent = os.path.join(path, network_name + "_latent.onnx")
         model_latent = torch.nn.Sequential(model.obs_rms, model.latent_net)
         model_latent.eval()
-        dummy_input = torch.rand((1, num_inputs))
+        dummy_input = torch.rand((num_inputs))
         model_traced = torch.jit.trace(model_latent, dummy_input)
         torch.onnx.export(model_traced, dummy_input, path_latent)
 
