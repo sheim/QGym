@@ -6,9 +6,9 @@ from tensordict import TensorDict
 from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
+from learning.algorithms import *  # noqa: F403
 from learning.modules import Actor, SmoothActor, Critic
 from learning.storage import DictStorage, ReplayBuffer
-from learning.algorithms import PPO_IPG
 
 logger = Logger()
 storage_onpol = DictStorage()
@@ -26,10 +26,11 @@ class IPGRunner(BaseRunner):
         )
 
     def _set_up_alg(self):
-        alg_class = eval(self.cfg["algorithm_class_name"])
-        if alg_class != PPO_IPG:
+        alg_class_name = self.cfg["algorithm_class_name"]
+        if alg_class_name != "PPO_IPG":
             raise ValueError("IPGRunner only supports PPO_IPG")
 
+        alg_class = eval(alg_class_name)
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
         num_actions = self.get_action_size(self.actor_cfg["actions"])
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
@@ -170,7 +171,7 @@ class IPGRunner(BaseRunner):
         self.save()
 
     @torch.no_grad
-    def burn_in_normalization(self, n_iterations=200):
+    def burn_in_normalization(self, n_iterations=100):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         for _ in range(n_iterations):
@@ -181,11 +182,12 @@ class IPGRunner(BaseRunner):
                 self.actor_cfg["obs"], self.actor_cfg["noise"]
             )
             critic_obs = self.get_obs(self.critic_cfg["obs"])
-            self.alg.critic_v.evaluate(critic_obs)
+            # TODO: Check this, seems to perform better without critic eval
+            # self.alg.critic_v.evaluate(critic_obs)
             q_input = torch.cat((critic_obs, actions), dim=-1)
             self.alg.critic_q.evaluate(q_input)
             self.alg.target_critic_q.evaluate(q_input)
-        # self.env.reset()
+        self.env.reset()
 
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(

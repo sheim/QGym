@@ -289,20 +289,27 @@ class LeggedRobotRunnerCfg(BaseConfig):
                 termination = 0.01
 
     class algorithm:
-        # * training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 5
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 4
-        learning_rate = 1.0e-3
-        schedule = "adaptive"  # could be adaptive, fixed
+        # both
         gamma = 0.99
         lam = 0.95
-        desired_kl = 0.01
+        # shared
+        batch_size = 2**15
+        max_gradient_steps = 24
+        # new
+        storage_size = 2**17  # new
+        batch_size = 2**15  #  new
+
+        clip_param = 0.2
+        learning_rate = 1.0e-3
         max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [2e-4, 1e-2]
+        lr_ratio = 1.3
 
     class runner:
         policy_class_name = "ActorCritic"

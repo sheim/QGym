@@ -5,9 +5,9 @@ import torch.optim as optim
 from learning.utils import (
     create_uniform_generator,
     compute_generalized_advantages,
+    normalize,
     polyak_update,
 )
-from learning.modules import SmoothActor
 
 
 class PPO_IPG:
@@ -17,8 +17,8 @@ class PPO_IPG:
         critic_v,
         critic_q,
         target_critic_q,
-        num_learning_epochs=1,
-        num_mini_batches=1,
+        batch_size=2**15,
+        max_gradient_steps=10,
         clip_param=0.2,
         gamma=0.998,
         lam=0.95,
@@ -28,13 +28,13 @@ class PPO_IPG:
         use_clipped_value_loss=True,
         schedule="fixed",
         desired_kl=0.01,
-        lr_range=[1e-4, 1e-2],
-        lr_ratio=1.3,
         polyak=0.995,
         use_cv=False,
         inter_nu=0.2,
         beta="off_policy",
         device="cpu",
+        lr_range=[1e-4, 1e-2],
+        lr_ratio=1.3,
         **kwargs,
     ):
         self.device = device
@@ -63,8 +63,8 @@ class PPO_IPG:
 
         # * PPO parameters
         self.clip_param = clip_param
-        self.num_learning_epochs = num_learning_epochs
-        self.num_mini_batches = num_mini_batches
+        self.batch_size = batch_size
+        self.max_gradient_steps = max_gradient_steps
         self.entropy_coef = entropy_coef
         self.gamma = gamma
         self.lam = lam
@@ -87,14 +87,16 @@ class PPO_IPG:
 
     def update(self, data_onpol, data_offpol, last_obs=None):
         # On-policy GAE
-        if last_obs is None:
-            last_values = None
-        else:
-            with torch.no_grad():
-                last_values = self.critic_v.evaluate(last_obs).detach()
-        compute_generalized_advantages(
-            data_onpol, self.gamma, self.lam, self.critic_v, last_values
+        values = self.critic_v.evaluate(data_onpol["critic_obs"])
+        # Handle single env case
+        if values.dim() == 1:
+            values = values.unsqueeze(-1)
+        data_onpol["values"] = values
+        data_onpol["advantages"] = compute_generalized_advantages(
+            data_onpol, self.gamma, self.lam, self.critic_v
         )
+        data_onpol["returns"] = data_onpol["advantages"] + data_onpol["values"]
+        data_onpol["advantages"] = normalize(data_onpol["advantages"])
 
         self.update_critic_q(data_offpol)
 
@@ -116,10 +118,11 @@ class PPO_IPG:
         self.mean_q_loss = 0
         counter = 0
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
             with torch.no_grad():
                 # TODO: check that should be inference
@@ -133,8 +136,7 @@ class PPO_IPG:
                     + self.gamma * batch["dones"].logical_not() * q_next
                 )
             q_input = torch.cat((batch["critic_obs"], batch["actions"]), dim=-1)
-            q_value = self.critic_q.evaluate(q_input)
-            q_loss = self.critic_q.loss_fn(q_value, q_target)
+            q_loss = self.critic_q.loss_fn(q_input, q_target)
             self.critic_q_optimizer.zero_grad()
             q_loss.backward()
             nn.utils.clip_grad_norm_(self.critic_q.parameters(), self.max_grad_norm)
@@ -152,13 +154,13 @@ class PPO_IPG:
         self.mean_value_loss = 0
         counter = 0
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
-            value_batch = self.critic_v.evaluate(batch["critic_obs"])
-            value_loss = self.critic_v.loss_fn(value_batch, batch["returns"])
+            value_loss = self.critic_v.loss_fn(batch["critic_obs"], batch["returns"])
             self.critic_v_optimizer.zero_grad()
             value_loss.backward()
             nn.utils.clip_grad_norm_(self.critic_v.parameters(), self.max_grad_norm)
@@ -180,17 +182,12 @@ class PPO_IPG:
         ).detach()
 
         # Generate off-policy batches and use all on-policy data
-        n, m = data_offpol.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
         generator_offpol = create_uniform_generator(
-            data_offpol, batch_size, self.num_learning_epochs
+            data_offpol,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
         )
         for batch_offpol in generator_offpol:
-            # * Re-sample noise for smooth actor
-            if isinstance(self.actor, SmoothActor):
-                self.actor.sample_weights(batch_size)
-
             self.actor.update_distribution(data_onpol["actor_obs"])
             actions_log_prob_onpol = self.actor.get_actions_log_prob(
                 data_onpol["actions"]

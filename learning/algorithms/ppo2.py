@@ -5,8 +5,8 @@ import torch.optim as optim
 from learning.utils import (
     create_uniform_generator,
     compute_generalized_advantages,
+    normalize,
 )
-from learning.modules import SmoothActor
 
 
 class PPO2:
@@ -14,8 +14,8 @@ class PPO2:
         self,
         actor,
         critic,
-        num_learning_epochs=1,
-        num_mini_batches=1,
+        batch_size=2**15,
+        max_gradient_steps=10,
         clip_param=0.2,
         gamma=0.998,
         lam=0.95,
@@ -25,9 +25,9 @@ class PPO2:
         use_clipped_value_loss=True,
         schedule="fixed",
         desired_kl=0.01,
+        device="cpu",
         lr_range=[1e-4, 1e-2],
         lr_ratio=1.3,
-        device="cpu",
         **kwargs,
     ):
         self.device = device
@@ -46,17 +46,13 @@ class PPO2:
 
         # * PPO parameters
         self.clip_param = clip_param
-        self.num_learning_epochs = num_learning_epochs
-        self.num_mini_batches = num_mini_batches
+        self.batch_size = batch_size
+        self.max_gradient_steps = max_gradient_steps
         self.entropy_coef = entropy_coef
         self.gamma = gamma
         self.lam = lam
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
-
-    def test_mode(self):
-        self.actor.test()
-        self.critic.test()
 
     def switch_to_train(self):
         self.actor.train()
@@ -65,30 +61,27 @@ class PPO2:
     def act(self, obs):
         return self.actor.act(obs).detach()
 
-    def update(self, data, last_obs=None):
-        if last_obs is None:
-            last_values = None
-        else:
-            with torch.no_grad():
-                last_values = self.critic.evaluate(last_obs).detach()
-        compute_generalized_advantages(
-            data, self.gamma, self.lam, self.critic, last_values
+    def update(self, data):
+        data["values"] = self.critic.evaluate(data["critic_obs"])
+        data["advantages"] = compute_generalized_advantages(
+            data, self.gamma, self.lam, self.critic
         )
-
+        data["returns"] = data["advantages"] + data["values"]
         self.update_critic(data)
+        data["advantages"] = normalize(data["advantages"])
         self.update_actor(data)
 
     def update_critic(self, data):
         self.mean_value_loss = 0
         counter = 0
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
-            value_batch = self.critic.evaluate(batch["critic_obs"])
-            value_loss = self.critic.loss_fn(value_batch, batch["returns"])
+            value_loss = self.critic.loss_fn(batch["critic_obs"], batch["returns"])
             self.critic_optimizer.zero_grad()
             value_loss.backward()
             nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
@@ -98,8 +91,6 @@ class PPO2:
         self.mean_value_loss /= counter
 
     def update_actor(self, data):
-        # already done before
-        # compute_generalized_advantages(data, self.gamma, self.lam, self.critic)
         self.mean_surrogate_loss = 0
         counter = 0
 
@@ -110,16 +101,12 @@ class PPO2:
             data["actions"]
         ).detach()
 
-        n, m = data.shape
-        total_data = n * m
-        batch_size = total_data // self.num_mini_batches
-        generator = create_uniform_generator(data, batch_size, self.num_learning_epochs)
+        generator = create_uniform_generator(
+            data,
+            self.batch_size,
+            max_gradient_steps=self.max_gradient_steps,
+        )
         for batch in generator:
-            # * Re-sample noise for smooth actor
-            if isinstance(self.actor, SmoothActor):
-                self.actor.sample_weights(batch_size)
-
-            # ! refactor how this is done
             self.actor.update_distribution(batch["actor_obs"])
             actions_log_prob_batch = self.actor.get_actions_log_prob(batch["actions"])
             mu_batch = self.actor.action_mean
@@ -171,10 +158,7 @@ class PPO2:
             # * Gradient step
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(
-                list(self.actor.parameters()) + list(self.critic.parameters()),
-                self.max_grad_norm,
-            )
+            nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
             self.optimizer.step()
             self.mean_surrogate_loss += surrogate_loss.item()
             counter += 1

@@ -41,8 +41,10 @@ class OnPolicyRunner(BaseRunner):
         transition.update(
             {
                 "actor_obs": actor_obs,
+                "next_actor_obs": actor_obs,
                 "actions": self.alg.act(actor_obs),
                 "critic_obs": critic_obs,
+                "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
                 "dones": self.get_timed_out(),
             }
@@ -62,6 +64,13 @@ class OnPolicyRunner(BaseRunner):
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
             logger.tic("collection")
+
+            # * Simulate environment and log states
+            if states_to_log_dict is not None:
+                it_idx = self.it - 1
+                if it_idx % 10 == 0:
+                    self.sim_and_log_states(states_to_log_dict, it_idx)
+
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
@@ -102,6 +111,8 @@ class OnPolicyRunner(BaseRunner):
 
                     transition.update(
                         {
+                            "next_actor_obs": actor_obs,
+                            "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
                             "timed_out": timed_out,
                             "dones": dones,
@@ -130,7 +141,7 @@ class OnPolicyRunner(BaseRunner):
         self.save()
 
     @torch.no_grad
-    def burn_in_normalization(self, n_iterations=200):
+    def burn_in_normalization(self, n_iterations=100):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         # critic_obs = self.get_obs(self.critic_cfg["obs"])
         for _ in range(n_iterations):
@@ -140,10 +151,10 @@ class OnPolicyRunner(BaseRunner):
             actor_obs = self.get_noisy_obs(
                 self.actor_cfg["obs"], self.actor_cfg["noise"]
             )
-            # TODO: check this, trains better without evaluating critic
+            # TODO: Check this, seems to perform better without critic eval
             # critic_obs = self.get_obs(self.critic_cfg["obs"])
             # self.alg.critic.evaluate(critic_obs)
-        # self.env.reset()
+        self.env.reset()
 
     def update_rewards(self, rewards_dict, terminated):
         rewards_dict.update(
@@ -170,7 +181,9 @@ class OnPolicyRunner(BaseRunner):
             self.alg,
             ["mean_value_loss", "mean_surrogate_loss", "learning_rate"],
         )
-        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
+        logger.register_category(
+            "actor", self.alg.actor, ["action_std", "entropy", "get_std"]
+        )
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 
@@ -209,3 +222,42 @@ class OnPolicyRunner(BaseRunner):
 
     def export(self, path):
         self.alg.actor.export(path)
+
+    def sim_and_log_states(self, states_to_log_dict, it_idx):
+        # Simulate environment for as many steps as expected in the dict.
+        # Log states to the dict, as well as whether the env terminated.
+        steps = states_to_log_dict["terminated"].shape[2]
+        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
+        critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+        with torch.inference_mode():
+            for i in range(steps):
+                sample_freq = self.policy_cfg["exploration_sample_freq"]
+                if self.policy_cfg["smooth_exploration"] and i % sample_freq == 0:
+                    self.alg.actor_critic.actor.sample_weights(
+                        batch_size=self.env.num_envs
+                    )
+
+                actions = self.alg.act(actor_obs, critic_obs)
+                self.set_actions(
+                    self.policy_cfg["actions"],
+                    actions,
+                    self.policy_cfg["disable_actions"],
+                )
+
+                self.env.step()
+
+                actor_obs = self.get_noisy_obs(
+                    self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
+                )
+                critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+
+                # Log states (just for the first env)
+                terminated = self.get_terminated()[0]
+                for state in states_to_log_dict:
+                    if state == "terminated":
+                        states_to_log_dict[state][0, it_idx, i, :] = terminated
+                    else:
+                        states_to_log_dict[state][0, it_idx, i, :] = getattr(
+                            self.env, state
+                        )[0, :]

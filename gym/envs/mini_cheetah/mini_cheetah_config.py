@@ -192,23 +192,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 termination = 0.01
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        # * training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 6
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 4
-        discount_horizon = 1.0  # [s]
-        # GAE_bootstrap_horizon = 2.0  # [s]
-        desired_kl = 0.02
-        max_grad_norm = 1.0
-        # * Learning rate
-        learning_rate = 0.002
-        schedule = "adaptive"  # can be adaptive or fixed
-        lr_range = [2e-4, 1e-2]
-        lr_ratio = 1.3
+        pass
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""

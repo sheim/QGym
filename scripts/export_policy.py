@@ -22,6 +22,7 @@ def setup_and_export(args):
         LEGGED_GYM_ROOT_DIR,
         "logs",
         train_cfg.runner.experiment_name,
+        train_cfg.runner.load_run,
         "exported",
     )
     runner.export(path)
