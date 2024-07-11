@@ -85,13 +85,9 @@ class PPO_IPG:
     def act(self, obs):
         return self.actor.act(obs).detach()
 
-    def update(self, data_onpol, data_offpol, last_obs=None):
+    def update(self, data_onpol, data_offpol):
         # On-policy GAE
-        values = self.critic_v.evaluate(data_onpol["critic_obs"])
-        # Handle single env case
-        if values.dim() == 1:
-            values = values.unsqueeze(-1)
-        data_onpol["values"] = values
+        data_onpol["values"] = self.critic_v.evaluate(data_onpol["critic_obs"])
         data_onpol["advantages"] = compute_generalized_advantages(
             data_onpol, self.gamma, self.lam, self.critic_v
         )

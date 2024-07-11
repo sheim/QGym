@@ -41,7 +41,7 @@ class RunningMeanStd(nn.Module):
     def forward(self, input):
         if self.training:
             mean = input.mean(tuple(range(input.dim() - 1)))
-            var = input.var(tuple(range(input.dim() - 1)))
+            var = torch.nan_to_num(input.var(tuple(range(input.dim() - 1))))
             (
                 self.running_mean,
                 self.running_var,
