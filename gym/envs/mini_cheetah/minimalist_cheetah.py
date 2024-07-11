@@ -31,11 +31,23 @@ class MinimalistCheetah:
         phase_obs = torch.tensor(phase_obs, device=self.device).unsqueeze(0)
         self.phase_sin = phase_obs[:, 0].unsqueeze(0)
 
-    def _switch(self):
+    def _sqrdexp(self, x, scale=1.0):
+        """shorthand helper for squared exponential"""
+        return torch.exp(-torch.square(x / scale) / self.tracking_sigma)
+
+    def _switch(self, scale=0.5):
+        # TODO: Check scale, RS commands are scaled differently than QGym
         c_vel = torch.linalg.norm(self.commands, dim=1)
         return torch.exp(
-            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1)) / 0.1
+            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - scale)) / scale
         )
+
+    def _reward_min_base_height(self, target_height=0.3, scale=0.3):
+        """Squared exponential saturating at base_height target"""
+        # TODO: Check scale
+        error = (self.base_height - target_height) / scale
+        error = torch.clamp(error, max=0, min=None).flatten()
+        return self._sqrdexp(error)
 
     def _reward_tracking_lin_vel(self):
         """Tracking of linear velocity commands (xy axes)"""

@@ -43,6 +43,7 @@ DATA_LIST = [
 
 # Finetune for these rewards instead of the ones in the cfg
 REWARD_WEIGHTS = {
+    "min_base_height": 1.5,
     # "tracking_lin_vel": 4.0,
     # "tracking_ang_vel": 2.0,
     # "orientation": 1.0,
@@ -91,7 +92,8 @@ def get_rewards(data_struct, batches):
 
     if PLOT:
         for name, rewards in rewards_dict.items():
-            plt.plot(rewards, label=name)
+            n_steps = 200
+            plt.plot(rewards[:n_steps], label=name)
 
     return rewards_all.float()
 
