@@ -5,9 +5,10 @@ from learning.utils import remove_zero_weighted_rewards
 
 
 class FineTuneRunner:
-    def __init__(self, train_cfg, data_dict, device="cpu"):
+    def __init__(self, train_cfg, data_dict, exploration_scale=1.0, device="cpu"):
         self.parse_train_cfg(train_cfg)
         self.data_dict = data_dict
+        self.exploration_scale = exploration_scale
         self.device = device
 
     def _set_up_alg(self):
@@ -15,7 +16,12 @@ class FineTuneRunner:
         num_actions = self.data_dict["actions"].shape[-1]
         num_critic_obs = self.data_dict["critic_obs"].shape[-1]
         if self.actor_cfg["smooth_exploration"]:
-            actor = SmoothActor(num_actor_obs, num_actions, **self.actor_cfg)
+            actor = SmoothActor(
+                num_obs=num_actor_obs,
+                num_actions=num_actions,
+                exploration_scale=self.exploration_scale,
+                **self.actor_cfg,
+            )
         else:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
         critic = Critic(num_critic_obs, **self.critic_cfg)

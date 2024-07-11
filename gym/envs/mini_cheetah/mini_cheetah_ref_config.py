@@ -67,7 +67,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "IPGRunner"
+    runner_class_name = "OnPolicyRunner"
 
     class actor:
         hidden_dims = [256, 256, 128]
@@ -150,9 +150,14 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         beta = "off_policy"
         storage_size = 4 * 32 * 4096  # num_policies*num_stpes*num_envs
 
+        # Finetuning
+        learning_rate = 3e-4
+        max_gradient_steps = 10
+        batch_size = 4096
+
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
         max_iterations = 700  # number of policy updates
-        algorithm_class_name = "PPO_IPG"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32

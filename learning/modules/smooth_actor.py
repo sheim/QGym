@@ -12,8 +12,9 @@ from gym import LEGGED_GYM_ROOT_DIR
 # https://github.com/DLR-RM/stable-baselines3/blob/56f20e40a2206bbb16501a0f600e29ce1b112ef1/stable_baselines3/common/distributions.py#L421C7-L421C38
 class SmoothActor(Actor):
     weights_dist: Normal
-    _latent_sde: torch.Tensor
+    latent_sde: torch.Tensor
     exploration_matrices: torch.Tensor
+    exploration_scale: float
 
     def __init__(
         self,
@@ -23,6 +24,7 @@ class SmoothActor(Actor):
         learn_features: bool = True,
         epsilon: float = 1e-6,
         log_std_init: float = 0.0,
+        exploration_scale: float = 1.0,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -31,6 +33,7 @@ class SmoothActor(Actor):
         self.learn_features = learn_features
         self.epsilon = epsilon
         self.log_std_init = log_std_init
+        self.exploration_scale = exploration_scale  # for finetuning
 
         # Create latent NN and last layer
         self.latent_net = create_MLP(
@@ -88,16 +91,17 @@ class SmoothActor(Actor):
             with torch.no_grad():
                 observations = self.obs_rms(observations)
         # Get latent features and compute distribution
-        self._latent_sde = self.latent_net(observations)
+        self.latent_sde = self.latent_net(observations)
+        std_scaled = self.get_std * self.exploration_scale
         if not self.learn_features:
-            self._latent_sde = self._latent_sde.detach()
-        if self._latent_sde.dim() == 2:
-            variance = torch.mm(self._latent_sde**2, self.get_std**2)
-        elif self._latent_sde.dim() == 3:
-            variance = torch.einsum("abc,cd->abd", self._latent_sde**2, self.get_std**2)
+            self.latent_sde = self.latent_sde.detach()
+        if self.latent_sde.dim() == 2:
+            variance = torch.mm(self.latent_sde**2, std_scaled**2)
+        elif self.latent_sde.dim() == 3:
+            variance = torch.einsum("abc,cd->abd", self.latent_sde**2, std_scaled**2)
         else:
             raise ValueError("Invalid latent_sde dimension")
-        mean_actions = self.mean_actions_net(self._latent_sde)
+        mean_actions = self.mean_actions_net(self.latent_sde)
         self.distribution = Normal(mean_actions, torch.sqrt(variance + self.epsilon))
 
     def act(self, observations):
@@ -118,7 +122,7 @@ class SmoothActor(Actor):
         return mean_actions
 
     def get_noise(self):
-        latent_sde = self._latent_sde
+        latent_sde = self.latent_sde
         if not self.learn_features:
             latent_sde = latent_sde.detach()
         # Use batch matrix multiplication for efficient computation

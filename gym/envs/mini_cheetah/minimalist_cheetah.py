@@ -29,7 +29,7 @@ class MinimalistCheetah:
         self.grf = torch.tensor(grf, device=self.device).unsqueeze(0)
 
         phase_obs = torch.tensor(phase_obs, device=self.device).unsqueeze(0)
-        self.phase_sin = torch.sin(phase_obs)
+        self.phase_sin = phase_obs[:, 0].unsqueeze(0)
 
     def _switch(self):
         c_vel = torch.linalg.norm(self.commands, dim=1)
@@ -56,16 +56,16 @@ class MinimalistCheetah:
         error = torch.square(self.proj_gravity[:, :2]) / self.tracking_sigma
         return torch.sum(torch.exp(-error), dim=1)
 
-    def _reward_swing_grf(self):
+    def _reward_swing_grf(self, contact_thresh=0.5):
         """Reward non-zero grf during swing (0 to pi)"""
-        in_contact = torch.gt(torch.norm(self.grf, dim=-1), 50.0)
+        in_contact = torch.gt(self.grf, contact_thresh)
         ph_off = torch.gt(self.phase_sin, 0)  # phase <= pi
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
-        return -torch.sum(rew.float(), dim=1) * (1 - self._switch())
+        return -torch.sum(rew.float(), dim=1)  # * (1 - self._switch())
 
-    def _reward_stance_grf(self):
+    def _reward_stance_grf(self, contact_thresh=0.5):
         """Reward non-zero grf during stance (pi to 2pi)"""
-        in_contact = torch.gt(torch.norm(self.grf, dim=-1), 50.0)
+        in_contact = torch.gt(self.grf, contact_thresh)
         ph_off = torch.lt(self.phase_sin, 0)  # phase >= pi
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
-        return torch.sum(rew.float(), dim=1) * (1 - self._switch())
+        return torch.sum(rew.float(), dim=1)  # * (1 - self._switch())
