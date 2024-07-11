@@ -193,6 +193,7 @@ class FixedRobotCfgPPO(BaseConfig):
         # * logging
         # * check for potential saves every this many iterations
         save_interval = 50
+        log_storage = False
         run_name = ""
         experiment_name = "fixed_robot"
 

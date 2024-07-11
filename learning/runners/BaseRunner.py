@@ -10,6 +10,7 @@ class BaseRunner:
         self.env = env
         self.parse_train_cfg(train_cfg)
 
+        self.log_storage = self.cfg["log_storage"]
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
         self.num_learning_iterations = self.cfg["max_iterations"]

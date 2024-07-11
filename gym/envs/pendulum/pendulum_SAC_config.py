@@ -5,11 +5,11 @@ from gym.envs.pendulum.pendulum_config import PendulumCfg
 
 class PendulumSACCfg(PendulumCfg):
     class env(PendulumCfg.env):
-        num_envs = 1
+        num_envs = 1024
         episode_length_s = 10
 
     class init_state(PendulumCfg.init_state):
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_uniform"
         default_joint_angles = {"theta": 0.0}
         dof_pos_range = {
             "theta": [-torch.pi, torch.pi],
@@ -85,8 +85,8 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        initial_fill = 500
-        storage_size = 10**6  # 17
+        initial_fill = 0
+        storage_size = 100 * 1024  # steps_per_episode * num_envs
         batch_size = 256  # 4096
         max_gradient_steps = 1  # 10 # SB3: 1
         action_max = 2.0
@@ -106,7 +106,8 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "sac_pendulum"
-        max_iterations = 40_000  # number of policy updates
+        max_iterations = 30_000  # number of policy updates
         algorithm_class_name = "SAC"
-        save_interval = 5000
         num_steps_per_env = 1
+        save_interval = 2000
+        log_storage = True

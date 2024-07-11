@@ -6,6 +6,7 @@ from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
 from learning.storage import DictStorage
+from learning.utils import export_to_numpy
 
 logger = Logger()
 storage = DictStorage()
@@ -30,7 +31,6 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
-        self.save()
 
         # * start up storage
         transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
@@ -42,9 +42,19 @@ class OnPolicyRunner(BaseRunner):
                 "critic_obs": critic_obs,
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
-                "dones": self.get_timed_out(),
+                "timed_out": self.get_timed_out(),
+                "terminated": self.get_terminated(),
+                "dones": self.get_timed_out() | self.get_terminated(),
             }
         )
+        if self.log_storage:
+            transition.update(
+                {
+                    "dof_pos": self.env.dof_pos,
+                    "dof_vel": self.env.dof_vel,
+                }
+            )
+
         storage.initialize(
             transition,
             self.env.num_envs,
@@ -52,9 +62,11 @@ class OnPolicyRunner(BaseRunner):
             device=self.device,
         )
 
+        self.save()
         # burn in observation normalization.
         if self.actor_cfg["normalize_obs"] or self.critic_cfg["normalize_obs"]:
             self.burn_in_normalization()
+        self.env.reset()
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
@@ -106,15 +118,27 @@ class OnPolicyRunner(BaseRunner):
                             "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
                             "timed_out": timed_out,
+                            "terminated": terminated,
                             "dones": dones,
                         }
                     )
+                    if self.log_storage:
+                        transition.update(
+                            {
+                                "dof_pos": self.env.dof_pos,
+                                "dof_vel": self.env.dof_vel,
+                            }
+                        )
+
                     storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
                     logger.finish_step(dones)
             logger.toc("collection")
+
+            if self.it % self.save_interval == 0:
+                self.save()
 
             logger.tic("learning")
             self.alg.update(storage.data)
@@ -127,9 +151,7 @@ class OnPolicyRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-            if self.it % self.save_interval == 0:
-                self.save()
-        self.save()
+        # self.save()
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -188,6 +210,10 @@ class OnPolicyRunner(BaseRunner):
             },
             path,
         )
+        if self.log_storage:
+            path_data = os.path.join(self.log_dir, "data_{}".format(self.it))
+            torch.save(storage.data.cpu(), path_data + ".pt")
+            export_to_numpy(storage.data, path_data + ".npz")
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
