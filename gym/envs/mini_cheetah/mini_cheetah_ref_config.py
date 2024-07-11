@@ -73,7 +73,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = True
+        smooth_exploration = False
         exploration_sample_freq = 16
         obs = [
             "base_ang_vel",
