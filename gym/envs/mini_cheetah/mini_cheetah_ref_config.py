@@ -129,13 +129,13 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 collision = 0.0
                 action_rate = 0.01
                 action_rate2 = 0.001
-                stand_still = 0.0
+                stand_still = 2.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 1.5
-                swing_grf = 1.5
-                stance_grf = 1.5
+                reference_traj = 0.0
+                swing_grf = 3.0
+                stance_grf = 3.0
 
             class termination_weight:
                 termination = 0.15
@@ -151,9 +151,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         storage_size = 4 * 32 * 4096  # num_policies*num_stpes*num_envs
 
         # Finetuning
-        learning_rate = 3e-4
-        max_gradient_steps = 10
-        batch_size = 4096
+        # learning_rate = 3e-4
+        # max_gradient_steps = 10
+        # batch_size = 4096
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

@@ -44,11 +44,21 @@ class MiniCheetahRef(MiniCheetah):
 
     def _resample_commands(self, env_ids):
         super()._resample_commands(env_ids)
-        # * with 10% chance, reset to 0 commands
-        rand_ids = torch_rand_float(
-            0, 1, (len(env_ids), 1), device=self.device
-        ).squeeze(1)
-        self.commands[env_ids, :3] *= (rand_ids < 0.9).unsqueeze(1)
+        # * with 10% chance, reset to 0 commands except for forward
+        self.commands[env_ids, 1:] *= (
+            torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+            < 0.9
+        ).unsqueeze(1)
+        # * with 10% chance, reset to 0 commands except for rotation
+        self.commands[env_ids, :2] *= (
+            torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+            < 0.9
+        ).unsqueeze(1)
+        # * with 10% chance, reset to 0
+        self.commands[env_ids, :] *= (
+            torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+            < 0.9
+        ).unsqueeze(1)
 
     def _switch(self):
         c_vel = torch.linalg.norm(self.commands, dim=1)

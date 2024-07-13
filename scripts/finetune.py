@@ -11,17 +11,20 @@ from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
 import scipy.io
+import numpy as np
 from tensordict import TensorDict
 import matplotlib.pyplot as plt
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
-LOAD_RUN = "Jul08_13-02-15_PPO32_S16"
-LOG_FILE = "PPO32_S16_Jul08_expl08.mat"
+LOAD_RUN = "Jul11_17-55-01_PPO32_S16_grf3"
+LOG_FILE = "PPO32_S16_grf3_expl1.mat"
 
 TRAJ_LENGTH = 100  # split data into chunks of this length
-EXPLORATION_SCALE = 0.8  # scale std in SmoothActor
-ITERATION = 500
+EXPLORATION_SCALE = 1  # scale std in SmoothActor
+ITERATION = 700  # load this iteration
+
 PLOT = True
+PLOT_N = 300  # number of steps to plot
 
 # Data struct fields from Robot-Software logs
 DATA_LIST = [
@@ -90,10 +93,14 @@ def get_rewards(data_struct, batches):
         rewards_all = torch.cat((rewards_all, total_rewards), dim=0)
     rewards_all = rewards_all.reshape((TRAJ_LENGTH, batches))
 
-    if PLOT:
-        for name, rewards in rewards_dict.items():
-            n_steps = 200
-            plt.plot(rewards[:n_steps], label=name)
+    rewards_stats = {}
+    for name, rewards in rewards_dict.items():
+        rewards = np.array(rewards)
+        rewards_stats[name] = [rewards.mean(), rewards.std()]
+        if PLOT:
+            plt.plot(rewards[:PLOT_N], label=name)
+
+    print(rewards_stats)
 
     return rewards_all.float()
 
