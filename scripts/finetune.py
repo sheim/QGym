@@ -17,12 +17,20 @@ from tensordict import TensorDict
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
 LOAD_RUN = "Jul13_01-49-59_PPO32_S16"
-LOG_FILE = "PPO_701_a001_expl08.mat"
+# LOAD_RUN = "Jul12_15-53-57_IPG32_S16"
+LOG_FILE = "PPO_700_expl08.mat"
+ITERATION = 700  # load this iteration
+
+# IPG_BUFFER = [
+#     "IPG_700_expl08.mat",
+#     "IPG_701_expl08.mat",
+# ]
+
+LOG_REWARDS = False  # whether to log to dataframe
 REWARDS_FILE = "rewards_test.csv"
 
 TRAJ_LENGTH = 100  # split data into chunks of this length
 EXPLORATION_SCALE = 0.8  # scale std in SmoothActor
-ITERATION = 701  # load this iteration
 
 # Data struct fields from Robot-Software logs
 DATA_LIST = [
@@ -58,28 +66,25 @@ REWARD_WEIGHTS = {
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def get_obs(obs_list, data_struct, batches):
+def get_obs(obs_list, data_struct, batch_size):
     obs_all = torch.empty(0).to(DEVICE)
     for obs_name in obs_list:
         data_idx = DATA_LIST.index(obs_name)
         obs = torch.tensor(data_struct[data_idx]).to(DEVICE)
-        if obs.shape[0] == 1:
-            obs = obs.T  # base_height has shape (1, data_length)
-        obs = obs[: TRAJ_LENGTH * batches, :]
-        obs = obs.reshape((TRAJ_LENGTH, batches, -1))
+        obs = obs.reshape((batch_size, 1, -1))  # shape (batch_size, 1, n)
         obs_all = torch.cat((obs_all, obs), dim=-1)
 
     return obs_all.float()
 
 
-def get_rewards(data_struct, num_trajs):
+def get_rewards(data_struct, batch_size):
     mini_cheetah = MinimalistCheetah(device=DEVICE)
     rewards_dict = {name: [] for name in REWARD_WEIGHTS.keys()}  # for plotting
     rewards_all = torch.empty(0).to(DEVICE)
 
-    for i in range(TRAJ_LENGTH * num_trajs):
+    for i in range(batch_size):
         mini_cheetah.set_states(
-            base_height=data_struct[1][:, i],  # shape (1, data_length)
+            base_height=data_struct[1][:, i],  # shape (1, batch_size)
             base_lin_vel=data_struct[2][i],
             base_ang_vel=data_struct[3][i],
             proj_gravity=data_struct[4][i],
@@ -101,30 +106,28 @@ def get_rewards(data_struct, num_trajs):
 
     rewards_dict["total"] = rewards_all.tolist()
 
-    # Save rewards in dataframe
-    rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
-    if not os.path.exists(rewards_path):
-        rewards_df = pd.DataFrame(columns=["iteration", "type", "mean", "std"])
-    else:
-        rewards_df = pd.read_csv(rewards_path)
-    for name, rewards in rewards_dict.items():
-        rewards = np.array(rewards)
-        mean = rewards.mean()
-        std = rewards.std()
-        rewards_df = rewards_df._append(
-            {
-                "iteration": str(ITERATION) + "_expl",
-                "type": name,
-                "mean": mean,
-                "std": std,
-            },
-            ignore_index=True,
-        )
-    rewards_df.to_csv(rewards_path, index=False)
-    print(rewards_df)
+    if LOG_REWARDS:
+        rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
+        if not os.path.exists(rewards_path):
+            rewards_df = pd.DataFrame(columns=["iteration", "type", "mean", "std"])
+        else:
+            rewards_df = pd.read_csv(rewards_path)
+        for name, rewards in rewards_dict.items():
+            rewards = np.array(rewards)
+            mean = rewards.mean()
+            std = rewards.std()
+            rewards_df = rewards_df._append(
+                {
+                    "iteration": str(ITERATION) + "_expl",
+                    "type": name,
+                    "mean": mean,
+                    "std": std,
+                },
+                ignore_index=True,
+            )
+        rewards_df.to_csv(rewards_path, index=False)
+        print(rewards_df)
 
-    # Return total rewards
-    rewards_all = rewards_all.reshape((TRAJ_LENGTH, num_trajs))
     return rewards_all.float()
 
 
@@ -132,16 +135,14 @@ def get_data_dict(train_cfg, name="SMOOTH_RL_CONTROLLER"):
     path = os.path.join(ROOT_DIR, LOAD_RUN, LOG_FILE)
     data = scipy.io.loadmat(path)
     data_struct = data[name][0][0]
-
-    data_length = data_struct[1].shape[1]  # base_height: shape (1, data_length)
-    num_trajs = data_length // TRAJ_LENGTH
+    batch_size = data_struct[1].shape[1]  # base_height: shape (1, batch_size)
     data_dict = TensorDict(
         {},
         device=DEVICE,
-        batch_size=(TRAJ_LENGTH - 1, num_trajs),  # -1 for next_obs
+        batch_size=(batch_size - 1, 1),  # -1 for next_obs
     )
-    actor_obs = get_obs(train_cfg["actor"]["obs"], data_struct, num_trajs)
-    critic_obs = get_obs(train_cfg["critic"]["obs"], data_struct, num_trajs)
+    actor_obs = get_obs(train_cfg["actor"]["obs"], data_struct, batch_size)
+    critic_obs = get_obs(train_cfg["critic"]["obs"], data_struct, batch_size)
 
     data_dict["actor_obs"] = actor_obs[:-1]
     data_dict["next_actor_obs"] = actor_obs[1:]
@@ -149,24 +150,18 @@ def get_data_dict(train_cfg, name="SMOOTH_RL_CONTROLLER"):
     data_dict["next_critic_obs"] = critic_obs[1:]
 
     actions_idx = DATA_LIST.index("dof_pos_target")
-    actions = torch.tensor(data_struct[actions_idx]).to(DEVICE)
-    actions = actions[: TRAJ_LENGTH * num_trajs, :]
-    actions = actions.reshape((TRAJ_LENGTH, num_trajs, -1))
+    actions = torch.tensor(data_struct[actions_idx]).to(DEVICE).float()
+    actions = actions.reshape((batch_size, 1, -1))  # shape (batch_size, 1, n)
     data_dict["actions"] = actions[:-1]
 
-    rewards = get_rewards(data_struct, num_trajs)
+    rewards = get_rewards(data_struct, batch_size)
+    rewards = rewards.reshape((batch_size, 1))  # shape (batch_size, 1)
     data_dict["rewards"] = rewards[:-1]
 
     # Assume no termination
-    data_dict["timed_out"] = torch.zeros(
-        TRAJ_LENGTH - 1, num_trajs, device=DEVICE, dtype=bool
-    )
-    data_dict["terminal"] = torch.zeros(
-        TRAJ_LENGTH - 1, num_trajs, device=DEVICE, dtype=bool
-    )
-    data_dict["dones"] = torch.zeros(
-        TRAJ_LENGTH - 1, num_trajs, device=DEVICE, dtype=bool
-    )
+    data_dict["timed_out"] = torch.zeros(batch_size - 1, 1, device=DEVICE, dtype=bool)
+    data_dict["terminal"] = torch.zeros(batch_size - 1, 1, device=DEVICE, dtype=bool)
+    data_dict["dones"] = torch.zeros(batch_size - 1, 1, device=DEVICE, dtype=bool)
 
     return data_dict
 
@@ -179,7 +174,10 @@ def setup():
     data_dict = get_data_dict(train_cfg)
 
     runner = FineTuneRunner(
-        train_cfg, data_dict, exploration_scale=EXPLORATION_SCALE, device=DEVICE
+        train_cfg,
+        data_dict,
+        exploration_scale=EXPLORATION_SCALE,
+        device=DEVICE,
     )
     runner._set_up_alg()
 

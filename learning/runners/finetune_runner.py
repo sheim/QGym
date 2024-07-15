@@ -24,9 +24,25 @@ class FineTuneRunner:
             )
         else:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
-        critic = Critic(num_critic_obs, **self.critic_cfg)
-        alg_class = eval(self.cfg["algorithm_class_name"])
-        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
+
+        alg_class_name = self.cfg["algorithm_class_name"]
+        alg_class = eval(alg_class_name)
+
+        if alg_class_name == "PPO_IPG":
+            critic_v = Critic(num_critic_obs, **self.critic_cfg)
+            critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
+            target_critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
+            self.alg = alg_class(
+                actor,
+                critic_v,
+                critic_q,
+                target_critic_q,
+                device=self.device,
+                **self.alg_cfg,
+            )
+        else:
+            critic = Critic(num_critic_obs, **self.critic_cfg)
+            self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def parse_train_cfg(self, train_cfg):
         self.cfg = train_cfg["runner"]
@@ -37,9 +53,27 @@ class FineTuneRunner:
 
     def learn(self):
         # Single update on data dict
-        self.alg.update(self.data_dict)
+        if self.cfg["algorithm_class_name"] == "PPO_IPG":
+            # TODO: How to handle off-policy data
+            self.alg.update(self.data_dict, self.data_dict)
+        else:
+            self.alg.update(self.data_dict)
 
     def save(self, path):
+        if self.cfg["algorithm_class_name"] == "PPO_IPG":
+            torch.save(
+                {
+                    "actor_state_dict": self.alg.actor.state_dict(),
+                    "critic_v_state_dict": self.alg.critic_v.state_dict(),
+                    "critic_q_state_dict": self.alg.critic_q.state_dict(),
+                    "optimizer_state_dict": self.alg.optimizer.state_dict(),
+                    "critic_v_opt_state_dict": self.alg.critic_v_optimizer.state_dict(),
+                    "critic_q_opt_state_dict": self.alg.critic_q_optimizer.state_dict(),
+                    "iter": 1,  # only one iteration
+                },
+                path,
+            )
+            return
         torch.save(
             {
                 "actor_state_dict": self.alg.actor.state_dict(),
@@ -54,12 +88,25 @@ class FineTuneRunner:
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
-        self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
-        if load_optimizer:
-            self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
-            self.alg.critic_optimizer.load_state_dict(
-                loaded_dict["critic_optimizer_state_dict"]
-            )
+
+        if self.cfg["algorithm_class_name"] == "PPO_IPG":
+            self.alg.critic_v.load_state_dict(loaded_dict["critic_v_state_dict"])
+            self.alg.critic_q.load_state_dict(loaded_dict["critic_q_state_dict"])
+            if load_optimizer:
+                self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
+                self.alg.critic_v_optimizer.load_state_dict(
+                    loaded_dict["critic_v_opt_state_dict"]
+                )
+                self.alg.critic_q_optimizer.load_state_dict(
+                    loaded_dict["critic_q_opt_state_dict"]
+                )
+        else:
+            self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
+            if load_optimizer:
+                self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
+                self.alg.critic_optimizer.load_state_dict(
+                    loaded_dict["critic_optimizer_state_dict"]
+                )
 
     def export(self, path):
         # Need to make a copy of actor
