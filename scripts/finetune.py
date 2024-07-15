@@ -12,35 +12,33 @@ import os
 import torch
 import scipy.io
 import numpy as np
+import pandas as pd
 from tensordict import TensorDict
-import matplotlib.pyplot as plt
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
-LOAD_RUN = "Jul11_17-55-01_PPO32_S16_grf3"
-LOG_FILE = "PPO32_S16_grf3_expl1.mat"
+LOAD_RUN = "Jul13_01-49-59_PPO32_S16"
+LOG_FILE = "PPO_701_a001_expl08.mat"
+REWARDS_FILE = "rewards_test.csv"
 
 TRAJ_LENGTH = 100  # split data into chunks of this length
-EXPLORATION_SCALE = 1  # scale std in SmoothActor
-ITERATION = 700  # load this iteration
-
-PLOT = True
-PLOT_N = 300  # number of steps to plot
+EXPLORATION_SCALE = 0.8  # scale std in SmoothActor
+ITERATION = 701  # load this iteration
 
 # Data struct fields from Robot-Software logs
 DATA_LIST = [
     "header",
-    "base_height",  # shape (1, data_length)
-    # the following are all shape (data_length, n)
-    "base_lin_vel",
-    "base_ang_vel",
-    "projected_gravity",
-    "commands",
-    "dof_pos_obs",
-    "dof_vel",
-    "phase_obs",
-    "grf",
-    "dof_pos_target",
-    "exploration_noise",
+    "base_height",  # 1 shape: (1, data_length)
+    # the following are all shape: (data_length, n)
+    "base_lin_vel",  # 2
+    "base_ang_vel",  # 3
+    "projected_gravity",  # 4
+    "commands",  # 5
+    "dof_pos_obs",  # 6
+    "dof_vel",  # 7
+    "phase_obs",  # 8
+    "grf",  # 9
+    "dof_pos_target",  # 10
+    "exploration_noise",  # 11
     "footer",
 ]
 
@@ -49,9 +47,12 @@ REWARD_WEIGHTS = {
     "min_base_height": 1.5,
     # "tracking_lin_vel": 4.0,
     # "tracking_ang_vel": 2.0,
-    # "orientation": 1.0,
-    "swing_grf": 1.5,
-    "stance_grf": 1.5,
+    "orientation": 1.0,
+    "swing_grf": 1.0,
+    "stance_grf": 1.0,
+    "stand_still": 1.0,
+    "action_rate": 0.001,
+    "action_rate2": 0.001,
 }
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -71,37 +72,59 @@ def get_obs(obs_list, data_struct, batches):
     return obs_all.float()
 
 
-def get_rewards(data_struct, batches):
+def get_rewards(data_struct, num_trajs):
+    mini_cheetah = MinimalistCheetah(device=DEVICE)
     rewards_dict = {name: [] for name in REWARD_WEIGHTS.keys()}  # for plotting
     rewards_all = torch.empty(0).to(DEVICE)
-    for i in range(TRAJ_LENGTH * batches):
-        mini_cheetah = MinimalistCheetah(device=DEVICE)
+
+    for i in range(TRAJ_LENGTH * num_trajs):
         mini_cheetah.set_states(
             base_height=data_struct[1][:, i],  # shape (1, data_length)
             base_lin_vel=data_struct[2][i],
             base_ang_vel=data_struct[3][i],
             proj_gravity=data_struct[4][i],
             commands=data_struct[5][i],
+            dof_pos_obs=data_struct[6][i],
+            dof_vel=data_struct[7][i],
             phase_obs=data_struct[8][i],
             grf=data_struct[9][i],
+            dof_pos_target=data_struct[10][i],
         )
         total_rewards = 0
         for name, weight in REWARD_WEIGHTS.items():
-            reward = eval(f"mini_cheetah._reward_{name}()")
+            reward = weight * eval(f"mini_cheetah._reward_{name}()")
             rewards_dict[name].append(reward.item())
-            total_rewards += weight * reward
+            total_rewards += reward
         rewards_all = torch.cat((rewards_all, total_rewards), dim=0)
-    rewards_all = rewards_all.reshape((TRAJ_LENGTH, batches))
+        # Post process mini cheetah
+        mini_cheetah.post_process()
 
-    rewards_stats = {}
+    rewards_dict["total"] = rewards_all.tolist()
+
+    # Save rewards in dataframe
+    rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
+    if not os.path.exists(rewards_path):
+        rewards_df = pd.DataFrame(columns=["iteration", "type", "mean", "std"])
+    else:
+        rewards_df = pd.read_csv(rewards_path)
     for name, rewards in rewards_dict.items():
         rewards = np.array(rewards)
-        rewards_stats[name] = [rewards.mean(), rewards.std()]
-        if PLOT:
-            plt.plot(rewards[:PLOT_N], label=name)
+        mean = rewards.mean()
+        std = rewards.std()
+        rewards_df = rewards_df._append(
+            {
+                "iteration": str(ITERATION) + "_expl",
+                "type": name,
+                "mean": mean,
+                "std": std,
+            },
+            ignore_index=True,
+        )
+    rewards_df.to_csv(rewards_path, index=False)
+    print(rewards_df)
 
-    print(rewards_stats)
-
+    # Return total rewards
+    rewards_all = rewards_all.reshape((TRAJ_LENGTH, num_trajs))
     return rewards_all.float()
 
 
@@ -183,13 +206,8 @@ def finetune(runner):
     save_path = os.path.join(ROOT_DIR, LOAD_RUN, "model_" + str(ITERATION + 1) + ".pt")
     runner.save(save_path)
 
-    export_path = os.path.join(ROOT_DIR, LOAD_RUN, "exported_finetuned")
+    export_path = os.path.join(ROOT_DIR, LOAD_RUN, "exported_" + str(ITERATION + 1))
     runner.export(export_path)
-
-    if PLOT:
-        plt.title("Rewards")
-        plt.legend()
-        plt.show()
 
 
 if __name__ == "__main__":
