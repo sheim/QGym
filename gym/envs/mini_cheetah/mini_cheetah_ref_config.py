@@ -62,7 +62,17 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         tracking_sigma = 0.25
 
     class scaling(MiniCheetahCfg.scaling):
-        pass
+        base_ang_vel = 0.3
+        base_lin_vel = BASE_HEIGHT_REF
+        se_base_lin_vel = base_lin_vel
+        dof_vel = 4 * [2.0, 2.0, 4.0]
+        base_height = 0.3
+        se_base_height = base_height
+        dof_pos = 4 * [0.2, 0.3, 0.3]
+        dof_pos_obs = dof_pos
+        dof_pos_target = 4 * [0.2, 0.3, 0.3]
+        tau_ff = 4 * [18, 18, 28]
+        commands = [3, 1, 3]
 
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
@@ -76,6 +86,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         smooth_exploration = False
         exploration_sample_freq = 16
         obs = [
+            "se_base_height",
+            "se_base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -138,6 +150,26 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
 
             class termination_weight:
                 termination = 0.15
+
+    class state_estimator:
+        class network:
+            hidden_dims = [128, 128]
+            activation = "elu"
+            dropouts = None
+
+        obs = [
+            "base_ang_vel",
+            "projected_gravity",
+            "dof_pos_obs",
+            "dof_vel",
+            "phase_obs",
+        ]
+        targets = ["base_height", "base_lin_vel"]
+        write_to = ["se_base_height", "se_base_lin_vel"]
+        batch_size = 2**15
+        max_gradient_steps = 10
+        normalize_obs = True
+        learning_rate = 1e-4
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         pass

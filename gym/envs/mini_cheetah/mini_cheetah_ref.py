@@ -14,6 +14,8 @@ class MiniCheetahRef(MiniCheetah):
         self.leg_ref = 3 * to_torch(pd.read_csv(csv_path).to_numpy(), device=sim_device)
         self.omega = 2 * torch.pi * cfg.control.gait_freq
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+        self.se_base_height = torch.zeros_like(self.base_height)
+        self.se_base_lin_vel = torch.zeros_like(self.base_lin_vel)
 
     def _init_buffers(self):
         super()._init_buffers()
