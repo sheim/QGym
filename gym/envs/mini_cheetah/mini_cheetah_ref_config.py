@@ -25,7 +25,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         # * PD Drive parameters:
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
-        gait_freq = 3.0
+        gait_freq = [0.0, 3.0]
         ctrl_frequency = 100
         desired_sim_frequency = 500
 
@@ -95,7 +95,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "phase_obs",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -125,7 +125,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         class reward:
             class weights:
@@ -144,7 +144,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 1.5
+                reference_traj = 0.0
                 swing_grf = 1.5
                 stance_grf = 1.5
 
@@ -168,7 +168,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         write_to = ["se_base_height", "se_base_lin_vel"]
         batch_size = 2**15
         max_gradient_steps = 10
-        normalize_obs = True
+        normalize_obs = False
         learning_rate = 1e-4
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
@@ -177,6 +177,6 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32  # deprecate

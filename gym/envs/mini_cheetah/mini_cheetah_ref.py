@@ -12,10 +12,8 @@ class MiniCheetahRef(MiniCheetah):
             LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR
         )
         self.leg_ref = 3 * to_torch(pd.read_csv(csv_path).to_numpy(), device=sim_device)
-        self.omega = 2 * torch.pi * cfg.control.gait_freq
+        # self.omega = 2 * torch.pi * cfg.control.gait_freq
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
-        self.se_base_height = torch.zeros_like(self.base_height)
-        self.se_base_lin_vel = torch.zeros_like(self.base_lin_vel)
 
     def _init_buffers(self):
         super()._init_buffers()
@@ -25,12 +23,18 @@ class MiniCheetahRef(MiniCheetah):
         self.phase_obs = torch.zeros(
             self.num_envs, 2, dtype=torch.float, device=self.device
         )
+        self.omega = torch.ones(self.num_envs, 1, device=self.device)
+        self.se_base_height = torch.zeros_like(self.base_height)
+        self.se_base_lin_vel = torch.zeros_like(self.base_lin_vel)
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
         self.phase[env_ids] = torch_rand_float(
             0, torch.pi, shape=self.phase[env_ids].shape, device=self.device
         )
+
+    def _reset_gait_frequencies(self, env_ids):
+        self.omega = torch_rand_float()
 
     def _post_physx_step(self):
         super()._post_physx_step()
