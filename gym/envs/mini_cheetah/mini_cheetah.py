@@ -6,6 +6,8 @@ from gym.envs.base.legged_robot import LeggedRobot
 class MiniCheetah(LeggedRobot):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+        self.se_base_height = torch.zeros_like(self.base_height)
+        self.se_base_lin_vel = torch.zeros_like(self.base_lin_vel)
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""

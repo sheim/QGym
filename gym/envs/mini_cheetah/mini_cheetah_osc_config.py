@@ -74,7 +74,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         coupling = 1  # 0.02
         osc_bool = False
         grf_bool = False
-        randomize_osc_params = False
+        randomize_osc_params = True
         grf_threshold = 0.1  # 20. # Normalized to body weight
         omega_range = [1.0, 4.0]  # [0.0, 10.]
         coupling_range = [
@@ -170,6 +170,8 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
         smooth_exploration = False
 
         obs = [
+            "base_height",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -226,6 +228,26 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             class termination_weight:
                 termination = 15.0 / 100.0
 
+    class state_estimator:
+        class network:
+            hidden_dims = [128, 128]
+            activation = "elu"
+            dropouts = None
+
+        obs = [
+            "base_ang_vel",
+            "projected_gravity",
+            "dof_pos_obs",
+            "dof_vel",
+            "oscillator_obs",
+        ]
+        targets = ["base_height", "base_lin_vel"]
+        write_to = ["se_base_height", "se_base_lin_vel"]
+        batch_size = 2**15
+        max_gradient_steps = 10
+        normalize_obs = True
+        learning_rate = 1e-4
+
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # training params
         value_loss_coef = 1.0
@@ -245,6 +267,6 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "FullSend"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 1000  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32

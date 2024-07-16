@@ -29,18 +29,23 @@ class MiniCheetahRef(MiniCheetah):
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
+        self._reset_gait_frequencies(env_ids)
         self.phase[env_ids] = torch_rand_float(
             0, torch.pi, shape=self.phase[env_ids].shape, device=self.device
         )
 
     def _reset_gait_frequencies(self, env_ids):
-        self.omega = torch_rand_float()
+        self.omega[env_ids, 0] = torch_rand_float(
+            self.cfg.control.gait_freq[0],
+            self.cfg.control.gait_freq[1],
+            (len(env_ids), 1),
+            device=self.device,
+        ).squeeze(1)
 
     def _post_physx_step(self):
         super()._post_physx_step()
-        self.phase = (
-            self.phase + self.dt * self.omega / self.cfg.control.decimation
-        ).fmod(2 * torch.pi)
+        self.phase += self.dt * 2 * torch.pi * self.omega / self.cfg.control.decimation
+        self.phase.fmod(2 * torch.pi)
 
     def _post_decimation_step(self):
         super()._post_decimation_step()
@@ -61,6 +66,19 @@ class MiniCheetahRef(MiniCheetah):
         return torch.exp(
             -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1)) / 0.1
         )
+
+    def _reward_trot(self):
+        off_phase = torch.fmod(self.phase + torch.pi, 2 * torch.pi)
+        phases = torch.cat((self.phase, off_phase, off_phase, self.phase), dim=1)
+        grf = self._compute_grf()
+        return (grf * torch.sin(phases)).mean(dim=1) * (1 - self._switch())
+
+    def _compute_grf(self, grf_norm=True):
+        grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
+        if grf_norm:
+            return torch.clamp_max(grf / 80.0, 1.0)
+        else:
+            return grf
 
     def _reward_swing_grf(self):
         """Reward non-zero grf during swing (0 to pi)"""

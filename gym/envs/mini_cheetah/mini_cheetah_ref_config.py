@@ -44,7 +44,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
             + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
         )
         foot_name = "foot"
-        penalize_contacts_on = ["shank"]
+        penalize_contacts_on = ["shank", "thigh"]
         terminate_after_contacts_on = ["base", "thigh"]
         collapse_fixed_joints = False
         fix_base_link = False
@@ -86,8 +86,8 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         smooth_exploration = False
         exploration_sample_freq = 16
         obs = [
-            "se_base_height",
-            "se_base_lin_vel",
+            "base_height",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -145,8 +145,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
                 reference_traj = 0.0
-                swing_grf = 1.5
-                stance_grf = 1.5
+                # swing_grf = 1.5
+                # stance_grf = 1.5
+                trot = 1.5
 
             class termination_weight:
                 termination = 0.15
