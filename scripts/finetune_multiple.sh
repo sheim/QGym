@@ -8,19 +8,16 @@ N_RUNS=5
 
 # Set directories
 QGYM_DIR="/home/lmolnar/workspace/QGym"
+RS_DIR="/home/lmolnar/workspace/Robot-Software"
+
 QGYM_LOG_DIR="${QGYM_DIR}/logs/mini_cheetah_ref/${LOAD_RUN}"
 
-RS_DIR="/home/lmolnar/workspace/Robot-Software"
-RS_POLICY_DIR="${RS_DIR}/config/systems/quadruped/controllers/policies"
-
-# Change name of export folder
+# Change default folder name and copy to RS
 mv ${QGYM_LOG_DIR}/exported ${QGYM_LOG_DIR}/exported_${CHECKPOINT}
+cp ${QGYM_LOG_DIR}/exported_${CHECKPOINT}/* ${RS_DIR}/config/systems/quadruped/controllers/policies
 
-for i in {1..N_RUNS}
+for i in $(seq 1 $N_RUNS)
 do
-    # Copy exported files to RS
-    cp ${QGYM_LOG_DIR}/exported_${CHECKPOINT}/* ${RS_POLICY_DIR}
-
     # Store LCM logs in file labeled with checkpoint
     FILE=${RS_DIR}/logging/lcm_logs/${CHECKPOINT}
     if [ -f "$FILE" ]; then
@@ -38,12 +35,15 @@ do
     # Convert logs to .mat and copy to QGym
     conda deactivate
     conda activate robot-sw
-    ${RS_DIR}/logging/scripts/sim_data_convert.sh -l
+    ${RS_DIR}/logging/scripts/sim_data_convert.sh ${CHECKPOINT}
     cp ${RS_DIR}/logging/matlab_logs/${CHECKPOINT}.mat ${QGYM_LOG_DIR}
 
     # Finetune in QGym
     conda deactivate
     conda activate qgym
     python ${QGYM_DIR}/scripts/finetune.py --task=mini_cheetah_finetune --headless --load_run=${LOAD_RUN} --checkpoint=${CHECKPOINT}
+
+    # Copy policy to RS
     CHECKPOINT=$((CHECKPOINT + 1))
+    cp ${QGYM_LOG_DIR}/exported_${CHECKPOINT}/* ${RS_DIR}/config/systems/quadruped/controllers/policies
 done

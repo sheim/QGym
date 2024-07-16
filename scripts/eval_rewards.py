@@ -11,10 +11,8 @@ import matplotlib.pyplot as plt
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
 LOAD_RUN = "Jul13_01-49-59_PPO32_S16"
-LOG_FILE = "PPO_701_a001.mat"
-REWARDS_FILE = "rewards_a001.csv"
-
-ITERATION = 701  # load this iteration
+REWARDS_FILE = "rewards.csv"
+ITERATIONS = range(700, 705)
 
 PLOT = True
 PLOT_N = 1000  # number of steps to plot
@@ -37,7 +35,6 @@ DATA_LIST = [
     "footer",
 ]
 
-# Finetune for these rewards instead of the ones in the cfg
 REWARD_WEIGHTS = {
     "min_base_height": 1.5,
     # "tracking_lin_vel": 4.0,
@@ -50,10 +47,10 @@ REWARD_WEIGHTS = {
     "action_rate2": 0.001,
 }
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = "cuda"
 
 
-def get_rewards(data_struct):
+def get_rewards(it, data_struct, rewards_path):
     data_length = data_struct[1].shape[1]  # base_height: shape (1, data_length)
 
     mini_cheetah = MinimalistCheetah(device=DEVICE)
@@ -85,7 +82,6 @@ def get_rewards(data_struct):
     rewards_dict["total"] = rewards_all.tolist()
 
     # Save rewards in dataframe
-    rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
     if not os.path.exists(rewards_path):
         rewards_df = pd.DataFrame(columns=["iteration", "type", "mean", "std"])
     else:
@@ -96,7 +92,7 @@ def get_rewards(data_struct):
         std = rewards.std()
         rewards_df = rewards_df._append(
             {
-                "iteration": ITERATION,
+                "iteration": it,
                 "type": name,
                 "mean": mean,
                 "std": std,
@@ -104,23 +100,31 @@ def get_rewards(data_struct):
             ignore_index=True,
         )
         if PLOT:
+            plt.figure(it)
             plt.plot(rewards[:PLOT_N], label=name)
+            plt.title(f"Rewards Iteration {it}")
+            plt.legend()
+            plt.savefig(f"{ROOT_DIR}/{LOAD_RUN}/rewards_{it}.png")
     rewards_df.to_csv(rewards_path, index=False)
-    print(rewards_df)
 
 
 def setup(name="SMOOTH_RL_CONTROLLER"):
-    path = os.path.join(ROOT_DIR, LOAD_RUN, LOG_FILE)
-    data = scipy.io.loadmat(path)
-    data_struct = data[name][0][0]
-    return data_struct
+    data_dict = {}
+    for it in ITERATIONS:
+        path = os.path.join(ROOT_DIR, LOAD_RUN, f"{it}.mat")
+        data = scipy.io.loadmat(path)
+        data_dict[it] = data[name][0][0]
+    return data_dict
 
 
 if __name__ == "__main__":
-    data_struct = setup()
-    get_rewards(data_struct)
+    data_dict = setup()
+    rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
+    if os.path.exists(rewards_path):
+        os.remove(rewards_path)
 
-    if PLOT:
-        plt.title("Rewards")
-        plt.legend()
-        plt.show()
+    for it, data_struct in data_dict.items():
+        get_rewards(it, data_struct, rewards_path)
+
+    rewards_df = pd.read_csv(rewards_path)
+    print(rewards_df)
