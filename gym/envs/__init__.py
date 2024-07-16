@@ -27,6 +27,7 @@ config_dict = {
     "MiniCheetahCfg": ".mini_cheetah.mini_cheetah_config",
     "MiniCheetahRefCfg": ".mini_cheetah.mini_cheetah_ref_config",
     "MiniCheetahOscCfg": ".mini_cheetah.mini_cheetah_osc_config",
+    "MiniCheetahFineTuneCfg": ".mini_cheetah.mini_cheetah_finetune_config",
     "MITHumanoidCfg": ".mit_humanoid.mit_humanoid_config",
     "A1Cfg": ".a1.a1_config",
     "AnymalCFlatCfg": ".anymal_c.flat.anymal_c_flat_config",
@@ -39,6 +40,7 @@ runner_config_dict = {
     "MiniCheetahRunnerCfg": ".mini_cheetah.mini_cheetah_config",
     "MiniCheetahRefRunnerCfg": ".mini_cheetah.mini_cheetah_ref_config",
     "MiniCheetahOscRunnerCfg": ".mini_cheetah.mini_cheetah_osc_config",
+    "MiniCheetahFineTuneRunnerCfg": ".mini_cheetah.mini_cheetah_finetune_config",
     "MITHumanoidRunnerCfg": ".mit_humanoid.mit_humanoid_config",
     "A1RunnerCfg": ".a1.a1_config",
     "AnymalCFlatRunnerCfg": ".anymal_c.flat.anymal_c_flat_config",
@@ -58,6 +60,11 @@ task_dict = {
         "MiniCheetahOsc",
         "MiniCheetahOscCfg",
         "MiniCheetahOscRunnerCfg",
+    ],
+    "mini_cheetah_finetune": [
+        "MiniCheetahRef",
+        "MiniCheetahFineTuneCfg",
+        "MiniCheetahFineTuneRunnerCfg",
     ],
     "humanoid": ["MIT_Humanoid", "MITHumanoidCfg", "MITHumanoidRunnerCfg"],
     "humanoid_running": [
