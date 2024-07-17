@@ -57,7 +57,7 @@ class MiniCheetahFineTuneCfg(MiniCheetahRefCfg):
 
 class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "IPGRunner"
 
     class actor:
         hidden_dims = [256, 256, 128]
@@ -132,18 +132,18 @@ class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
         storage_size = 4 * 32 * 4096  # num_policies*num_stpes*num_envs
 
         # Finetuning
-        learning_rate = 3e-4
+        learning_rate = 1e-4
         max_gradient_steps = 5
 
     class runner(MiniCheetahRefRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
         max_iterations = 20  # number of policy updates
-        algorithm_class_name = "PPO2"
+        algorithm_class_name = "PPO_IPG"
         num_steps_per_env = 3000
 
         # Finetuning
         resume = True
-        load_run = "Jul13_01-49-59_PPO32_S16"
+        load_run = "Jul12_15-53-57_IPG32_S16"
         checkpoint = 700
         save_interval = 5

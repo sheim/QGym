@@ -2,7 +2,7 @@
 source /home/lmolnar/miniconda3/etc/profile.d/conda.sh
 
 # Args
-LOAD_RUN="Jul13_01-49-59_PPO32_S16"
+LOAD_RUN="Jul12_15-53-57_IPG32_S16"
 CHECKPOINT=700
 N_RUNS=5
 

@@ -15,20 +15,22 @@ class FineTuneRunner(BaseRunner):
         self,
         env,
         train_cfg,
-        data_dict,
+        data_onpol,
+        data_offpol=None,
         exploration_scale=1.0,
         device="cpu",
     ):
         self.env = env
         self.parse_train_cfg(train_cfg)
-        self.data_dict = data_dict
+        self.data_onpol = data_onpol
+        self.data_offpol = data_offpol
         self.exploration_scale = exploration_scale
         self.device = device
 
     def _set_up_alg(self):
-        num_actor_obs = self.data_dict["actor_obs"].shape[-1]
-        num_actions = self.data_dict["actions"].shape[-1]
-        num_critic_obs = self.data_dict["critic_obs"].shape[-1]
+        num_actor_obs = self.data_onpol["actor_obs"].shape[-1]
+        num_actions = self.data_onpol["actions"].shape[-1]
+        num_critic_obs = self.data_onpol["critic_obs"].shape[-1]
         if self.actor_cfg["smooth_exploration"]:
             actor = SmoothActor(
                 num_obs=num_actor_obs,
@@ -69,24 +71,23 @@ class FineTuneRunner(BaseRunner):
         self.alg.switch_to_train()
 
         if self.env is not None:
-            # Simulate 1 env, same number of steps as in data dict
-            num_steps = self.data_dict.shape[0]
+            # Simulate 1 env, same number of steps as in data
+            num_steps = self.data_onpol.shape[0]
             sim_data = self.get_sim_data(num_steps)
             # Concatenate data dict wtih sim data
-            self.data_dict = TensorDict(
+            self.data_onpol = TensorDict(
                 {
-                    name: torch.cat((self.data_dict[name], sim_data[name]), dim=1)
-                    for name in self.data_dict.keys()
+                    name: torch.cat((self.data_onpol[name], sim_data[name]), dim=1)
+                    for name in self.data_onpol.keys()
                 },
                 batch_size=(num_steps, 2),
             )
 
-        # Single update on data dict
-        if self.cfg["algorithm_class_name"] == "PPO_IPG":
-            # TODO: How to handle off-policy data
-            self.alg.update(self.data_dict, self.data_dict)
+        # Single alg update on data
+        if self.data_offpol is None:
+            self.alg.update(self.data_onpol)
         else:
-            self.alg.update(self.data_dict)
+            self.alg.update(self.data_onpol, self.data_offpol)
 
     def get_sim_data(self, num_steps):
         rewards_dict = {}
