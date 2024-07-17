@@ -30,7 +30,7 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
-        self.save()
+        # self.save()
 
         # * Initialize smooth exploration matrices
         if self.actor_cfg["smooth_exploration"]:
@@ -47,6 +47,8 @@ class OnPolicyRunner(BaseRunner):
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
                 "dones": self.get_timed_out(),
+                "dof_pos": self.env.dof_pos,
+                "dof_vel": self.env.dof_vel,
             }
         )
         storage.initialize(
@@ -116,6 +118,8 @@ class OnPolicyRunner(BaseRunner):
                             "rewards": total_rewards,
                             "timed_out": timed_out,
                             "dones": dones,
+                            "dof_pos": self.env.dof_pos,
+                            "dof_vel": self.env.dof_vel,
                         }
                     )
                     storage.add_transitions(transition)
@@ -127,18 +131,19 @@ class OnPolicyRunner(BaseRunner):
 
             logger.tic("learning")
             self.alg.update(storage.data)
-            storage.clear()
             logger.toc("learning")
-            logger.log_all_categories()
 
+            if self.it % self.save_interval == 0:
+                self.save()
+            storage.clear()
+
+            logger.log_all_categories()
             logger.finish_iteration()
             logger.toc("iteration")
             logger.toc("runtime")
             logger.print_to_terminal()
 
-            if self.it % self.save_interval == 0:
-                self.save()
-        self.save()
+        self.save(end=True)
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -185,7 +190,7 @@ class OnPolicyRunner(BaseRunner):
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 
-    def save(self):
+    def save(self, end=False):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
         torch.save(
@@ -198,6 +203,10 @@ class OnPolicyRunner(BaseRunner):
             },
             path,
         )
+        # Save data if training hasn't ended, otherwise storage was cleared
+        if not end:
+            path_data = os.path.join(self.log_dir, "data_{}".format(self.it))
+            torch.save(storage.data.cpu(), path_data + ".pt")
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)

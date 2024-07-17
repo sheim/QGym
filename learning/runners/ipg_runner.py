@@ -59,7 +59,7 @@ class IPGRunner(BaseRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
-        self.save()
+        # self.save()
 
         # * Initialize smooth exploration matrices
         if self.actor_cfg["smooth_exploration"]:
@@ -76,6 +76,8 @@ class IPGRunner(BaseRunner):
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
                 "dones": self.get_timed_out(),
+                "dof_pos": self.env.dof_pos,
+                "dof_vel": self.env.dof_vel,
             }
         )
         storage_onpol.initialize(
@@ -144,6 +146,8 @@ class IPGRunner(BaseRunner):
                             "rewards": total_rewards,
                             "timed_out": timed_out,
                             "dones": dones,
+                            "dof_pos": self.env.dof_pos,
+                            "dof_vel": self.env.dof_vel,
                         }
                     )
                     # add transition to both storages
@@ -157,18 +161,19 @@ class IPGRunner(BaseRunner):
 
             logger.tic("learning")
             self.alg.update(storage_onpol.data, storage_offpol.get_data())
-            storage_onpol.clear()  # only clear on-policy storage
             logger.toc("learning")
-            logger.log_all_categories()
 
+            if self.it % self.save_interval == 0:
+                self.save()
+            storage_onpol.clear()  # only clear on-policy storage
+
+            logger.log_all_categories()
             logger.finish_iteration()
             logger.toc("iteration")
             logger.toc("runtime")
             logger.print_to_terminal()
 
-            if self.it % self.save_interval == 0:
-                self.save()
-        self.save()
+        self.save(end=True)
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -227,7 +232,7 @@ class IPGRunner(BaseRunner):
             (self.alg.actor, self.alg.critic_v, self.alg.critic_q)
         )
 
-    def save(self):
+    def save(self, end=False):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
         torch.save(
@@ -242,6 +247,13 @@ class IPGRunner(BaseRunner):
             },
             path,
         )
+        # Save data
+        path_offpol = os.path.join(self.log_dir, "data_offpol_{}".format(self.it))
+        torch.save(storage_offpol.get_data().cpu(), path_offpol + ".pt")
+        # When training ends the on-policy data was cleared
+        if not end:
+            path_onpol = os.path.join(self.log_dir, "data_onpol_{}".format(self.it))
+            torch.save(storage_onpol.data.cpu(), path_onpol + ".pt")
 
     def load(self, path, load_optimizer=True, load_actor_std=True):
         loaded_dict = torch.load(path)
