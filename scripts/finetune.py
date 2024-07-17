@@ -12,14 +12,11 @@ import os
 import torch
 import scipy.io
 import numpy as np
-import pandas as pd
 from tensordict import TensorDict
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
 
 USE_SIMULATOR = False
-LOG_REWARDS = False
-REWARDS_FILE = "rewards_test.csv"
 
 # Scales
 EXPLORATION_SCALE = 0.8  # used during data collection
@@ -60,7 +57,6 @@ def get_obs(obs_list, data_struct, data_length):
 
 def get_rewards(data_struct, reward_weights, data_length):
     minimalist_cheetah = MinimalistCheetah(device=DEVICE)
-    rewards_dict = {name: [] for name in reward_weights.keys()}  # for plotting
     rewards_all = torch.empty(0).to(DEVICE)
 
     for i in range(data_length):
@@ -79,37 +75,12 @@ def get_rewards(data_struct, reward_weights, data_length):
         total_rewards = 0
         for name, weight in reward_weights.items():
             reward = weight * eval(f"minimalist_cheetah._reward_{name}()")
-            rewards_dict[name].append(reward.item())
             total_rewards += reward
         rewards_all = torch.cat((rewards_all, total_rewards), dim=0)
         # Post process mini cheetah
         minimalist_cheetah.post_process()
 
-    rewards_dict["total"] = rewards_all.tolist()
-
-    return rewards_all.float(), rewards_dict
-
-
-def log_rewards(rewards_dict, path, checkpoint):
-    if not os.path.exists(path):
-        rewards_df = pd.DataFrame(columns=["checkpoint", "type", "mean", "std"])
-    else:
-        rewards_df = pd.read_csv(path)
-    for name, rewards in rewards_dict.items():
-        rewards = np.array(rewards)
-        mean = rewards.mean()
-        std = rewards.std()
-        rewards_df = rewards_df._append(
-            {
-                "checkpoint": str(checkpoint),
-                "type": name,
-                "mean": mean,
-                "std": std,
-            },
-            ignore_index=True,
-        )
-    rewards_df.to_csv(path, index=False)
-    print(rewards_df)
+    return rewards_all.float()
 
 
 def get_data_dict(train_cfg, name="SMOOTH_RL_CONTROLLER", offpol=False):
@@ -151,13 +122,9 @@ def get_data_dict(train_cfg, name="SMOOTH_RL_CONTROLLER", offpol=False):
         actions_all = torch.cat((actions_all, actions), dim=1)
 
         reward_weights = train_cfg["critic"]["reward"]["weights"]
-        rewards, rewards_dict = get_rewards(data_struct, reward_weights, data_length)
+        rewards = get_rewards(data_struct, reward_weights, data_length)
         rewards = rewards.reshape((data_length, 1))  # shape (data_length, 1)
         rewards_all = torch.cat((rewards_all, rewards), dim=1)
-
-        if LOG_REWARDS:
-            rewards_path = os.path.join(ROOT_DIR, load_run, REWARDS_FILE)
-            log_rewards(rewards_dict, rewards_path, checkpoint)
 
     data_dict["actor_obs"] = actor_obs_all[:-1]
     data_dict["next_actor_obs"] = actor_obs_all[1:]
