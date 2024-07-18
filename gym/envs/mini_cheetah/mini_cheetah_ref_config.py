@@ -20,6 +20,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
             + "mini_cheetah/trajectories/single_leg.csv"
         )
+        reset_mode = "reset_to_range"
 
     class control(MiniCheetahCfg.control):
         # * PD Drive parameters:
@@ -30,7 +31,14 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         desired_sim_frequency = 500
 
     class commands(MiniCheetahCfg.commands):
-        pass
+        # * time before command are changed[s]
+        resampling_time = 3.0
+        var = 1.0
+
+        class ranges:
+            lin_vel_x = [-1.0, 0.0, 1.0, 3.0]
+            lin_vel_y = 1.0  # max [m/s]
+            yaw_vel = 3  # max [rad/s]
 
     class push_robots(MiniCheetahCfg.push_robots):
         pass
@@ -45,7 +53,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         )
         foot_name = "foot"
         penalize_contacts_on = ["shank", "thigh"]
-        terminate_after_contacts_on = ["base", "thigh"]
+        terminate_after_contacts_on = ["base"]
         collapse_fixed_joints = False
         fix_base_link = False
         self_collisions = 1
@@ -58,8 +66,9 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
         max_contact_force = 600.0
-        base_height_target = 0.3
+        base_height_target = 0.36
         tracking_sigma = 0.25
+        switch_scale = 0.5
 
     class scaling(MiniCheetahCfg.scaling):
         base_ang_vel = 0.3
@@ -86,14 +95,15 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         smooth_exploration = False
         exploration_sample_freq = 16
         obs = [
-            "base_height",
-            "base_lin_vel",
+            # "base_height",
+            # "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
             "dof_pos_obs",
             "dof_vel",
             "phase_obs",
+            "omega",
         ]
         normalize_obs = False
 
@@ -101,7 +111,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         disable_actions = False
 
         class noise:
-            scale = 1.0
+            scale = 0.0
             dof_pos_obs = 0.01
             base_ang_vel = 0.01
             dof_pos = 0.005
@@ -123,6 +133,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "phase_obs",
+            "omega",
             "dof_pos_target",
         ]
         normalize_obs = False
@@ -132,7 +143,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
-                ang_vel_xy = 0.01
+                ang_vel_xy = 0.0
                 orientation = 1.0
                 torques = 5.0e-7
                 dof_vel = 0.0
@@ -141,13 +152,13 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 action_rate = 0.01
                 action_rate2 = 0.001
                 stand_still = 0.0
-                dof_pos_limits = 0.0
+                dof_pos_limits = 0.5
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
                 reference_traj = 0.0
                 # swing_grf = 1.5
                 # stance_grf = 1.5
-                trot = 1.5
+                trot = 3.0
 
             class termination_weight:
                 termination = 0.15
@@ -173,7 +184,28 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         learning_rate = 1e-4
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        pass
+        # both
+        gamma = 0.99
+        lam = 0.95
+        GAE_bootstrap_horizon = 2.0
+        discount_horizon = 1.0
+        # shared
+        batch_size = 2**15
+        max_gradient_steps = 24
+        # new
+        storage_size = 2**17  # new
+
+        clip_param = 0.2
+        learning_rate = 1.0e-5
+        max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [1e-5, 1e-2]
+        lr_ratio = 1.5
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

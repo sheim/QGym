@@ -266,13 +266,6 @@ class MiniCheetahOsc(MiniCheetah):
         else:
             return grf
 
-    def _switch(self):
-        c_vel = torch.linalg.norm(self.commands, dim=1)
-        return torch.exp(
-            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1))
-            / self.cfg.reward_settings.switch_scale
-        )
-
     def _reward_cursorial(self):
         # penalize the abad joints being away from 0
         return -torch.mean(

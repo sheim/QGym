@@ -36,21 +36,21 @@ class MiniCheetahCfg(LeggedRobotCfg):
         # * initialization for random range setup
         dof_pos_range = {
             "haa": [-0.01, 0.01],
-            "hfe": [-0.785398, -0.785398],
-            "kfe": [1.596976, 1.596976],
+            "hfe": [-0.885398, -0.585398],
+            "kfe": [1.396976, 1.796976],
         }
-        dof_vel_range = {"haa": [0.0, 0.0], "hfe": [0.0, 0.0], "kfe": [0.0, 0.0]}
+        dof_vel_range = {"haa": [0.0, 0.0], "hfe": [-0.2, 0.2], "kfe": [-0.2, 0.2]}
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
             [0.35, 0.35],  # z
-            [0.0, 0.0],  # roll
-            [0.0, 0.0],  # pitch
-            [0.0, 0.0],  # yaw
+            [-0.5, 0.5],  # roll
+            [-0.5, 0.5],  # pitch
+            [-0.5, 0.5],  # yaw
         ]
         root_vel_range = [
-            [-0.5, 2.0],  # x
-            [0.0, 0.0],  # y
+            [-1.0, 1.0],  # x
+            [-0.5, 0.5],  # y
             [-0.05, 0.05],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
@@ -67,9 +67,10 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class commands:
         # * time before command are changed[s]
         resampling_time = 3.0
+        var = 1.0
 
         class ranges:
-            lin_vel_x = [-2.0, 3.0]  # min max [m/s]
+            lin_vel_x = [-1.0, 0.0, 1.0, 3.0]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 3  # max [rad/s]
 
@@ -82,7 +83,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class domain_rand:
         randomize_friction = True
         friction_range = [0.5, 1.0]
-        randomize_base_mass = False
+        randomize_base_mass = True
         added_mass_range = [-1.0, 1.0]
 
     class asset(LeggedRobotCfg.asset):

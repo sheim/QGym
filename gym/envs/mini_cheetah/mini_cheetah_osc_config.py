@@ -170,8 +170,8 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
         smooth_exploration = False
 
         obs = [
-            "base_height",
-            "base_lin_vel",
+            "se_base_height",
+            "se_base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
