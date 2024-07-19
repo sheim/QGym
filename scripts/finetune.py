@@ -15,8 +15,10 @@ import numpy as np
 from tensordict import TensorDict
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
+OUTPUT_FILE = "output.txt"
 
-USE_SIMULATOR = False
+USE_SIMULATOR = True
+DATA_LENGTH = 2990  # Robot-Software logs must contain at least this many steps
 
 # Scales
 EXPLORATION_SCALE = 0.8  # used during data collection
@@ -44,22 +46,23 @@ DATA_LIST = [
 DEVICE = "cuda"
 
 
-def get_obs(obs_list, data_struct, data_length):
+def get_obs(obs_list, data_struct):
     obs_all = torch.empty(0).to(DEVICE)
     for obs_name in obs_list:
         data_idx = DATA_LIST.index(obs_name)
         obs = torch.tensor(data_struct[data_idx]).to(DEVICE)
-        obs = obs.reshape((data_length, 1, -1))  # shape (data_length, 1, n)
+        obs = obs.squeeze()[:DATA_LENGTH]
+        obs = obs.reshape((DATA_LENGTH, 1, -1))  # shape (data_length, 1, n)
         obs_all = torch.cat((obs_all, obs), dim=-1)
 
     return obs_all.float()
 
 
-def get_rewards(data_struct, reward_weights, data_length):
+def get_rewards(data_struct, reward_weights, dt):
     minimalist_cheetah = MinimalistCheetah(device=DEVICE)
     rewards_all = torch.empty(0).to(DEVICE)
 
-    for i in range(data_length):
+    for i in range(DATA_LENGTH):
         minimalist_cheetah.set_states(
             base_height=data_struct[1][:, i],  # shape (1, data_length)
             base_lin_vel=data_struct[2][i],
@@ -75,7 +78,7 @@ def get_rewards(data_struct, reward_weights, data_length):
         total_rewards = 0
         for name, weight in reward_weights.items():
             reward = weight * eval(f"minimalist_cheetah._reward_{name}()")
-            total_rewards += reward
+            total_rewards += dt * reward  # scaled
         rewards_all = torch.cat((rewards_all, total_rewards), dim=0)
         # Post process mini cheetah
         minimalist_cheetah.post_process()
@@ -83,23 +86,26 @@ def get_rewards(data_struct, reward_weights, data_length):
     return rewards_all.float()
 
 
-def get_data_dict(train_cfg, name="SMOOTH_RL_CONTROLLER", offpol=False):
+def get_data_dict(train_cfg, env_cfg, offpol=False, name="SMOOTH_RL_CONTROLLER"):
     load_run = train_cfg["runner"]["load_run"]
     checkpoint = train_cfg["runner"]["checkpoint"]
     run_dir = os.path.join(ROOT_DIR, load_run)
 
     if offpol:
-        log_files = [file for file in os.listdir(run_dir) if file.endswith(".mat")]
+        # All files up until checkpoint
+        log_files = [
+            file
+            for file in os.listdir(run_dir)
+            if file.endswith(".mat") and int(file.split(".")[0]) <= checkpoint
+        ]
         log_files = sorted(log_files)
     else:
-        # Single log file
+        # Single log file for checkpoint
         log_files = [str(checkpoint) + ".mat"]
 
     # Initialize data dict
     data = scipy.io.loadmat(os.path.join(run_dir, log_files[0]))
-    data_struct = data[name][0][0]
-    data_length = data_struct[1].shape[1]  # base_height: shape (1, data_length)
-    batch_size = (data_length - 1, len(log_files))  # -1 for next_obs
+    batch_size = (DATA_LENGTH - 1, len(log_files))  # -1 for next_obs
     data_dict = TensorDict({}, device=DEVICE, batch_size=batch_size)
 
     # Get all data
@@ -111,19 +117,22 @@ def get_data_dict(train_cfg, name="SMOOTH_RL_CONTROLLER", offpol=False):
         data = scipy.io.loadmat(os.path.join(run_dir, log))
         data_struct = data[name][0][0]
 
-        actor_obs = get_obs(train_cfg["actor"]["obs"], data_struct, data_length)
-        critic_obs = get_obs(train_cfg["critic"]["obs"], data_struct, data_length)
+        actor_obs = get_obs(train_cfg["actor"]["obs"], data_struct)
+        critic_obs = get_obs(train_cfg["critic"]["obs"], data_struct)
         actor_obs_all = torch.cat((actor_obs_all, actor_obs), dim=1)
         critic_obs_all = torch.cat((critic_obs_all, critic_obs), dim=1)
 
         actions_idx = DATA_LIST.index("dof_pos_target")
         actions = torch.tensor(data_struct[actions_idx]).to(DEVICE).float()
-        actions = actions.reshape((data_length, 1, -1))  # shape (data_length, 1, n)
+        actions = actions[:DATA_LENGTH]
+        actions = actions.reshape((DATA_LENGTH, 1, -1))  # shape (data_length, 1, n)
         actions_all = torch.cat((actions_all, actions), dim=1)
 
         reward_weights = train_cfg["critic"]["reward"]["weights"]
-        rewards = get_rewards(data_struct, reward_weights, data_length)
-        rewards = rewards.reshape((data_length, 1))  # shape (data_length, 1)
+        dt = 1.0 / env_cfg["control"]["ctrl_frequency"]
+        rewards = get_rewards(data_struct, reward_weights, dt)
+        rewards = rewards[:DATA_LENGTH]
+        rewards = rewards.reshape((DATA_LENGTH, 1))  # shape (data_length, 1)
         rewards_all = torch.cat((rewards_all, rewards), dim=1)
 
     data_dict["actor_obs"] = actor_obs_all[:-1]
@@ -152,15 +161,13 @@ def setup():
         env = None
 
     train_cfg = class_to_dict(train_cfg)
-    data_onpol = get_data_dict(train_cfg, offpol=False)
+    env_cfg = class_to_dict(env_cfg)
+    data_onpol = get_data_dict(train_cfg, env_cfg, offpol=False)
 
     if train_cfg["runner"]["algorithm_class_name"] == "PPO_IPG":
-        data_offpol = get_data_dict(train_cfg, offpol=True)
+        data_offpol = get_data_dict(train_cfg, env_cfg, offpol=True)
     else:
         data_offpol = None
-
-    print(data_onpol)
-    print(data_offpol)
 
     runner = FineTuneRunner(
         env,
@@ -170,7 +177,6 @@ def setup():
         exploration_scale=EXPLORATION_SCALE,
         device=DEVICE,
     )
-    runner._set_up_alg()
 
     return runner
 
@@ -179,7 +185,6 @@ def finetune(runner):
     load_run = runner.cfg["load_run"]
     checkpoint = runner.cfg["checkpoint"]
     load_path = os.path.join(ROOT_DIR, load_run, "model_" + str(checkpoint) + ".pt")
-    print("Loading model from: ", load_path)
     runner.load(load_path)
 
     # Perform a single update
@@ -192,14 +197,30 @@ def finetune(runner):
         runner.data_onpol["actor_obs"]
     )
     diff = actions_new - actions_old
-    print("Mean action diff per actuator: ", diff.mean(dim=(0, 1)))
-    print("Overall mean action diff: ", diff.mean())
 
+    # Save and export
     save_path = os.path.join(ROOT_DIR, load_run, "model_" + str(checkpoint + 1) + ".pt")
-    runner.save(save_path)
-
     export_path = os.path.join(ROOT_DIR, load_run, "exported_" + str(checkpoint + 1))
+    runner.save(save_path)
     runner.export(export_path)
+
+    # Print to output file
+    with open(os.path.join(ROOT_DIR, load_run, OUTPUT_FILE), "a") as f:
+        f.write(f"############ Checkpoint: {checkpoint} #######################\n")
+        f.write("############### DATA ###############\n")
+        f.write(f"Data on-policy shape: {runner.data_onpol.shape}\n")
+        if runner.data_offpol is not None:
+            f.write(f"Data off-policy shape: {runner.data_offpol.shape}\n")
+        f.write("############## LOSSES ##############\n")
+        f.write(f"Mean Value Loss: {runner.alg.mean_value_loss}\n")
+        f.write(f"Mean Surrogate Loss: {runner.alg.mean_surrogate_loss}\n")
+        if runner.data_offpol is not None:
+            f.write(f"Mean Q Loss: {runner.alg.mean_q_loss}\n")
+            f.write(f"Mean Offpol Loss: {runner.alg.mean_offpol_loss}\n")
+        f.write("############## ACTIONS #############\n")
+        f.write(f"Mean action diff per actuator: {diff.mean(dim=(0, 1))}\n")
+        f.write(f"Std action diff per actuator: {diff.std(dim=(0, 1))}\n")
+        f.write(f"Overall mean action diff: {diff.mean()}\n")
 
 
 if __name__ == "__main__":

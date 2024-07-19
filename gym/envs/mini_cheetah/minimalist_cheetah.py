@@ -85,7 +85,7 @@ class MinimalistCheetah:
         # * scale by (1+|cmd|): if cmd=0, no scaling.
         error *= 1.0 / (1.0 + torch.abs(self.commands[:, :2]))
         error = torch.sum(torch.square(error), dim=1)
-        return torch.exp(-error / self.tracking_sigma)
+        return torch.exp(-error / self.tracking_sigma) * (1 - self._switch())
 
     def _reward_tracking_ang_vel(self):
         """Tracking of angular velocity commands (yaw)"""

@@ -20,17 +20,16 @@ class FineTuneRunner(BaseRunner):
         exploration_scale=1.0,
         device="cpu",
     ):
-        self.env = env
-        self.parse_train_cfg(train_cfg)
         self.data_onpol = data_onpol
         self.data_offpol = data_offpol
         self.exploration_scale = exploration_scale
-        self.device = device
+        # Init calls _set_up_alg which needs exploration scale
+        super().__init__(env, train_cfg, device)
 
     def _set_up_alg(self):
-        num_actor_obs = self.data_onpol["actor_obs"].shape[-1]
-        num_actions = self.data_onpol["actions"].shape[-1]
-        num_critic_obs = self.data_onpol["critic_obs"].shape[-1]
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])
         if self.actor_cfg["smooth_exploration"]:
             actor = SmoothActor(
                 num_obs=num_actor_obs,
@@ -41,10 +40,8 @@ class FineTuneRunner(BaseRunner):
         else:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
 
-        alg_class_name = self.cfg["algorithm_class_name"]
-        alg_class = eval(alg_class_name)
-
-        if alg_class_name == "PPO_IPG":
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        if self.data_offpol is not None:
             critic_v = Critic(num_critic_obs, **self.critic_cfg)
             critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
             target_critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
@@ -71,16 +68,11 @@ class FineTuneRunner(BaseRunner):
         self.alg.switch_to_train()
 
         if self.env is not None:
-            # Simulate 1 env, same number of steps as in data
-            num_steps = self.data_onpol.shape[0]
-            sim_data = self.get_sim_data(num_steps)
-            # Concatenate data dict wtih sim data
+            # Simulate on-policy data
             self.data_onpol = TensorDict(
-                {
-                    name: torch.cat((self.data_onpol[name], sim_data[name]), dim=1)
-                    for name in self.data_onpol.keys()
-                },
-                batch_size=(num_steps, 2),
+                self.get_sim_data(),
+                batch_size=(self.num_steps_per_env, self.env.num_envs),
+                device=self.device,
             )
 
         # Single alg update on data
@@ -89,17 +81,17 @@ class FineTuneRunner(BaseRunner):
         else:
             self.alg.update(self.data_onpol, self.data_offpol)
 
-    def get_sim_data(self, num_steps):
+    def get_sim_data(self):
         rewards_dict = {}
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
 
         # * Initialize smooth exploration matrices
         if self.actor_cfg["smooth_exploration"]:
-            self.alg.actor.sample_weights(batch_size=1)
+            self.alg.actor.sample_weights(batch_size=self.env.num_envs)
 
         # * Start up storage
-        transition = TensorDict({}, batch_size=1, device=self.device)
+        transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
         transition.update(
             {
                 "actor_obs": actor_obs,
@@ -113,18 +105,18 @@ class FineTuneRunner(BaseRunner):
         )
         sim_storage.initialize(
             transition,
-            num_envs=1,
-            max_storage=num_steps,
+            self.env.num_envs,
+            self.env.num_envs * self.num_steps_per_env,
             device=self.device,
         )
 
         # * Rollout
         with torch.inference_mode():
-            for i in range(num_steps):
+            for i in range(self.num_steps_per_env):
                 # * Re-sample noise matrix for smooth exploration
                 sample_freq = self.actor_cfg["exploration_sample_freq"]
                 if self.actor_cfg["smooth_exploration"] and i % sample_freq == 0:
-                    self.alg.actor.sample_weights(batch_size=1)
+                    self.alg.actor.sample_weights(batch_size=self.env.num_envs)
 
                 actions = self.alg.act(actor_obs)
                 self.set_actions(
