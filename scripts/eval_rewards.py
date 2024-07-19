@@ -11,11 +11,13 @@ import matplotlib.pyplot as plt
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
 LOAD_RUN = "Jul12_15-53-57_IPG32_S16"
-REWARDS_FILE = "rewards.csv"
 
-DATAFRAME_LOADED = True
-PLOT = False
-PLOT_N = 1000  # number of steps to plot
+REWARDS_FILE = "rewards_nu1.csv"  # generate this file from logs, if None: just plot
+PLOT_REWARDS = {
+    "Nu=0.5": "rewards_nu05.csv",
+    "Nu=0.8": "rewards_nu08.csv",
+    "Nu=1.0": "rewards_nu1.csv",
+}
 
 # Data struct fields from Robot-Software logs
 DATA_LIST = [
@@ -99,16 +101,10 @@ def get_rewards(it, data_struct, rewards_path):
             },
             ignore_index=True,
         )
-        if PLOT:
-            plt.figure(it)
-            plt.plot(rewards[:PLOT_N], label=name)
-            plt.title(f"Rewards Iteration {it}")
-            plt.legend()
-            plt.savefig(f"{ROOT_DIR}/{LOAD_RUN}/rewards_{it}.png")
     rewards_df.to_csv(rewards_path, index=False)
 
 
-def setup(name="SMOOTH_RL_CONTROLLER"):
+def get_data_dict(name="SMOOTH_RL_CONTROLLER"):
     data_dict = {}
     log_files = [
         file
@@ -124,28 +120,7 @@ def setup(name="SMOOTH_RL_CONTROLLER"):
     return data_dict
 
 
-if __name__ == "__main__":
-    data_dict = setup()
-    rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
-
-    if not DATAFRAME_LOADED:
-        # Compute rewards and store in dataframe
-        if os.path.exists(rewards_path):
-            os.remove(rewards_path)
-        for it, data_struct in data_dict.items():
-            get_rewards(it, data_struct, rewards_path)
-
-    rewards_df = pd.read_csv(rewards_path)
-    print(rewards_df)
-
-    # Plot rewards stats
-    num_plots = len(REWARD_WEIGHTS) + 1  # +1 for total rewards
-    cols = 5
-    rows = np.ceil(num_plots / cols).astype(int)
-    fig, axs = plt.subplots(rows, cols, figsize=(15, 6))
-    fig.suptitle("IPG Finetuning Rewards")
-    axs = axs.flatten()
-
+def plot_rewards(rewards_df, axs, name):
     for i, key in enumerate(REWARD_WEIGHTS.keys()):
         rewards_mean = rewards_df[rewards_df["type"] == key]["mean"].reset_index(
             drop=True
@@ -153,35 +128,59 @@ if __name__ == "__main__":
         rewards_std = rewards_df[rewards_df["type"] == key]["std"].reset_index(
             drop=True
         )
-        axs[i].plot(rewards_mean, label=key)
+        axs[i].plot(rewards_mean, label=name)
         axs[i].fill_between(
             range(len(rewards_mean)),
             rewards_mean - rewards_std,
             rewards_mean + rewards_std,
-            color="b",
             alpha=0.2,
         )
+        axs[i].set_title(key)
         axs[i].legend()
-        axs[i].set_xlabel("Iter")
 
     i = num_plots - 1
     total_mean = rewards_df[rewards_df["type"] == "total"]["mean"].reset_index(
         drop=True
     )
     total_std = rewards_df[rewards_df["type"] == "total"]["std"].reset_index(drop=True)
-    axs[i].plot(total_mean, label="total", color="r")
+    axs[i].plot(total_mean, label=name)
     axs[i].fill_between(
         range(len(total_mean)),
         total_mean - total_std,
         total_mean + total_std,
-        color="r",
         alpha=0.2,
     )
+    axs[i].set_title("Total Rewards")
     axs[i].legend()
-    axs[i].set_xlabel("Iter")
 
+
+if __name__ == "__main__":
+    if REWARDS_FILE is not None:
+        data_dict = get_data_dict()
+        rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
+        if os.path.exists(rewards_path):
+            os.remove(rewards_path)
+        for it, data_struct in data_dict.items():
+            get_rewards(it, data_struct, rewards_path)
+
+    # Plot rewards stats
+    num_plots = len(REWARD_WEIGHTS) + 1  # +1 for total rewards
+    cols = 5
+    rows = np.ceil(num_plots / cols).astype(int)
+    fig, axs = plt.subplots(rows, cols, figsize=(30, 10))
+    fig.suptitle("IPG Finetuning Rewards")
+    axs = axs.flatten()
+
+    for name, file in PLOT_REWARDS.items():
+        path = os.path.join(ROOT_DIR, LOAD_RUN, file)
+        rewards_df = pd.read_csv(path)
+        plot_rewards(rewards_df, axs, name)
+
+    for i in range(num_plots):
+        axs[i].set_xlabel("Iter")
     for i in range(num_plots, len(axs)):
         axs[i].axis("off")
 
     plt.tight_layout()
+    plt.savefig(f"{ROOT_DIR}/{LOAD_RUN}/rewards_stats.png")
     plt.show()
