@@ -1,6 +1,5 @@
 import torch.nn as nn
-from .utils import create_MLP
-from .utils import export_network
+from .utils import create_MLP, export_network, RunningMeanStd
 
 
 class StateEstimatorNN(nn.Module):
@@ -21,6 +20,7 @@ class StateEstimatorNN(nn.Module):
         hidden_dims=[256, 128],
         activation="elu",
         dropouts=None,
+        normalize_obs=True,
         **kwargs,
     ):
         if kwargs:
@@ -30,13 +30,19 @@ class StateEstimatorNN(nn.Module):
             )
         super().__init__()
 
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_inputs)
+
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.NN = create_MLP(num_inputs, num_outputs, hidden_dims, activation, dropouts)
         print(f"State Estimator MLP: {self.NN}")
 
-    def evaluate(self, observations):
-        return self.NN(observations)
+    def evaluate(self, obs):
+        if self._normalize_obs:
+            obs = self.obs_rms(obs)
+        return self.NN(obs)
 
     def export(self, path):
         export_network(self.NN, "state_estimator", path, self.num_inputs)

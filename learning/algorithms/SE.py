@@ -3,9 +3,56 @@ import torch.optim as optim
 
 from learning.modules import StateEstimatorNN
 from learning.storage import SERolloutStorage
+from learning.utils import create_uniform_generator
 
 
 class StateEstimator:
+    def __init__(
+        self,
+        state_estimator,
+        normalize_obs=True,
+        batch_size=2**15,
+        max_gradient_steps=10,
+        learning_rate=1e-3,
+        device="cpu",
+        **kwargs,
+    ):
+        self.device = device
+
+        self.network = state_estimator.to(self.device)
+
+        self.batch_size = batch_size
+        self.max_gradient_steps = max_gradient_steps
+
+        self.learning_rate = learning_rate
+        self.mean_loss = 0.0
+        self.optimizer = optim.Adam(self.network.parameters(), lr=learning_rate)
+
+    def update(self, data):
+        self.mean_loss = 0
+        counter = 0
+        generator = create_uniform_generator(
+            data, self.batch_size, self.max_gradient_steps
+        )
+        for batch in generator:
+            loss = nn.functional.mse_loss(
+                self.network.evaluate(batch["SE_obs"]), batch["SE_targets"]
+            )
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            self.mean_loss += loss.item()
+            counter += 1
+        self.mean_loss /= counter
+
+    def estimate(self, obs):
+        return self.network.evaluate(obs)
+
+    def export(self, path):
+        self.network.export(path)
+
+
+class OldStateEstimator:
     """This class provides a learned state estimator.
     This is trained with supervised learning, using only on-policy data
     collected in a rollout storage.
@@ -40,6 +87,7 @@ class StateEstimator:
         self.state_estimator.to(self.device)
         self.optimizer = optim.Adam(self.state_estimator.parameters(), lr=learning_rate)
         self.SE_loss_fn = nn.MSELoss()
+        self.SE_loss = 0.0
 
     def init_storage(self, num_envs, num_transitions_per_env, obs_shape, se_shape):
         self.storage = SERolloutStorage(

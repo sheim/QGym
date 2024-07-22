@@ -79,7 +79,10 @@ class Logger:
             if v is None:
                 log_string += f"{key:>{pad}}: {append}\n"
             else:
-                log_string += f"{key:>{pad}}: {v:.2f} {append}\n"
+                if abs(v) > 1e-2:
+                    log_string += f"{key:>{pad}}: {v:.2f} {append}\n"
+                else:
+                    log_string += f"{key:>{pad}}: {v:.2e} {append}\n"
 
         def separator(subtitle="", marker="-"):
             nonlocal log_string

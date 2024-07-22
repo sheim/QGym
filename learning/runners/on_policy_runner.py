@@ -7,8 +7,12 @@ from learning.utils import Logger
 from .BaseRunner import BaseRunner
 from learning.storage import DictStorage
 
+from learning.algorithms import StateEstimator
+from learning.modules import StateEstimatorNN
+
 logger = Logger()
 storage = DictStorage()
+SEStorage = DictStorage()
 
 
 class OnPolicyRunner(BaseRunner):
@@ -20,6 +24,21 @@ class OnPolicyRunner(BaseRunner):
             self.cfg["max_iterations"],
             self.device,
         )
+
+    def _set_up_alg(self):
+        super()._set_up_alg()
+        if "state_estimator" in self.train_cfg.keys():
+            self.train_SE = True
+            cfg = self.train_cfg["state_estimator"]
+            # todo refactor cfg
+            state_estimator_network = StateEstimatorNN(
+                self.get_obs_size(cfg["obs"]),
+                self.get_obs_size(cfg["targets"]),
+                **cfg["network"],
+            )
+            self.SE = StateEstimator(state_estimator_network, device=self.device, **cfg)
+        else:
+            self.train_SE = False
 
     def learn(self, states_to_log_dict=None):
         self.set_up_logger()
@@ -45,6 +64,17 @@ class OnPolicyRunner(BaseRunner):
                 "dones": self.get_timed_out(),
             }
         )
+
+        if self.train_SE:
+            transition.update(
+                {
+                    "SE_obs": self.get_obs(self.train_cfg["state_estimator"]["obs"]),
+                    "SE_targets": self.get_obs(
+                        self.train_cfg["state_estimator"]["targets"]
+                    ),
+                }
+            )
+
         storage.initialize(
             transition,
             self.env.num_envs,
@@ -87,6 +117,23 @@ class OnPolicyRunner(BaseRunner):
 
                     self.env.step()
 
+                    if self.train_SE:
+                        # use the state-estimator
+                        SE_obs = self.get_obs(self.train_cfg["state_estimator"]["obs"])
+                        self.env.set_states(
+                            self.train_cfg["state_estimator"]["write_to"],
+                            self.SE.estimate(SE_obs),
+                        )
+                        # update storage for training estimator
+                        transition.update(
+                            {
+                                "SE_obs": SE_obs,
+                                "SE_targets": self.get_obs(
+                                    self.train_cfg["state_estimator"]["targets"]
+                                ),
+                            }
+                        )
+
                     actor_obs = self.get_noisy_obs(
                         self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
@@ -109,6 +156,7 @@ class OnPolicyRunner(BaseRunner):
                             "dones": dones,
                         }
                     )
+
                     storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
@@ -118,6 +166,7 @@ class OnPolicyRunner(BaseRunner):
 
             logger.tic("learning")
             self.alg.update(storage.data)
+            self.SE.update(storage.data)
             storage.clear()
             logger.toc("learning")
             logger.log_all_categories()
@@ -173,21 +222,31 @@ class OnPolicyRunner(BaseRunner):
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
+        if self.train_SE:
+            logger.register_category("state_estimator", self.SE, ["mean_loss"])
+
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 
     def save(self):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
-        torch.save(
-            {
-                "actor_state_dict": self.alg.actor.state_dict(),
-                "critic_state_dict": self.alg.critic.state_dict(),
-                "optimizer_state_dict": self.alg.optimizer.state_dict(),
-                "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
-                "iter": self.it,
-            },
-            path,
-        )
+        save_dict = {
+            "actor_state_dict": self.alg.actor.state_dict(),
+            "critic_state_dict": self.alg.critic.state_dict(),
+            "optimizer_state_dict": self.alg.optimizer.state_dict(),
+            "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
+            "iter": self.it,
+        }
+
+        if self.train_SE:
+            save_dict.update(
+                {
+                    "SE_state_dict": self.SE.network.state_dict(),
+                    "SE_optimizer_state_dict": self.SE.optimizer.state_dict(),
+                }
+            )
+
+        torch.save(save_dict, path)
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
@@ -199,17 +258,27 @@ class OnPolicyRunner(BaseRunner):
                 loaded_dict["critic_optimizer_state_dict"]
             )
         self.it = loaded_dict["iter"]
+        if self.train_SE:
+            self.SE.network.load_state_dict(loaded_dict["SE_state_dict"])
+            self.SE.optimizer.load_state_dict(loaded_dict["SE_optimizer_state_dict"])
 
     def switch_to_eval(self):
         self.alg.actor.eval()
         self.alg.critic.eval()
 
     def get_inference_actions(self):
+        if self.train_SE:
+            SE_obs = self.get_obs(self.train_cfg["state_estimator"]["obs"])
+            self.env.set_states(
+                self.train_cfg["state_estimator"]["write_to"],
+                self.SE.estimate(SE_obs),
+            )
         obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
         return self.alg.actor.act_inference(obs)
 
     def export(self, path):
         self.alg.actor.export(path)
+        self.SE.export(path)
 
     def sim_and_log_states(self, states_to_log_dict, it_idx):
         # Simulate environment for as many steps as expected in the dict.

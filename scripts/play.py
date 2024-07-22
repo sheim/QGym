@@ -13,11 +13,12 @@ def setup(args):
     if hasattr(env_cfg, "push_robots"):
         env_cfg.push_robots.toggle = False
     if hasattr(env_cfg, "commands"):
-        env_cfg.commands.resampling_time = 9999
+        env_cfg.commands.resampling_time = 9999.0
     env_cfg.env.episode_length_s = 50
     env_cfg.env.num_projectiles = 20
     task_registry.make_gym_and_sim()
-    env_cfg.init_state.reset_mode = "reset_to_range"
+    env_cfg.init_state.reset_mode = "reset_to_basic"
+    # env_cfg.init_state.reset_mode = "reset_to_range"
     env = task_registry.make_env(args.task, env_cfg)
     train_cfg.runner.resume = True
     train_cfg.logging.enable_local_saving = False

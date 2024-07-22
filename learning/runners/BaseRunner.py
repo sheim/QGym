@@ -34,10 +34,19 @@ class BaseRunner:
 
     def parse_train_cfg(self, train_cfg):
         self.cfg = train_cfg["runner"]
+        del train_cfg["runner"]
+
         self.alg_cfg = train_cfg["algorithm"]
+        del train_cfg["algorithm"]
+
         remove_zero_weighted_rewards(train_cfg["critic"]["reward"]["weights"])
         self.actor_cfg = train_cfg["actor"]
+        del train_cfg["actor"]
+
         self.critic_cfg = train_cfg["critic"]
+        del train_cfg["critic"]
+
+        self.train_cfg = train_cfg
 
     def init_storage(self):
         raise NotImplementedError

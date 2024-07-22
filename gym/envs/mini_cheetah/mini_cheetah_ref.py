@@ -12,7 +12,7 @@ class MiniCheetahRef(MiniCheetah):
             LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR
         )
         self.leg_ref = 3 * to_torch(pd.read_csv(csv_path).to_numpy(), device=sim_device)
-        self.omega = 2 * torch.pi * cfg.control.gait_freq
+        # self.omega = 2 * torch.pi * cfg.control.gait_freq
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
 
     def _init_buffers(self):
@@ -23,38 +23,108 @@ class MiniCheetahRef(MiniCheetah):
         self.phase_obs = torch.zeros(
             self.num_envs, 2, dtype=torch.float, device=self.device
         )
+        self.omega = torch.ones(self.num_envs, 1, device=self.device)
+
+        # self.previous_base_lin_vel = torch.zeros_like(self.base_lin_vel)
+        # self.base_lin_acc = torch.zeros_like(self.base_lin_vel)
+
+        self.grf = self._compute_grf()
+        self.se_grf = self._compute_grf()
+
+        self.se_base_height = torch.zeros_like(self.base_height)
+        self.se_base_lin_vel = torch.zeros_like(self.base_lin_vel)
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
+        self._reset_gait_frequencies(env_ids)
         self.phase[env_ids] = torch_rand_float(
             0, torch.pi, shape=self.phase[env_ids].shape, device=self.device
         )
+        self.se_base_lin_vel[env_ids] = self.base_lin_vel[env_ids]
+
+    def _reset_gait_frequencies(self, env_ids):
+        self.omega[env_ids, 0] = torch_rand_float(
+            self.cfg.control.gait_freq[0],
+            self.cfg.control.gait_freq[1],
+            (len(env_ids), 1),
+            device=self.device,
+        ).squeeze(1)
+
+    def _resample_commands(self, env_ids):
+        """Randommly select commands of some environments
+
+        Args:
+            env_ids (List[int]): Environments ids for which new commands are needed
+        """
+        if len(env_ids) == 0:
+            return
+        super()._resample_commands(env_ids)
+        possible_commands = torch.tensor(
+            self.command_ranges["lin_vel_x"], device=self.device
+        )
+        self.commands[env_ids, 0:1] = possible_commands[
+            torch.randint(
+                0, len(possible_commands), (len(env_ids), 1), device=self.device
+            )
+        ]
+        # add some gaussian noise to the commands
+        self.commands[env_ids, 0:1] += (
+            torch.randn((len(env_ids), 1), device=self.device) * self.cfg.commands.var
+        )
+
+        # if 0 in self.cfg.commands.ranges.lin_vel_x:
+        # * with 20% chance, reset to 0 commands except for forward
+        self.commands[env_ids, 1:] *= (
+            torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+            < 0.8
+        ).unsqueeze(1)
+        # * with 20% chance, reset to 0 commands except for rotation
+        self.commands[env_ids, :2] *= (
+            torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+            < 0.8
+        ).unsqueeze(1)
+        # * with 10% chance, reset to 0
+        # self.commands[env_ids, :] *= (
+        #     torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+        #     < 0.9
+        # ).unsqueeze(1)
 
     def _post_physx_step(self):
         super()._post_physx_step()
-        self.phase = (
-            self.phase + self.dt * self.omega / self.cfg.control.decimation
-        ).fmod(2 * torch.pi)
+        self.phase += self.dt * 2 * torch.pi * self.omega / self.cfg.control.decimation
+        self.phase.fmod(2 * torch.pi)
+
+    def _pre_decimation_step(self):
+        super()._pre_decimation_step
+        # self.previous_base_lin_vel = self.base_lin_vel.clone()
 
     def _post_decimation_step(self):
         super()._post_decimation_step()
         self.phase_obs = torch.cat(
             (torch.sin(self.phase), torch.cos(self.phase)), dim=1
         )
-
-    def _resample_commands(self, env_ids):
-        super()._resample_commands(env_ids)
-        # * with 10% chance, reset to 0 commands
-        rand_ids = torch_rand_float(
-            0, 1, (len(env_ids), 1), device=self.device
-        ).squeeze(1)
-        self.commands[env_ids, :3] *= (rand_ids < 0.9).unsqueeze(1)
+        self.grf = self._compute_grf()
+        # self.base_lin_acc = (self.base_lin_vel - self.previous_base_lin_vel) / self.dt
 
     def _switch(self):
         c_vel = torch.linalg.norm(self.commands, dim=1)
         return torch.exp(
-            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1)) / 0.1
+            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1))
+            / self.cfg.reward_settings.switch_scale
         )
+
+    def _reward_trot(self):
+        off_phase = torch.fmod(self.phase + torch.pi, 2 * torch.pi)
+        phases = torch.cat((self.phase, off_phase, off_phase, self.phase), dim=1)
+        # grf = self._compute_grf()
+        return (self.grf * torch.sin(phases)).mean(dim=1)  # * (1 - self._switch())
+
+    def _compute_grf(self, grf_norm=True):
+        grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
+        if grf_norm:
+            return torch.clamp_max(grf / 80.0, 1.0)
+        else:
+            return grf
 
     def _reward_swing_grf(self):
         """Reward non-zero grf during swing (0 to pi)"""
@@ -64,7 +134,7 @@ class MiniCheetahRef(MiniCheetah):
         )
         ph_off = torch.lt(self.phase, torch.pi)
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
-        return -torch.sum(rew.float(), dim=1) * (1 - self._switch())
+        return -torch.sum(rew.float(), dim=1)  # * (1 - self._switch())
 
     def _reward_stance_grf(self):
         """Reward non-zero grf during stance (pi to 2pi)"""
@@ -75,7 +145,7 @@ class MiniCheetahRef(MiniCheetah):
         ph_off = torch.gt(self.phase, torch.pi)  # should this be in swing?
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
 
-        return torch.sum(rew.float(), dim=1) * (1 - self._switch())
+        return torch.sum(rew.float(), dim=1)  # * (1 - self._switch())
 
     def _reward_reference_traj(self):
         """REWARDS EACH LEG INDIVIDUALLY BASED ON ITS POSITION IN THE CYCLE"""
@@ -84,7 +154,7 @@ class MiniCheetahRef(MiniCheetah):
         error /= self.scales["dof_pos"]
         reward = (self._sqrdexp(error) - torch.abs(error) * 0.2).mean(dim=1)
         # * only when commanded velocity is higher
-        return reward * (1 - self._switch())
+        return reward  # * (1 - self._switch())
 
     def _get_ref(self):
         leg_frame = torch.zeros_like(self.torques)
@@ -112,10 +182,10 @@ class MiniCheetahRef(MiniCheetah):
         rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
         rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
         rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
-        return (rew_vel + rew_pos - rew_base_vel) * self._switch()
+        return rew_vel + rew_pos - rew_base_vel  # * self._switch()
 
     def _reward_tracking_lin_vel(self):
         """Tracking linear velocity commands (xy axes)"""
         # just use lin_vel?
         reward = super()._reward_tracking_lin_vel()
-        return reward * (1 - self._switch())
+        return reward  # * (1 - self._switch())
