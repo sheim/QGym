@@ -82,6 +82,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         dof_pos_target = 4 * [0.2, 0.3, 0.3]
         tau_ff = 4 * [18, 18, 28]
         commands = [3, 1, 3]
+        torques = 4 * [9.0, 9.0, 14.0]
 
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
@@ -91,7 +92,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = "tanh"
         smooth_exploration = False
         exploration_sample_freq = 16
         obs = [
@@ -105,7 +106,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "omega",
         ]
-        normalize_obs = False
+        normalize_obs = True
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -174,10 +175,11 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "projected_gravity",
             "dof_pos_obs",
             "dof_vel",
+            "torques",
             "phase_obs",
         ]
-        targets = ["base_height", "base_lin_vel"]
-        write_to = ["se_base_height", "se_base_lin_vel"]
+        targets = ["base_height", "base_lin_vel", "grf"]
+        write_to = ["se_base_height", "se_base_lin_vel", "se_grf"]
         batch_size = 2**15
         max_gradient_steps = 10
         normalize_obs = False

@@ -24,6 +24,13 @@ class MiniCheetahRef(MiniCheetah):
             self.num_envs, 2, dtype=torch.float, device=self.device
         )
         self.omega = torch.ones(self.num_envs, 1, device=self.device)
+
+        # self.previous_base_lin_vel = torch.zeros_like(self.base_lin_vel)
+        # self.base_lin_acc = torch.zeros_like(self.base_lin_vel)
+
+        self.grf = self._compute_grf()
+        self.se_grf = self._compute_grf()
+
         self.se_base_height = torch.zeros_like(self.base_height)
         self.se_base_lin_vel = torch.zeros_like(self.base_lin_vel)
 
@@ -33,6 +40,7 @@ class MiniCheetahRef(MiniCheetah):
         self.phase[env_ids] = torch_rand_float(
             0, torch.pi, shape=self.phase[env_ids].shape, device=self.device
         )
+        self.se_base_lin_vel[env_ids] = self.base_lin_vel[env_ids]
 
     def _reset_gait_frequencies(self, env_ids):
         self.omega[env_ids, 0] = torch_rand_float(
@@ -86,11 +94,17 @@ class MiniCheetahRef(MiniCheetah):
         self.phase += self.dt * 2 * torch.pi * self.omega / self.cfg.control.decimation
         self.phase.fmod(2 * torch.pi)
 
+    def _pre_decimation_step(self):
+        super()._pre_decimation_step
+        # self.previous_base_lin_vel = self.base_lin_vel.clone()
+
     def _post_decimation_step(self):
         super()._post_decimation_step()
         self.phase_obs = torch.cat(
             (torch.sin(self.phase), torch.cos(self.phase)), dim=1
         )
+        self.grf = self._compute_grf()
+        # self.base_lin_acc = (self.base_lin_vel - self.previous_base_lin_vel) / self.dt
 
     def _switch(self):
         c_vel = torch.linalg.norm(self.commands, dim=1)
@@ -102,8 +116,8 @@ class MiniCheetahRef(MiniCheetah):
     def _reward_trot(self):
         off_phase = torch.fmod(self.phase + torch.pi, 2 * torch.pi)
         phases = torch.cat((self.phase, off_phase, off_phase, self.phase), dim=1)
-        grf = self._compute_grf()
-        return (grf * torch.sin(phases)).mean(dim=1)  # * (1 - self._switch())
+        # grf = self._compute_grf()
+        return (self.grf * torch.sin(phases)).mean(dim=1)  # * (1 - self._switch())
 
     def _compute_grf(self, grf_norm=True):
         grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
