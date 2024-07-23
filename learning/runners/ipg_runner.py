@@ -27,8 +27,8 @@ class IPGRunner(BaseRunner):
 
     def _set_up_alg(self):
         alg_class_name = self.cfg["algorithm_class_name"]
-        if alg_class_name != "PPO_IPG":
-            raise ValueError("IPGRunner only supports PPO_IPG")
+        if alg_class_name not in ["PPO_IPG", "LinkedIPG"]:
+            raise ValueError("IPGRunner only supports PPO_IPG or Linked_IPG")
 
         alg_class = eval(alg_class_name)
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
@@ -232,7 +232,7 @@ class IPGRunner(BaseRunner):
             (self.alg.actor, self.alg.critic_v, self.alg.critic_q)
         )
 
-    def save(self, save_storage=False):
+    def save(self, save_storage=True):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
         torch.save(

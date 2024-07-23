@@ -125,16 +125,17 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
         desired_kl = 0.01
 
         # IPG
-        polyak = 0.995
+        polyak = 0.5
         use_cv = False
         inter_nu = 0.2
         beta = "off_policy"
         storage_size = 4 * 100 * 4096  # num_policies*num_steps*num_envs
+        val_interpolation = 0.25  # 0: use V(s'), 1: use Q(s', pi(s'))
 
     class runner(FixedRobotCfgPPO.runner):
         run_name = ""
         experiment_name = "pendulum"
         max_iterations = 100  # number of policy updates
-        algorithm_class_name = "PPO_IPG"
+        algorithm_class_name = "LinkedIPG"
         num_steps_per_env = 100
         save_interval = 20

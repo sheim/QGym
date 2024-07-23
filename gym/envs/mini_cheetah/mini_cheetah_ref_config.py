@@ -76,7 +76,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         smooth_exploration = True
         exploration_sample_freq = 16
 
-        normalize_obs = True
+        normalize_obs = False
         obs = [
             "base_ang_vel",
             "projected_gravity",
@@ -146,15 +146,16 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         desired_kl = 0.02  # 0.02 for smooth-exploration, else 0.01
 
         # IPG
-        polyak = 0.995
+        polyak = 0.95
         use_cv = False
         inter_nu = 0.2
         beta = "off_policy"
         storage_size = 8 * 32 * 4096  # num_policies*num_stpes*num_envs
+        val_interpolation = 0.25  # 0: use V(s'), 1: use Q(s', pi(s'))
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
         max_iterations = 1000  # number of policy updates
-        algorithm_class_name = "PPO_IPG"
+        algorithm_class_name = "LinkedIPG"
         num_steps_per_env = 32

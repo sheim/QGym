@@ -97,15 +97,15 @@ class PPO_IPG:
         self.update_critic_q(data_offpol)
 
         # Freeze Q-network params
-        for param in self.critic_q.parameters():
-            param.requires_grad = False
+        # for param in self.critic_q.parameters():
+        #     param.requires_grad = False
 
         self.update_actor(data_onpol, data_offpol)
         self.update_critic_v(data_onpol)
 
         # Un-freeze Q-network params
-        for param in self.critic_q.parameters():
-            param.requires_grad = True
+        # for param in self.critic_q.parameters():
+        #     param.requires_grad = True
 
     def update_critic_q(self, data):
         self.mean_q_loss = 0
