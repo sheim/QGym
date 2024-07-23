@@ -6,15 +6,22 @@ class MinimalistCheetah:
     Helper class for computing mini cheetah rewards
     """
 
-    def __init__(self, device="cpu", dt=0.01, tracking_sigma=0.25):
+    def __init__(
+        self, device="cpu", tracking_sigma=0.25, ctrl_dt=0.01, ctrl_decimation=5
+    ):
         self.device = device
-        self.dt = dt
         self.tracking_sigma = tracking_sigma
+
+        # Implemented as in legged robot action rate reward
+        self.dt = ctrl_dt * ctrl_decimation
 
         # Default joint angles from mini_cheetah_config.py
         self.default_dof_pos = torch.tensor(
             [0.0, -0.785398, 1.596976], device=self.device
         ).repeat(4)
+
+        # Scales
+        self.command_scales = torch.tensor([3.0, 1.0, 3.0]).to(self.device)
 
         # Previous 2 dof pos targets
         self.dof_target_prev = None
@@ -38,7 +45,10 @@ class MinimalistCheetah:
         self.base_lin_vel = torch.tensor(base_lin_vel, device=self.device).unsqueeze(0)
         self.base_ang_vel = torch.tensor(base_ang_vel, device=self.device).unsqueeze(0)
         self.proj_gravity = torch.tensor(proj_gravity, device=self.device).unsqueeze(0)
-        self.commands = torch.tensor(commands, device=self.device).unsqueeze(0)
+        self.commands = (
+            torch.tensor(commands, device=self.device).unsqueeze(0)
+            * self.command_scales
+        )
         self.dof_pos_obs = torch.tensor(dof_pos_obs, device=self.device).unsqueeze(0)
         self.dof_vel = torch.tensor(dof_vel, device=self.device).unsqueeze(0)
         self.grf = torch.tensor(grf, device=self.device).unsqueeze(0)
@@ -97,14 +107,14 @@ class MinimalistCheetah:
         error = torch.square(self.proj_gravity[:, :2]) / self.tracking_sigma
         return torch.sum(torch.exp(-error), dim=1)
 
-    def _reward_swing_grf(self, contact_thresh=0.5):
+    def _reward_swing_grf(self, contact_thresh=50 / 80):
         """Reward non-zero grf during swing (0 to pi)"""
         in_contact = torch.gt(self.grf, contact_thresh)
         ph_off = torch.gt(self.phase_sin, 0)  # phase <= pi
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
         return -torch.sum(rew.float(), dim=1) * (1 - self._switch())
 
-    def _reward_stance_grf(self, contact_thresh=0.5):
+    def _reward_stance_grf(self, contact_thresh=50 / 80):
         """Reward non-zero grf during stance (pi to 2pi)"""
         in_contact = torch.gt(self.grf, contact_thresh)
         ph_off = torch.lt(self.phase_sin, 0)  # phase >= pi
@@ -119,9 +129,8 @@ class MinimalistCheetah:
             dim=1,
         )
         rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
-        rew_base_vel = 0  # TODO: This seems too noisy
-        # rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
-        # rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
+        rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
+        rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
         return (rew_vel + rew_pos - rew_base_vel) * self._switch()
 
     def _reward_action_rate(self):
@@ -137,6 +146,6 @@ class MinimalistCheetah:
             torch.square(
                 self.dof_pos_target - 2 * self.dof_target_prev + self.dof_target_prev2
             )
-            / self.dt
+            / self.dt**2
         )
         return -torch.sum(error, dim=1)

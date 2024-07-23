@@ -67,7 +67,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "IPGRunner"
 
     class actor:
         hidden_dims = [256, 256, 128]
@@ -103,7 +103,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        normalize_obs = True
+
+        # TODO: Check normalization, SAC/IPG need gradient to pass back through actor
+        normalize_obs = False
         obs = [
             "base_height",
             "base_lin_vel",
@@ -121,15 +123,15 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
-                ang_vel_xy = 0.01
+                ang_vel_xy = 0.0
                 orientation = 1.0
-                torques = 5.0e-7
+                torques = 0.0
                 dof_vel = 0.0
                 min_base_height = 1.5
                 collision = 0.0
                 action_rate = 0.01
                 action_rate2 = 0.001
-                stand_still = 2.0
+                stand_still = 1.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
@@ -148,16 +150,11 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         use_cv = False
         inter_nu = 0.2
         beta = "off_policy"
-        storage_size = 4 * 32 * 4096  # num_policies*num_stpes*num_envs
-
-        # Finetuning
-        # learning_rate = 3e-4
-        # max_gradient_steps = 10
-        # batch_size = 4096
+        storage_size = 8 * 32 * 4096  # num_policies*num_stpes*num_envs
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 700  # number of policy updates
-        algorithm_class_name = "PPO2"
+        max_iterations = 1000  # number of policy updates
+        algorithm_class_name = "PPO_IPG"
         num_steps_per_env = 32

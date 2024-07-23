@@ -23,6 +23,7 @@ class MiniCheetahRef(MiniCheetah):
         self.phase_obs = torch.zeros(
             self.num_envs, 2, dtype=torch.float, device=self.device
         )
+        self.grf = self._compute_grf()
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
@@ -41,18 +42,19 @@ class MiniCheetahRef(MiniCheetah):
         self.phase_obs = torch.cat(
             (torch.sin(self.phase), torch.cos(self.phase)), dim=1
         )
+        self.grf = self._compute_grf()
 
     def _resample_commands(self, env_ids):
         super()._resample_commands(env_ids)
-        # * with 10% chance, reset to 0 commands except for forward
+        # * with 20% chance, reset to 0 commands except for forward
         self.commands[env_ids, 1:] *= (
             torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
-            < 0.9
+            < 0.8
         ).unsqueeze(1)
-        # * with 10% chance, reset to 0 commands except for rotation
+        # * with 20% chance, reset to 0 commands except for rotation
         self.commands[env_ids, :2] *= (
             torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
-            < 0.9
+            < 0.8
         ).unsqueeze(1)
         # * with 10% chance, reset to 0
         self.commands[env_ids, :] *= (
@@ -65,6 +67,13 @@ class MiniCheetahRef(MiniCheetah):
         return torch.exp(
             -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1)) / 0.1
         )
+
+    def _compute_grf(self, grf_norm=True):
+        grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
+        if grf_norm:
+            return torch.clamp_max(grf / 80.0, 1.0)
+        else:
+            return grf
 
     def _reward_swing_grf(self):
         """Reward non-zero grf during swing (0 to pi)"""

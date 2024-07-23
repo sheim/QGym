@@ -2,9 +2,10 @@
 source /home/lmolnar/miniconda3/etc/profile.d/conda.sh
 
 # Args
-LOAD_RUN="Jul12_15-53-57_IPG32_S16"
-CHECKPOINT=700
-N_RUNS=5
+LOAD_RUN="Jul23_00-14-23_nu02_B8"
+CHECKPOINT=1000
+N_RUNS=6
+EVAL=false  # make sure to turn exploration on/off in RS
 
 # Set directories
 QGYM_DIR="/home/lmolnar/workspace/QGym"
@@ -39,9 +40,11 @@ do
     cp ${RS_DIR}/logging/matlab_logs/${CHECKPOINT}.mat ${QGYM_LOG_DIR}
 
     # Finetune in QGym
-    conda deactivate
-    conda activate qgym
-    python ${QGYM_DIR}/scripts/finetune.py --task=mini_cheetah_finetune --headless --load_run=${LOAD_RUN} --checkpoint=${CHECKPOINT}
+    if [ "$EVAL" = false ] ; then
+        conda deactivate
+        conda activate qgym
+        python ${QGYM_DIR}/scripts/finetune.py --task=mini_cheetah_finetune --headless --load_run=${LOAD_RUN} --checkpoint=${CHECKPOINT}
+    fi
 
     # Copy policy to RS
     CHECKPOINT=$((CHECKPOINT + 1))

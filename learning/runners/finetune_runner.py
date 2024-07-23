@@ -1,11 +1,14 @@
-import torch
-from tensordict import TensorDict
 from learning.algorithms import *  # noqa: F403
-from learning.modules import Actor, SmoothActor, Critic
-from learning.utils import remove_zero_weighted_rewards
+from learning.algorithms import StateEstimator
+from learning.modules import Actor, SmoothActor, Critic, StateEstimatorNN
 from learning.storage import DictStorage
-
+from gym.envs.mini_cheetah.minimalist_cheetah import MinimalistCheetah
 from .BaseRunner import BaseRunner
+
+import torch
+import os
+import scipy.io
+from tensordict import TensorDict
 
 sim_storage = DictStorage()
 
@@ -15,16 +18,21 @@ class FineTuneRunner(BaseRunner):
         self,
         env,
         train_cfg,
-        data_onpol,
-        data_offpol=None,
+        log_dir,
+        data_list,
+        data_length=2990,
+        data_name="SMOOTH_RL_CONTROLLER",
         exploration_scale=1.0,
         device="cpu",
     ):
-        self.data_onpol = data_onpol
-        self.data_offpol = data_offpol
-        self.exploration_scale = exploration_scale
         # Init calls _set_up_alg which needs exploration scale
+        self.exploration_scale = exploration_scale
         super().__init__(env, train_cfg, device)
+
+        self.log_dir = log_dir
+        self.data_list = data_list  # Describes structure of Robot-Software logs
+        self.data_length = data_length  # Logs must contain at least this many steps
+        self.data_name = data_name
 
     def _set_up_alg(self):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
@@ -40,8 +48,21 @@ class FineTuneRunner(BaseRunner):
         else:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
 
+        if "state_estimator" in self.train_cfg.keys():
+            self.se_cfg = self.train_cfg["state_estimator"]
+            state_estimator_network = StateEstimatorNN(
+                self.get_obs_size(self.se_cfg["obs"]),
+                self.get_obs_size(self.se_cfg["targets"]),
+                **self.se_cfg["network"],
+            )
+            self.SE = StateEstimator(
+                state_estimator_network, device=self.device, **self.se_cfg
+            )
+        else:
+            self.SE = None
+
         alg_class = eval(self.cfg["algorithm_class_name"])
-        if self.data_offpol is not None:
+        if self.cfg["algorithm_class_name"] == "PPO_IPG":
             critic_v = Critic(num_critic_obs, **self.critic_cfg)
             critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
             target_critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
@@ -60,9 +81,137 @@ class FineTuneRunner(BaseRunner):
     def parse_train_cfg(self, train_cfg):
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
-        remove_zero_weighted_rewards(train_cfg["critic"]["reward"]["weights"])
         self.actor_cfg = train_cfg["actor"]
         self.critic_cfg = train_cfg["critic"]
+        self.train_cfg = train_cfg
+
+    def get_data_dict(self, offpol=False):
+        checkpoint = self.cfg["checkpoint"]
+        if offpol:
+            # All files up until checkpoint
+            log_files = [
+                file
+                for file in os.listdir(self.log_dir)
+                if file.endswith(".mat") and int(file.split(".")[0]) <= checkpoint
+            ]
+            log_files = sorted(log_files)
+        else:
+            # Single log file for checkpoint
+            log_files = [str(checkpoint) + ".mat"]
+
+        # Initialize data dict
+        data = scipy.io.loadmat(os.path.join(self.log_dir, log_files[0]))
+        batch_size = (self.data_length - 1, len(log_files))  # -1 for next_obs
+        data_dict = TensorDict({}, device=self.device, batch_size=batch_size)
+
+        # Collect all data
+        actor_obs_all = torch.empty(0).to(self.device)
+        critic_obs_all = torch.empty(0).to(self.device)
+        actions_all = torch.empty(0).to(self.device)
+        rewards_all = torch.empty(0).to(self.device)
+        for log in log_files:
+            data = scipy.io.loadmat(os.path.join(self.log_dir, log))
+            self.data_struct = data[self.data_name][0][0]
+            if self.SE:
+                self.update_state_estimates()
+
+            actor_obs = self.get_data_obs(self.actor_cfg["obs"], self.data_struct)
+            critic_obs = self.get_data_obs(self.critic_cfg["obs"], self.data_struct)
+            actor_obs_all = torch.cat((actor_obs_all, actor_obs), dim=1)
+            critic_obs_all = torch.cat((critic_obs_all, critic_obs), dim=1)
+
+            actions_idx = self.data_list.index("dof_pos_target")
+            actions = (
+                torch.tensor(self.data_struct[actions_idx]).to(self.device).float()
+            )
+            actions = actions[: self.data_length]
+            actions = actions.reshape(
+                (self.data_length, 1, -1)
+            )  # shape (data_length, 1, n)
+            actions_all = torch.cat((actions_all, actions), dim=1)
+
+            reward_weights = self.critic_cfg["reward"]["weights"]
+            rewards, _ = self.get_data_rewards(self.data_struct, reward_weights)
+            rewards = rewards[: self.data_length]
+            rewards = rewards.reshape((self.data_length, 1))  # shape (data_length, 1)
+            rewards_all = torch.cat((rewards_all, rewards), dim=1)
+
+        data_dict["actor_obs"] = actor_obs_all[:-1]
+        data_dict["next_actor_obs"] = actor_obs_all[1:]
+        data_dict["critic_obs"] = critic_obs_all[:-1]
+        data_dict["next_critic_obs"] = critic_obs_all[1:]
+        data_dict["actions"] = actions_all[:-1]
+        data_dict["rewards"] = rewards_all[:-1]
+
+        # No time outs and dones
+        data_dict["timed_out"] = torch.zeros(batch_size, device=self.device, dtype=bool)
+        data_dict["dones"] = torch.zeros(batch_size, device=self.device, dtype=bool)
+
+        return data_dict
+
+    def get_data_obs(self, obs_list, data_struct):
+        obs_all = torch.empty(0).to(self.device)
+        for obs_name in obs_list:
+            data_idx = self.data_list.index(obs_name)
+            obs = torch.tensor(data_struct[data_idx]).to(self.device)
+            obs = obs.squeeze()[: self.data_length]
+            obs = obs.reshape((self.data_length, 1, -1))  # shape (data_length, 1, n)
+            obs_all = torch.cat((obs_all, obs), dim=-1)
+
+        return obs_all.float()
+
+    def get_data_rewards(self, data_struct, reward_weights, dt=0.01):
+        minimalist_cheetah = MinimalistCheetah(device=self.device)
+        rewards_dict = {name: [] for name in reward_weights.keys()}  # for plotting
+        rewards_all = torch.empty(0).to(self.device)
+
+        for i in range(self.data_length):
+            minimalist_cheetah.set_states(
+                base_height=data_struct[1][i],
+                base_lin_vel=data_struct[2][i],
+                base_ang_vel=data_struct[3][i],
+                proj_gravity=data_struct[4][i],
+                commands=data_struct[5][i],
+                dof_pos_obs=data_struct[6][i],
+                dof_vel=data_struct[7][i],
+                phase_obs=data_struct[8][i],
+                grf=data_struct[9][i],
+                dof_pos_target=data_struct[10][i],
+            )
+            total_rewards = 0
+            for name, weight in reward_weights.items():
+                reward = weight * eval(f"minimalist_cheetah._reward_{name}()")
+                rewards_dict[name].append(reward.item())
+                total_rewards += reward
+            rewards_all = torch.cat((rewards_all, total_rewards), dim=0)
+            # Post process mini cheetah
+            minimalist_cheetah.post_process()
+
+        rewards_dict["total"] = rewards_all.tolist()
+        rewards_all *= dt  # scaled for alg update
+
+        return rewards_all.float(), rewards_dict
+
+    def update_state_estimates(self):
+        se_obs = torch.empty(0).to(self.device)
+        for obs in self.se_cfg["obs"]:
+            data_idx = self.data_list.index(obs)
+            data = torch.tensor(self.data_struct[data_idx]).to(self.device)
+            data = data.squeeze()[: self.data_length]
+            data = data.reshape((self.data_length, -1))
+            se_obs = torch.cat((se_obs, data), dim=-1)
+
+        se_targets = self.SE.estimate(se_obs.float())
+
+        # Overwrite data struct with state estimates
+        idx = 0
+        for target in self.se_cfg["targets"]:
+            data_idx = self.data_list.index(target)
+            dim = self.data_struct[data_idx].shape[1]
+            self.data_struct[data_idx] = (
+                se_targets[:, idx : idx + dim].cpu().detach().numpy()
+            )
+            idx += dim
 
     def learn(self):
         self.alg.switch_to_train()
@@ -74,12 +223,15 @@ class FineTuneRunner(BaseRunner):
                 batch_size=(self.num_steps_per_env, self.env.num_envs),
                 device=self.device,
             )
+        else:
+            self.data_onpol = self.get_data_dict()
 
         # Single alg update on data
-        if self.data_offpol is None:
-            self.alg.update(self.data_onpol)
-        else:
+        if self.cfg["algorithm_class_name"] == "PPO_IPG":
+            self.data_offpol = self.get_data_dict(offpol=True)
             self.alg.update(self.data_onpol, self.data_offpol)
+        else:
+            self.alg.update(self.data_onpol)
 
     def get_sim_data(self):
         rewards_dict = {}
@@ -223,6 +375,10 @@ class FineTuneRunner(BaseRunner):
                 self.alg.critic_optimizer.load_state_dict(
                     loaded_dict["critic_optimizer_state_dict"]
                 )
+
+    def load_se(self, se_path):
+        se_dict = torch.load(se_path)
+        self.SE.network.load_state_dict(se_dict["SE_state_dict"])
 
     def export(self, path):
         # Need to make a copy of actor

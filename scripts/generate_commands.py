@@ -1,10 +1,15 @@
 import numpy as np
 import random
 
-# Command ranges
-x_range = [-0.5, 1]  # [m/s]
-y_range = [-0.25, 0.25]  # [m/s]
-yaw_range = [-1, 1]  # [rad/s]
+# Command ranges during training:
+# x_range = [-2.0, 3.0]  # [m/s]
+# y_range = [-1.0, 1.0]  # [m/s]
+# yaw_range = [-3.0. 3.0]  # [rad/s]
+
+# Command ranges for finetuning:
+x_range = [-1.0, 1.5]  # [m/s]
+y_range = [-0.5, 0.5]  # [m/s]
+yaw_range = [-1.5, 1.5]  # [rad/s]
 
 # Generate random command sequence
 N = 10

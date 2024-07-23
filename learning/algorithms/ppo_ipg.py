@@ -107,9 +107,6 @@ class PPO_IPG:
         for param in self.critic_q.parameters():
             param.requires_grad = True
 
-        # print("On-policy data shape: ", data_onpol.shape)
-        # print("Off-policy data shape: ", data_offpol.shape)
-
     def update_critic_q(self, data):
         self.mean_q_loss = 0
         counter = 0
@@ -121,7 +118,6 @@ class PPO_IPG:
         )
         for batch in generator:
             with torch.no_grad():
-                # TODO: check that should be inference
                 action_next = self.actor.act_inference(batch["next_actor_obs"])
                 q_input_next = torch.cat(
                     (batch["next_critic_obs"], action_next), dim=-1
@@ -252,7 +248,7 @@ class PPO_IPG:
             else:
                 b = self.inter_nu
 
-            loss = loss_onpol + b * loss_offpol
+            loss = loss_onpol + b * loss_offpol.requires_grad_()
 
             # * Gradient step
             self.optimizer.zero_grad()

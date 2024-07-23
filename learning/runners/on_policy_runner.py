@@ -143,7 +143,7 @@ class OnPolicyRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-        self.save(end=True)
+        self.save()
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -190,7 +190,7 @@ class OnPolicyRunner(BaseRunner):
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 
-    def save(self, end=False):
+    def save(self, save_storage=False):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
         torch.save(
@@ -203,8 +203,7 @@ class OnPolicyRunner(BaseRunner):
             },
             path,
         )
-        # Save data if training hasn't ended, otherwise storage was cleared
-        if not end:
+        if save_storage:
             path_data = os.path.join(self.log_dir, "data_{}".format(self.it))
             torch.save(storage.data.cpu(), path_data + ".pt")
 

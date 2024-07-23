@@ -173,7 +173,7 @@ class IPGRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-        self.save(end=True)
+        self.save()
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -232,7 +232,7 @@ class IPGRunner(BaseRunner):
             (self.alg.actor, self.alg.critic_v, self.alg.critic_q)
         )
 
-    def save(self, end=False):
+    def save(self, save_storage=False):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
         torch.save(
@@ -247,13 +247,11 @@ class IPGRunner(BaseRunner):
             },
             path,
         )
-        # Save data
-        path_offpol = os.path.join(self.log_dir, "data_offpol_{}".format(self.it))
-        torch.save(storage_offpol.get_data().cpu(), path_offpol + ".pt")
-        # When training ends the on-policy data was cleared
-        if not end:
+        if save_storage:
             path_onpol = os.path.join(self.log_dir, "data_onpol_{}".format(self.it))
+            path_offpol = os.path.join(self.log_dir, "data_offpol_{}".format(self.it))
             torch.save(storage_onpol.data.cpu(), path_onpol + ".pt")
+            torch.save(storage_offpol.get_data().cpu(), path_offpol + ".pt")
 
     def load(self, path, load_optimizer=True, load_actor_std=True):
         loaded_dict = torch.load(path)

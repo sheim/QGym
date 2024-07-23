@@ -1,29 +1,33 @@
-from gym.envs.mini_cheetah.minimalist_cheetah import MinimalistCheetah
+from gym.envs import __init__  # noqa: F401
+from gym.utils import get_args, task_registry
+from gym.utils.helpers import class_to_dict
+
+from learning.runners.finetune_runner import FineTuneRunner
 
 from gym import LEGGED_GYM_ROOT_DIR
 
 import os
-import torch
 import scipy.io
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
-LOAD_RUN = "Jul12_15-53-57_IPG32_S16"
+SE_PATH = f"{LEGGED_GYM_ROOT_DIR}/logs/SE/model_1000.pt"  # if None: no SE
+LOAD_RUN = "Jul23_00-14-23_nu02_B8"
 
-REWARDS_FILE = "rewards_nu1.csv"  # generate this file from logs, if None: just plot
+REWARDS_FILE = None  # generate this file from logs, if None: just plot
 PLOT_REWARDS = {
+    "Nu=0.0": "rewards_nu0.csv",
     "Nu=0.5": "rewards_nu05.csv",
-    "Nu=0.8": "rewards_nu08.csv",
-    "Nu=1.0": "rewards_nu1.csv",
+    "Nu=0.9": "rewards_nu09.csv",
+    "Nu=0.9 new": "rewards_nu09_new.csv",
 }
 
 # Data struct fields from Robot-Software logs
 DATA_LIST = [
     "header",
-    "base_height",  # 1 shape: (1, data_length)
-    # the following are all shape: (data_length, n)
+    "base_height",  # 1
     "base_lin_vel",  # 2
     "base_ang_vel",  # 3
     "projected_gravity",  # 4
@@ -52,59 +56,7 @@ REWARD_WEIGHTS = {
 DEVICE = "cuda"
 
 
-def get_rewards(it, data_struct, rewards_path):
-    data_length = data_struct[1].shape[1]  # base_height: shape (1, data_length)
-
-    mini_cheetah = MinimalistCheetah(device=DEVICE)
-    rewards_dict = {name: [] for name in REWARD_WEIGHTS.keys()}  # for plotting
-    rewards_all = torch.empty(0).to(DEVICE)
-
-    for i in range(data_length):
-        mini_cheetah.set_states(
-            base_height=data_struct[1][:, i],  # shape (1, data_length)
-            base_lin_vel=data_struct[2][i],
-            base_ang_vel=data_struct[3][i],
-            proj_gravity=data_struct[4][i],
-            commands=data_struct[5][i],
-            dof_pos_obs=data_struct[6][i],
-            dof_vel=data_struct[7][i],
-            phase_obs=data_struct[8][i],
-            grf=data_struct[9][i],
-            dof_pos_target=data_struct[10][i],
-        )
-        total_rewards = 0
-        for name, weight in REWARD_WEIGHTS.items():
-            reward = weight * eval(f"mini_cheetah._reward_{name}()")
-            rewards_dict[name].append(reward.item())
-            total_rewards += reward
-        rewards_all = torch.cat((rewards_all, total_rewards), dim=0)
-        # Post process mini cheetah
-        mini_cheetah.post_process()
-
-    rewards_dict["total"] = rewards_all.tolist()
-
-    # Save rewards in dataframe
-    if not os.path.exists(rewards_path):
-        rewards_df = pd.DataFrame(columns=["iteration", "type", "mean", "std"])
-    else:
-        rewards_df = pd.read_csv(rewards_path)
-    for name, rewards in rewards_dict.items():
-        rewards = np.array(rewards)
-        mean = rewards.mean()
-        std = rewards.std()
-        rewards_df = rewards_df._append(
-            {
-                "iteration": it,
-                "type": name,
-                "mean": mean,
-                "std": std,
-            },
-            ignore_index=True,
-        )
-    rewards_df.to_csv(rewards_path, index=False)
-
-
-def get_data_dict(name="SMOOTH_RL_CONTROLLER"):
+def update_rewards_df(runner):
     data_dict = {}
     log_files = [
         file
@@ -116,8 +68,35 @@ def get_data_dict(name="SMOOTH_RL_CONTROLLER"):
         iteration = int(file.split(".")[0])
         path = os.path.join(ROOT_DIR, LOAD_RUN, file)
         data = scipy.io.loadmat(path)
-        data_dict[iteration] = data[name][0][0]
-    return data_dict
+        data_dict[iteration] = data[runner.data_name][0][0]
+
+    rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
+    if os.path.exists(rewards_path):
+        os.remove(rewards_path)
+
+    # Get rewards from runner
+    for it, data_struct in data_dict.items():
+        _, rewards_dict = runner.get_data_rewards(data_struct, REWARD_WEIGHTS)
+
+        # Save rewards in dataframe
+        if not os.path.exists(rewards_path):
+            rewards_df = pd.DataFrame(columns=["iteration", "type", "mean", "std"])
+        else:
+            rewards_df = pd.read_csv(rewards_path)
+        for name, rewards in rewards_dict.items():
+            rewards = np.array(rewards)
+            mean = rewards.mean()
+            std = rewards.std()
+            rewards_df = rewards_df._append(
+                {
+                    "iteration": it,
+                    "type": name,
+                    "mean": mean,
+                    "std": std,
+                },
+                ignore_index=True,
+            )
+        rewards_df.to_csv(rewards_path, index=False)
 
 
 def plot_rewards(rewards_df, axs, name):
@@ -154,20 +133,39 @@ def plot_rewards(rewards_df, axs, name):
     axs[i].legend()
 
 
+def setup():
+    args = get_args()
+
+    env_cfg, train_cfg = task_registry.create_cfgs(args)
+    task_registry.make_gym_and_sim()
+    env = task_registry.make_env(name=args.task, env_cfg=env_cfg)
+
+    train_cfg = class_to_dict(train_cfg)
+    log_dir = os.path.join(ROOT_DIR, train_cfg["runner"]["load_run"])
+
+    runner = FineTuneRunner(
+        env,
+        train_cfg,
+        log_dir,
+        data_list=DATA_LIST,
+        device=DEVICE,
+    )
+
+    return runner
+
+
 if __name__ == "__main__":
     if REWARDS_FILE is not None:
-        data_dict = get_data_dict()
-        rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
-        if os.path.exists(rewards_path):
-            os.remove(rewards_path)
-        for it, data_struct in data_dict.items():
-            get_rewards(it, data_struct, rewards_path)
+        runner = setup()
+        if SE_PATH is not None:
+            runner.load_se(SE_PATH)
+        update_rewards_df(runner)
 
     # Plot rewards stats
     num_plots = len(REWARD_WEIGHTS) + 1  # +1 for total rewards
     cols = 5
     rows = np.ceil(num_plots / cols).astype(int)
-    fig, axs = plt.subplots(rows, cols, figsize=(30, 10))
+    fig, axs = plt.subplots(rows, cols, figsize=(20, 8))
     fig.suptitle("IPG Finetuning Rewards")
     axs = axs.flatten()
 

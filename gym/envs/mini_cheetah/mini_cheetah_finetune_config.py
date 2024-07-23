@@ -8,7 +8,7 @@ BASE_HEIGHT_REF = 0.33
 
 class MiniCheetahFineTuneCfg(MiniCheetahRefCfg):
     class env(MiniCheetahRefCfg.env):
-        num_envs = 1024
+        num_envs = 4096
         num_actuators = 12
         episode_length_s = 30.0
 
@@ -27,23 +27,13 @@ class MiniCheetahFineTuneCfg(MiniCheetahRefCfg):
         desired_sim_frequency = 500
 
     class commands(MiniCheetahRefCfg.commands):
-        # * time before command are changed[s]
-        resampling_time = 3.0
-
-        # * smaller ranges for finetuning
-        class ranges:
-            lin_vel_x = [-1.0, 1.5]  # min max [m/s]
-            lin_vel_y = 0.5  # max [m/s]
-            yaw_vel = 1.5  # max [rad/s]
+        pass
 
     class push_robots(MiniCheetahRefCfg.push_robots):
         pass
 
     class domain_rand(MiniCheetahRefCfg.domain_rand):
-        randomize_friction = False
-        friction_range = [0.5, 1.0]
-        randomize_base_mass = False
-        added_mass_range = [5.0, 5.0]
+        pass
 
     class asset(MiniCheetahRefCfg.asset):
         pass
@@ -93,7 +83,9 @@ class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        normalize_obs = True
+
+        # TODO: Check normalization, SAC/IPG need gradient to pass back through actor
+        normalize_obs = False
         obs = [
             "base_height",
             "base_lin_vel",
@@ -121,15 +113,32 @@ class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
             class termination_weight:
                 termination = 0.15
 
+    class state_estimator:
+        class network:
+            hidden_dims = [128, 128]
+            activation = "tanh"
+            dropouts = None
+
+        obs = [
+            "base_ang_vel",
+            "projected_gravity",
+            "dof_pos_obs",
+            "dof_vel",
+            "torques",
+            "phase_obs",
+        ]
+        targets = ["base_height", "base_lin_vel", "grf"]
+        normalize_obs = True
+
     class algorithm(MiniCheetahRefRunnerCfg.algorithm):
         desired_kl = 0.02  # 0.02 for smooth-exploration, else 0.01
 
         # IPG
         polyak = 0.995
         use_cv = False
-        inter_nu = 0.5
+        inter_nu = 0.9
         beta = "off_policy"
-        storage_size = 4 * 32 * 4096  # num_policies*num_steps*num_envs
+        storage_size = 30000
 
         # Finetuning
         clip_param = 0.2
@@ -143,10 +152,10 @@ class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
         experiment_name = "mini_cheetah_ref"
         max_iterations = 20  # number of policy updates
         algorithm_class_name = "PPO_IPG"
-        num_steps_per_env = 200
+        num_steps_per_env = 32
 
         # Finetuning
         resume = True
-        load_run = "Jul12_15-53-57_IPG32_S16"
-        checkpoint = 700
-        save_interval = 5
+        load_run = "Jul23_00-14-23_nu02_B8"
+        checkpoint = 1000
+        save_interval = 1
