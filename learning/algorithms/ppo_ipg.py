@@ -256,7 +256,7 @@ class PPO_IPG:
             nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
             self.optimizer.step()
             self.mean_surrogate_loss += loss_onpol.item()
-            self.mean_offpol_loss += loss_offpol.item()
+            self.mean_offpol_loss += b * loss_offpol.item()
             counter += 1
         self.mean_surrogate_loss /= counter
         self.mean_offpol_loss /= counter

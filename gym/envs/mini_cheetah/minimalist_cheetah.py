@@ -22,6 +22,8 @@ class MinimalistCheetah:
 
         # Scales
         self.command_scales = torch.tensor([3.0, 1.0, 3.0]).to(self.device)
+        self.dof_pos_scales = torch.tensor([0.2, 0.3, 0.3]).to(self.device).repeat(4)
+        self.dof_vel_scales = torch.tensor([2.0, 2.0, 4.0]).to(self.device).repeat(4)
 
         # Previous 2 dof pos targets
         self.dof_target_prev = None
@@ -49,15 +51,20 @@ class MinimalistCheetah:
             torch.tensor(commands, device=self.device).unsqueeze(0)
             * self.command_scales
         )
-        self.dof_pos_obs = torch.tensor(dof_pos_obs, device=self.device).unsqueeze(0)
-        self.dof_vel = torch.tensor(dof_vel, device=self.device).unsqueeze(0)
+        self.dof_pos_obs = (
+            torch.tensor(dof_pos_obs, device=self.device).unsqueeze(0)
+            * self.dof_pos_scales
+        )
+        self.dof_vel = (
+            torch.tensor(dof_vel, device=self.device).unsqueeze(0) * self.dof_vel_scales
+        )
         self.grf = torch.tensor(grf, device=self.device).unsqueeze(0)
 
         # Compute phase sin
         phase_obs = torch.tensor(phase_obs, device=self.device).unsqueeze(0)
         self.phase_sin = phase_obs[:, 0].unsqueeze(0)
 
-        # Set targets
+        # Set targets, these are scaled in Robot-Software
         self.dof_pos_target = torch.tensor(
             dof_pos_target, device=self.device
         ).unsqueeze(0)

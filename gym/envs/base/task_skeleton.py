@@ -45,6 +45,7 @@ class TaskSkeleton:
         """Reset all robots"""
         self._reset_idx(torch.arange(self.num_envs, device=self.device))
         self.step()
+        self.episode_length_buf[:] = 0
 
     def _reset_buffers(self):
         self.to_be_reset[:] = False
@@ -67,7 +68,7 @@ class TaskSkeleton:
     def _check_terminations_and_timeouts(self):
         """Check if environments need to be reset"""
         contact_forces = self.contact_forces[:, self.termination_contact_indices, :]
-        self.terminated = torch.any(torch.norm(contact_forces, dim=-1) > 1.0, dim=1)
+        self.terminated |= torch.any(torch.norm(contact_forces, dim=-1) > 1.0, dim=1)
         self.timed_out = self.episode_length_buf >= self.max_episode_length
         self.to_be_reset = self.timed_out | self.terminated
 

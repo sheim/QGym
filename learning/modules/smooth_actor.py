@@ -107,7 +107,7 @@ class SmoothActor(Actor):
     def act(self, observations):
         self.update_distribution(observations)
         mean = self.distribution.mean
-        sample = mean + self.get_noise()
+        sample = mean + self.get_noise() * self.exploration_scale
         if self.debug:
             path = f"{LEGGED_GYM_ROOT_DIR}/plots/distribution_smooth.csv"
             self.log_actions(mean[0][2], sample[0][2], path)
