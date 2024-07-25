@@ -1,24 +1,33 @@
 {
     "method": "random",
     "metric": {
-        "name": "Train/mean_reward",
+        "name": "rewards/tracking_lin_vel",
         "goal": "maximize"
     },
-    "run_cap": 10,
+    "run_cap": 500,
     "parameters": {
-        "train_cfg.runner.max_iterations": {
-            "values": [10]
+        "train_cfg.algorithm.polyak": {
+            "min": 0.5,
+            "max": 0.999
         },
-        "env_cfg.env.episode_length_s": {
-            "min": 2,
-            "max": 10
+        "train_cfg.algorithm.inter_nu": {
+            "min": 0.0,
+            "max": 1.0
         },
-        "train_cfg.policy.reward.weights.lin_vel_z":{
-            "min":0.1,
-            "max":1.0
+        "train_cfg.algorithm.val_interpolation": {
+            "min": 0.0,
+            "max": 1.0
         },
-        "env_cfg.env.num_envs": {
-            "values": [64]
+         "env_cfg.control.ctrl_frequency": {
+            "values": [25, 50, 100]
+        },
+        "env_cfg.control.gait_freq": {
+            "min": 2.0,
+            "max": 3.0
+        },
+        "train_cfg.algorithm.learning_rate": {
+            "min": 0.00001,
+            "max": 0.01
         }
     }
 }

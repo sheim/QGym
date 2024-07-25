@@ -73,7 +73,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = True
+        smooth_exploration = False
         exploration_sample_freq = 16
 
         normalize_obs = False
@@ -146,16 +146,19 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         desired_kl = 0.02  # 0.02 for smooth-exploration, else 0.01
 
         # IPG
-        polyak = 0.95
+        polyak = 0.995
         use_cv = False
-        inter_nu = 0.2
+        inter_nu = 0.8  # 0: on-policy only, 1: off-policy only
         beta = "off_policy"
         storage_size = 8 * 32 * 4096  # num_policies*num_stpes*num_envs
-        val_interpolation = 0.25  # 0: use V(s'), 1: use Q(s', pi(s'))
+        val_interpolation = 0.9  # 0: use V(s'), 1: use Q(s', pi(s'))
+        learning_rate = 1.0e-3
+        lr_range = [1e-5, 1e-2]
+        lr_ratio = 1.5
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 500  # number of policy updates
         algorithm_class_name = "LinkedIPG"
         num_steps_per_env = 32

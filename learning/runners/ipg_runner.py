@@ -173,7 +173,7 @@ class IPGRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-        self.save()
+        # self.save()
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -232,7 +232,7 @@ class IPGRunner(BaseRunner):
             (self.alg.actor, self.alg.critic_v, self.alg.critic_q)
         )
 
-    def save(self, save_storage=True):
+    def save(self, save_storage=False):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
         torch.save(
