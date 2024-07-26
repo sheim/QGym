@@ -9,12 +9,19 @@ from gym import LEGGED_GYM_ROOT_DIR
 import os
 import torch
 import numpy as np
+import pandas as pd
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
-SE_PATH = f"{LEGGED_GYM_ROOT_DIR}/logs/SE/model_1000.pt"  # if None: no SE
+# SE_PATH = f"{LEGGED_GYM_ROOT_DIR}/logs/SE/model_1000.pt"  # if None: no SE
+SE_PATH = None
 OUTPUT_FILE = "output.txt"
+LOSSES_FILE = "losses.csv"
 
 USE_SIMULATOR = True
+
+# Load/save off-policy storage, this can contain many runs
+OFFPOL_LOAD_FILE = "offpol_data_10.pt"
+OFFPOL_SAVE_FILE = None
 
 # Scales
 EXPLORATION_SCALE = 0.5  # used during data collection
@@ -56,6 +63,8 @@ def setup():
         train_cfg,
         log_dir,
         data_list=DATA_LIST,
+        se_path=SE_PATH,
+        use_simulator=USE_SIMULATOR,
         exploration_scale=EXPLORATION_SCALE,
         device=DEVICE,
     )
@@ -64,20 +73,31 @@ def setup():
 
 
 def finetune(runner):
+    # Load model
     load_run = runner.cfg["load_run"]
     checkpoint = runner.cfg["checkpoint"]
-    load_path = os.path.join(ROOT_DIR, load_run, "model_" + str(checkpoint) + ".pt")
-    runner.load(load_path)
+    model_path = os.path.join(ROOT_DIR, load_run, "model_" + str(checkpoint) + ".pt")
+    runner.load(model_path)
 
-    if SE_PATH is not None:
-        runner.load_se(SE_PATH)
+    # Load data
+    load_path = (
+        os.path.join(ROOT_DIR, load_run, OFFPOL_LOAD_FILE) if OFFPOL_LOAD_FILE else None
+    )
+    save_path = (
+        os.path.join(ROOT_DIR, load_run, OFFPOL_SAVE_FILE) if OFFPOL_SAVE_FILE else None
+    )
+    runner.load_data(load_path=load_path, save_path=save_path)
+
+    # Get old inference actions
+    action_scales = torch.tensor(ACTION_SCALES).to(DEVICE)
+    actions_old = action_scales * runner.alg.actor.act_inference(
+        runner.data_onpol["actor_obs"]
+    )
 
     # Perform a single update
     runner.learn()
 
-    # Compare old and new actions
-    actions_old = runner.data_onpol["actions"]
-    action_scales = torch.tensor(ACTION_SCALES).to(DEVICE)
+    # Compare old to new actions
     actions_new = action_scales * runner.alg.actor.act_inference(
         runner.data_onpol["actor_obs"]
     )
@@ -92,6 +112,7 @@ def finetune(runner):
     # Print to output file
     with open(os.path.join(ROOT_DIR, load_run, OUTPUT_FILE), "a") as f:
         f.write(f"############ Checkpoint: {checkpoint} #######################\n")
+        f.write(f"############## Nu={runner.alg.inter_nu} ###################\n")
         f.write("############### DATA ###############\n")
         f.write(f"Data on-policy shape: {runner.data_onpol.shape}\n")
         if runner.data_offpol is not None:
@@ -106,6 +127,38 @@ def finetune(runner):
         f.write(f"Mean action diff per actuator: {diff.mean(dim=(0, 1))}\n")
         f.write(f"Std action diff per actuator: {diff.std(dim=(0, 1))}\n")
         f.write(f"Overall mean action diff: {diff.mean()}\n")
+
+    # Log losses to csv
+    losses_path = os.path.join(ROOT_DIR, load_run, LOSSES_FILE)
+    if not os.path.exists(losses_path):
+        if runner.data_offpol is None:
+            losses_df = pd.DataFrame(
+                columns=["checkpoint", "value_loss", "surrogate_loss"]
+            )
+        else:
+            losses_df = pd.DataFrame(
+                columns=[
+                    "checkpoint",
+                    "value_loss",
+                    "q_loss",
+                    "surrogate_loss",
+                    "offpol_loss",
+                ]
+            )
+    else:
+        losses_df = pd.read_csv(losses_path)
+
+    append_data = {
+        "checkpoint": checkpoint,
+        "value_loss": runner.alg.mean_value_loss,
+        "surrogate_loss": runner.alg.mean_surrogate_loss,
+    }
+    if runner.data_offpol is not None:
+        append_data["q_loss"] = runner.alg.mean_q_loss
+        append_data["offpol_loss"] = runner.alg.mean_offpol_loss
+
+    losses_df = losses_df._append(append_data, ignore_index=True)
+    losses_df.to_csv(losses_path, index=False)
 
 
 if __name__ == "__main__":

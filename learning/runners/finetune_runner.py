@@ -20,19 +20,27 @@ class FineTuneRunner(BaseRunner):
         train_cfg,
         log_dir,
         data_list,
-        data_length=2990,
+        data_length=1500,
         data_name="SMOOTH_RL_CONTROLLER",
+        se_path=None,
+        use_simulator=True,
         exploration_scale=1.0,
         device="cpu",
     ):
-        # Init calls _set_up_alg which needs exploration scale
-        self.exploration_scale = exploration_scale
-        super().__init__(env, train_cfg, device)
+        # Instead of super init, only set necessary attributes
+        self.env = env
+        self.parse_train_cfg(train_cfg)
+        self.num_steps_per_env = self.cfg["num_steps_per_env"]
 
         self.log_dir = log_dir
         self.data_list = data_list  # Describes structure of Robot-Software logs
         self.data_length = data_length  # Logs must contain at least this many steps
         self.data_name = data_name
+        self.se_path = se_path
+        self.use_simulator = use_simulator
+        self.exploration_scale = exploration_scale
+        self.device = device
+        self._set_up_alg()
 
     def _set_up_alg(self):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
@@ -48,21 +56,11 @@ class FineTuneRunner(BaseRunner):
         else:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
 
-        if "state_estimator" in self.train_cfg.keys():
-            self.se_cfg = self.train_cfg["state_estimator"]
-            state_estimator_network = StateEstimatorNN(
-                self.get_obs_size(self.se_cfg["obs"]),
-                self.get_obs_size(self.se_cfg["targets"]),
-                **self.se_cfg["network"],
-            )
-            self.SE = StateEstimator(
-                state_estimator_network, device=self.device, **self.se_cfg
-            )
-        else:
-            self.SE = None
+        alg_name = self.cfg["algorithm_class_name"]
+        alg_class = eval(alg_name)
+        self.ipg = alg_name in ["PPO_IPG", "LinkedIPG"]
 
-        alg_class = eval(self.cfg["algorithm_class_name"])
-        if self.cfg["algorithm_class_name"] == "PPO_IPG":
+        if self.ipg:
             critic_v = Critic(num_critic_obs, **self.critic_cfg)
             critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
             target_critic_q = Critic(num_critic_obs + num_actions, **self.critic_cfg)
@@ -78,6 +76,20 @@ class FineTuneRunner(BaseRunner):
             critic = Critic(num_critic_obs, **self.critic_cfg)
             self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
+        if "state_estimator" in self.train_cfg.keys() and self.se_path is not None:
+            self.se_cfg = self.train_cfg["state_estimator"]
+            state_estimator_network = StateEstimatorNN(
+                self.get_obs_size(self.se_cfg["obs"]),
+                self.get_obs_size(self.se_cfg["targets"]),
+                **self.se_cfg["network"],
+            )
+            self.SE = StateEstimator(
+                state_estimator_network, device=self.device, **self.se_cfg
+            )
+            self.load_se(self.se_path)
+        else:
+            self.SE = None
+
     def parse_train_cfg(self, train_cfg):
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
@@ -85,7 +97,10 @@ class FineTuneRunner(BaseRunner):
         self.critic_cfg = train_cfg["critic"]
         self.train_cfg = train_cfg
 
-    def get_data_dict(self, offpol=False):
+    def get_data_dict(self, offpol=False, load_path=None, save_path=None):
+        # Concatenate data with loaded dict
+        loaded_data_dict = torch.load(load_path) if load_path else None
+
         checkpoint = self.cfg["checkpoint"]
         if offpol:
             # All files up until checkpoint
@@ -147,6 +162,26 @@ class FineTuneRunner(BaseRunner):
         data_dict["timed_out"] = torch.zeros(batch_size, device=self.device, dtype=bool)
         data_dict["dones"] = torch.zeros(batch_size, device=self.device, dtype=bool)
 
+        # Concatenate with loaded dict
+        if loaded_data_dict is not None:
+            loaded_batch_size = loaded_data_dict.batch_size
+            assert loaded_batch_size[0] == batch_size[0]
+            new_batch_size = (
+                loaded_batch_size[0],
+                loaded_batch_size[1] + batch_size[1],
+            )
+            data_dict = TensorDict(
+                {
+                    key: torch.cat((loaded_data_dict[key], data_dict[key]), dim=1)
+                    for key in data_dict.keys()
+                },
+                device=self.device,
+                batch_size=new_batch_size,
+            )
+
+        if save_path:
+            torch.save(data_dict, save_path)
+
         return data_dict
 
     def get_data_obs(self, obs_list, data_struct):
@@ -160,8 +195,9 @@ class FineTuneRunner(BaseRunner):
 
         return obs_all.float()
 
-    def get_data_rewards(self, data_struct, reward_weights, dt=0.01):
-        minimalist_cheetah = MinimalistCheetah(device=self.device)
+    def get_data_rewards(self, data_struct, reward_weights):
+        ctrl_dt = 1.0 / self.env.cfg.control.ctrl_frequency
+        minimalist_cheetah = MinimalistCheetah(ctrl_dt=ctrl_dt, device=self.device)
         rewards_dict = {name: [] for name in reward_weights.keys()}  # for plotting
         rewards_all = torch.empty(0).to(self.device)
 
@@ -188,7 +224,7 @@ class FineTuneRunner(BaseRunner):
             minimalist_cheetah.post_process()
 
         rewards_dict["total"] = rewards_all.tolist()
-        rewards_all *= dt  # scaled for alg update
+        rewards_all *= ctrl_dt  # scaled for alg update
 
         return rewards_all.float(), rewards_dict
 
@@ -213,10 +249,9 @@ class FineTuneRunner(BaseRunner):
             )
             idx += dim
 
-    def learn(self):
-        self.alg.switch_to_train()
-
-        if self.env is not None:
+    def load_data(self, load_path=None, save_path=None):
+        # Load on- and off-policy data
+        if self.use_simulator:
             # Simulate on-policy data
             self.data_onpol = TensorDict(
                 self.get_sim_data(),
@@ -226,12 +261,21 @@ class FineTuneRunner(BaseRunner):
         else:
             self.data_onpol = self.get_data_dict()
 
-        # Single alg update on data
-        if self.cfg["algorithm_class_name"] == "PPO_IPG":
-            self.data_offpol = self.get_data_dict(offpol=True)
-            self.alg.update(self.data_onpol, self.data_offpol)
+        if self.ipg:
+            self.data_offpol = self.get_data_dict(
+                offpol=True, load_path=load_path, save_path=save_path
+            )
         else:
+            self.data_offpol = None
+
+    def learn(self):
+        self.alg.switch_to_train()
+
+        # Single alg update on data
+        if self.data_offpol is None:
             self.alg.update(self.data_onpol)
+        else:
+            self.alg.update(self.data_onpol, self.data_offpol)
 
     def get_sim_data(self):
         rewards_dict = {}
@@ -328,16 +372,16 @@ class FineTuneRunner(BaseRunner):
         )
 
     def save(self, path):
-        if self.cfg["algorithm_class_name"] == "PPO_IPG":
+        if self.ipg:
             torch.save(
                 {
                     "actor_state_dict": self.alg.actor.state_dict(),
                     "critic_v_state_dict": self.alg.critic_v.state_dict(),
                     "critic_q_state_dict": self.alg.critic_q.state_dict(),
+                    "target_critic_q_state_dict": self.alg.target_critic_q.state_dict(),
                     "optimizer_state_dict": self.alg.optimizer.state_dict(),
                     "critic_v_opt_state_dict": self.alg.critic_v_optimizer.state_dict(),
                     "critic_q_opt_state_dict": self.alg.critic_q_optimizer.state_dict(),
-                    "iter": 1,  # only one iteration
                 },
                 path,
             )
@@ -348,7 +392,6 @@ class FineTuneRunner(BaseRunner):
                 "critic_state_dict": self.alg.critic.state_dict(),
                 "optimizer_state_dict": self.alg.optimizer.state_dict(),
                 "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
-                "iter": 1,  # only one iteration
             },
             path,
         )
@@ -357,9 +400,12 @@ class FineTuneRunner(BaseRunner):
         loaded_dict = torch.load(path)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
 
-        if self.cfg["algorithm_class_name"] == "PPO_IPG":
+        if self.ipg:
             self.alg.critic_v.load_state_dict(loaded_dict["critic_v_state_dict"])
             self.alg.critic_q.load_state_dict(loaded_dict["critic_q_state_dict"])
+            self.alg.target_critic_q.load_state_dict(
+                loaded_dict["target_critic_q_state_dict"]
+            )
             if load_optimizer:
                 self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
                 self.alg.critic_v_optimizer.load_state_dict(

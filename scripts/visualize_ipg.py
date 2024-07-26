@@ -17,8 +17,8 @@ from gym import LEGGED_GYM_ROOT_DIR
 DEVICE = "cpu"
 
 # * Setup
-LOAD_RUN = "Jul17_17-22-37_IPG_nu1"
-TITLE = "IPG nu=1.0"
+LOAD_RUN = "Jul25_11-28-41_LinkedIPG_nu05_v05"
+TITLE = "LinkedIPG nu=0.5 blend=0.5 polyak=0.9"
 IT_RANGE = range(20, 101, 20)
 
 RUN_DIR = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "pendulum", LOAD_RUN)
@@ -53,7 +53,7 @@ test_idx = rand_perm[n_trajs : n_trajs + 1000]
 
 for it in IT_RANGE:
     # load data
-    base_data = torch.load(os.path.join(RUN_DIR, "data_onpol{}.pt".format(it))).to(
+    base_data = torch.load(os.path.join(RUN_DIR, "data_onpol_{}.pt".format(it))).to(
         DEVICE
     )
     data = base_data.detach().clone()

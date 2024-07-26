@@ -27,8 +27,8 @@ class IPGRunner(BaseRunner):
 
     def _set_up_alg(self):
         alg_class_name = self.cfg["algorithm_class_name"]
-        if alg_class_name != "PPO_IPG":
-            raise ValueError("IPGRunner only supports PPO_IPG")
+        if alg_class_name not in ["PPO_IPG", "LinkedIPG"]:
+            raise ValueError("IPGRunner only supports PPO_IPG or Linked_IPG")
 
         alg_class = eval(alg_class_name)
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
@@ -164,7 +164,7 @@ class IPGRunner(BaseRunner):
             logger.toc("learning")
 
             if self.it % self.save_interval == 0:
-                self.save()
+                self.save(save_storage=False)
             storage_onpol.clear()  # only clear on-policy storage
 
             logger.log_all_categories()
@@ -173,7 +173,7 @@ class IPGRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-        self.save()
+        # self.save()
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -240,6 +240,7 @@ class IPGRunner(BaseRunner):
                 "actor_state_dict": self.alg.actor.state_dict(),
                 "critic_v_state_dict": self.alg.critic_v.state_dict(),
                 "critic_q_state_dict": self.alg.critic_q.state_dict(),
+                "target_critic_q_state_dict": self.alg.target_critic_q.state_dict(),
                 "optimizer_state_dict": self.alg.optimizer.state_dict(),
                 "critic_v_opt_state_dict": self.alg.critic_v_optimizer.state_dict(),
                 "critic_q_opt_state_dict": self.alg.critic_q_optimizer.state_dict(),
@@ -263,6 +264,9 @@ class IPGRunner(BaseRunner):
             self.alg.actor.std = nn.Parameter(std_init)
         self.alg.critic_v.load_state_dict(loaded_dict["critic_v_state_dict"])
         self.alg.critic_q.load_state_dict(loaded_dict["critic_q_state_dict"])
+        self.alg.target_critic_q.load_state_dict(
+            loaded_dict["target_critic_q_state_dict"]
+        )
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
             self.alg.critic_v_optimizer.load_state_dict(

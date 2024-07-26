@@ -2,10 +2,11 @@
 source /home/lmolnar/miniconda3/etc/profile.d/conda.sh
 
 # Args
-LOAD_RUN="Jul23_00-14-23_nu02_B8"
+LOAD_RUN="Jul25_16-06-36_LinkedIPG_50Hz_nu02_v08"
 CHECKPOINT=1000
-N_RUNS=6
-EVAL=false  # make sure to turn exploration on/off in RS
+N_RUNS=10
+INTER_NU=0.9  # can be fixed or adaptive
+EVAL=false  # no finetuning, just evaluate without exploration (set in RS)
 
 # Set directories
 QGYM_DIR="/home/lmolnar/workspace/QGym"
@@ -19,11 +20,11 @@ cp ${QGYM_LOG_DIR}/exported_${CHECKPOINT}/* ${RS_DIR}/config/systems/quadruped/c
 
 for i in $(seq 1 $N_RUNS)
 do
-    # Store LCM logs in file labeled with checkpoint
-    FILE=${RS_DIR}/logging/lcm_logs/${CHECKPOINT}
-    if [ -f "$FILE" ]; then
-        rm "$FILE"
-    fi
+    # Store logs in files labeled by checkpoint
+    LCM_FILE=${RS_DIR}/logging/lcm_logs/${CHECKPOINT}
+    MAT_FILE=${RS_DIR}/logging/matlab_logs/${CHECKPOINT}.mat
+    rm ${LCM_FILE}
+    rm ${MAT_FILE}
 
     # Run logging script in background
     ${RS_DIR}/logging/scripts/run_lcm_logger.sh ${CHECKPOINT} &
@@ -40,10 +41,11 @@ do
     cp ${RS_DIR}/logging/matlab_logs/${CHECKPOINT}.mat ${QGYM_LOG_DIR}
 
     # Finetune in QGym
+    # INTER_NU=$(echo "0.05 * $i" | bc)  # adaptive
     if [ "$EVAL" = false ] ; then
         conda deactivate
         conda activate qgym
-        python ${QGYM_DIR}/scripts/finetune.py --task=mini_cheetah_finetune --headless --load_run=${LOAD_RUN} --checkpoint=${CHECKPOINT}
+        python ${QGYM_DIR}/scripts/finetune.py --task=mini_cheetah_finetune --headless --load_run=${LOAD_RUN} --checkpoint=${CHECKPOINT} --inter_nu=${INTER_NU}
     fi
 
     # Copy policy to RS

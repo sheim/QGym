@@ -13,15 +13,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
-SE_PATH = f"{LEGGED_GYM_ROOT_DIR}/logs/SE/model_1000.pt"  # if None: no SE
-LOAD_RUN = "Jul23_00-14-23_nu02_B8"
+# SE_PATH = f"{LEGGED_GYM_ROOT_DIR}/logs/SE/model_1000.pt"  # if None: no SE
+SE_PATH = None
+LOAD_RUN = "Jul25_16-06-36_LinkedIPG_50Hz_nu02_v08"
 
 REWARDS_FILE = None  # generate this file from logs, if None: just plot
+
 PLOT_REWARDS = {
-    "Nu=0.0": "rewards_nu0.csv",
-    "Nu=0.5": "rewards_nu05.csv",
-    "Nu=0.9": "rewards_nu09.csv",
-    "Nu=0.9 new": "rewards_nu09_new.csv",
+    "Nu=0.5 sim onpol concat": "rewards_nu05_sim_concat.csv",
+    "Nu=0.5 sim onpol": "rewards_nu05_sim_onpol.csv",
+    "Nu=0.5 real onpol": "rewards_nu05_real_onpol.csv",
 }
 
 # Data struct fields from Robot-Software logs
@@ -37,7 +38,8 @@ DATA_LIST = [
     "phase_obs",  # 8
     "grf",  # 9
     "dof_pos_target",  # 10
-    "exploration_noise",  # 11
+    "torques",  # 11
+    "exploration_noise",  # 12
     "footer",
 ]
 
@@ -68,7 +70,10 @@ def update_rewards_df(runner):
         iteration = int(file.split(".")[0])
         path = os.path.join(ROOT_DIR, LOAD_RUN, file)
         data = scipy.io.loadmat(path)
-        data_dict[iteration] = data[runner.data_name][0][0]
+        runner.data_struct = data[runner.data_name][0][0]
+        if runner.SE:
+            runner.update_state_estimates()
+        data_dict[iteration] = runner.data_struct
 
     rewards_path = os.path.join(ROOT_DIR, LOAD_RUN, REWARDS_FILE)
     if os.path.exists(rewards_path):
@@ -149,6 +154,7 @@ def setup():
         log_dir,
         data_list=DATA_LIST,
         device=DEVICE,
+        se_path=SE_PATH,
     )
 
     return runner
@@ -157,8 +163,6 @@ def setup():
 if __name__ == "__main__":
     if REWARDS_FILE is not None:
         runner = setup()
-        if SE_PATH is not None:
-            runner.load_se(SE_PATH)
         update_rewards_df(runner)
 
     # Plot rewards stats

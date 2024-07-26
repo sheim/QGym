@@ -10,7 +10,7 @@ from learning.utils import (
 )
 
 
-class PPO_IPG:
+class LinkedIPG:
     def __init__(
         self,
         actor,
@@ -35,6 +35,7 @@ class PPO_IPG:
         device="cpu",
         lr_range=[1e-4, 1e-2],
         lr_ratio=1.3,
+        val_interpolation=0.5,
         **kwargs,
     ):
         self.device = device
@@ -76,6 +77,7 @@ class PPO_IPG:
         self.use_cv = use_cv
         self.inter_nu = inter_nu
         self.beta = beta
+        self.val_interpolation = val_interpolation
 
     def switch_to_train(self):
         self.actor.train()
@@ -94,9 +96,59 @@ class PPO_IPG:
         data_onpol["returns"] = data_onpol["advantages"] + data_onpol["values"]
         data_onpol["advantages"] = normalize(data_onpol["advantages"])
 
+        data_offpol["values"] = self.critic_v.evaluate(data_offpol["critic_obs"])
+        data_offpol["advantages"] = compute_generalized_advantages(
+            data_offpol, self.gamma, self.lam, self.critic_v
+        )
+        data_offpol["returns"] = data_offpol["advantages"] + data_offpol["values"]
+
+        self.update_critic_v(data_offpol)
         self.update_critic_q(data_offpol)
-        self.update_critic_v(data_onpol)
         self.update_actor(data_onpol, data_offpol)
+
+    # def update_joint_critics(self, data_onpol, data_offpol):
+    #     self.mean_q_loss = 0
+    #     self.mean_value_loss = 0
+    #     counter = 0
+    #     generator_onpol = create_uniform_generator(
+    #         data_onpol,
+    #         self.batch_size,
+    #         max_gradient_steps=self.max_gradient_steps,
+    #     )
+    #     generator_offpol = create_uniform_generator(
+    #         data_offpol,
+    #         self.batch_size,
+    #         max_gradient_steps=self.max_gradient_steps,
+    #     )
+    #     for batch_onpol, batch_offpol in zip(generator_onpol, generator_offpol):
+    #         with torch.no_grad():
+    #             action_next_onpol = self.actor.act_inference(
+    #                 batch_onpol["next_actor_obs"]
+    #             )
+    #             q_input_next_onpol = torch.cat(
+    #                 batch_onpol["next_critic_obs"], action_next_onpol
+    #             )
+    #             action_next_offpol = self.actor.act_inference(
+    #                 batch_offpol["next_actor_obs"]
+    #             )
+    #             q_input_next_offpol = torch.cat(
+    #                 batch_offpol["next_critic_obs"], action_next_offpol
+    #             )
+    #             q_value_offpol = self.critic_q.evaluate(q_input_next_offpol)
+
+    #         loss_V_returns = self.critic_v.loss_fn(
+    #             batch_onpol["critic_obs"], batch_onpol["returns"]
+    #         )
+    # loss_V_Q = nn.functional.mse_loss(
+    #     self.critic_v.evaluate(batch_onpol["critic_obs"]),
+    #     self.critic_q.evaluate(batch_onpol["critic_obs"]),
+    #     reduction="mean")
+    #
+    #         with torch.no_grad():
+    #             action_next = self.actor.act_inference(batch_offpol["next_actor_obs"])
+    #             q_input_next = torch.cat(
+    #                 (batch_offpol["next_critic_obs"], action_next), dim=-1
+    #             )
 
     def update_critic_q(self, data):
         self.mean_q_loss = 0
@@ -114,13 +166,16 @@ class PPO_IPG:
                     (batch["next_critic_obs"], action_next), dim=-1
                 )
                 q_next = self.target_critic_q.evaluate(q_input_next)
-                q_target = (
-                    batch["rewards"]
-                    + self.gamma * batch["dones"].logical_not() * q_next
+                v_next = self.critic_v.evaluate(batch["next_critic_obs"])
+                q_target = batch["rewards"] + batch["dones"].logical_not() * (
+                    self.gamma
+                    * (
+                        q_next * self.val_interpolation
+                        + v_next * (1 - self.val_interpolation)
+                    )
                 )
             q_input = torch.cat((batch["critic_obs"], batch["actions"]), dim=-1)
             q_loss = self.critic_q.loss_fn(q_input, q_target)
-            print(q_loss.item())
             self.critic_q_optimizer.zero_grad()
             q_loss.backward()
             nn.utils.clip_grad_norm_(self.critic_q.parameters(), self.max_grad_norm)
@@ -240,7 +295,7 @@ class PPO_IPG:
             else:
                 b = self.inter_nu
 
-            loss = loss_onpol + b * loss_offpol.requires_grad_()
+            loss = loss_onpol + b * loss_offpol
 
             # * Gradient step
             self.optimizer.zero_grad()

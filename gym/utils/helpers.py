@@ -181,6 +181,9 @@ def update_cfg_from_args(env_cfg, train_cfg, args):
             train_cfg.runner.checkpoint = args.checkpoint
         if args.rl_device is not None:
             train_cfg.runner.device = args.rl_device
+        # * IPG parameters
+        if args.inter_nu is not None:
+            train_cfg.algorithm.inter_nu = args.inter_nu
 
 
 def get_args(custom_parameters=None):
@@ -300,6 +303,11 @@ def get_args(custom_parameters=None):
             "action": "store_true",
             "default": False,
             "help": "Use original config file for loaded policy.",
+        },
+        {
+            "name": "--inter_nu",
+            "type": float,
+            "help": "Interpolation parameter for IPG.",
         },
     ]
     # * parse arguments
