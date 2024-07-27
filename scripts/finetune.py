@@ -17,14 +17,15 @@ SE_PATH = None
 OUTPUT_FILE = "output.txt"
 LOSSES_FILE = "losses.csv"
 
-USE_SIMULATOR = True
+USE_SIMULATOR = False  # For on-policy data
+DATA_LENGTH = 12_000  # Robot-Software logs must contain at least this many steps
 
 # Load/save off-policy storage, this can contain many runs
-OFFPOL_LOAD_FILE = "offpol_data_10.pt"
-OFFPOL_SAVE_FILE = None
+OFFPOL_LOAD_FILE = None  # "offpol_data.pt"
+OFFPOL_SAVE_FILE = None  # "offpol_data.pt"
 
 # Scales
-EXPLORATION_SCALE = 0.5  # used during data collection
+EXPLORATION_SCALE = 0.8  # used during data collection
 ACTION_SCALES = np.tile(np.array([0.2, 0.3, 0.3]), 4)
 
 # Data struct fields from Robot-Software logs
@@ -63,6 +64,7 @@ def setup():
         train_cfg,
         log_dir,
         data_list=DATA_LIST,
+        data_length=DATA_LENGTH,
         se_path=SE_PATH,
         use_simulator=USE_SIMULATOR,
         exploration_scale=EXPLORATION_SCALE,
@@ -131,11 +133,7 @@ def finetune(runner):
     # Log losses to csv
     losses_path = os.path.join(ROOT_DIR, load_run, LOSSES_FILE)
     if not os.path.exists(losses_path):
-        if runner.data_offpol is None:
-            losses_df = pd.DataFrame(
-                columns=["checkpoint", "value_loss", "surrogate_loss"]
-            )
-        else:
+        if runner.ipg:
             losses_df = pd.DataFrame(
                 columns=[
                     "checkpoint",
@@ -144,6 +142,10 @@ def finetune(runner):
                     "surrogate_loss",
                     "offpol_loss",
                 ]
+            )
+        else:
+            losses_df = pd.DataFrame(
+                columns=["checkpoint", "value_loss", "surrogate_loss"]
             )
     else:
         losses_df = pd.read_csv(losses_path)

@@ -96,13 +96,14 @@ class LinkedIPG:
         data_onpol["returns"] = data_onpol["advantages"] + data_onpol["values"]
         data_onpol["advantages"] = normalize(data_onpol["advantages"])
 
-        data_offpol["values"] = self.critic_v.evaluate(data_offpol["critic_obs"])
-        data_offpol["advantages"] = compute_generalized_advantages(
-            data_offpol, self.gamma, self.lam, self.critic_v
-        )
-        data_offpol["returns"] = data_offpol["advantages"] + data_offpol["values"]
+        # TODO: Possibly use off-policy GAE for V-critic update
+        # data_offpol["values"] = self.critic_v.evaluate(data_offpol["critic_obs"])
+        # data_offpol["advantages"] = compute_generalized_advantages(
+        #     data_offpol, self.gamma, self.lam, self.critic_v
+        # )
+        # data_offpol["returns"] = data_offpol["advantages"] + data_offpol["values"]
 
-        self.update_critic_v(data_offpol)
+        self.update_critic_v(data_onpol)
         self.update_critic_q(data_offpol)
         self.update_actor(data_onpol, data_offpol)
 

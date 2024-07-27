@@ -2,9 +2,9 @@
 source /home/lmolnar/miniconda3/etc/profile.d/conda.sh
 
 # Args
-LOAD_RUN="Jul25_16-06-36_LinkedIPG_50Hz_nu02_v08"
+LOAD_RUN="Jul24_22-48-41_nu05_B8"
 CHECKPOINT=1000
-N_RUNS=10
+N_RUNS=5
 INTER_NU=0.9  # can be fixed or adaptive
 EVAL=false  # no finetuning, just evaluate without exploration (set in RS)
 
@@ -24,7 +24,6 @@ do
     LCM_FILE=${RS_DIR}/logging/lcm_logs/${CHECKPOINT}
     MAT_FILE=${RS_DIR}/logging/matlab_logs/${CHECKPOINT}.mat
     rm ${LCM_FILE}
-    rm ${MAT_FILE}
 
     # Run logging script in background
     ${RS_DIR}/logging/scripts/run_lcm_logger.sh ${CHECKPOINT} &

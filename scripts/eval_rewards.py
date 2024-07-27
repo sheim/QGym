@@ -15,14 +15,17 @@ import matplotlib.pyplot as plt
 ROOT_DIR = f"{LEGGED_GYM_ROOT_DIR}/logs/mini_cheetah_ref/"
 # SE_PATH = f"{LEGGED_GYM_ROOT_DIR}/logs/SE/model_1000.pt"  # if None: no SE
 SE_PATH = None
-LOAD_RUN = "Jul25_16-06-36_LinkedIPG_50Hz_nu02_v08"
+LOAD_RUN = "Jul24_22-48-41_nu05_B8"
 
-REWARDS_FILE = None  # generate this file from logs, if None: just plot
+REWARDS_FILE = (
+    "rewards_nu09_nosim2.csv"  # generate this file from logs, if None: just plot
+)
 
 PLOT_REWARDS = {
-    "Nu=0.5 sim onpol concat": "rewards_nu05_sim_concat.csv",
-    "Nu=0.5 sim onpol": "rewards_nu05_sim_onpol.csv",
-    "Nu=0.5 real onpol": "rewards_nu05_real_onpol.csv",
+    "Nu=0.5 no sim": "rewards_nu05_nosim.csv",
+    "Nu=0.9 no sim": "rewards_nu09_nosim.csv",
+    "Nu=0.9 no sim 2": "rewards_nu09_nosim2.csv",
+    "Nu=0.95 no sim": "rewards_nu095_nosim.csv",
 }
 
 # Data struct fields from Robot-Software logs
@@ -48,7 +51,7 @@ REWARD_WEIGHTS = {
     "tracking_ang_vel": 2.0,
     "min_base_height": 1.5,
     "orientation": 1.0,
-    "stand_still": 2.0,
+    "stand_still": 1.0,
     "swing_grf": 3.0,
     "stance_grf": 3.0,
     "action_rate": 0.01,

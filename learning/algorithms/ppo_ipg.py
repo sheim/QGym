@@ -94,8 +94,15 @@ class PPO_IPG:
         data_onpol["returns"] = data_onpol["advantages"] + data_onpol["values"]
         data_onpol["advantages"] = normalize(data_onpol["advantages"])
 
-        self.update_critic_q(data_offpol)
+        # TODO: Possibly use off-policy GAE for V-critic update
+        # data_offpol["values"] = self.critic_v.evaluate(data_offpol["critic_obs"])
+        # data_offpol["advantages"] = compute_generalized_advantages(
+        #     data_offpol, self.gamma, self.lam, self.critic_v
+        # )
+        # data_offpol["returns"] = data_offpol["advantages"] + data_offpol["values"]
+
         self.update_critic_v(data_onpol)
+        self.update_critic_q(data_offpol)
         self.update_actor(data_onpol, data_offpol)
 
     def update_critic_q(self, data):
@@ -120,7 +127,6 @@ class PPO_IPG:
                 )
             q_input = torch.cat((batch["critic_obs"], batch["actions"]), dim=-1)
             q_loss = self.critic_q.loss_fn(q_input, q_target)
-            print(q_loss.item())
             self.critic_q_optimizer.zero_grad()
             q_loss.backward()
             nn.utils.clip_grad_norm_(self.critic_q.parameters(), self.max_grad_norm)

@@ -20,7 +20,7 @@ class FineTuneRunner(BaseRunner):
         train_cfg,
         log_dir,
         data_list,
-        data_length=1500,
+        data_length=3000,
         data_name="SMOOTH_RL_CONTROLLER",
         se_path=None,
         use_simulator=True,
@@ -271,6 +271,10 @@ class FineTuneRunner(BaseRunner):
     def learn(self):
         self.alg.switch_to_train()
 
+        # Set fixed actor LR from config
+        for param_group in self.alg.optimizer.param_groups:
+            param_group["lr"] = self.alg_cfg["learning_rate"]
+
         # Single alg update on data
         if self.data_offpol is None:
             self.alg.update(self.data_onpol)
@@ -403,9 +407,15 @@ class FineTuneRunner(BaseRunner):
         if self.ipg:
             self.alg.critic_v.load_state_dict(loaded_dict["critic_v_state_dict"])
             self.alg.critic_q.load_state_dict(loaded_dict["critic_q_state_dict"])
-            self.alg.target_critic_q.load_state_dict(
-                loaded_dict["target_critic_q_state_dict"]
-            )
+            # TODO: Possibly always load target with critic_q_state_dict
+            try:
+                self.alg.target_critic_q.load_state_dict(
+                    loaded_dict["target_critic_q_state_dict"]
+                )
+            except:
+                self.alg.target_critic_q.load_state_dict(
+                    loaded_dict["critic_q_state_dict"]
+                )
             if load_optimizer:
                 self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
                 self.alg.critic_v_optimizer.load_state_dict(

@@ -104,7 +104,7 @@ class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
                 tracking_ang_vel = 2.0
                 orientation = 1.0
                 min_base_height = 1.5
-                stand_still = 2.0
+                stand_still = 1.0
                 swing_grf = 3.0
                 stance_grf = 3.0
                 action_rate = 0.01
@@ -138,13 +138,14 @@ class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
         use_cv = False
         inter_nu = 0.9
         beta = "off_policy"
-        storage_size = 30000
+        storage_size = 30_000
+        # val_interpolation = 0.8
 
         # Finetuning
         clip_param = 0.2
-        max_gradient_steps = 4
-        batch_size = 30000
-        learning_rate = 1e-4
+        max_gradient_steps = 8
+        batch_size = 30_000
+        learning_rate = 5e-5  # ACTOR
         schedule = "fixed"
 
     class runner(MiniCheetahRefRunnerCfg.runner):
@@ -156,6 +157,6 @@ class MiniCheetahFineTuneRunnerCfg(MiniCheetahRefRunnerCfg):
 
         # Finetuning
         resume = True
-        load_run = "Jul23_00-14-23_nu02_B8"
+        load_run = "Jul24_22-48-41_nu05_B8"
         checkpoint = 1000
         save_interval = 1

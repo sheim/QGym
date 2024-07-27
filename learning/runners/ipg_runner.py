@@ -264,9 +264,12 @@ class IPGRunner(BaseRunner):
             self.alg.actor.std = nn.Parameter(std_init)
         self.alg.critic_v.load_state_dict(loaded_dict["critic_v_state_dict"])
         self.alg.critic_q.load_state_dict(loaded_dict["critic_q_state_dict"])
-        self.alg.target_critic_q.load_state_dict(
-            loaded_dict["target_critic_q_state_dict"]
-        )
+        try:
+            self.alg.target_critic_q.load_state_dict(
+                loaded_dict["target_critic_q_state_dict"]
+            )
+        except:
+            self.alg.target_critic_q.load_state_dict(loaded_dict["critic_q_state_dict"])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
             self.alg.critic_v_optimizer.load_state_dict(

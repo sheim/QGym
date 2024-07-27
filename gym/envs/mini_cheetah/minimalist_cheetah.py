@@ -60,14 +60,15 @@ class MinimalistCheetah:
         )
         self.grf = torch.tensor(grf, device=self.device).unsqueeze(0)
 
-        # Compute phase sin
+        # Get phase sin
         phase_obs = torch.tensor(phase_obs, device=self.device).unsqueeze(0)
         self.phase_sin = phase_obs[:, 0].unsqueeze(0)
 
-        # Set targets, these are scaled in Robot-Software
-        self.dof_pos_target = torch.tensor(
-            dof_pos_target, device=self.device
-        ).unsqueeze(0)
+        # Set target history
+        self.dof_pos_target = (
+            torch.tensor(dof_pos_target, device=self.device).unsqueeze(0)
+            * self.dof_pos_scales
+        )
         if self.dof_target_prev is None:
             self.dof_target_prev = self.dof_pos_target
         if self.dof_target_prev2 is None:
