@@ -9,7 +9,7 @@ from learning.utils import (
 )
 from learning.modules.lqrc.plotting import (
     plot_learning_progress,  # noqa F401
-    plot_rosenbrock_multiple_critics_w_data,
+    plot_multiple_critics_w_data,
     plot_binned_errors,
 )
 from gym import LEGGED_GYM_ROOT_DIR
@@ -122,14 +122,16 @@ if not os.path.exists(save_path):
     os.makedirs(save_path)
 
 if n_dims == 2:
-    plot_rosenbrock_multiple_critics_w_data(
+    plot_multiple_critics_w_data(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
-        title=f"Learning a {n_dims}D Rosenbrock with Different State Represntations \n",
+        title=f"Learning a {n_dims}D Rosenbrock with Different State Representations \n",
+        display_names={"Rosenbrock": "Rosenbrock", "Baseline": "Baseline", "Identity": "Identity", "Affine": "Affine", "Nonlinear": "Nonlinear"},
         fn=save_path + "/state_representation_rosenbrock",
         data=data[0, train_idx]["critic_obs"],
         grid_size=grid_resolution,
+        task="Rosenbrock",
     )
 
 critics_no_ground_truth = list(graphing_data["critic_obs"].keys())
@@ -151,24 +153,14 @@ for name in list(graphing_data["critic_obs"].keys()):
         - graphing_data["values"][name].squeeze()
     )
 
-plot_binned_errors(
-    g_data_no_ground_truth,
-    save_path + "/rosenbrock",
-    lb=0,
-    ub=15,
-    step=1,
-    tick_step=2,
-    title_add_on=f"{n_dims}D Rosenbrock Function with Different State Representations",
-)
-
-
-# plot_pendulum_multiple_critics_w_data(
-#     graphing_data["critic_obs"],
-#     graphing_data["values"],
-#     graphing_data["returns"],
-#     title=f"iteration{iteration}",
-#     fn=save_path + f"/{len(experiment_params.keys())}_CRITIC_it{iteration}",
-#     data=data[:num_steps, traj_idx]["critic_obs"],
+# plot_binned_errors(
+#     g_data_no_ground_truth,
+#     save_path + "/rosenbrock",
+#     lb=0,
+#     ub=15,
+#     step=1,
+#     tick_step=2,
+#     title_add_on=f"{n_dims}D Rosenbrock Function with Different State Representations",
 # )
 
 plt.close()

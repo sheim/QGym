@@ -7,7 +7,7 @@ from learning.utils import (
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import (
-    plot_rosenbrock_multiple_critics_w_data,
+    plot_multiple_critics_w_data,
     plot_learning_progress,
     plot_binned_errors,
 )
@@ -51,7 +51,7 @@ critic_names = [
 ]
 
 # generate data
-n_dims = 3
+n_dims = 2
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
@@ -181,15 +181,17 @@ plot_binned_errors(
 
 if n_dims == 2:
     for lr, g_data in graphing_data.items():
-        plot_rosenbrock_multiple_critics_w_data(
+        plot_multiple_critics_w_data(
             g_data["critic_obs"],
             g_data["values"],
             g_data["returns"],
             title=f"Learning a {n_dims}D Rosenbrock Function \n Learning Rate: {lr},"
             "Linear Latent Activation",
+            display_names = {"Rosenbrock":"Rosenbrock", "OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"},
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,
+            task="Rosenbrock"
         )
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")

@@ -496,12 +496,18 @@ class DenseSpectralLatent(nn.Module):
         L[..., :, self.relative_dim :] = y[
             ..., self.relative_dim + tril_indices.shape[1] :
         ].view(L[..., :, self.relative_dim :].shape)
+        
         # Compute (L^T A_diag) L
         A = torch.einsum(
             "...ij,...jk->...ik",
             torch.einsum("...ik,...kj->...ij", L.transpose(-1, -2), A_diag),
             L,
         )
+        # A = torch.einsum(
+        #     "...ij,...jk->...ik",
+        #     torch.einsum("...ik,...kj->...ij", L, A_diag),
+        #     L.transpose(-1, -2),
+        # )
         # assert (torch.linalg.eigvals(A).real >= -1e-6).all()
         # ! This fails, but so far with just -e-10, so really really small...
         value = self.sign * quadratify_xAx(z, A)

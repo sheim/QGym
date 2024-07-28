@@ -12,7 +12,7 @@ from learning.utils import (
 from learning.modules.lqrc.plotting import (
     plot_pendulum_multiple_critics_w_data,
     plot_learning_progress,
-    plot_rosenbrock_multiple_critics_w_data
+    plot_multiple_critics_w_data
 )
 from gym import LEGGED_GYM_ROOT_DIR
 import os
@@ -177,22 +177,16 @@ for iteration in range(iter_offset, tot_iter, iter_step):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    # plot_pendulum_multiple_critics_w_data(
-    #     graphing_data["critic_obs"],
-    #     graphing_data["values"],
-    #     graphing_data["returns"],
-    #     title=f"iteration{iteration}",
-    #     fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
-    #     data=data[:num_steps, traj_idx]["critic_obs"],
-    # )
-    plot_rosenbrock_multiple_critics_w_data(
+    plot_multiple_critics_w_data(
         graphing_data["critic_obs"],
         graphing_data["values"],
         graphing_data["returns"],
         title=f"Learning an Inverted Pendulum's Ground Truth Value Function: Linear Latent Activation",
+        display_names = {"Ground Truth MC Returns": "Ground Truth MC Returns", "OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"},
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
         data=data[:num_steps, traj_idx]["critic_obs"],
         log_norm=False,
+        task="Pendulum",
     )
 
     plt.close()
