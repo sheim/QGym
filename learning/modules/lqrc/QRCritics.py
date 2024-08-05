@@ -97,11 +97,9 @@ class OuterProduct(nn.Module):
         self.latent_dim = latent_dim
         self.minimize = minimize
         if minimize:
-            # self.sign = torch.ones(1, device=device)
-            self.sign = torch.ones(1)
+            self.sign = torch.ones(1, device=device)
         else:
-            # self.sign = -torch.ones(1, device=device)
-            self.sign = -torch.ones(1)
+            self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
 
         self._normalize_obs = normalize_obs
