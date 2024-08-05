@@ -87,6 +87,49 @@ def create_custom_pink_green_colormap():
 
     return custom_pink_green
 
+def plot_binned_errors_ampc(data, fn, lb=0, ub=10e10, step=1000, tick_step=5000, title_add_on="", extension="png"):
+    display_names = {"OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"}
+    fig, axes = plt.subplots(
+        nrows=1, ncols=1, figsize=(16, 15), layout="constrained"
+    )
+    fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
+    
+    bins = np.arange(lb, ub, step)
+    bin_labels = [
+        "<" + str(np.round(bins[ix], decimals=1))
+        for ix in range(0, len(bins), tick_step)
+    ]
+    y_min = float("inf")
+    y_max = -float("inf")
+
+    for ix, critic in enumerate(data["critic_obs"].keys()):
+        critic_data = data["error"][critic].squeeze().detach().cpu().numpy()
+        num_bins = bins.shape[0] + 1
+        bincount = np.bincount(np.digitize(critic_data, bins), minlength=num_bins)
+
+        y_min = bincount.min() if bincount.min() < y_min else y_min
+        y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
+
+        axes.bar(
+            np.arange(len(bincount)),
+            bincount,
+            alpha=0.5,
+        )
+        # axes formatting
+        axes[ix].set_title(display_names[critic], fontsize=25)
+        x_ticks = np.arange(0, len(bins), tick_step)
+        axes[ix].set_xticks(x_ticks, labels=bin_labels)
+        axes[ix].set_xlim(
+            -min((tick_step / 2.0), 2.0),
+            min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
+        )
+        axes[ix].tick_params(axis="both", which="major", labelsize=15)
+    for ix, critic in enumerate(data.keys()):
+        axes[ix].set_ylim(y_min, y_max)
+    fig.legend(loc=" outside upper right", fontsize=20, ncol=3, bbox_to_anchor=(0.85, 0.2))
+    plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
+    print(f"Saved to {fn}.{extension}")
+
 
 def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", multi_trial=False):
     # set up figure metadata
@@ -1095,11 +1138,13 @@ def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=
         ax2.plot(error_change, label=name)
 
     ax1.set_ylabel("Average Test Error")
+    ax1.set_yscale("log")
     ax2.set_ylabel("Change in Average Test Error")
     ax2.set_xlabel("Iteration")
-    # ax2.set_yscale("log")
+    ax2.set_yscale("log")
     ax1.legend()
     ax2.legend()
     fig.suptitle(title, fontsize=18)
     plt.tight_layout()
     plt.savefig(f"{fn}.{extension}", dpi=300, bbox_inches="tight")
+    print("Learning progress plot saved to", f"{fn}.{extension}")

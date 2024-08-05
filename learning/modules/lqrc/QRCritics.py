@@ -97,9 +97,11 @@ class OuterProduct(nn.Module):
         self.latent_dim = latent_dim
         self.minimize = minimize
         if minimize:
-            self.sign = torch.ones(1, device=device)
+            # self.sign = torch.ones(1, device=device)
+            self.sign = torch.ones(1)
         else:
-            self.sign = -torch.ones(1, device=device)
+            # self.sign = -torch.ones(1, device=device)
+            self.sign = -torch.ones(1)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
 
         self._normalize_obs = normalize_obs
@@ -110,11 +112,15 @@ class OuterProduct(nn.Module):
         # todo: have a linear NN to automatically coord-shift input
 
     def forward(self, x, return_all=False):
+        print("x device", x.device)
         z = self.NN(x)
+        print("z device", z.device)
         # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
         value = self.sign * quadratify_xAx(x, A)
+        print("value device", value.device)
+        print("value offset device", self.value_offset.device)
         value += self.value_offset
 
         if return_all:
