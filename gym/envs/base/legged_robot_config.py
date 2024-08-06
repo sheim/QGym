@@ -233,24 +233,20 @@ class LeggedRobotRunnerCfg(BaseConfig):
     class logging:
         enable_local_saving = True
 
-    class policy:
+    class actor:
         init_noise_std = 1.0
-        actor_hidden_dims = [512, 256, 128]
-        critic_hidden_dims = [512, 256, 128]
+        hidden_dims = [512, 256, 128]
         # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         normalize_obs = True
+        smooth_exploration = False
 
-        actor_obs = [
+        obs = [
             "observation_a",
             "observation_b",
             "these_need_to_be_atributes_(states)_of_the_robot_env",
         ]
-        critic_obs = [
-            "observation_x",
-            "observation_y",
-            "critic_obs_can_be_the_same_or_different_than_actor_obs",
-        ]
+        normalize_obs = True
 
         actions = ["q_des"]
         disable_actions = False
@@ -262,6 +258,17 @@ class LeggedRobotRunnerCfg(BaseConfig):
             ang_vel = 0.2
             projected_gravity = 0.05
             height_measurements = 0.1
+
+    class critic:
+        hidden_dims = [512, 256, 128]
+        # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        normalize_obs = True
+        obs = [
+            "observation_x",
+            "observation_y",
+            "critic_obs_can_be_the_same_or_different_than_actor_obs",
+        ]
 
         class reward:
             class weights:
@@ -283,25 +290,32 @@ class LeggedRobotRunnerCfg(BaseConfig):
                 termination = 0.01
 
     class algorithm:
-        # * training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 5
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 4
-        learning_rate = 1.0e-3
-        schedule = "adaptive"  # could be adaptive, fixed
+        # both
         gamma = 0.99
         lam = 0.95
-        desired_kl = 0.01
+        # shared
+        batch_size = 2**15
+        max_gradient_steps = 24
+        # new
+        storage_size = 2**17  # new
+        batch_size = 2**15  #  new
+
+        clip_param = 0.2
+        learning_rate = 1.0e-3
         max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [2e-4, 1e-2]
+        lr_ratio = 1.3
 
     class runner:
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 24
+        num_steps_per_env = 24  # deprecate
         max_iterations = 1500
         save_interval = 50
         run_name = ""

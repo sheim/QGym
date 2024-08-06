@@ -9,16 +9,16 @@ import torch
 
 def setup(args):
     env_cfg, train_cfg = task_registry.create_cfgs(args)
-    env_cfg.env.num_envs = min(env_cfg.env.num_envs, 16)
+    env_cfg.env.num_envs = 32
     if hasattr(env_cfg, "push_robots"):
         env_cfg.push_robots.toggle = False
     if hasattr(env_cfg, "commands"):
         env_cfg.commands.resampling_time = 9999
-    env_cfg.env.episode_length_s = 9999
+    env_cfg.env.episode_length_s = 50
     env_cfg.env.num_projectiles = 20
     task_registry.make_gym_and_sim()
+    env_cfg.init_state.reset_mode = "reset_to_range"
     env = task_registry.make_env(args.task, env_cfg)
-    # env.cfg.init_state.reset_mode = "reset_to_basic"
     train_cfg.runner.resume = True
     train_cfg.logging.enable_local_saving = False
     runner = task_registry.make_alg_runner(env, train_cfg)
@@ -46,9 +46,9 @@ def play(env, runner, train_cfg):
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
-            runner.policy_cfg["actions"],
+            runner.actor_cfg["actions"],
             runner.get_inference_actions(),
-            runner.policy_cfg["disable_actions"],
+            runner.actor_cfg["disable_actions"],
         )
         env.step()
         env.check_exit()

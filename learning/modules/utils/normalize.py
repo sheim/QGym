@@ -4,7 +4,7 @@ import torch.nn as nn
 
 class RunningMeanStd(nn.Module):
     def __init__(self, num_items, epsilon=1e-05):
-        super(RunningMeanStd, self).__init__()
+        super().__init__()
         self.num_items = num_items
         self.epsilon = epsilon
 

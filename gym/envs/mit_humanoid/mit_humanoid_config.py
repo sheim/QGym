@@ -155,7 +155,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
         # * see GymDofDriveModeFlags
         # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
         default_dof_drive_mode = 3
-        fix_base_link = True
+        fix_base_link = False
         disable_gravity = False
         disable_motors = False
         total_mass = 25.0
@@ -224,17 +224,16 @@ class MITHumanoidCfg(LeggedRobotCfg):
 
 class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
-    runner_class_name = "OldPolicyRunner"
+    runner_class_name = "OnPolicyRunner"
 
-    class policy(LeggedRobotRunnerCfg.policy):
-        disable_actions = False
+    class actor(LeggedRobotRunnerCfg.actor):
         init_noise_std = 1.0
-        actor_hidden_dims = [512, 512, 128]
-        critic_hidden_dims = [512, 256, 128]
+        hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
 
-        actor_obs = [
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -248,9 +247,10 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             # "sampled_history_dof_pos_target",
             "oscillator_obs",
         ]
-        critic_obs = actor_obs
+        normalize_obs = True
 
         actions = ["dof_pos_target"]
+        disable_actions = False
 
         class noise:
             dof_pos = 0.005
@@ -259,6 +259,23 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             base_lin_vel = 0.025
             projected_gravity = 0.01
             feet_contact_state = 0.025
+
+    class critic(LeggedRobotRunnerCfg.critic):
+        hidden_dims = [512, 256, 128]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            "dof_pos_obs",
+            "dof_vel",
+            "dof_pos_history",
+        ]
+        normalize_obs = True
 
         class reward:
             class weights:
@@ -284,25 +301,32 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
                 termination = 15
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        # * training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 4
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 4
-        learning_rate = 1.0e-6
-        schedule = "adaptive"  # could be adaptive, fixed
+        # both
         gamma = 0.99
         lam = 0.95
-        desired_kl = 0.01
+        # shared
+        batch_size = 2**15
+        max_gradient_steps = 24
+        # new
+        storage_size = 2**17  # new
+        batch_size = 2**15  #  new
+
+        clip_param = 0.2
+        learning_rate = 1.0e-3
         max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [1e-5, 1e-2]
+        lr_ratio = 1.5
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
-        algorithm_class_name = "PPO"
-        num_steps_per_env = 32
+        algorithm_class_name = "PPO2"
+        num_steps_per_env = 24
         max_iterations = 1000
         run_name = "Standing"
         experiment_name = "Humanoid"

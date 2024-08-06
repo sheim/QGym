@@ -67,23 +67,20 @@ class CartpoleRunnerCfg(FixedRobotCfgPPO):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class policy(FixedRobotCfgPPO.policy):
+    class actor(FixedRobotCfgPPO.actor):
         init_noise_std = 1.0
         num_layers = 2
         num_units = 32
-        actor_hidden_dims = [num_units] * num_layers
-        critic_hidden_dims = [num_units] * num_layers
+        hidden_dims = [num_units] * num_layers
         activation = "elu"
 
-        actor_obs = [
+        obs = [
             "cart_obs",
             "pole_trig_obs",
             "dof_vel",
             "cart_vel_square",
             "pole_vel_square",
         ]
-
-        critic_obs = actor_obs
 
         actions = ["tau_ff"]
 
@@ -93,6 +90,20 @@ class CartpoleRunnerCfg(FixedRobotCfgPPO):
             cart_vel = 0.010
             pole_vel = 0.010
             actuation = 0.00
+
+    class critic:
+        num_layers = 2
+        num_units = 32
+        hidden_dims = [num_units] * num_layers
+        activation = "elu"
+
+        obs = [
+            "cart_obs",
+            "pole_trig_obs",
+            "dof_vel",
+            "cart_vel_square",
+            "pole_vel_square",
+        ]
 
         class reward:
             class weights:
@@ -125,7 +136,7 @@ class CartpoleRunnerCfg(FixedRobotCfgPPO):
 
     class runner(FixedRobotCfgPPO.runner):
         policy_class_name = "ActorCritic"
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 96  # per iteration
         max_iterations = 500  # number of policy updates
 

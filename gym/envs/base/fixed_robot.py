@@ -40,64 +40,60 @@ class FixedRobot(BaseTask):
         self.reset()
 
     def step(self):
-        """Apply actions, simulate, call self.post_physics_step()
-            and pre_physics_step()
-
-        Args:
-            actions (torch.Tensor): Tensor of shape
-                (num_envs, num_actions_per_env)
-        """
-
         self._reset_buffers()
-        self._pre_physics_step()
-        # * step physics and render each frame
+        self._pre_decimation_step()
         self._render()
         for _ in range(self.cfg.control.decimation):
+            self._pre_compute_torques()
             self.torques = self._compute_torques()
-
-            if self.cfg.asset.disable_motors:
-                self.torques[:] = 0.0
-            torques_to_gym_tensor = torch.zeros(
-                self.num_envs, self.num_dof, device=self.device
-            )
-
-            # todo encapsulate
-            next_torques_idx = 0
-            for dof_idx in range(self.num_dof):
-                if self.cfg.control.actuated_joints_mask[dof_idx]:
-                    torques_to_gym_tensor[:, dof_idx] = self.torques[
-                        :, next_torques_idx
-                    ]
-                    next_torques_idx += 1
-                else:
-                    torques_to_gym_tensor[:, dof_idx] = torch.zeros(
-                        self.num_envs, device=self.device
-                    )
-
-            self.gym.set_dof_actuation_force_tensor(
-                self.sim, gymtorch.unwrap_tensor(torques_to_gym_tensor)
-            )
-            self.gym.simulate(self.sim)
-            if self.device == "cpu":
-                self.gym.fetch_results(self.sim, True)
-            self.gym.refresh_dof_state_tensor(self.sim)
-
-        self._post_physics_step()
+            self._post_compute_torques()
+            self._step_physx_sim()
+            self._post_physx_step()
+        self._post_decimation_step()
         self._check_terminations_and_timeouts()
 
         env_ids = self.to_be_reset.nonzero(as_tuple=False).flatten()
         self._reset_idx(env_ids)
 
-    def _pre_physics_step(self):
-        pass
+    def _pre_decimation_step(self):
+        return None
 
-    def _post_physics_step(self):
+    def _pre_compute_torques(self):
+        return None
+
+    def _post_compute_torques(self):
+        if self.cfg.asset.disable_motors:
+            self.torques[:] = 0.0
+
+    def _step_physx_sim(self):
+        next_torques_idx = 0
+        torques_to_gym_tensor = torch.zeros(
+            self.num_envs, self.num_dof, device=self.device
+        )
+        for dof_idx in range(self.num_dof):
+            if self.cfg.control.actuated_joints_mask[dof_idx]:
+                torques_to_gym_tensor[:, dof_idx] = self.torques[:, next_torques_idx]
+                next_torques_idx += 1
+            else:
+                torques_to_gym_tensor[:, dof_idx] = torch.zeros(
+                    self.num_envs, device=self.device
+                )
+        self.gym.set_dof_actuation_force_tensor(
+            self.sim, gymtorch.unwrap_tensor(self.torques)
+        )
+        self.gym.simulate(self.sim)
+        if self.device == "cpu":
+            self.gym.fetch_results(self.sim, True)
+        self.gym.refresh_dof_state_tensor(self.sim)
+
+    def _post_physx_step(self):
         """
         check terminations, compute observations and rewards
         """
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
+    def _post_decimation_step(self):
         self.episode_length_buf += 1
         self.common_step_counter += 1
 
@@ -212,18 +208,6 @@ class FixedRobot(BaseTask):
         return props
 
     def _compute_torques(self):
-        """Compute torques from actions.
-            Actions can be interpreted as position or velocity targets given
-            to a PD controller, or directly as scaled torques.
-            [NOTE]: torques must have the same dimension as the number of DOFs,
-                even if some DOFs are not actuated.
-
-        Args:
-            actions (torch.Tensor): Actions
-
-        Returns:
-            [torch.Tensor]: Torques sent to the simulation
-        """
         actuated_dof_pos = torch.zeros(
             self.num_envs, self.num_actuators, device=self.device
         )
@@ -592,11 +576,11 @@ class FixedRobot(BaseTask):
 
     def _reward_torques(self):
         """Penalize torques"""
-        return -torch.sum(torch.square(self.torques), dim=1)
+        return -torch.mean(torch.square(self.torques), dim=1)
 
     def _reward_dof_vel(self):
         """Penalize dof velocities"""
-        return -torch.sum(torch.square(self.dof_vel), dim=1)
+        return -torch.mean(torch.square(self.dof_vel), dim=1)
 
     def _reward_action_rate(self):
         """Penalize changes in actions"""
@@ -609,7 +593,7 @@ class FixedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_action_rate2(self):
         """Penalize changes in actions"""
@@ -623,11 +607,11 @@ class FixedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_collision(self):
         """Penalize collisions on selected bodies"""
-        return -torch.sum(
+        return -torch.mean(
             1.0
             * (
                 torch.norm(
@@ -649,11 +633,11 @@ class FixedRobot(BaseTask):
             max=0.0
         )  # lower limit
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)
-        return -torch.sum(out_of_limits, dim=1)
+        return -torch.mean(out_of_limits, dim=1)
 
     def _reward_dof_vel_limits(self):
         """Penalize dof velocities too close to the limit"""
         # * clip to max error = 1 rad/s per joint to avoid huge penalties
         limit = self.cfg.reward_settings.soft_dof_vel_limit
         error = self.dof_vel.abs() - self.dof_vel_limits * limit
-        return -torch.sum(error.clip(min=0.0, max=1.0), dim=1)
+        return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)

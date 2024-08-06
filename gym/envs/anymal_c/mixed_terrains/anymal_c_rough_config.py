@@ -56,11 +56,14 @@ class AnymalCRoughCfg(AnymalCFlatCfg):
 
 
 class AnymalCRoughCCfgPPO(AnymalCFlatCfgPPO):
-    class policy(AnymalCFlatCfgPPO.policy):
-        actor_hidden_dims = [128, 64, 32]
+    class actor(AnymalCFlatCfgPPO.actor):
+        hidden_dims = [128, 64, 32]
         critic_hidden_dims = [128, 64, 32]
         # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+
+    class critic(AnymalCFlatCfgPPO.critic):
+        pass
 
     class algorithm(AnymalCFlatCfgPPO.algorithm):
         entropy_coef = 0.01

@@ -24,11 +24,10 @@ class MyRunner(OnPolicyRunner):
 
         rewards_dict = {}
 
-        self.alg.actor_critic.train()
-        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
-        critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+        self.alg.switch_to_train()
+        actor_obs = self.get_obs(self.actor_cfg["actor_obs"])
+        critic_obs = self.get_obs(self.critic_cfg["critic_obs"])
         tot_iter = self.it + self.num_learning_iterations
-        rewards_dict
         self.save()
 
         # * start up storage
@@ -58,9 +57,9 @@ class MyRunner(OnPolicyRunner):
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(actor_obs, critic_obs)
                     self.set_actions(
-                        self.policy_cfg["actions"],
+                        self.actor_cfg["actions"],
                         actions,
-                        self.policy_cfg["disable_actions"],
+                        self.actor_cfg["disable_actions"],
                     )
 
                     transition.update(
@@ -74,9 +73,9 @@ class MyRunner(OnPolicyRunner):
                     self.env.step()
 
                     actor_obs = self.get_noisy_obs(
-                        self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
+                        self.actor_cfg["actor_obs"], self.actor_cfg["noise"]
                     )
-                    critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
+                    critic_obs = self.get_obs(self.critic_cfg["critic_obs"])
                     # * get time_outs
                     timed_out = self.get_timed_out()
                     terminated = self.get_terminated()
@@ -112,22 +111,17 @@ class MyRunner(OnPolicyRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-            storage.clear()
         self.save()
 
     def set_up_logger(self):
-        logger.register_rewards(list(self.policy_cfg["reward"]["weights"].keys()))
+        logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))
         logger.register_rewards(
-            list(self.policy_cfg["reward"]["termination_weight"].keys())
+            list(self.critic_cfg["reward"]["termination_weight"].keys())
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
             "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
         )
-        logger.register_category(
-            "actor", self.alg.actor_critic, ["action_std", "entropy"]
-        )
+        logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
-        logger.attach_torch_obj_to_wandb(
-            (self.alg.actor_critic.actor, self.alg.actor_critic.critic)
-        )
+        logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))

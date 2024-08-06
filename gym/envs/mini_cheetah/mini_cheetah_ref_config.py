@@ -67,15 +67,15 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "MyRunner"
+    runner_class_name = "OnPolicyRunner"
 
-    class policy(MiniCheetahRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [256, 256, 128]
+    class actor(MiniCheetahRunnerCfg.actor):
+        hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        normalize_obs = True
-        actor_obs = [
+        smooth_exploration = False
+        exploration_sample_freq = 16
+        obs = [
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -83,8 +83,26 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "phase_obs",
         ]
+        normalize_obs = True
 
-        critic_obs = [
+        actions = ["dof_pos_target"]
+        disable_actions = False
+
+        class noise:
+            scale = 1.0
+            dof_pos_obs = 0.01
+            base_ang_vel = 0.01
+            dof_pos = 0.005
+            dof_vel = 0.005
+            lin_vel = 0.05
+            ang_vel = [0.3, 0.15, 0.4]
+            gravity_vec = 0.1
+
+    class critic(MiniCheetahRunnerCfg.critic):
+        hidden_dims = [256, 256, 128]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -95,12 +113,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "dof_pos_target",
         ]
-
-        actions = ["dof_pos_target"]
-        disable_actions = False
-
-        class noise:
-            pass
+        normalize_obs = True
 
         class reward:
             class weights:
@@ -127,27 +140,11 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 termination = 0.15
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        # training params
-        value_loss_coef = 1.0  # deprecate for PPO2
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 6
-        # mini batch size = num_envs*nsteps/nminibatches
-        num_mini_batches = 4
-        storage_size = 2**17  # new
-        mini_batch_size = 2**15  #  new
-        learning_rate = 5.0e-5
-        schedule = "adaptive"  # can be adaptive, fixed
-        discount_horizon = 1.0  # [s]
-        lam = 0.95
-        GAE_bootstrap_horizon = 2.0  # [s]
-        desired_kl = 0.01
-        max_grad_norm = 1.0
+        pass
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 1000  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 32
+        num_steps_per_env = 32  # deprecate

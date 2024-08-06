@@ -53,9 +53,9 @@ class SERolloutStorage(BaseStorage):
     def mini_batch_generator(self, num_mini_batches, num_epochs=8):
         """Generate mini batch for learning"""
         batch_size = self.num_envs * self.num_transitions_per_env
-        mini_batch_size = batch_size // num_mini_batches
+        batch_size = batch_size // num_mini_batches
         indices = torch.randperm(
-            num_mini_batches * mini_batch_size,
+            num_mini_batches * batch_size,
             requires_grad=False,
             device=self.device,
         )
@@ -69,8 +69,8 @@ class SERolloutStorage(BaseStorage):
 
         for epoch in range(num_epochs):
             for i in range(num_mini_batches):
-                start = i * mini_batch_size
-                end = (i + 1) * mini_batch_size
+                start = i * batch_size
+                end = (i + 1) * batch_size
                 batch_idx = indices[start:end]
 
                 obs_batch = observations[batch_idx]

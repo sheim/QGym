@@ -1,6 +1,7 @@
 import torch
 import os
 import copy
+import numpy as np
 
 
 def create_MLP(num_inputs, num_outputs, hidden_dims, activation, dropouts=None):
@@ -56,7 +57,7 @@ def add_layer(layer_list, num_inputs, num_outputs, activation=None, dropout=0):
         layer_list.append(activation)
 
 
-def export_network(network, network_name, path, num_inputs):
+def export_network(network, network_name, path, num_inputs, latent=False):
     """
     Thsi function traces and exports the given network module in .pt and
     .onnx file formats. These can be used for evaluation on other systems
@@ -74,7 +75,22 @@ def export_network(network, network_name, path, num_inputs):
     model = copy.deepcopy(network).to("cpu")
     # To trace model, must be evaluated once with arbitrary input
     model.eval()
-    dummy_input = torch.rand((1, num_inputs))
+    dummy_input = torch.rand((num_inputs))
     model_traced = torch.jit.trace(model, dummy_input)
     torch.jit.save(model_traced, path_TS)
     torch.onnx.export(model_traced, dummy_input, path_onnx)
+
+    if latent:
+        # Export latent model
+        path_latent = os.path.join(path, network_name + "_latent.onnx")
+        model_latent = torch.nn.Sequential(model.obs_rms, model.latent_net)
+        model_latent.eval()
+        dummy_input = torch.rand((num_inputs))
+        model_traced = torch.jit.trace(model_latent, dummy_input)
+        torch.onnx.export(model_traced, dummy_input, path_latent)
+
+        # Save actor std of shape (num_actions, latent_dim)
+        # It is important that the shape is the same as the exploration matrix
+        path_std = os.path.join(path, network_name + "_std.txt")
+        std_transposed = model.get_std.numpy().T
+        np.savetxt(path_std, std_transposed)

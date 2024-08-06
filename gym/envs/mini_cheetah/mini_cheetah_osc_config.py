@@ -160,14 +160,16 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
+    runner_class_name = "OnPolicyRunner"
 
-    class policy(MiniCheetahRunnerCfg.policy):
-        actor_hidden_dims = [256, 256, 128]
+    class policy:
+        hidden_dims = [256, 256, 128]
         critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
 
-        actor_obs = [
+        obs = [
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -244,5 +246,5 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
         run_name = ""
         experiment_name = "FullSend"
         max_iterations = 500  # number of policy updates
-        algorithm_class_name = "PPO"
+        algorithm_class_name = "PPO2"
         num_steps_per_env = 32
