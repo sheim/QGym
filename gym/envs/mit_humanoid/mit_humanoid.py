@@ -223,12 +223,12 @@ class MIT_Humanoid(LeggedRobot):
 
     def _reward_hips_forward(self):
         # reward hip motors for pointing forward
-        hip_yaw_abad = torch.stack((self.dof_pos[:, 0:2], self.dof_pos[:, 5:7]), dim=1)
-        hip_yaw_abad -= torch.stack(
+        hip_yaw_abad = torch.cat((self.dof_pos[:, 0:2], self.dof_pos[:, 5:7]), dim=1)
+        hip_yaw_abad -= torch.cat(
             (self.default_dof_pos[:, 0:2], self.default_dof_pos[:, 5:7]), dim=1
         )
-        hip_yaw_abad /= torch.stack(
-            (self.scales["dof_pos"][0:2], self.scales["dof_pos"][5:7]), dim=1
+        hip_yaw_abad /= torch.cat(
+            (self.scales["dof_pos"][0:2], self.scales["dof_pos"][5:7])
         )
         return (hip_yaw_abad).pow(2).mean(dim=1)
         # return self._sqrdexp(hip_yaw_abad).sum(dim=1).mean(dim=1)
