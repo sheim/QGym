@@ -10,7 +10,7 @@ class LanderCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_actuators = 18
-        episode_length_s = 5  # episode length in seconds
+        episode_length_s = 10  # episode length in seconds
 
         sampled_history_length = 3  # n samples
         sampled_history_frequency = 10  # [Hz]
@@ -71,7 +71,7 @@ class LanderCfg(LeggedRobotCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [1.0, 1.5],  # z
+            [0.64, 1.5],  # z
             [-0.1, 0.1],  # roll
             [-0.1, 0.1],  # pitch
             [-0.1, 0.1],
@@ -144,7 +144,7 @@ class LanderCfg(LeggedRobotCfg):
         )
         # foot_collisionbox_names = ["foot"]
         foot_name = "foot"
-        penalize_contacts_on = ["arm"]
+        penalize_contacts_on = ["arm", "hand", "shoulder"]
         terminate_after_contacts_on = ["base"]
         end_effector_names = ["hand", "foot"]  # ??
         flip_visual_attachments = False
@@ -228,7 +228,7 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
         init_noise_std = 1.0
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = "tanh"
         smooth_exploration = False
 
         obs = [
@@ -236,16 +236,15 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
-            # "commands",
+            "commands",
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_history",
-            # "sampled_history_dof_pos",
-            # "sampled_history_dof_vel",
-            # "sampled_history_dof_pos_target",
-            # "oscillator_obs",
+            "sampled_history_dof_pos",
+            "sampled_history_dof_vel",
+            "sampled_history_dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -261,10 +260,10 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
     class critic(LeggedRobotRunnerCfg.critic):
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = "tanh"
 
         obs = [
-            "base_height",
+            # "base_height",
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
@@ -272,21 +271,25 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_history",
+            "sampled_history_dof_pos",
+            "sampled_history_dof_vel",
+            "sampled_history_dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         class reward:
             class weights:
                 # tracking_lin_vel = 0.0
                 # tracking_ang_vel = 1.5
                 # orientation = 1.0
-                torques = 5.0e-4
-                # min_base_height = 1.5
+                torques = 5.0e-5
+                power = 0  # 1.0e-2
+                min_base_height = 1.5
                 action_rate = 1e-3
                 action_rate2 = 1e-3
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
-                # dof_vel = 0.25
+                dof_vel = 0.5
                 # stand_still = 0.25
                 dof_pos_limits = 0.25
                 dof_near_home = 0.25
@@ -294,6 +297,7 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
                 # swing = 1.0
                 hips_forward = 0.0
                 # walk_freq = 0.0  # 2.5
+                collision = 1.0
 
             class termination_weight:
                 termination = 15

@@ -1,97 +1,12 @@
 import torch
 
-from gym.envs.base.legged_robot import LeggedRobot
-
-# from gym.envs.mit_humanoid.mit_humanoid import MIT_Humanoid
-from .jacobian import _apply_coupling
+# from gym.envs.base.legged_robot import LeggedRobot
+from gym.envs.mit_humanoid.mit_humanoid import MIT_Humanoid
 
 
-class Lander(LeggedRobot):
+class Lander(MIT_Humanoid):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
-
-    def _init_buffers(self):
-        super()._init_buffers()
-        self._init_sampled_history_buffers()
-
-    def _init_sampled_history_buffers(self):
-        self.sampled_history_dof_pos_target = torch.zeros(
-            (self.num_envs, self.num_dof * self.cfg.env.sampled_history_length),
-            device=self.device,
-        )
-        self.sampled_history_dof_pos = torch.zeros(
-            self.num_envs,
-            self.num_dof * self.cfg.env.sampled_history_length,
-            device=self.device,
-        )
-        self.sampled_history_dof_vel = torch.zeros(
-            self.num_envs,
-            self.num_dof * self.cfg.env.sampled_history_length,
-            device=self.device,
-        )
-        self.sampled_history_counter = torch.zeros(
-            self.num_envs, dtype=int, device=self.device
-        )
-        self.sampled_history_threshold = int(
-            self.cfg.control.ctrl_frequency / self.cfg.env.sampled_history_frequency
-        )
-
-    def _reset_system(self, env_ids):
-        if len(env_ids) == 0:
-            return
-        super()._reset_system(env_ids)
-
-        self._reset_sampled_history_buffers(env_ids)
-        return
-
-    def _reset_sampled_history_buffers(self, ids):
-        n = self.cfg.env.sampled_history_length
-        self.sampled_history_dof_pos_target[ids] = self.dof_pos_target[ids].tile(n)
-        self.sampled_history_dof_pos[ids] = self.dof_pos_target[ids].tile(n)
-        self.sampled_history_dof_vel[ids] = self.dof_pos_target[ids].tile(n)
-
-    # compute_torques accounting for coupling, and filtering torques
-    def _compute_torques(self):
-        torques = _apply_coupling(
-            self.dof_pos,
-            self.dof_vel,
-            self.dof_pos_target + self.default_dof_pos,
-            self.dof_vel_target,
-            self.p_gains,
-            self.d_gains,
-            self.tau_ff,
-        )
-        torques = torques.clip(-self.torque_limits, self.torque_limits)
-        return torques
-
-    def _post_decimation_step(self):
-        super()._post_decimation_step()
-        self._update_sampled_history_buffers()
-
-    def _update_sampled_history_buffers(self):
-        self.sampled_history_counter += 1
-
-        ids = torch.nonzero(
-            self.sampled_history_counter == self.sampled_history_threshold,
-            as_tuple=False,
-        ).flatten()
-
-        self.sampled_history_dof_pos_target[ids] = torch.roll(
-            self.sampled_history_dof_pos_target[ids], self.num_dof, dims=1
-        )  # check
-        self.sampled_history_dof_pos_target[ids, : self.num_dof] = self.dof_pos_target[
-            ids
-        ]
-        self.sampled_history_dof_pos[ids] = torch.roll(
-            self.sampled_history_dof_pos[ids], self.num_dof, dims=1
-        )  # check
-        self.sampled_history_dof_pos[ids, : self.num_dof] = self.dof_pos_target[ids]
-        self.sampled_history_dof_vel[ids] = torch.roll(
-            self.sampled_history_dof_vel[ids], self.num_dof, dims=1
-        )  # check
-        self.sampled_history_dof_vel[ids, : self.num_dof] = self.dof_pos_target[ids]
-
-        self.sampled_history_counter[ids] = 0
 
     # --- rewards ---
 
@@ -172,24 +87,18 @@ class Lander(LeggedRobot):
     def smooth_sqr_wave(self, phase, sigma=0.2):  # sigma=0 is step function
         return phase.sin() / (2 * torch.sqrt(phase.sin() ** 2.0 + sigma**2.0)) + 0.5
 
-    def _reward_walk_freq(self):
-        # Penalize deviation from base frequency
-        return torch.mean(
-            self._sqrdexp(
-                (self.oscillator_freq - self.cfg.oscillator.base_frequency)
-                / self.cfg.oscillator.base_frequency
-            ),
-            dim=1,
-        ) * self._switch("move")
-
     def _reward_hips_forward(self):
         # reward hip motors for pointing forward
-        hip_yaw_abad = torch.stack((self.dof_pos[:, 0:2], self.dof_pos[:, 5:7]), dim=1)
-        hip_yaw_abad -= torch.stack(
+        hip_yaw_abad = torch.cat((self.dof_pos[:, 0:2], self.dof_pos[:, 5:7]), dim=1)
+        hip_yaw_abad -= torch.cat(
             (self.default_dof_pos[:, 0:2], self.default_dof_pos[:, 5:7]), dim=1
         )
-        hip_yaw_abad /= torch.stack(
-            (self.scales["dof_pos"][0:2], self.scales["dof_pos"][5:7]), dim=1
+        hip_yaw_abad /= torch.cat(
+            (self.scales["dof_pos"][0:2], self.scales["dof_pos"][5:7])
         )
         return (hip_yaw_abad).pow(2).mean(dim=1)
         # return self._sqrdexp(hip_yaw_abad).sum(dim=1).mean(dim=1)
+
+    def _reward_power(self):
+        power = self.torques * self.dof_vel
+        return power.pow(2).mean(dim=1)

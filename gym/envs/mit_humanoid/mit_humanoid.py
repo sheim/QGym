@@ -1,8 +1,6 @@
 import torch
 
 from gym.envs.base.legged_robot import LeggedRobot
-from .jacobian import _apply_coupling
-from gym.utils import exp_avg_filter
 
 
 class MIT_Humanoid(LeggedRobot):
@@ -11,9 +9,6 @@ class MIT_Humanoid(LeggedRobot):
 
     def _init_buffers(self):
         super()._init_buffers()
-        self.oscillators = torch.zeros(self.num_envs, 2, device=self.device)
-        self.oscillator_obs = torch.zeros(self.num_envs, 4, device=self.device)
-        self.oscillator_freq = torch.zeros(self.num_envs, 2, device=self.device)
         self._init_sampled_history_buffers()
 
     def _init_sampled_history_buffers(self):
@@ -38,22 +33,51 @@ class MIT_Humanoid(LeggedRobot):
             self.cfg.control.ctrl_frequency / self.cfg.env.sampled_history_frequency
         )
 
+    def _apply_coupling(self, q, qd, q_des, qd_des, kp, kd, tau_ff):
+        # Create a Jacobian matrix and move it to the same device as input tensors
+        J = torch.eye(q.shape[-1]).to(q.device)
+        J[4, 3] = 1
+        J[9, 8] = 1
+
+        # Perform transformations using Jacobian
+        q = torch.matmul(q, J.T)
+        qd = torch.matmul(qd, J.T)
+        q_des = torch.matmul(q_des, J.T)
+        qd_des = torch.matmul(qd_des, J.T)
+
+        # Inverse of the transpose of Jacobian
+        J_inv_T = torch.inverse(J.T)
+
+        # Compute feed-forward torques
+        tau_ff = torch.matmul(J_inv_T, tau_ff.T).T
+
+        # Compute kp and kd terms
+        kp = torch.diagonal(
+            torch.matmul(
+                torch.matmul(J_inv_T, torch.diag_embed(kp, dim1=-2, dim2=-1)), J_inv_T.T
+            ),
+            dim1=-2,
+            dim2=-1,
+        )
+
+        kd = torch.diagonal(
+            torch.matmul(
+                torch.matmul(J_inv_T, torch.diag_embed(kd, dim1=-2, dim2=-1)), J_inv_T.T
+            ),
+            dim1=-2,
+            dim2=-1,
+        )
+
+        # Compute torques
+        torques = kp * (q_des - q) + kd * (qd_des - qd) + tau_ff
+        torques = torch.matmul(torques, J)
+
+        return torques
+
     def _reset_system(self, env_ids):
         if len(env_ids) == 0:
             return
         super()._reset_system(env_ids)
-        # reset oscillators, with a pi phase shift between left and right
-        self.oscillators[env_ids, 0] = (
-            torch.rand(len(env_ids), device=self.device) * 2 * torch.pi
-        )
-        self.oscillators[env_ids, 1] = self.oscillators[env_ids, 0] + torch.pi
-        self.oscillators = torch.remainder(self.oscillators, 2 * torch.pi)
-        # reset oscillator velocities to base freq
-        self.oscillator_freq[env_ids] = self.cfg.oscillator.base_frequency
-        # recompute oscillator observations
-        self.oscillator_obs = torch.cat(
-            (self.oscillators.cos(), self.oscillators.sin()), dim=1
-        )
         self._reset_sampled_history_buffers(env_ids)
         return
 
@@ -65,7 +89,7 @@ class MIT_Humanoid(LeggedRobot):
 
     # compute_torques accounting for coupling, and filtering torques
     def _compute_torques(self):
-        torques = _apply_coupling(
+        torques = self._apply_coupling(
             self.dof_pos,
             self.dof_vel,
             self.dof_pos_target + self.default_dof_pos,
@@ -74,24 +98,11 @@ class MIT_Humanoid(LeggedRobot):
             self.d_gains,
             self.tau_ff,
         )
-        torques = torques.clip(-self.torque_limits, self.torque_limits)
-        return exp_avg_filter(torques, self.torques, self.cfg.control.filter_gain)
-
-    # oscillator integration
+        return torques.clip(-self.torque_limits, self.torque_limits)
 
     def _post_decimation_step(self):
         super()._post_decimation_step()
-        self._step_oscillators()
         self._update_sampled_history_buffers()
-
-    def _step_oscillators(self, dt=None):
-        if dt is None:
-            dt = self.dt
-        self.oscillators += (self.oscillator_freq * 2 * torch.pi) * dt
-        self.oscillators = torch.remainder(self.oscillators, 2 * torch.pi)
-        self.oscillator_obs = torch.cat(
-            (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
-        )
 
     def _update_sampled_history_buffers(self):
         self.sampled_history_counter += 1
@@ -187,20 +198,6 @@ class MIT_Humanoid(LeggedRobot):
         rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
         return rew_vel + rew_pos - rew_base_vel * self._switch("stand")
 
-    def _reward_stance(self):
-        # phase = torch.maximum(
-        #     torch.zeros_like(self.oscillators), -self.oscillators.sin()
-        # )  # positive during swing, negative during stance
-        phase = self.smooth_sqr_wave(self.oscillators)
-        return (phase * self._compute_grf()).mean(dim=1)
-
-    def _reward_swing(self):
-        # phase = torch.maximum(
-        #     torch.zeros_like(self.oscillators), self.oscillators.sin()
-        # )  # positive during swing, negative during stance
-        phase = self.smooth_sqr_wave(self.oscillators + torch.pi)
-        return -(phase * self._compute_grf()).mean(dim=1)
-
     def _compute_grf(self, grf_norm=True):
         grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
         if grf_norm:
@@ -210,16 +207,6 @@ class MIT_Humanoid(LeggedRobot):
 
     def smooth_sqr_wave(self, phase, sigma=0.2):  # sigma=0 is step function
         return phase.sin() / (2 * torch.sqrt(phase.sin() ** 2.0 + sigma**2.0)) + 0.5
-
-    def _reward_walk_freq(self):
-        # Penalize deviation from base frequency
-        return torch.mean(
-            self._sqrdexp(
-                (self.oscillator_freq - self.cfg.oscillator.base_frequency)
-                / self.cfg.oscillator.base_frequency
-            ),
-            dim=1,
-        ) * self._switch("move")
 
     def _reward_hips_forward(self):
         # reward hip motors for pointing forward
