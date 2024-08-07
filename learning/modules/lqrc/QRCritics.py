@@ -96,10 +96,10 @@ class OuterProduct(nn.Module):
             latent_dim = num_obs
         self.latent_dim = latent_dim
         self.minimize = minimize
-        if minimize:
-            self.sign = torch.ones(1, device=device)
-        else:
-            self.sign = -torch.ones(1, device=device)
+        # if minimize:
+        #     self.sign = torch.ones(1, device=device)
+        # else:
+        #     self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
 
         self._normalize_obs = normalize_obs
@@ -111,12 +111,19 @@ class OuterProduct(nn.Module):
 
     def forward(self, x, return_all=False):
         print("x device", x.device)
+        print("x shape", x.shape)
         z = self.NN(x)
         print("z device", z.device)
+        print("z shape", z.shape)
         # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
-        value = self.sign * quadratify_xAx(x, A)
+        # value = self.sign * quadratify_xAx(x, A)
+        value = quadratify_xAx(x, A)
+        print("value shape before min", value.shape)
+        print("value type", type(value), value)
+        value *= 1.0 if self.minimize else -1.0
+        print("value shape", value.shape)
         print("value device", value.device)
         print("value offset device", self.value_offset.device)
         value += self.value_offset
