@@ -89,9 +89,10 @@ def export_network(network, network_name, path, num_inputs):
     path_TS = os.path.join(path, network_name + ".pt")  # TorchScript path
     path_onnx = os.path.join(path, network_name + ".onnx")  # ONNX path
     model = copy.deepcopy(network).to("cpu")
+    model.device = "cpu" # force all tensors created as intermediate steps to CPU
     # To trace model, must be evaluated once with arbitrary input
     model.eval()
     dummy_input = torch.rand((2, num_inputs))
     model_traced = torch.jit.trace(model, dummy_input)
     torch.jit.save(model_traced, path_TS)
-    torch.onnx.export(model_traced, dummy_input, path_onnx)
+    # torch.onnx.export(model_traced, dummy_input, path_onnx)

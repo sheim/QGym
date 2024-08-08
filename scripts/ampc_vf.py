@@ -99,8 +99,8 @@ graphing_data = {data_name: {name: {} for name in critic_names}
 test_error = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 200 #1000
-batch_size = 64 #128
+max_gradient_steps = 1000
+batch_size = 128
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
 print(f"training data: {n_training_data}, validation data: {n_validation_data}")
