@@ -35,6 +35,7 @@ if not os.path.exists(save_path):
 # set up critics
 for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
+    print(critic_param.get("minimize"))
 critic_names = [
     "Critic",
     "OuterProduct",
