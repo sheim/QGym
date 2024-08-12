@@ -1,5 +1,7 @@
 import pickle
 import math
+import optuna
+import csv
 import time
 from gym import LEGGED_GYM_ROOT_DIR
 
@@ -38,9 +40,9 @@ for critic_param in critic_params.values():
 
 critic_names = [
     "Critic",
-    "OuterProduct",
-    "PDCholeskyInput",
-    "CholeskyLatent",
+    # "OuterProduct",
+    # "PDCholeskyInput",
+    # "CholeskyLatent",
     "DenseSpectralLatent",
 ]
 print("Loading data")
@@ -87,8 +89,6 @@ cost = np.concatenate((cost, cost_non_fs))
 x0 = torch.from_numpy(x0).float().to(DEVICE)
 cost = torch.from_numpy(cost).float().to(DEVICE)
 
-print("cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std())
-
 # set up constants
 total_data = x0.shape[0]
 n_dims = x0.shape[1]
@@ -99,11 +99,11 @@ graphing_data = {data_name: {name: {} for name in critic_names}
                 "cost",
                 "error",
             ]}
-test_error = {name: [] for name in critic_names}
+# test_error = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 3000
-batch_size = 512
+# max_gradient_steps = 1000
+# batch_size = 128
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
 print(f"training data: {n_training_data}, validation data: {n_validation_data}")
@@ -117,8 +117,10 @@ data = TensorDict(
     device=DEVICE,
 )
 
-standard_offset = 0
-for ix, name in enumerate(critic_names):
+def objective(trial, name):
+    max_gradient_steps = trial.suggest_int("max_gradient_steps", low=100, high=5000, step=100)
+    batch_size = trial.suggest_categorical("batch_size", [2**x for x in range(7, 10)])
+    lr = trial.suggest_float("lr_critic", 1.0e-7, 1.0e-2, log=True)
     torch.cuda.empty_cache()
     print("")
     params = critic_params[name]
@@ -128,7 +130,7 @@ for ix, name in enumerate(critic_names):
 
     critic_class = globals()[name]
     critic = critic_class(**params).to(DEVICE)
-    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
+    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr)
 
     # train new critic
     mean_value_loss = 0
@@ -140,13 +142,6 @@ for ix, name in enumerate(critic_names):
         max_gradient_steps=max_gradient_steps,
     )
     for batch in generator:
-        if counter == 0:
-            if ix == 0:
-                standard_offset = batch["cost"].mean()
-            # print(f"{name} value offset before mean assigning", critic.value_offset)
-            with torch.no_grad():
-                critic.value_offset.copy_(standard_offset)
-            # print(f"{name} value offset after mean assigning", critic.value_offset)
         value_loss = critic.loss_fn(
             batch["critic_obs"].squeeze(), batch["cost"].squeeze()
         )
@@ -162,7 +157,7 @@ for ix, name in enumerate(critic_names):
                     - critic.evaluate(data["critic_obs"][0, test_idx])
                 ).pow(2)
             ).to("cpu")
-        test_error[name].append(actual_error.detach().mean().numpy())
+        # test_error[name].append(actual_error.detach().mean().numpy())
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
 
@@ -173,11 +168,25 @@ for ix, name in enumerate(critic_names):
             data[0, :]["critic_obs"]
         )
         graphing_data["cost"][name] = data[0, :]["cost"]
-    # print("exporting", name)
-    # export_network(critic, name, save_path, n_dims)
-    print(f"{name} mean", graphing_data["values"][name].mean(), "median", graphing_data["values"][name].median(), "std dev", graphing_data["values"][name].std())
+    
+    return actual_error.mean().item(), actual_error.max().item()
 
-plot_learning_progress(test_error, "AMPC VF Test Error", fn=f"{save_path}/test_error")
+
+for name in critic_names:
+    study = optuna.create_study(
+        storage=f"sqlite:///{save_path}/{name}_db.sqlite3",
+        directions=["minimize", "minimize"],
+    )
+    n_trials=100
+    study.optimize(lambda trial: objective(trial, name), n_trials=n_trials)
+    study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
+    best_trials = [trial.params for trial in study.best_trials]
+    with open(save_path + f"/{name}_best_trials.csv", "w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=best_trials[0].keys())
+        writer.writeheader()
+        writer.writerows(best_trials)
+
+# plot_learning_progress(test_error, "AMPC VF Test Error", fn=f"{save_path}/test_error")
 
 
 # plot_binned_errors_ampc(
