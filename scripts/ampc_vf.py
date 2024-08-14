@@ -50,7 +50,23 @@ with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f
 x0 = np.array(data["x0"]) # (3478114, 10)
 cost = np.array(data["cost"]) # (3478114,)
 
-V_max = max(cost)
+# remove top 1% of cost values and corresponding states
+num_to_remove = int(0.01 * len(cost))
+top_indices = np.argsort(cost)[-num_to_remove:]
+mask = np.ones(len(cost), dtype=bool)
+mask[top_indices] = False
+x0 = x0[mask]
+cost = cost[mask]
+
+# min max normalization to put state and cost on [0, 1]
+x0_min = x0.min(axis=0)
+x0_max = x0.max(axis=0)
+x0 = (x0 - x0_min) / (x0_max - x0_min)
+cost_min = cost.min()
+cost_max = cost.max()
+cost = (cost - cost_min) / (cost_max - cost_min)
+
+# V_max = max(cost)
 d_max = 0
 
 print("Building KDTree")
@@ -58,7 +74,7 @@ print("Building KDTree")
 start = time.time()
 tree = KDTree(x0)
 
-random_x0 = np.random.uniform(low=np.amax(np.min(x0, axis=0)), high=np.amin(np.max(x0, axis=0)), size=(10000, x0.shape[1]))
+random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
 
 def process_batch(batch):
     indices = tree.query_ball_point(batch, d_max)
@@ -78,10 +94,15 @@ print("")
 
 # concatenate all filtered batches and create matching cost array
 x0_non_fs = np.concatenate(x0_non_fs_list) if x0_non_fs_list else None
-cost_non_fs = np.ones((x0_non_fs.shape[0],))*V_max*2.0
+cost_non_fs = np.ones((x0_non_fs.shape[0],))
 # union non feasible and feasible states
 x0 = np.concatenate((x0, x0_non_fs))
 cost = np.concatenate((cost, cost_non_fs))
+
+#hack to see data dist
+import matplotlib.pyplot as plt
+plt.hist(cost, bins=100)
+plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
 
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
@@ -143,10 +164,10 @@ for ix, name in enumerate(critic_names):
         if counter == 0:
             if ix == 0:
                 standard_offset = batch["cost"].mean()
-            # print(f"{name} value offset before mean assigning", critic.value_offset)
+            print(f"{name} value offset before mean assigning", critic.value_offset)
             with torch.no_grad():
                 critic.value_offset.copy_(standard_offset)
-            # print(f"{name} value offset after mean assigning", critic.value_offset)
+            print(f"{name} value offset after mean assigning", critic.value_offset)
         value_loss = critic.loss_fn(
             batch["critic_obs"].squeeze(), batch["cost"].squeeze()
         )

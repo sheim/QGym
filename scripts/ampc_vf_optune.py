@@ -145,7 +145,9 @@ def objective(trial, name):
         value_loss = critic.loss_fn(
             batch["critic_obs"].squeeze(), batch["cost"].squeeze()
         )
-
+        if counter == 0:
+            with torch.no_grad():
+                critic.value_offset.copy_(6476.1982)
         critic_optimizer.zero_grad()
         value_loss.backward()
         critic_optimizer.step()
@@ -171,13 +173,12 @@ def objective(trial, name):
     
     return actual_error.mean().item(), actual_error.max().item()
 
-
 for name in critic_names:
     study = optuna.create_study(
         storage=f"sqlite:///{save_path}/{name}_db.sqlite3",
         directions=["minimize", "minimize"],
     )
-    n_trials=100
+    n_trials=50
     study.optimize(lambda trial: objective(trial, name), n_trials=n_trials)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
     best_trials = [trial.params for trial in study.best_trials]
