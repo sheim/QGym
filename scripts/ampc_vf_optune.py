@@ -52,7 +52,22 @@ with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f
 x0 = np.array(data["x0"]) # (3478114, 10)
 cost = np.array(data["cost"]) # (3478114,)
 
-V_max = max(cost)
+# remove top 1% of cost values and corresponding states
+num_to_remove = int(0.01 * len(cost))
+top_indices = np.argsort(cost)[-num_to_remove:]
+mask = np.ones(len(cost), dtype=bool)
+mask[top_indices] = False
+x0 = x0[mask]
+cost = cost[mask]
+
+# min max normalization to put state and cost on [0, 1]
+x0_min = x0.min(axis=0)
+x0_max = x0.max(axis=0)
+x0 = (x0 - x0_min) / (x0_max - x0_min)
+cost_min = cost.min()
+cost_max = cost.max()
+cost = (cost - cost_min) / (cost_max - cost_min)
+
 d_max = 0
 
 print("Building KDTree")
@@ -60,7 +75,7 @@ print("Building KDTree")
 start = time.time()
 tree = KDTree(x0)
 
-random_x0 = np.random.uniform(low=np.amax(np.min(x0, axis=0)), high=np.amin(np.max(x0, axis=0)), size=(10000, x0.shape[1]))
+random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
 
 def process_batch(batch):
     indices = tree.query_ball_point(batch, d_max)
@@ -80,10 +95,15 @@ print("")
 
 # concatenate all filtered batches and create matching cost array
 x0_non_fs = np.concatenate(x0_non_fs_list) if x0_non_fs_list else None
-cost_non_fs = np.ones((x0_non_fs.shape[0],))*V_max*2.0
+cost_non_fs = np.ones((x0_non_fs.shape[0],))
 # union non feasible and feasible states
 x0 = np.concatenate((x0, x0_non_fs))
 cost = np.concatenate((cost, cost_non_fs))
+
+#hack to see data dist
+import matplotlib.pyplot as plt
+plt.hist(cost, bins=100)
+plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
 
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
@@ -99,8 +119,6 @@ graphing_data = {data_name: {name: {} for name in critic_names}
                 "cost",
                 "error",
             ]}
-# test_error = {name: [] for name in critic_names}
-
 # set up training
 # max_gradient_steps = 1000
 # batch_size = 128
@@ -178,7 +196,7 @@ for name in critic_names:
         storage=f"sqlite:///{save_path}/{name}_db.sqlite3",
         directions=["minimize", "minimize"],
     )
-    n_trials=50
+    n_trials=100
     study.optimize(lambda trial: objective(trial, name), n_trials=n_trials)
     study.trials_dataframe().to_csv(save_path + f"/{name}.csv")
     best_trials = [trial.params for trial in study.best_trials]

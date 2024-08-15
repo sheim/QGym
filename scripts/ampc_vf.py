@@ -66,7 +66,6 @@ cost_min = cost.min()
 cost_max = cost.max()
 cost = (cost - cost_min) / (cost_max - cost_min)
 
-# V_max = max(cost)
 d_max = 0
 
 print("Building KDTree")
@@ -99,10 +98,10 @@ cost_non_fs = np.ones((x0_non_fs.shape[0],))
 x0 = np.concatenate((x0, x0_non_fs))
 cost = np.concatenate((cost, cost_non_fs))
 
-#hack to see data dist
-import matplotlib.pyplot as plt
-plt.hist(cost, bins=100)
-plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
+# #hack to see data dist
+# import matplotlib.pyplot as plt
+# plt.hist(cost, bins=100)
+# plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
 
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
