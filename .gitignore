@@ -14,10 +14,13 @@ gym/wandb
 *.DS_Store
 *.zip
 *.npz
+*.pkl
 user/wandb_config.json
 *trajectories/
 gym/graphing/data
 learning/modules/lqrc/graphs
+# Henrik's ampc byproduct
+c_generated_code/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

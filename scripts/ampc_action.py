@@ -37,11 +37,11 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    "Critic",
-    # "OuterProduct",
+    # "Critic",
+    "OuterProduct",
     # "PDCholeskyInput",
-    "CholeskyLatent",
-    "DenseSpectralLatent",
+    # "CholeskyLatent",
+    # "DenseSpectralLatent",
 ]
 print("Loading data")
 # load data
@@ -82,7 +82,7 @@ def process_batch(batch):
 
 print("Creating non feasible state data points")
 # filter random_x0 in batches
-chunk_size = 10000
+chunk_size = 3
 x0_non_fs_list = []
 for i in range(0, len(random_x0), chunk_size):
     batch = random_x0[i:i+chunk_size]
@@ -103,6 +103,17 @@ cost = np.concatenate((cost, cost_non_fs))
 # plt.hist(cost, bins=100)
 # plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
 
+# ampc imports and setup
+from collections import defaultdict
+import functools
+from learning.modules.ampc.wheelbot import load_dataset, N, nu, nx, ntheta, x_max, x_min, WheelbotBatchSimulation, plot_wheelbot, WheelbotOneStepMPC
+def in_box(x, x_min, x_max):
+    return np.all(np.logical_and(x >= x_min,  x <= x_max ))
+terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
+onestepmpc = WheelbotOneStepMPC()
+check_terminal_nth_epoch = 100
+eval_frac_in_terminal = defaultdict(list)
+
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
 cost = torch.from_numpy(cost).float().to(DEVICE)
@@ -122,7 +133,7 @@ graphing_data = {data_name: {name: {} for name in critic_names}
 test_error = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 3000
+max_gradient_steps = 4000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -175,6 +186,7 @@ for ix, name in enumerate(critic_names):
         value_loss.backward()
         critic_optimizer.step()
         counter += 1
+        # pointwise prediction test error
         with torch.no_grad():
             actual_error = (
                 (
@@ -183,6 +195,42 @@ for ix, name in enumerate(critic_names):
                 ).pow(2)
             ).to("cpu")
         test_error[name].append(actual_error.detach().mean().numpy())
+        # perform closed-loop simulation as test error metric
+        if name != "Critic" and (counter % check_terminal_nth_epoch == 0):
+            batch_terminal_eval = batch["critic_obs"].shape[0]  #100
+            N_eval = int(3*N)
+            # X_sim_ = np.copy(np.asarray(jax.numpy.copy(X_)))
+            X_sim_ = batch["critic_obs"].cpu().detach().numpy()
+            X_sim_cl_ = np.repeat(X_sim_[:,:,np.newaxis], N_eval+1, axis=2)
+            U_sim_cl_ = np.zeros((np.shape(X_sim_cl_)[0], nu, N_eval))
+
+            print("X sim shape", X_sim_.shape)
+            print("X sim cl shape", X_sim_cl_.shape)
+            print("U sim cl shape", U_sim_cl_.shape)
+            
+            for b in range(batch_terminal_eval):
+                onestepmpc.reset()
+                for k in range(N_eval):
+                    # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
+                    prediction  = critic.evaluate(torch.from_numpy(X_sim_cl_[b,:,k]).to(DEVICE).unsqueeze(0), return_all=True)
+                    A = prediction["A"].squeeze().cpu().detach().numpy()
+                    # if k == 0:
+                    #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
+                    u, xnext, status = onestepmpc.run(X_sim_cl_[b,:,k], A)
+                    U_sim_cl_[b,:,k] = np.copy(u)
+                    X_sim_cl_[b,:,k+1] = np.copy(xnext)
+            
+            # compute fraction of states in terminal set
+            frac_in_terminal = np.mean(np.vectorize(terminal_set_fcn)(X_sim_cl_[:batch_terminal_eval,:6,N_eval]))
+            eval_frac_in_terminal[name].append(frac_in_terminal)
+            
+            for idx in range(min(batch_terminal_eval, 100)):
+                labels = ["cl_sim"]
+                plot_outdir = f"plots/value_{time_str}/{counter}"
+                if not os.path.exists(plot_outdir):
+                    os.makedirs(plot_outdir)
+                plot_wheelbot([X_sim_cl_[idx]],[U_sim_cl_[idx]],labels,filename=f"{plot_outdir}/plot_{idx}", show=False)
+
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
 

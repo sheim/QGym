@@ -29,11 +29,14 @@ def compose_cholesky(L):
 
 
 def quadratify_xAx(x, A):
-    return torch.einsum(
+    res  = torch.einsum(
         "...ij, ...jk -> ...ik",
         torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A),
         x.unsqueeze(-1),
-    ).squeeze()
+    )
+    if res.shape == (1, 1, 1):
+        return res.squeeze(0)
+    return res.squeeze()
 
 
 def init_weights(m):
