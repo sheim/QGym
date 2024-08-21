@@ -21,6 +21,7 @@ gym/graphing/data
 learning/modules/lqrc/graphs
 # Henrik's ampc byproduct
 c_generated_code/*
+plots/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

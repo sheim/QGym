@@ -38,9 +38,9 @@ for critic_param in critic_params.values():
 
 critic_names = [
     # "Critic",
-    "OuterProduct",
+    # "OuterProduct",
     # "PDCholeskyInput",
-    # "CholeskyLatent",
+    "CholeskyLatent",
     # "DenseSpectralLatent",
 ]
 print("Loading data")
@@ -59,12 +59,12 @@ x0 = x0[mask]
 cost = cost[mask]
 
 # min max normalization to put state and cost on [0, 1]
-x0_min = x0.min(axis=0)
-x0_max = x0.max(axis=0)
-x0 = (x0 - x0_min) / (x0_max - x0_min)
-cost_min = cost.min()
-cost_max = cost.max()
-cost = (cost - cost_min) / (cost_max - cost_min)
+# x0_min = x0.min(axis=0)
+# x0_max = x0.max(axis=0)
+# x0 = (x0 - x0_min) / (x0_max - x0_min)
+# cost_min = cost.min()
+# cost_max = cost.max()
+# cost = (cost - cost_min) / (cost_max - cost_min)
 
 d_max = 0
 
@@ -73,7 +73,8 @@ print("Building KDTree")
 start = time.time()
 tree = KDTree(x0)
 
-random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
+# random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
+random_x0 = np.random.uniform(low=cost.min(), high=cost.max(), size=(10000, x0.shape[1]))
 
 def process_batch(batch):
     indices = tree.query_ball_point(batch, d_max)
@@ -211,6 +212,7 @@ for ix, name in enumerate(critic_names):
             for b in range(batch_terminal_eval):
                 onestepmpc.reset()
                 for k in range(N_eval):
+                    print("k", k)
                     # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
                     prediction  = critic.evaluate(torch.from_numpy(X_sim_cl_[b,:,k]).to(DEVICE).unsqueeze(0), return_all=True)
                     A = prediction["A"].squeeze().cpu().detach().numpy()
