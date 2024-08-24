@@ -1,6 +1,7 @@
 import argparse
 import os
 from gym import LEGGED_GYM_ROOT_DIR
+import torch
 
 
 def benchmark_args():
@@ -270,3 +271,17 @@ def train_interleaved(critic, value_opt, reg_opt, value_generator, **kwargs):
     mean_value_loss /= val_counter
     mean_reg_loss /= reg_counter
     return mean_value_loss, mean_reg_loss
+
+def get_latent_matrix(input_size, model, device):
+    dummy_input = torch.randn(*input_size, device=device)
+    # Use torch.jit.trace to create a traced version of the model
+    traced_model = torch.jit.trace(model, dummy_input)
+    final_weight = traced_model.get_parameter("0.weight")
+    for i in range(1, len(list(model.children()))):
+        final_weight = traced_model.get_parameter(f"{i}.weight") @ final_weight
+
+    final_bias = traced_model.get_parameter("0.bias")
+    for i in range(1, len(list(model.children()))):
+        final_bias = traced_model.get_parameter(f"{i}.weight") @ final_bias + traced_model.get_parameter(f"{i}.bias")
+    
+    return final_weight, final_bias

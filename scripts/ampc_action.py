@@ -24,6 +24,7 @@ from learning.modules.lqrc.plotting import (
     plot_learning_progress,
     plot_binned_errors_ampc
 )
+from learning.modules.lqrc.utils import get_latent_matrix
 from learning.modules.utils.neural_net import export_network
 
 # make dir for saving this run's results
@@ -40,8 +41,8 @@ critic_names = [
     # "Critic",
     # "OuterProduct",
     # "PDCholeskyInput",
-    "CholeskyLatent",
-    # "DenseSpectralLatent",
+    # "CholeskyLatent",
+    "DenseSpectralLatent",
 ]
 print("Loading data")
 # load data
@@ -172,6 +173,7 @@ for ix, name in enumerate(critic_names):
         max_gradient_steps=max_gradient_steps,
     )
     for batch in generator:
+        # print offset to check it's working as intended
         if counter == 0:
             if ix == 0:
                 standard_offset = batch["cost"].mean()
@@ -179,10 +181,17 @@ for ix, name in enumerate(critic_names):
             with torch.no_grad():
                 critic.value_offset.copy_(standard_offset)
             print(f"{name} value offset after mean assigning", critic.value_offset)
+        
+        # extract matrix transform for latent if applicable
+        if "Latent" in name:
+            latent_weight, latent_bias = get_latent_matrix(batch["critic_obs"].shape, critic.latent_NN, device=DEVICE)
+            latent_weight = latent_weight.cpu().detach().numpy()
+            latent_bias = latent_bias.cpu().detach().numpy()
+
+        # calculate loss and optimize
         value_loss = critic.loss_fn(
             batch["critic_obs"].squeeze(), batch["cost"].squeeze()
         )
-
         critic_optimizer.zero_grad()
         value_loss.backward()
         critic_optimizer.step()
@@ -208,7 +217,6 @@ for ix, name in enumerate(critic_names):
             print("X sim shape", X_sim_.shape)
             print("X sim cl shape", X_sim_cl_.shape)
             print("U sim cl shape", U_sim_cl_.shape)
-            
             for b in range(batch_terminal_eval):
                 onestepmpc.reset()
                 for k in range(N_eval):
@@ -216,9 +224,16 @@ for ix, name in enumerate(critic_names):
                     # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
                     prediction  = critic.evaluate(torch.from_numpy(X_sim_cl_[b,:,k]).to(DEVICE).unsqueeze(0), return_all=True)
                     A = prediction["A"].squeeze().cpu().detach().numpy()
+                    if "Latent" in name:
+                        print("shape", (latent_weight @ X_sim_cl_[b,:,k] + latent_bias).shape)
+                        print("A shape", A.shape)
+                        latent_u, latent_xnext, status = onestepmpc.run(latent_weight @ X_sim_cl_[b,:,k] + latent_bias, A)
+                        u = latent_weight @ (latent_u - latent_bias)
+                        xnext = latent_weight @ (latent_xnext - latent_bias)
+                    else:
+                        u, xnext, status = onestepmpc.run(X_sim_cl_[b,:,k], A)
                     # if k == 0:
                     #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
-                    u, xnext, status = onestepmpc.run(X_sim_cl_[b,:,k], A)
                     U_sim_cl_[b,:,k] = np.copy(u)
                     X_sim_cl_[b,:,k+1] = np.copy(xnext)
             

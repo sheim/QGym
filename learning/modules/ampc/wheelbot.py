@@ -223,6 +223,9 @@ class WheelbotOneStepMPC():
         ny = nx + nu
         ny_e = nx
 
+        print("model x shape", model.x.rows())
+        print("model u shape", model.u.rows())
+
         ocp.dims.N = 1
 
         # set cost module
