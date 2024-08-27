@@ -6,12 +6,13 @@ from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
 from learning.storage import DictStorage
+from learning.utils import export_to_numpy
 
 logger = Logger()
 storage = DictStorage()
 
 
-class OnPolicyRunner(BaseRunner):
+class DataLoggingRunner(BaseRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         logger.initialize(
@@ -21,7 +22,7 @@ class OnPolicyRunner(BaseRunner):
             self.device,
         )
 
-    def learn(self, states_to_log_dict=None):
+    def learn(self):
         self.set_up_logger()
 
         rewards_dict = {}
@@ -30,7 +31,6 @@ class OnPolicyRunner(BaseRunner):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
-        self.save()
 
         # * start up storage
         transition = TensorDict({}, batch_size=self.env.num_envs, device=self.device)
@@ -54,21 +54,16 @@ class OnPolicyRunner(BaseRunner):
             device=self.device,
         )
 
+        self.save()
         # burn in observation normalization.
         if self.actor_cfg["normalize_obs"] or self.critic_cfg["normalize_obs"]:
             self.burn_in_normalization()
+        self.env.reset()
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
             logger.tic("collection")
-
-            # * Simulate environment and log states
-            if states_to_log_dict is not None:
-                it_idx = self.it - 1
-                if it_idx % 10 == 0:
-                    self.sim_and_log_states(states_to_log_dict, it_idx)
-
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
@@ -120,6 +115,7 @@ class OnPolicyRunner(BaseRunner):
             logger.toc("collection")
 
             logger.tic("learning")
+            self.save()
             self.alg.update(storage.data)
             storage.clear()
             logger.toc("learning")
@@ -130,9 +126,10 @@ class OnPolicyRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-            if self.it % self.save_interval == 0:
-                self.save()
-        self.save()
+            # if self.it % self.save_interval == 0:
+            #     self.save()
+        # self.save()
+        # print(f"Saved data from LQR Pendulum run to {dict_save_path}")
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
@@ -170,9 +167,7 @@ class OnPolicyRunner(BaseRunner):
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
-            "algorithm",
-            self.alg,
-            ["mean_value_loss", "mean_surrogate_loss", "learning_rate"],
+            "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
@@ -191,6 +186,9 @@ class OnPolicyRunner(BaseRunner):
             },
             path,
         )
+        path_data = os.path.join(self.log_dir, "data_{}".format(self.it))
+        torch.save(storage.data.cpu(), path_data + ".pt")
+        export_to_numpy(storage.data, path_data + ".npz")
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
@@ -213,34 +211,3 @@ class OnPolicyRunner(BaseRunner):
 
     def export(self, path):
         self.alg.actor.export(path)
-
-    def sim_and_log_states(self, states_to_log_dict, it_idx):
-        # Simulate environment for as many steps as expected in the dict.
-        # Log states to the dict, as well as whether the env terminated.
-        steps = states_to_log_dict["terminated"].shape[2]
-        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
-
-        with torch.inference_mode():
-            for i in range(steps):
-                actions = self.alg.act(actor_obs)
-                self.set_actions(
-                    self.policy_cfg["actions"],
-                    actions,
-                    self.policy_cfg["disable_actions"],
-                )
-
-                self.env.step()
-
-                actor_obs = self.get_noisy_obs(
-                    self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
-                )
-
-                # Log states (just for the first env)
-                terminated = self.get_terminated()[0]
-                for state in states_to_log_dict:
-                    if state == "terminated":
-                        states_to_log_dict[state][0, it_idx, i, :] = terminated
-                    else:
-                        states_to_log_dict[state][0, it_idx, i, :] = getattr(
-                            self.env, state
-                        )[0, :]

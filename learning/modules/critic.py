@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from .utils import create_MLP
 from .utils import RunningMeanStd
 
@@ -29,5 +30,5 @@ class Critic(nn.Module):
     def evaluate(self, critic_observations):
         return self.forward(critic_observations)
 
-    def loss_fn(self, obs, target):
+    def loss_fn(self, obs, target, **kwargs):
         return nn.functional.mse_loss(self.forward(obs), target, reduction="mean")

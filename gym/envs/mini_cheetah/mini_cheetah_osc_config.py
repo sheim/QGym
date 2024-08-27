@@ -69,27 +69,28 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
     class osc:
         process_noise_std = 0.25
-        # oscillator parameters
-        omega = 3  # 0.5 #3.5  # in Hz
-        coupling = 1  # 0.02
-        osc_bool = False
-        grf_bool = False
-        randomize_osc_params = False
         grf_threshold = 0.1  # 20. # Normalized to body weight
+        # oscillator parameters
+        omega = 3  # gets overwritten
+        coupling = 1  # gets overwritten
+        osc_bool = False  # not used in paper
+        grf_bool = False  # not used in paper
+        randomize_osc_params = False
+        # randomization ranges: not used in paper
         omega_range = [1.0, 4.0]  # [0.0, 10.]
         coupling_range = [
             0.0,
             1.0,
         ]  # with normalized grf, can have omega/coupling on same scale
         offset_range = [0.0, 0.0]
+
+        # choice of oscillator parameters, see paper equation (5)
         stop_threshold = 0.5
         omega_stop = 1.0
         omega_step = 2.0
         omega_slope = 1.0
         omega_max = 4.0
         omega_var = 0.25
-        # coupling_step = 0.
-        # coupling_stop = 0.
         coupling_stop = 4.0
         coupling_step = 1.0
         coupling_slope = 0.0
@@ -160,11 +161,10 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "MyRunner"
 
-    class policy:
+    class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         smooth_exploration = False
@@ -178,8 +178,25 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "oscillator_obs",
             "dof_pos_target",
         ]
+        actions = ["dof_pos_target"]
+        normalize_obs = False
 
-        critic_obs = [
+        class noise(MiniCheetahRunnerCfg.actor.noise):
+            pass
+
+    class critic(MiniCheetahRunnerCfg.critic):
+        hidden_dims = [128, 128]
+        activation = "relu"
+        normalize_obs = False
+
+        critic_class_name = "Critic"  # "DenseSpectralLatent"
+        # * some class-specific params
+        # minimize = False
+        # relative_dim = 8  # 16
+        # latent_dim = 32  # 18,
+        # latent_hidden_dims = [128, 128]
+        # latent_activation = "relu"
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -188,14 +205,9 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "oscillator_obs",
-            "oscillators_vel",
             "dof_pos_target",
         ]
-
-        actions = ["dof_pos_target"]
-
-        class noise:
-            pass
+        normalize_obs = False
 
         class reward:
             class weights:
@@ -227,20 +239,23 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
                 termination = 15.0 / 100.0
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        # training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
+        # both
+        gamma = 0.99
+        lam = 0.98
+        # new
+        storage_size = 2**17
+        batch_size = 2**15
+        max_grad_steps = 24
+
         clip_param = 0.2
-        entropy_coef = 0.02
-        num_learning_epochs = 4
-        # mini batch size = num_envs*nsteps/nminibatches
-        num_mini_batches = 8
         learning_rate = 1.0e-5
-        schedule = "adaptive"  # can be adaptive, fixed
-        discount_horizon = 1.0
-        GAE_bootstrap_horizon = 2.0
-        desired_kl = 0.01
         max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

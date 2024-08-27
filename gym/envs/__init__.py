@@ -19,7 +19,7 @@ class_dict = {
     "Anymal": ".anymal_c.anymal",
     "A1": ".a1.a1",
     "HumanoidRunning": ".mit_humanoid.humanoid_running",
-    "Pendulum": ".pendulum.pendulum"
+    "Pendulum": ".pendulum.pendulum",
 }
 
 config_dict = {

@@ -79,7 +79,7 @@ class FixedRobot(BaseTask):
                     self.num_envs, device=self.device
                 )
         self.gym.set_dof_actuation_force_tensor(
-            self.sim, gymtorch.unwrap_tensor(self.torques)
+            self.sim, gymtorch.unwrap_tensor(torques_to_gym_tensor)
         )
         self.gym.simulate(self.sim)
         if self.device == "cpu":
@@ -184,10 +184,7 @@ class FixedRobot(BaseTask):
                 try:  # ! this seems like a crime...
                     self.torque_limits[i] = props["effort"][i].item()
                 except:
-                    print(
-                        "WARNING: passive joints need to be listed after "
-                        + "active joints in the URDF."
-                    )
+                    print("WARNING: your system has unactuated joints")
                 # * soft limits
                 m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
                 r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
@@ -399,10 +396,7 @@ class FixedRobot(BaseTask):
         self.default_act_pos = self.default_act_pos.unsqueeze(0)
         # * store indices of actuated joints
         self.act_idx = to_torch(actuated_idx, dtype=torch.long, device=self.device)
-        # * check that init range highs and lows are consistent
-        # * and repopulate to match
-        if self.cfg.init_state.reset_mode == "reset_to_range":
-            self.initialize_ranges_for_initial_conditions()
+        self.initialize_ranges_for_initial_conditions()
 
     def initialize_ranges_for_initial_conditions(self):
         self.dof_pos_range = torch.zeros(
@@ -568,11 +562,12 @@ class FixedRobot(BaseTask):
 
     # ------------ reward functions----------------
 
-    def _sqrdexp(self, x, scale=1.0):
+    def _sqrdexp(self, x, sigma=None):
         """shorthand helper for squared exponential"""
-        return torch.exp(
-            -torch.square(x / scale) / self.cfg.reward_settings.tracking_sigma
-        )
+        if sigma is None:
+            return torch.exp(-torch.square(x) / self.cfg.reward_settings.tracking_sigma)
+        else:
+            return torch.exp(-torch.square(x) / sigma)
 
     def _reward_torques(self):
         """Penalize torques"""

@@ -72,9 +72,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
         smooth_exploration = False
         exploration_sample_freq = 16
+        activation = ["elu", "elu", "tanh"]
         obs = [
             "base_ang_vel",
             "projected_gravity",
@@ -83,7 +83,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "phase_obs",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -98,10 +98,10 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             ang_vel = [0.3, 0.15, 0.4]
             gravity_vec = 0.1
 
-    class critic(MiniCheetahRunnerCfg.critic):
-        hidden_dims = [256, 256, 128]
+    class critic:
+        hidden_dims = [256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = ["elu", "tanh"]
         obs = [
             "base_height",
             "base_lin_vel",
@@ -113,7 +113,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         class reward:
             class weights:

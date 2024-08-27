@@ -138,7 +138,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
         actions = ["dof_pos_target"]
         add_noise = True
         disable_actions = False
@@ -167,7 +167,6 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             "dof_vel",
             "dof_pos_target",
         ]
-        normalize_obs = True
 
         class reward:
             class weights:
