@@ -166,7 +166,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
+        activation = ["elu", "elu", "tanh"]
         smooth_exploration = False
 
         obs = [
@@ -186,7 +186,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
 
     class critic(MiniCheetahRunnerCfg.critic):
         hidden_dims = [128, 128]
-        activation = "relu"
+        activation = ["relu", "tanh"]
         normalize_obs = False
 
         critic_class_name = "Critic"  # "DenseSpectralLatent"
