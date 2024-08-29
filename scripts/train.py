@@ -31,3 +31,4 @@ def train(train_cfg, policy_runner):
 if __name__ == "__main__":
     train_cfg, policy_runner = setup()
     train(train_cfg=train_cfg, policy_runner=policy_runner)
+    print(f"Final value offset: {policy_runner.alg.critic.value_offset.item()}")

@@ -144,16 +144,16 @@ class MyRunner(OnPolicyRunner):
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
-            "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
+            "algorithm",
+            self.alg,
+            ["mean_value_loss", "mean_surrogate_loss", "learning_rate"],
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
-
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):
         actor_obs = self.get_obs(self.actor_cfg["obs"])
-        critic_obs = self.get_obs(self.critic_cfg["obs"])
         for _ in range(n_iterations):
             actions = self.alg.act(actor_obs)
             self.set_actions(self.actor_cfg["actions"], actions)
@@ -161,8 +161,5 @@ class MyRunner(OnPolicyRunner):
             actor_obs = self.get_noisy_obs(
                 self.actor_cfg["obs"], self.actor_cfg["noise"]
             )
-            critic_obs = self.get_obs(self.critic_cfg["obs"])
-            rewards = self.alg.critic.evaluate(critic_obs)
-        self.alg.critic.value_offset.copy_(rewards.mean())
         print(f"Value offset: {self.alg.critic.value_offset.item()}")
         self.env.reset()

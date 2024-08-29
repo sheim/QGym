@@ -67,13 +67,13 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
 class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "MyRunner"
 
     class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         smooth_exploration = False
-        exploration_sample_freq = 16
+        # exploration_sample_freq = 16
         activation = ["elu", "elu", "tanh"]
         obs = [
             "base_ang_vel",
@@ -82,6 +82,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "phase_obs",
+            "dof_pos_target",
         ]
         normalize_obs = False
 
@@ -114,6 +115,14 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_target",
         ]
         normalize_obs = False
+        # critic_class_name = "Critic"  # "DenseSpectralLatent"
+        critic_class_name = "DenseSpectralLatent"
+        # * some class-specific params
+        minimize = False
+        relative_dim = 4  # 16
+        latent_dim = 12  # 18,
+        latent_hidden_dims = [256, 256]
+        latent_activation = "elu"
 
         class reward:
             class weights:
@@ -142,7 +151,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # both
         gamma = 0.99
-        lam = 0.95
+        lam = 0.75
         # shared
         batch_size = 2**15
         max_gradient_steps = 36
@@ -151,7 +160,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         batch_size = 2**15  #  new
 
         clip_param = 0.2
-        learning_rate = 1.0e-3
+        learning_rate = 1.0e-2
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
