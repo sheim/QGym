@@ -35,7 +35,7 @@ def load_saved_policy(runner):
         load_run=runner.cfg["load_run"],
         checkpoint=runner.cfg["checkpoint"],
     )
-    loaded_dict = torch.load(resume_path)
+    loaded_dict = torch.load(resume_path, weights_only=True)
     actor.load_state_dict(loaded_dict["actor_state_dict"])
     actor.eval()
     return actor

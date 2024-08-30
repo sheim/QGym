@@ -221,6 +221,10 @@ class OffPolicyRunner(BaseRunner):
                 "mean_actor_loss",
                 "mean_alpha_loss",
                 "alpha",
+                "alpha_lr",
+                "critic_1_lr",
+                "critic_2_lr",
+                "actor_lr",
             ],
         )
         # logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
@@ -246,7 +250,7 @@ class OffPolicyRunner(BaseRunner):
         torch.save(save_dict, path)
 
     def load(self, path, load_optimizer=True):
-        loaded_dict = torch.load(path)
+        loaded_dict = torch.load(path, weights_only=True)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
         self.alg.critic_1.load_state_dict(loaded_dict["critic_1_state_dict"])
         self.alg.critic_2.load_state_dict(loaded_dict["critic_2_state_dict"])

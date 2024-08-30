@@ -74,6 +74,22 @@ class SAC:
     def alpha(self):
         return self.log_alpha.exp()
 
+    @property
+    def alpha_lr(self):
+        return self.log_alpha_optimizer.param_groups[0]["lr"]
+
+    @property
+    def critic_1_lr(self):
+        return self.critic_1_optimizer.param_groups[0]["lr"]
+
+    @property
+    def critic_2_lr(self):
+        return self.critic_2_optimizer.param_groups[0]["lr"]
+
+    @property
+    def actor_lr(self):
+        return self.actor_optimizer.param_groups[0]["lr"]
+
     def switch_to_train(self):
         self.actor.train()
         self.critic_1.train()

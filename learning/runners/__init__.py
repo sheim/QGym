@@ -36,3 +36,4 @@ from .old_policy_runner import OldPolicyRunner
 from .off_policy_runner import OffPolicyRunner
 from .custom_critic_runner import CustomCriticRunner
 from .datalogging_runner import DataLoggingRunner
+from .psd_sac_runner import PSACRunner

@@ -134,7 +134,7 @@ class OldPolicyRunner(BaseRunner):
         )
 
     def load(self, path, load_optimizer=True):
-        loaded_dict = torch.load(path)
+        loaded_dict = torch.load(path, weights_only=True)
         self.alg.actor_critic.actor.load_state_dict(loaded_dict["actor_state_dict"])
         self.alg.actor_critic.critic.load_state_dict(loaded_dict["critic_state_dict"])
         if load_optimizer:
