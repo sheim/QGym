@@ -39,8 +39,8 @@ class Pendulum(FixedRobot):
             device=self.device,
         )
         grid = torch.cartesian_prod(lin_pos, lin_vel)
-        self.dof_pos[env_ids] = grid[:, 0].unsqueeze(-1)
-        self.dof_vel[env_ids] = grid[:, 1].unsqueeze(-1)
+        self.dof_pos[env_ids] = grid[env_ids, 0].unsqueeze(-1)
+        self.dof_vel[env_ids] = grid[env_ids, 1].unsqueeze(-1)
 
     def _reward_theta(self):
         theta_rwd = torch.cos(self.dof_pos[:, 0])  # no scaling
@@ -54,8 +54,8 @@ class Pendulum(FixedRobot):
         # theta_norm = self._normalize_theta()
         # omega = self.dof_vel[:, 0]
         # error = torch.stack(
-        #     [theta_norm / self.scales["dof_pos"], omega / self.scales["dof_vel"]], dim=1
-        # )
+        #     [theta_norm / self.scales["dof_pos"], omega / self.scales["dof_vel"]],
+        # dim=1)
         # return self._sqrdexp(torch.mean(error, dim=1), 0.01)
 
         # todo compare alternatives
