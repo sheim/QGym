@@ -1,5 +1,7 @@
 import pickle
 import math
+import random
+import os
 import time
 from gym import LEGGED_GYM_ROOT_DIR
 
@@ -16,13 +18,13 @@ from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
     create_uniform_generator,
 )
-from utils import DEVICE
+from utils import DEVICE, find_flatline_index
 from critic_params_ampc import critic_params
 from tensordict import TensorDict
 
 from learning.modules.lqrc.plotting import (
     plot_learning_progress,
-    plot_binned_errors_ampc
+    plot_binned_errors_ampc,
 )
 from learning.modules.lqrc.utils import get_latent_matrix
 from learning.modules.utils.neural_net import export_network
@@ -38,7 +40,7 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    # "Critic",
+    "Critic",
     # "OuterProduct",
     # "PDCholeskyInput",
     # "CholeskyLatent",
@@ -48,8 +50,8 @@ print("Loading data")
 # load data
 with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f:
     data = pickle.load(f)
-x0 = np.array(data["x0"]) # (3478114, 10)
-cost = np.array(data["cost"]) # (3478114,)
+x0 = np.array(data["x0"])  # (3478114, 10)
+cost = np.array(data["cost"])  # (3478114,)
 
 # remove top 1% of cost values and corresponding states
 num_to_remove = int(0.01 * len(cost))
@@ -75,19 +77,23 @@ start = time.time()
 tree = KDTree(x0)
 
 # random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
-random_x0 = np.random.uniform(low=cost.min(), high=cost.max(), size=(10000, x0.shape[1]))
+random_x0 = np.random.uniform(
+    low=cost.min(), high=cost.max(), size=(10000, x0.shape[1])
+)
+
 
 def process_batch(batch):
     indices = tree.query_ball_point(batch, d_max)
     mask = np.array([len(idx) == 0 for idx in indices])
     return batch[mask]
 
+
 print("Creating non feasible state data points")
 # filter random_x0 in batches
 chunk_size = 3
 x0_non_fs_list = []
 for i in range(0, len(random_x0), chunk_size):
-    batch = random_x0[i:i+chunk_size]
+    batch = random_x0[i : i + chunk_size]
     Y_filtered_batch = process_batch(batch)
     if len(Y_filtered_batch) > 0:
         x0_non_fs_list.append(Y_filtered_batch)
@@ -108,34 +114,55 @@ cost = np.concatenate((cost, cost_non_fs))
 # ampc imports and setup
 from collections import defaultdict
 import functools
-from learning.modules.ampc.wheelbot import load_dataset, N, nu, nx, ntheta, x_max, x_min, WheelbotBatchSimulation, plot_wheelbot, WheelbotOneStepMPC
+from learning.modules.ampc.wheelbot import (
+    load_dataset,
+    N,
+    nu,
+    nx,
+    ntheta,
+    x_max,
+    x_min,
+    WheelbotBatchSimulation,
+    plot_wheelbot,
+    plot_wheelbot_all_inits,
+    plot_time_to_failure,
+    WheelbotOneStepMPC,
+)
+
+
 def in_box(x, x_min, x_max):
-    return np.all(np.logical_and(x >= x_min,  x <= x_max ))
+    return np.all(np.logical_and(x >= x_min, x <= x_max))
+
+
 terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
 onestepmpc = WheelbotOneStepMPC()
-check_terminal_nth_epoch = 100
+check_terminal_nth_epoch = 3
 eval_frac_in_terminal = defaultdict(list)
 
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
 cost = torch.from_numpy(cost).float().to(DEVICE)
 
-print("cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std())
+print(
+    "cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std()
+)
 
 # set up constants
 total_data = x0.shape[0]
 n_dims = x0.shape[1]
-graphing_data = {data_name: {name: {} for name in critic_names}
-            for data_name in [
-                "critic_obs",
-                "values",
-                "cost",
-                "error",
-            ]}
+graphing_data = {
+    data_name: {name: {} for name in critic_names}
+    for data_name in [
+        "critic_obs",
+        "values",
+        "cost",
+        "error",
+    ]
+}
 test_error = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 4000
+max_gradient_steps = 7  # 4000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -149,6 +176,8 @@ data = TensorDict(
     batch_size=(1, total_data),
     device=DEVICE,
 )
+
+t_to_fail = {name: [] for name in critic_names}
 
 standard_offset = 0
 for ix, name in enumerate(critic_names):
@@ -181,12 +210,15 @@ for ix, name in enumerate(critic_names):
             with torch.no_grad():
                 critic.value_offset.copy_(standard_offset)
             print(f"{name} value offset after mean assigning", critic.value_offset)
-        
+
         # extract matrix transform for latent if applicable
         if "Latent" in name:
-            latent_weight, latent_bias = get_latent_matrix(batch["critic_obs"].shape, critic.latent_NN, device=DEVICE)
+            latent_weight = get_latent_matrix(
+                batch["critic_obs"].shape, critic.latent_NN, device=DEVICE
+            )
             latent_weight = latent_weight.cpu().detach().numpy()
-            latent_bias = latent_bias.cpu().detach().numpy()
+            # latent_bias = latent_bias.cpu().detach().numpy()
+            # print(latent_bias)
 
         # calculate loss and optimize
         value_loss = critic.loss_fn(
@@ -207,61 +239,100 @@ for ix, name in enumerate(critic_names):
         test_error[name].append(actual_error.detach().mean().numpy())
         # perform closed-loop simulation as test error metric
         if name != "Critic" and (counter % check_terminal_nth_epoch == 0):
-            batch_terminal_eval = batch["critic_obs"].shape[0]  #100
-            N_eval = int(3*N)
+            batch_terminal_eval = batch["critic_obs"].shape[0]  # 100
+            print("batch terminal eval", batch_terminal_eval)
+            N_eval = int(3 * N)
             # X_sim_ = np.copy(np.asarray(jax.numpy.copy(X_)))
             X_sim_ = batch["critic_obs"].cpu().detach().numpy()
-            X_sim_cl_ = np.repeat(X_sim_[:,:,np.newaxis], N_eval+1, axis=2)
+            X_sim_cl_ = np.repeat(X_sim_[:, :, np.newaxis], N_eval + 1, axis=2)
             U_sim_cl_ = np.zeros((np.shape(X_sim_cl_)[0], nu, N_eval))
 
-            print("X sim shape", X_sim_.shape)
-            print("X sim cl shape", X_sim_cl_.shape)
-            print("U sim cl shape", U_sim_cl_.shape)
+            # print("X sim shape", X_sim_.shape)
+            # print("X sim cl shape", X_sim_cl_.shape)
+            # print("U sim cl shape", U_sim_cl_.shape)
             for b in range(batch_terminal_eval):
                 onestepmpc.reset()
                 for k in range(N_eval):
-                    print("k", k)
+                    # print("k", k)
                     # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
-                    prediction  = critic.evaluate(torch.from_numpy(X_sim_cl_[b,:,k]).to(DEVICE).unsqueeze(0), return_all=True)
+                    prediction = critic.evaluate(
+                        torch.from_numpy(X_sim_cl_[b, :, k]).to(DEVICE).unsqueeze(0),
+                        return_all=True,
+                    )
                     A = prediction["A"].squeeze().cpu().detach().numpy()
                     if "Latent" in name:
-                        print("shape", (latent_weight @ X_sim_cl_[b,:,k] + latent_bias).shape)
-                        print("A shape", A.shape)
-                        latent_u, latent_xnext, status = onestepmpc.run(latent_weight @ X_sim_cl_[b,:,k] + latent_bias, A)
-                        u = latent_weight @ (latent_u - latent_bias)
-                        xnext = latent_weight @ (latent_xnext - latent_bias)
-                    else:
-                        u, xnext, status = onestepmpc.run(X_sim_cl_[b,:,k], A)
+                        A = latent_weight.T @ A @ latent_weight
+                    u, xnext, status = onestepmpc.run(X_sim_cl_[b, :, k], A)
                     # if k == 0:
                     #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
-                    U_sim_cl_[b,:,k] = np.copy(u)
-                    X_sim_cl_[b,:,k+1] = np.copy(xnext)
-            
-            # compute fraction of states in terminal set
-            frac_in_terminal = np.mean(np.vectorize(terminal_set_fcn)(X_sim_cl_[:batch_terminal_eval,:6,N_eval]))
-            eval_frac_in_terminal[name].append(frac_in_terminal)
-            
-            for idx in range(min(batch_terminal_eval, 100)):
-                labels = ["cl_sim"]
-                plot_outdir = f"plots/value_{time_str}/{counter}"
-                if not os.path.exists(plot_outdir):
-                    os.makedirs(plot_outdir)
-                plot_wheelbot([X_sim_cl_[idx]],[U_sim_cl_[idx]],labels,filename=f"{plot_outdir}/plot_{idx}", show=False)
+                    U_sim_cl_[b, :, k] = np.copy(u)
+                    X_sim_cl_[b, :, k + 1] = np.copy(xnext)
 
+            # compute fraction of states in terminal set
+            frac_in_terminal = np.mean(
+                np.vectorize(terminal_set_fcn)(
+                    X_sim_cl_[:batch_terminal_eval, :6, N_eval]
+                )
+            )
+            eval_frac_in_terminal[name].append(frac_in_terminal)
+
+            # for idx in range(min(batch_terminal_eval, 100)):
+            #     labels = ["cl_sim"]
+            #     plot_outdir = f"plots/value_{time_str}/{counter}"
+            #     if not os.path.exists(plot_outdir):
+            #         os.makedirs(plot_outdir)
+            #     plot_wheelbot(
+            #         [X_sim_cl_[idx]],
+            #         [U_sim_cl_[idx]],
+            #         labels,
+            #         filename=f"{plot_outdir}/plot_{idx}",
+            #         show=False,
+            #     )
+            plot_outdir = f"plots/value_{time_str}/{counter}"
+            if not os.path.exists(plot_outdir):
+                os.makedirs(plot_outdir)
+            random_indices = random.sample(list(range(batch_terminal_eval)), 5)
+            plot_wheelbot_all_inits(
+                X_sim_cl_[random_indices],
+                U_sim_cl_[random_indices],
+                plot_labels=["cl_sim"],
+                filename=f"{plot_outdir}/plot",
+                show=False,
+            )
+            t_to_fail_samples = []
+            for ix in random_indices:
+                fail_ix = find_flatline_index(
+                    X_sim_cl_[ix, 0]
+                )  # arbitrarily picking first state for now
+                t_to_fail_samples.append(fail_ix)
+            t_to_fail_samples = np.array(t_to_fail_samples)
+            t_to_fail[name].append([t_to_fail_samples.mean(), t_to_fail_samples.std()])
+            print(
+                "Time to failure mean",
+                t_to_fail_samples.mean(),
+                "and std",
+                t_to_fail_samples.std(),
+            )
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
 
     with torch.no_grad():
         graphing_data["error"][name] = actual_error
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
-        graphing_data["values"][name] = critic.evaluate(
-            data[0, :]["critic_obs"]
-        )
+        graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["cost"][name] = data[0, :]["cost"]
     # print("exporting", name)
     # export_network(critic, name, save_path, n_dims)
-    print(f"{name} mean", graphing_data["values"][name].mean(), "median", graphing_data["values"][name].median(), "std dev", graphing_data["values"][name].std())
+    print(
+        f"{name} mean",
+        graphing_data["values"][name].mean(),
+        "median",
+        graphing_data["values"][name].median(),
+        "std dev",
+        graphing_data["values"][name].std(),
+    )
 
+plot_time_to_failure(t_to_fail, f"{save_path}/time_to_fail")
 plot_learning_progress(test_error, "AMPC VF Test Error", fn=f"{save_path}/test_error")
 
 

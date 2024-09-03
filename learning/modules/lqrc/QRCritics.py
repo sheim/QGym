@@ -164,7 +164,7 @@ class OuterProductLatent(OuterProduct):
             **kwargs,
         )
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation
+            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
         )
 
     def forward(self, x, return_all=False):
@@ -270,7 +270,7 @@ class CholeskyLatent(CholeskyInput):
         )
 
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation
+            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
         )
 
         # self.latent_NN.apply(init_weights)
@@ -381,7 +381,7 @@ class SpectralLatent(nn.Module):
             num_obs, n_outputs, hidden_dims, activation, dropouts
         )
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation
+            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
         )
 
     def forward(self, x, return_all=False):
@@ -485,7 +485,7 @@ class DenseSpectralLatent(nn.Module):
             num_obs, n_outputs, hidden_dims, activation, dropouts
         )
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation
+            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
         )
 
     def forward(self, x, return_all=False):

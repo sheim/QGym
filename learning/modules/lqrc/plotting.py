@@ -87,13 +87,26 @@ def create_custom_pink_green_colormap():
 
     return custom_pink_green
 
-def plot_binned_errors_ampc(data, fn, lb=0, ub=10e10, step=1000, tick_step=5000, title_add_on="", extension="png"):
-    display_names = {"OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"}
-    fig, axes = plt.subplots(
-        nrows=1, ncols=1, figsize=(16, 15), layout="constrained"
-    )
+
+def plot_binned_errors_ampc(
+    data,
+    fn,
+    lb=0,
+    ub=10e10,
+    step=1000,
+    tick_step=5000,
+    title_add_on="",
+    extension="png",
+):
+    display_names = {
+        "OuterProduct": "Outer Product",
+        "CholeskyLatent": "Cholesky Latent",
+        "DenseSpectralLatent": "Spectral Latent",
+        "Critic": "Critic",
+    }
+    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(16, 15), layout="constrained")
     fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
-    
+
     bins = np.arange(lb, ub, step)
     bin_labels = [
         "<" + str(np.round(bins[ix], decimals=1))
@@ -126,15 +139,33 @@ def plot_binned_errors_ampc(data, fn, lb=0, ub=10e10, step=1000, tick_step=5000,
         axes[ix].tick_params(axis="both", which="major", labelsize=15)
     for ix, critic in enumerate(data.keys()):
         axes[ix].set_ylim(y_min, y_max)
-    fig.legend(loc=" outside upper right", fontsize=20, ncol=3, bbox_to_anchor=(0.85, 0.2))
+    fig.legend(
+        loc=" outside upper right", fontsize=20, ncol=3, bbox_to_anchor=(0.85, 0.2)
+    )
     plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}.{extension}")
 
 
-def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_on="", extension="png", multi_trial=False):
+def plot_binned_errors(
+    data,
+    fn,
+    lb=0,
+    ub=500,
+    step=20,
+    tick_step=5,
+    title_add_on="",
+    extension="png",
+    multi_trial=False,
+):
     # set up figure metadata
     # props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    display_names = {"Rosenbrock": "Rosenbrock", "OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"}
+    display_names = {
+        "Rosenbrock": "Rosenbrock",
+        "OuterProduct": "Outer Product",
+        "CholeskyLatent": "Cholesky Latent",
+        "DenseSpectralLatent": "Spectral Latent",
+        "Critic": "Critic",
+    }
     num_cols = len(list(list(list(data.values())[0].values())[0].keys()))
     fig, axes = plt.subplots(
         nrows=num_cols, ncols=1, figsize=(16, 15), layout="constrained"
@@ -159,7 +190,9 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
         for ix, critic in enumerate(data[param]["critic_obs"].keys()):
             critic_data = data[param]["error"][critic].squeeze().detach().cpu().numpy()
             num_bins = bins.shape[0] + 1
-            bincount = np.bincount(np.digitize(critic_data.mean(axis=0), bins), minlength=num_bins)
+            bincount = np.bincount(
+                np.digitize(critic_data.mean(axis=0), bins), minlength=num_bins
+            )
 
             if multi_trial:
                 digitized = np.digitize(critic_data, bins)
@@ -201,7 +234,9 @@ def plot_binned_errors(data, fn, lb=0, ub=500, step=20, tick_step=5, title_add_o
             axes[ix].tick_params(axis="both", which="major", labelsize=15)
         for ix, critic in enumerate(data[param].keys()):
             axes[ix].set_ylim(y_min, y_max)
-    fig.legend(loc=" outside upper right", fontsize=20, ncol=3, bbox_to_anchor=(0.85, 0.2))
+    fig.legend(
+        loc=" outside upper right", fontsize=20, ncol=3, bbox_to_anchor=(0.85, 0.2)
+    )
     plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}.{extension}")
 
@@ -269,7 +304,7 @@ def plot_dim_sweep_mean_std(
     trial_num,
     title,
     step=5,
-    extension="png"
+    extension="png",
 ):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(22, 15))
 
@@ -443,7 +478,18 @@ def plot_pendulum_multiple_critics(
 
 
 def plot_multiple_critics_w_data(
-    x, predictions, targets, title, fn, data, display_names, grid_size=64, extension="png", data_title="Training Data Distribution", log_norm=True, task=None,
+    x,
+    predictions,
+    targets,
+    title,
+    fn,
+    data,
+    display_names,
+    grid_size=64,
+    extension="png",
+    data_title="Training Data Distribution",
+    log_norm=True,
+    task=None,
 ):
     num_critics = len(x.keys())
     fig, axes = plt.subplots(
@@ -471,7 +517,9 @@ def plot_multiple_critics_w_data(
         y_coord = data[:, :, 1] * 5
         ground_truth = "Ground Truth MC Returns"
     else:
-        raise ValueError( "Please specify prediction task when calling plotting function.")
+        raise ValueError(
+            "Please specify prediction task when calling plotting function."
+        )
 
     # unify colorbar min maxes across plotting data
     for critic_name in x:
@@ -482,14 +530,27 @@ def plot_multiple_critics_w_data(
         global_max_error = max(global_max_error, np.max(np_error))
         global_min_prediction = np.min(np_targets)
         global_max_prediction = np.max(np_targets)
-        
-    error_norm = mcolors.LogNorm() if log_norm else mcolors.TwoSlopeNorm(
-        vmin=global_min_error, vcenter=0, vmax=global_max_error
-    ) # left this as regular lognorm because symlognorm changes custom colormap markers, will throw error if vmin < -60.0 (so train for 1000 grad steps, not 200)
+
+    error_norm = (
+        mcolors.LogNorm()
+        if log_norm
+        else mcolors.TwoSlopeNorm(
+            vmin=global_min_error, vcenter=0, vmax=global_max_error
+        )
+    )  # left this as regular lognorm because symlognorm changes custom colormap markers, will throw error if vmin < -60.0 (so train for 1000 grad steps, not 200)
     pred_vcenter = (global_max_prediction + global_min_prediction) / 2
     pred_halfrange = (global_max_prediction - global_min_prediction) / 2
-    prediction_norm = mcolors.SymLogNorm(linthresh=0.01, linscale=0.01, vmin=pred_vcenter - pred_halfrange, vmax=pred_vcenter + pred_halfrange) if log_norm else mcolors.CenteredNorm(vcenter=pred_vcenter, halfrange=pred_halfrange)
-    
+    prediction_norm = (
+        mcolors.SymLogNorm(
+            linthresh=0.01,
+            linscale=0.01,
+            vmin=pred_vcenter - pred_halfrange,
+            vmax=pred_vcenter + pred_halfrange,
+        )
+        if log_norm
+        else mcolors.CenteredNorm(vcenter=pred_vcenter, halfrange=pred_halfrange)
+    )
+
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
         np_x[:, 0] = np_x[:, 0]
@@ -516,7 +577,7 @@ def plot_multiple_critics_w_data(
         axes[0, ix].tick_params(axis="both", which="major", labelsize=15)
         axes[1, ix].tick_params(axis="both", which="major", labelsize=15)
 
-        # skip error plotting in bottom left subplot so it 
+        # skip error plotting in bottom left subplot so it
         # can later be used for plotting training data distribution
         if ix == 0:
             continue
@@ -531,7 +592,7 @@ def plot_multiple_critics_w_data(
         )
         axes[1, ix].set_title(f"{display_names[critic_name]} Error", fontsize=25)
 
-    # plot training data distribution    
+    # plot training data distribution
     axes[1, 0].scatter(x_coord, y_coord, alpha=0.75, s=3)
     axes[1, 0].set_title(data_title, fontsize=25)
     axes[1, 0].set_xlabel("x" if ground_truth == "Rosenbrock" else "theta", fontsize=25)
@@ -543,7 +604,7 @@ def plot_multiple_critics_w_data(
         ax.set_ylim([y_coord.min(), y_coord.max()])
 
     # match data plot size to imshow pointwise plot size
-    axes[1, 0].set_aspect('equal', adjustable='box')
+    axes[1, 0].set_aspect("equal", adjustable="box")
 
     pred_cbar = fig.colorbar(
         mpl.cm.ScalarMappable(norm=prediction_norm, cmap=prediction_cmap),
@@ -1115,7 +1176,9 @@ def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
 
 
-def plot_learning_progress(test_error, title, fn="test_error", smoothing_window=30, extension="png"):
+def plot_learning_progress(
+    test_error, title, fn="test_error", smoothing_window=30, extension="png"
+):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     for name, error in test_error.items():

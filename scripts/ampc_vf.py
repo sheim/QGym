@@ -40,7 +40,7 @@ critic_names = [
     "Critic",
     # "OuterProduct",
     # "PDCholeskyInput",
-    "CholeskyLatent",
+    # "CholeskyLatent",
     "DenseSpectralLatent",
 ]
 print("Loading data")

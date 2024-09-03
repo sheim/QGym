@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 DEVICE = "cuda:0"
@@ -51,3 +52,23 @@ def generate_rosenbrock_g_data_dict(names, learning_rates):
         for lr in learning_rates
     }
     return graphing_data
+
+
+def find_flatline_index(data, threshold=5):
+    # Calculate differences between consecutive elements
+    diffs = np.diff(data)
+
+    # Find where differences are zero
+    zero_diffs = diffs == 0
+
+    # Use a rolling window to find a sequence of zeros
+    rolling_sum = np.convolve(zero_diffs, np.ones(threshold, dtype=int), "valid")
+
+    # Find the first occurrence where we have 'threshold' consecutive zeros
+    flatline_start = np.argmax(rolling_sum == threshold)
+
+    # If we found a flatline, return the index where it starts
+    if flatline_start > 0 or rolling_sum[-1] == threshold:
+        return flatline_start
+    else:
+        return -1  # No flatline found

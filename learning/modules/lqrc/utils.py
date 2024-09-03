@@ -280,8 +280,12 @@ def get_latent_matrix(input_size, model, device):
     for i in range(1, len(list(model.children()))):
         final_weight = traced_model.get_parameter(f"{i}.weight") @ final_weight
 
-    final_bias = traced_model.get_parameter("0.bias")
-    for i in range(1, len(list(model.children()))):
-        final_bias = traced_model.get_parameter(f"{i}.weight") @ final_bias + traced_model.get_parameter(f"{i}.bias")
+    # try:
+    #     final_bias = traced_model.get_parameter("0.bias")
+    #     for i in range(1, len(list(model.children()))):
+    #         final_bias = traced_model.get_parameter(f"{i}.weight") @ final_bias + traced_model.get_parameter(f"{i}.bias")
+    #         return final_weight, final_bias
+    # except:
+    #     print("No bias found.")
     
-    return final_weight, final_bias
+    return final_weight #, final_bias
