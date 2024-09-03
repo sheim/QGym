@@ -37,3 +37,4 @@ from .critic import Critic
 from .chimera_actor import ChimeraActor
 from .smooth_actor import SmoothActor
 from .QRCritics import *
+from .TaylorCritics import *
