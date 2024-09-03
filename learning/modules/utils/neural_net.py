@@ -4,18 +4,33 @@ import copy
 
 
 def create_MLP(
-    num_inputs, num_outputs, hidden_dims, activations, dropouts=None, just_list=False
+    num_inputs,
+    num_outputs,
+    hidden_dims,
+    activations=None,
+    dropouts=0.0,
+    layer_norm=False,
+    just_list=False,
+    **kwargs,
 ):
     if not isinstance(activations, list):
         activations = [activations] * len(hidden_dims)
-    if dropouts is None:
-        dropouts = [0] * len(hidden_dims)
-    elif not isinstance(dropouts, list):
+    if not isinstance(dropouts, list):
         dropouts = [dropouts] * len(hidden_dims)
+    if not isinstance(layer_norm, list):
+        layer_norm = [layer_norm] * len(hidden_dims)
+
     layers = []
     # first layer
     if len(hidden_dims) > 0:
-        add_layer(layers, num_inputs, hidden_dims[0], activations[0], dropouts[0])
+        add_layer(
+            layers,
+            num_inputs,
+            hidden_dims[0],
+            activations[0],
+            dropouts[0],
+            layer_norm[0],
+        )
         for i in range(len(hidden_dims) - 1):
             add_layer(
                 layers,
@@ -23,6 +38,7 @@ def create_MLP(
                 hidden_dims[i + 1],
                 activations[i + 1],
                 dropouts[i + 1],
+                layer_norm=layer_norm[i + 1],
             )
         else:
             add_layer(layers, hidden_dims[-1], num_outputs)
@@ -35,8 +51,12 @@ def create_MLP(
         return torch.nn.Sequential(*layers)
 
 
-def add_layer(layer_list, num_inputs, num_outputs, activation=None, dropout=0):
+def add_layer(
+    layer_list, num_inputs, num_outputs, activation=None, dropout=0, layer_norm=False
+):
     layer_list.append(torch.nn.Linear(num_inputs, num_outputs))
+    if layer_norm:
+        layer_list.append(torch.nn.LayerNorm(num_outputs))
     if dropout > 0:
         layer_list.append(torch.nn.Dropout(p=dropout))
     if activation is not None:
