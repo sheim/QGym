@@ -20,7 +20,7 @@ class StateEstimatorNN(nn.Module):
         num_outputs,
         hidden_dims=[256, 128],
         activation="elu",
-        dropouts=None,
+        dropouts=0.0,
         **kwargs,
     ):
         if kwargs:
