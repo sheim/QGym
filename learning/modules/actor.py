@@ -27,7 +27,7 @@ class Actor(nn.Module):
         self.num_actions = num_actions
         self.hidden_dims = hidden_dims
         self.activation = activation
-        self.NN = create_MLP(num_obs, num_actions, hidden_dims, activation)
+        self.NN = create_MLP(num_obs, num_actions, hidden_dims, activation, **kwargs)
 
         # Action noise
         self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))
