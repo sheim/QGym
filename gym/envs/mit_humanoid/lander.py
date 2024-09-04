@@ -2,11 +2,27 @@ import torch
 
 # from gym.envs.base.legged_robot import LeggedRobot
 from gym.envs.mit_humanoid.mit_humanoid import MIT_Humanoid
+from isaacgym.torch_utils import torch_rand_float
 
 
 class Lander(MIT_Humanoid):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+
+    def _resample_commands(self, env_ids):
+        """Randommly select commands of some environments
+
+        Args:
+            env_ids (List[int]): Environments ids for which new commands are needed
+        """
+        if len(env_ids) == 0:
+            return
+        super()._resample_commands(env_ids)
+        # * with 75% chance, reset to 0
+        self.commands[env_ids, :] *= (
+            torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
+            < 0.25
+        ).unsqueeze(1)
 
     # --- rewards ---
 

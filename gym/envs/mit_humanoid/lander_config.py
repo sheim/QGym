@@ -112,7 +112,7 @@ class LanderCfg(LeggedRobotCfg):
         }  # [N*m*s/rad]
 
         ctrl_frequency = 100
-        desired_sim_frequency = 1000
+        desired_sim_frequency = 500
 
     # class oscillator:
     #     base_frequency = 3.0  # [Hz]
@@ -121,13 +121,13 @@ class LanderCfg(LeggedRobotCfg):
         resampling_time = 10.0  # time before command are changed[s]
 
         class ranges:
-            lin_vel_x = [-0.0, 0.0]  # min max [m/s] [-0.75, 0.75]
-            lin_vel_y = 0.0  # max [m/s]
-            yaw_vel = 0.0  # max [rad/s]
+            lin_vel_x = [-2.0, 2.0]  # min max [m/s] [-0.75, 0.75]
+            lin_vel_y = 0.3  # max [m/s]
+            yaw_vel = 1.0  # max [rad/s]
 
     class push_robots:
         toggle = True
-        interval_s = 1
+        interval_s = 2
         max_push_vel_xy = 0.5
         push_box_dims = [0.1, 0.1, 0.3]  # x,y,z [m]
 
@@ -146,13 +146,9 @@ class LanderCfg(LeggedRobotCfg):
         foot_name = "foot"
         penalize_contacts_on = ["arm", "hand", "shoulder"]
         terminate_after_contacts_on = ["base"]
-        end_effector_names = ["hand", "foot"]  # ??
         flip_visual_attachments = False
         self_collisions = 0  # 1 to disagble, 0 to enable...bitwise filter
         collapse_fixed_joints = False
-        # * see GymDofDriveModeFlags
-        # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
-        default_dof_drive_mode = 3
         fix_base_link = False
         disable_gravity = False
         disable_motors = False
@@ -279,24 +275,18 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
 
         class reward:
             class weights:
-                # tracking_lin_vel = 0.0
-                # tracking_ang_vel = 1.5
-                # orientation = 1.0
                 torques = 5.0e-5
-                power = 0  # 1.0e-2
+                power = 1e-6  # 1.0e-2
                 min_base_height = 1.5
+                lin_vel_xy = 1.0
                 action_rate = 1e-3
                 action_rate2 = 1e-3
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
                 dof_vel = 0.5
-                # stand_still = 0.25
                 dof_pos_limits = 0.25
-                dof_near_home = 0.25
-                # stance = 1.0
-                # swing = 1.0
+                dof_near_home = 0.75
                 hips_forward = 0.0
-                # walk_freq = 0.0  # 2.5
                 collision = 1.0
 
             class termination_weight:
@@ -330,6 +320,6 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
         algorithm_class_name = "PPO2"
         num_steps_per_env = 24
         max_iterations = 1000
-        run_name = "Standing"
+        run_name = "lander"
         experiment_name = "Humanoid"
         save_interval = 50
