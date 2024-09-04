@@ -19,14 +19,18 @@ class MyRunner(OnPolicyRunner):
             self.device,
         )
 
-    def learn(self):
+    def learn(self, states_to_log_dict=None):
         self.set_up_logger()
 
+        n_policy_steps = int((1 / self.env.dt) / self.actor_cfg["frequency"])
+        assert n_policy_steps > 0, "actor frequency should be less than ctrl_freq"
+
         rewards_dict = {}
+        rewards_list = [dict() for x in range(n_policy_steps)]
 
         self.alg.switch_to_train()
-        actor_obs = self.get_obs(self.actor_cfg["actor_obs"])
-        critic_obs = self.get_obs(self.critic_cfg["critic_obs"])
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
+        critic_obs = self.get_obs(self.critic_cfg["obs"])
         tot_iter = self.it + self.num_learning_iterations
         self.save()
 
@@ -35,8 +39,10 @@ class MyRunner(OnPolicyRunner):
         transition.update(
             {
                 "actor_obs": actor_obs,
-                "actions": self.alg.act(actor_obs, critic_obs),
+                "next_actor_obs": actor_obs,
+                "actions": self.alg.act(actor_obs),
                 "critic_obs": critic_obs,
+                "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
                 "dones": self.get_timed_out(),
             }
@@ -52,10 +58,17 @@ class MyRunner(OnPolicyRunner):
         for self.it in range(self.it + 1, tot_iter + 1):
             logger.tic("iteration")
             logger.tic("collection")
+
+            # * Simulate environment and log states
+            if states_to_log_dict is not None:
+                it_idx = self.it - 1
+                if it_idx % 10 == 0:
+                    self.sim_and_log_states(states_to_log_dict, it_idx)
+
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    actions = self.alg.act(actor_obs, critic_obs)
+                    actions = self.alg.act(actor_obs)
                     self.set_actions(
                         self.actor_cfg["actions"],
                         actions,
@@ -69,33 +82,48 @@ class MyRunner(OnPolicyRunner):
                             "critic_obs": critic_obs,
                         }
                     )
-
-                    self.env.step()
+                    for step in range(n_policy_steps):
+                        self.env.step()
+                        # put reward integration here
+                        self.update_rewards(rewards_list[step], self.env.terminated)
+                        # handle time-outs/terminations happening inside here with mask
+                    else:
+                        # catch and reset failed envs
+                        to_be_reset = self.env.timed_out | self.env.terminated
+                        env_ids = (to_be_reset).nonzero(as_tuple=False).flatten()
+                        self.env._reset_idx(env_ids)
 
                     actor_obs = self.get_noisy_obs(
-                        self.actor_cfg["actor_obs"], self.actor_cfg["noise"]
+                        self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
-                    critic_obs = self.get_obs(self.critic_cfg["critic_obs"])
-                    # * get time_outs
-                    timed_out = self.get_timed_out()
-                    terminated = self.get_terminated()
-                    dones = timed_out | terminated
+                    critic_obs = self.get_obs(self.critic_cfg["obs"])
 
-                    self.update_rewards(rewards_dict, terminated)
-                    total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
+                    # * get time_outs
+
+                    self.update_rewards(rewards_dict, self.env.terminated)
+
+                    # integrate rewards from list
+                    total_rewards = torch.stack(
+                        tuple(
+                            torch.stack(tuple(rewards_dict.values()))
+                            for rewards_dict in rewards_list
+                        )
+                    ).sum(dim=(0, 1))
 
                     transition.update(
                         {
+                            "next_actor_obs": actor_obs,
+                            "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
-                            "timed_out": timed_out,
-                            "dones": dones,
+                            "timed_out": self.env.timed_out,
+                            "dones": self.env.timed_out | self.env.terminated,
                         }
                     )
                     storage.add_transitions(transition)
 
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
-                    logger.finish_step(dones)
+                    logger.finish_step(self.env.timed_out | self.env.terminated)
             logger.toc("collection")
 
             logger.tic("learning")
@@ -113,6 +141,21 @@ class MyRunner(OnPolicyRunner):
                 self.save()
         self.save()
 
+    @torch.no_grad
+    def burn_in_normalization(self, n_iterations=100):
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
+        critic_obs = self.get_obs(self.critic_cfg["obs"])
+        for _ in range(n_iterations):
+            actions = self.alg.act(actor_obs)
+            self.set_actions(self.actor_cfg["actions"], actions)
+            self.env.step()
+            actor_obs = self.get_noisy_obs(
+                self.actor_cfg["obs"], self.actor_cfg["noise"]
+            )
+            critic_obs = self.get_obs(self.critic_cfg["obs"])
+            self.alg.critic.evaluate(critic_obs)
+        self.env.reset()
+
     def set_up_logger(self):
         logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))
         logger.register_rewards(
@@ -120,8 +163,57 @@ class MyRunner(OnPolicyRunner):
         )
         logger.register_rewards(["total_rewards"])
         logger.register_category(
-            "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
+            "algorithm",
+            self.alg,
+            ["mean_value_loss", "mean_surrogate_loss", "learning_rate"],
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
 
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
+
+    def update_rewards(self, rewards_dict, terminated):
+        # sum existing rewards with new rewards
+
+        rewards_dict.update(
+            self.get_rewards(
+                self.critic_cfg["reward"]["termination_weight"], mask=terminated
+            )
+        )
+        rewards_dict.update(
+            self.get_rewards(
+                self.critic_cfg["reward"]["weights"],
+                modifier=self.env.dt,
+                mask=~terminated,
+            )
+        )
+
+    def sim_and_log_states(self, states_to_log_dict, it_idx):
+        # Simulate environment for as many steps as expected in the dict.
+        # Log states to the dict, as well as whether the env terminated.
+        steps = states_to_log_dict["terminated"].shape[2]
+        actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
+
+        with torch.inference_mode():
+            for i in range(steps):
+                actions = self.alg.act(actor_obs)
+                self.set_actions(
+                    self.policy_cfg["actions"],
+                    actions,
+                    self.policy_cfg["disable_actions"],
+                )
+
+                self.env.step()
+
+                actor_obs = self.get_noisy_obs(
+                    self.policy_cfg["actor_obs"], self.policy_cfg["noise"]
+                )
+
+                # Log states (just for the first env)
+                terminated = self.get_terminated()[0]
+                for state in states_to_log_dict:
+                    if state == "terminated":
+                        states_to_log_dict[state][0, it_idx, i, :] = terminated
+                    else:
+                        states_to_log_dict[state][0, it_idx, i, :] = getattr(
+                            self.env, state
+                        )[0, :]

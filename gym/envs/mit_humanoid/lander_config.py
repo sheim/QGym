@@ -111,7 +111,7 @@ class LanderCfg(LeggedRobotCfg):
             "elbow": 1.0,
         }  # [N*m*s/rad]
 
-        ctrl_frequency = 100
+        ctrl_frequency = 500
         desired_sim_frequency = 500
 
     # class oscillator:
@@ -218,13 +218,15 @@ class LanderCfg(LeggedRobotCfg):
 
 class LanderRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "MyRunner"
 
     class actor(LeggedRobotRunnerCfg.actor):
+        frequency = 100
         init_noise_std = 1.0
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
+        activation = ["elu", "elu", "tanh"]
+        layer_norm = True
         smooth_exploration = False
 
         obs = [
@@ -256,7 +258,8 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
     class critic(LeggedRobotRunnerCfg.critic):
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "tanh"
+        activation = "elu"
+        layer_norm = True
 
         obs = [
             # "base_height",
@@ -290,7 +293,7 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
                 collision = 1.0
 
             class termination_weight:
-                termination = 15
+                termination = 1.0
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
         # both
@@ -319,7 +322,7 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO2"
         num_steps_per_env = 24
-        max_iterations = 1000
+        max_iterations = 500
         run_name = "lander"
         experiment_name = "Humanoid"
         save_interval = 50
