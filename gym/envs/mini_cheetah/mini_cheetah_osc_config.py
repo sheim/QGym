@@ -160,12 +160,14 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
+    runner_class_name = "OnPolicyRunner"
 
     class policy:
         hidden_dims = [256, 256, 128]
         critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        smooth_exploration = False
 
         obs = [
             "base_ang_vel",

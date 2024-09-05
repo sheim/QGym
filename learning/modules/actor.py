@@ -25,7 +25,9 @@ class Actor(nn.Module):
 
         self.num_obs = num_obs
         self.num_actions = num_actions
-        self.NN = create_MLP(num_obs, num_actions, hidden_dims, activation)
+        self.hidden_dims = hidden_dims
+        self.activation = activation
+        self.NN = create_MLP(num_obs, num_actions, hidden_dims, activation, **kwargs)
 
         # Action noise
         self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))
@@ -39,6 +41,10 @@ class Actor(nn.Module):
 
     @property
     def action_std(self):
+        return self.distribution.stddev
+
+    @property
+    def get_std(self):
         return self.distribution.stddev
 
     @property
@@ -67,3 +73,7 @@ class Actor(nn.Module):
 
     def export(self, path):
         export_network(self, "policy", path, self.num_obs)
+
+    def log_actions(self, mean, sample, path):
+        with open(path, "a") as f:
+            f.write(str(mean.item()) + ", " + str(sample.item()) + "\n")

@@ -19,7 +19,7 @@ class_dict = {
     "Anymal": ".anymal_c.anymal",
     "A1": ".a1.a1",
     "HumanoidRunning": ".mit_humanoid.humanoid_running",
-    "Pendulum": ".pendulum.pendulum",
+    "Pendulum": ".pendulum.pendulum"
 }
 
 config_dict = {
@@ -27,11 +27,13 @@ config_dict = {
     "MiniCheetahCfg": ".mini_cheetah.mini_cheetah_config",
     "MiniCheetahRefCfg": ".mini_cheetah.mini_cheetah_ref_config",
     "MiniCheetahOscCfg": ".mini_cheetah.mini_cheetah_osc_config",
+    "MiniCheetahSACCfg": ".mini_cheetah.mini_cheetah_SAC_config",
     "MITHumanoidCfg": ".mit_humanoid.mit_humanoid_config",
     "A1Cfg": ".a1.a1_config",
     "AnymalCFlatCfg": ".anymal_c.flat.anymal_c_flat_config",
     "HumanoidRunningCfg": ".mit_humanoid.humanoid_running_config",
     "PendulumCfg": ".pendulum.pendulum_config",
+    "PendulumSACCfg": ".pendulum.pendulum_SAC_config",
 }
 
 runner_config_dict = {
@@ -39,11 +41,13 @@ runner_config_dict = {
     "MiniCheetahRunnerCfg": ".mini_cheetah.mini_cheetah_config",
     "MiniCheetahRefRunnerCfg": ".mini_cheetah.mini_cheetah_ref_config",
     "MiniCheetahOscRunnerCfg": ".mini_cheetah.mini_cheetah_osc_config",
+    "MiniCheetahSACRunnerCfg": ".mini_cheetah.mini_cheetah_SAC_config",
     "MITHumanoidRunnerCfg": ".mit_humanoid.mit_humanoid_config",
     "A1RunnerCfg": ".a1.a1_config",
     "AnymalCFlatRunnerCfg": ".anymal_c.flat.anymal_c_flat_config",
     "HumanoidRunningRunnerCfg": ".mit_humanoid.humanoid_running_config",
     "PendulumRunnerCfg": ".pendulum.pendulum_config",
+    "PendulumSACRunnerCfg": ".pendulum.pendulum_SAC_config",
 }
 
 task_dict = {
@@ -59,6 +63,11 @@ task_dict = {
         "MiniCheetahOscCfg",
         "MiniCheetahOscRunnerCfg",
     ],
+    "sac_mini_cheetah": [
+        "MiniCheetahRef",
+        "MiniCheetahSACCfg",
+        "MiniCheetahSACRunnerCfg"
+    ],
     "humanoid": ["MIT_Humanoid", "MITHumanoidCfg", "MITHumanoidRunnerCfg"],
     "humanoid_running": [
         "HumanoidRunning",
@@ -66,7 +75,8 @@ task_dict = {
         "HumanoidRunningRunnerCfg",
     ],
     "flat_anymal_c": ["Anymal", "AnymalCFlatCfg", "AnymalCFlatRunnerCfg"],
-    "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"]
+    "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"],
+    "sac_pendulum": ["Pendulum", "PendulumSACCfg", "PendulumSACRunnerCfg"],
 }
 
 for class_name, class_location in class_dict.items():

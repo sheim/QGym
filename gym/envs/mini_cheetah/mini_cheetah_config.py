@@ -126,12 +126,11 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class actor:
+    class actor(LeggedRobotRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [
-            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -154,7 +153,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
             ang_vel = [0.3, 0.15, 0.4]
             gravity_vec = 0.1
 
-    class critic:
+    class critic(LeggedRobotRunnerCfg.critic):
         hidden_dims = [128, 64]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
@@ -191,20 +190,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 termination = 0.01
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        # * training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.02
-        num_learning_epochs = 4
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 8
-        learning_rate = 1.0e-5
-        schedule = "adaptive"  # can be adaptive or fixed
-        discount_horizon = 1.0  # [s]
-        # GAE_bootstrap_horizon = 2.0  # [s]
-        desired_kl = 0.01
-        max_grad_norm = 1.0
+        pass
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""

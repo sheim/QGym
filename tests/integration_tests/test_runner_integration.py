@@ -35,7 +35,7 @@ def load_saved_policy(runner):
         load_run=runner.cfg["load_run"],
         checkpoint=runner.cfg["checkpoint"],
     )
-    loaded_dict = torch.load(resume_path)
+    loaded_dict = torch.load(resume_path, weights_only=True)
     actor.load_state_dict(loaded_dict["actor_state_dict"])
     actor.eval()
     return actor
@@ -118,7 +118,7 @@ class TestDefaultIntegration:
         )
         # compute torch output
         with torch.no_grad():
-            test_input = runner.get_obs(runner.actor_cfg["obs"])[0:1]
+            test_input = runner.get_obs(runner.actor_cfg["obs"])[0]
             runner_out = runner.alg.actor.act_inference(test_input)
             loaded_out = loaded_actor.act_inference(test_input)
 
