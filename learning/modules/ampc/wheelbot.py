@@ -201,7 +201,7 @@ def plot_u_diff(data, filename):
     for ix, name in enumerate(data.keys()):
         ax = axes[ix] if isinstance(axes, list) else axes
         values = data[name]
-        ax.plot(values[:, 0], values[:, 1], label="U Error")
+        ax.scatter(values[:, 0], values[:, 1], label="U Error")
         ax.legend(loc=1)
         ax.set_ylabel(f"{name} Average Error to Optimal U")
         ax.set_xlabel("Epochs")

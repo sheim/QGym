@@ -63,14 +63,17 @@ x0 = x0[mask]
 cost = cost[mask]
 optimal_u = optimal_u[mask]
 
-# min max normalization to put state and cost on [0, 1]
-# x0_min = x0.min(axis=0)
-# x0_max = x0.max(axis=0)
-# x0 = (x0 - x0_min) / (x0_max - x0_min)
-# cost_min = cost.min()
-# cost_max = cost.max()
-# cost = (cost - cost_min) / (cost_max - cost_min)
+# make batch for one step MPC eval before adding non-fs synthetic data points
+batch_terminal_eval = 100
+mpc_eval_ix = random.sample(list(range(x0.shape[0])), batch_terminal_eval)
+# mpc_eval_x0 = torch.from_numpy(x0[mpc_eval_ix]).float().to(DEVICE)
+# mpc_eval_cost = torch.from_numpy(cost[mpc_eval_ix]).float().to(DEVICE)
+# mpc_eval_optimal_u = torch.from_numpy(optimal_u[mpc_eval_ix]).float().to(DEVICE)
+mpc_eval_x0 = x0[mpc_eval_ix]
+mpc_eval_cost = cost[mpc_eval_ix]
+mpc_eval_optimal_u = optimal_u[mpc_eval_ix]
 
+# add in non-fs synthetic data points
 d_max = 0
 
 print("Building KDTree")
@@ -139,7 +142,7 @@ def in_box(x, x_min, x_max):
 
 terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
 onestepmpc = WheelbotOneStepMPC()
-check_terminal_nth_epoch = 500
+check_terminal_nth_epoch = 2  # 500
 eval_frac_in_terminal = defaultdict(list)
 
 # turn numpy arrays to torch before training
@@ -165,7 +168,7 @@ graphing_data = {
 test_error = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 4000
+max_gradient_steps = 7  # 4000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -182,6 +185,7 @@ data = TensorDict(
 
 t_to_fail = {name: [] for name in critic_names}
 u_diff = {name: None for name in critic_names}
+u_diff_per_batch = np.zeros((max_gradient_steps // check_terminal_nth_epoch, 2))
 
 standard_offset = 0
 for ix, name in enumerate(critic_names):
@@ -243,21 +247,12 @@ for ix, name in enumerate(critic_names):
         test_error[name].append(actual_error.detach().mean().numpy())
         # perform closed-loop simulation as test error metric
         if name != "Critic" and (counter % check_terminal_nth_epoch == 0):
-            batch_terminal_eval = 100
-            one_step_counter = 0  # this is different from batch_terminal_eval because we don't have optimal U for synthetic points
-            random_indices = random.sample(
-                list(range(batch["critic_obs"].shape[0])), batch_terminal_eval
-            )
             N_eval = int(3 * N)
-            # X_sim_ = np.copy(np.asarray(jax.numpy.copy(X_)))
-            X_sim_ = batch["critic_obs"].cpu().detach().numpy()[random_indices]
+            X_sim_ = mpc_eval_x0
             X_sim_cl_ = np.repeat(X_sim_[:, :, np.newaxis], N_eval + 1, axis=2)
             U_sim_cl_ = np.zeros((np.shape(X_sim_cl_)[0], nu, N_eval))
 
-            u_diff_per_batch = np.zeros(
-                (max_gradient_steps // check_terminal_nth_epoch, 2)
-            )
-            epoch_ix = counter // check_terminal_nth_epoch - 1
+            epoch_ix = (counter // check_terminal_nth_epoch) - 1
             u_diff_per_batch[epoch_ix, 0] = counter
             for b in range(batch_terminal_eval):
                 onestepmpc.reset()
@@ -265,7 +260,10 @@ for ix, name in enumerate(critic_names):
                     # print("k", k)
                     # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
                     prediction = critic.evaluate(
-                        torch.from_numpy(X_sim_cl_[b, :, k]).to(DEVICE).unsqueeze(0),
+                        torch.from_numpy(X_sim_cl_[b, :, k])
+                        .float()
+                        .to(DEVICE)
+                        .unsqueeze(0),
                         return_all=True,
                     )
                     A = prediction["A"].squeeze().cpu().detach().numpy()
@@ -276,22 +274,16 @@ for ix, name in enumerate(critic_names):
                     #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
                     if k == 0:
                         row_ix = (
-                            np.asarray(x0.cpu().detach().numpy() == X_sim_cl_[b, :, k])
+                            np.asarray(mpc_eval_x0 == X_sim_cl_[b, :, k])
                             .all(axis=1)
                             .nonzero()
                         )
-                        if (
-                            row_ix and row_ix[0].item() < optimal_u.shape[0]
-                        ):  # because optimal_u has no synthetic pts
-                            diff = u - optimal_u[row_ix]
-                            avg_diff = np.sqrt(np.sum(np.square(diff)))
-                            u_diff_per_batch[:, 1] += avg_diff
-                            one_step_counter += 1
+                        diff = u - mpc_eval_optimal_u[row_ix]
+                        avg_diff = np.sqrt(np.sum(np.square(diff)))
+                        u_diff_per_batch[epoch_ix, 1] += avg_diff
                     U_sim_cl_[b, :, k] = np.copy(u)
                     X_sim_cl_[b, :, k + 1] = np.copy(xnext)
-            u_diff_per_batch[epoch_ix, 1] = (
-                u_diff_per_batch[epoch_ix, 1] / one_step_counter
-            )
+            u_diff_per_batch[:, 1] = u_diff_per_batch[:, 1] / batch_terminal_eval
             u_diff[name] = u_diff_per_batch
 
             # compute fraction of states in terminal set
