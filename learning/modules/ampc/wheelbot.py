@@ -182,12 +182,31 @@ def plot_time_to_failure(data, filename):
         ncols=1,
     )
     for ix, name in enumerate(data.keys()):
+        ax = axes[ix] if isinstance(axes, list) else axes
         values = data[name]
-        axes[ix].scatter(values[0], label="mean")
-        axes[ix].scatter(values[1], label="std")
-        axes[ix].legend(loc=1)
-        axes[ix].set_ylabel(f"{name} Index of Flatline")
+        ax.scatter(values[:, 0], values[:, 1], label="mean")
+        ax.scatter(values[:, 0], values[:, 2], label="std")
+        ax.legend(loc=1)
+        ax.set_ylabel(f"{name} Index of Flatline")
+        ax.set_xlabel("Epochs")
     plt.savefig(f"{filename}.pdf", format="pdf")
+    print("Saving time to failure plot to", filename)
+
+
+def plot_u_diff(data, filename):
+    fig, axes = plt.subplots(
+        nrows=len(list(data.keys())),
+        ncols=1,
+    )
+    for ix, name in enumerate(data.keys()):
+        ax = axes[ix] if isinstance(axes, list) else axes
+        values = data[name]
+        ax.plot(values[:, 0], values[:, 1], label="U Error")
+        ax.legend(loc=1)
+        ax.set_ylabel(f"{name} Average Error to Optimal U")
+        ax.set_xlabel("Epochs")
+    plt.savefig(f"{filename}.pdf", format="pdf")
+    print("Saving U error plot to", filename)
 
 
 def plot_wheelbot_all_inits(
@@ -218,7 +237,7 @@ def plot_wheelbot_all_inits(
             ax.set_ylim(-np.pi / 6.0, np.pi / 6.0)
         if ix in [3, 4, 5]:  # yaw_rate, roll_rate, pitch_rate
             # ax.set_ylim(-1.0 / 20.0, 1.0 / 20.0)
-            ax.set_ylim(-1.0, 1.0)
+            ax.set_ylim(-100.0, 100.0)
         if ix in [6, 7]:  # driving angle, reaction angle
             ax.set_ylim(-1000.0, 1000.0)
         if ix == 8:  # driving rate
@@ -260,9 +279,9 @@ def plot_wheelbot_all_inits(
                 ax.legend(loc=1)
 
     plt.xlabel("t [ms]")
-    plt.tight_layout(pad=0, w_pad=0, h_pad=0)
+    plt.tight_layout(pad=0.0, w_pad=0.75, h_pad=0.0)
     plt.subplots_adjust(
-        left=0.06, right=0.97, bottom=0.04, top=0.95, wspace=0.2, hspace=0.35
+        left=0.1, right=0.97, bottom=0.04, top=0.95, wspace=0.2, hspace=0.35
     )
 
     if filename is not None:
@@ -325,7 +344,7 @@ def plot_wheelbot(
         ax.legend(loc=1)
 
     plt.xlabel("t [ms]")
-    plt.tight_layout(pad=0, w_pad=0, h_pad=0)
+    plt.tight_layout(pad=0.5, w_pad=0.5, h_pad=0.5)
     plt.subplots_adjust(
         left=0.06, right=0.97, bottom=0.04, top=0.95, wspace=0.2, hspace=0.35
     )

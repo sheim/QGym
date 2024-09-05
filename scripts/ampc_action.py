@@ -40,7 +40,7 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    "Critic",
+    # "Critic",
     # "OuterProduct",
     # "PDCholeskyInput",
     # "CholeskyLatent",
@@ -52,6 +52,7 @@ with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f
     data = pickle.load(f)
 x0 = np.array(data["x0"])  # (3478114, 10)
 cost = np.array(data["cost"])  # (3478114,)
+optimal_u = np.array(data["U"])  # (3478114, 2)
 
 # remove top 1% of cost values and corresponding states
 num_to_remove = int(0.01 * len(cost))
@@ -60,6 +61,7 @@ mask = np.ones(len(cost), dtype=bool)
 mask[top_indices] = False
 x0 = x0[mask]
 cost = cost[mask]
+optimal_u = optimal_u[mask]
 
 # min max normalization to put state and cost on [0, 1]
 # x0_min = x0.min(axis=0)
@@ -126,6 +128,7 @@ from learning.modules.ampc.wheelbot import (
     plot_wheelbot,
     plot_wheelbot_all_inits,
     plot_time_to_failure,
+    plot_u_diff,
     WheelbotOneStepMPC,
 )
 
@@ -136,7 +139,7 @@ def in_box(x, x_min, x_max):
 
 terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
 onestepmpc = WheelbotOneStepMPC()
-check_terminal_nth_epoch = 3
+check_terminal_nth_epoch = 500
 eval_frac_in_terminal = defaultdict(list)
 
 # turn numpy arrays to torch before training
@@ -162,7 +165,7 @@ graphing_data = {
 test_error = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 7  # 4000
+max_gradient_steps = 4000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -178,6 +181,7 @@ data = TensorDict(
 )
 
 t_to_fail = {name: [] for name in critic_names}
+u_diff = {name: None for name in critic_names}
 
 standard_offset = 0
 for ix, name in enumerate(critic_names):
@@ -239,17 +243,22 @@ for ix, name in enumerate(critic_names):
         test_error[name].append(actual_error.detach().mean().numpy())
         # perform closed-loop simulation as test error metric
         if name != "Critic" and (counter % check_terminal_nth_epoch == 0):
-            batch_terminal_eval = batch["critic_obs"].shape[0]  # 100
-            print("batch terminal eval", batch_terminal_eval)
+            batch_terminal_eval = 100
+            one_step_counter = 0  # this is different from batch_terminal_eval because we don't have optimal U for synthetic points
+            random_indices = random.sample(
+                list(range(batch["critic_obs"].shape[0])), batch_terminal_eval
+            )
             N_eval = int(3 * N)
             # X_sim_ = np.copy(np.asarray(jax.numpy.copy(X_)))
-            X_sim_ = batch["critic_obs"].cpu().detach().numpy()
+            X_sim_ = batch["critic_obs"].cpu().detach().numpy()[random_indices]
             X_sim_cl_ = np.repeat(X_sim_[:, :, np.newaxis], N_eval + 1, axis=2)
             U_sim_cl_ = np.zeros((np.shape(X_sim_cl_)[0], nu, N_eval))
 
-            # print("X sim shape", X_sim_.shape)
-            # print("X sim cl shape", X_sim_cl_.shape)
-            # print("U sim cl shape", U_sim_cl_.shape)
+            u_diff_per_batch = np.zeros(
+                (max_gradient_steps // check_terminal_nth_epoch, 2)
+            )
+            epoch_ix = counter // check_terminal_nth_epoch - 1
+            u_diff_per_batch[epoch_ix, 0] = counter
             for b in range(batch_terminal_eval):
                 onestepmpc.reset()
                 for k in range(N_eval):
@@ -265,8 +274,25 @@ for ix, name in enumerate(critic_names):
                     u, xnext, status = onestepmpc.run(X_sim_cl_[b, :, k], A)
                     # if k == 0:
                     #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
+                    if k == 0:
+                        row_ix = (
+                            np.asarray(x0.cpu().detach().numpy() == X_sim_cl_[b, :, k])
+                            .all(axis=1)
+                            .nonzero()
+                        )
+                        if (
+                            row_ix and row_ix[0].item() < optimal_u.shape[0]
+                        ):  # because optimal_u has no synthetic pts
+                            diff = u - optimal_u[row_ix]
+                            avg_diff = np.sqrt(np.sum(np.square(diff)))
+                            u_diff_per_batch[:, 1] += avg_diff
+                            one_step_counter += 1
                     U_sim_cl_[b, :, k] = np.copy(u)
                     X_sim_cl_[b, :, k + 1] = np.copy(xnext)
+            u_diff_per_batch[epoch_ix, 1] = (
+                u_diff_per_batch[epoch_ix, 1] / one_step_counter
+            )
+            u_diff[name] = u_diff_per_batch
 
             # compute fraction of states in terminal set
             frac_in_terminal = np.mean(
@@ -276,18 +302,6 @@ for ix, name in enumerate(critic_names):
             )
             eval_frac_in_terminal[name].append(frac_in_terminal)
 
-            # for idx in range(min(batch_terminal_eval, 100)):
-            #     labels = ["cl_sim"]
-            #     plot_outdir = f"plots/value_{time_str}/{counter}"
-            #     if not os.path.exists(plot_outdir):
-            #         os.makedirs(plot_outdir)
-            #     plot_wheelbot(
-            #         [X_sim_cl_[idx]],
-            #         [U_sim_cl_[idx]],
-            #         labels,
-            #         filename=f"{plot_outdir}/plot_{idx}",
-            #         show=False,
-            #     )
             plot_outdir = f"plots/value_{time_str}/{counter}"
             if not os.path.exists(plot_outdir):
                 os.makedirs(plot_outdir)
@@ -306,7 +320,9 @@ for ix, name in enumerate(critic_names):
                 )  # arbitrarily picking first state for now
                 t_to_fail_samples.append(fail_ix)
             t_to_fail_samples = np.array(t_to_fail_samples)
-            t_to_fail[name].append([t_to_fail_samples.mean(), t_to_fail_samples.std()])
+            t_to_fail[name].append(
+                [counter, t_to_fail_samples.mean(), t_to_fail_samples.std()]
+            )
             print(
                 "Time to failure mean",
                 t_to_fail_samples.mean(),
@@ -321,8 +337,7 @@ for ix, name in enumerate(critic_names):
         graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
         graphing_data["values"][name] = critic.evaluate(data[0, :]["critic_obs"])
         graphing_data["cost"][name] = data[0, :]["cost"]
-    # print("exporting", name)
-    # export_network(critic, name, save_path, n_dims)
+
     print(
         f"{name} mean",
         graphing_data["values"][name].mean(),
@@ -331,8 +346,10 @@ for ix, name in enumerate(critic_names):
         "std dev",
         graphing_data["values"][name].std(),
     )
-
+for key in critic_names:
+    t_to_fail[key] = np.array(t_to_fail[key])
 plot_time_to_failure(t_to_fail, f"{save_path}/time_to_fail")
+plot_u_diff(u_diff, f"{save_path}/u_error")
 plot_learning_progress(test_error, "AMPC VF Test Error", fn=f"{save_path}/test_error")
 
 
