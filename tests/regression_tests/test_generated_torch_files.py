@@ -2,8 +2,8 @@ import torch
 
 
 def compare_tensors(file1, file2):
-    tensor1 = torch.load(file1)
-    tensor2 = torch.load(file2)
+    tensor1 = torch.load(file1, weights_only=True)
+    tensor2 = torch.load(file2, weights_only=True)
     assert torch.all(
         torch.eq(tensor1, tensor2)
     ), f"Tensors in {file1} and {file2} are not equal."
