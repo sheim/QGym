@@ -37,17 +37,10 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
     runner_class_name = "OffPolicyRunner"
 
     class actor(FixedRobotCfgPPO.actor):
-        hidden_dims = {
-            "latent": [128, 64],
-            "mean": [32],
-            "std": [32],
-        }
-        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = {
-            "latent": "elu",
-            "mean": "elu",
-            "std": "elu",
-        }
+        latent_nn = {"hidden_dims": [128, 64], "activation": "elu", "layer_norm": True}
+        mean_nn = {"hidden_dims": [32], "activation": "elu", "layer_norm": True}
+        std_nn = {"hidden_dims": [32], "activation": "elu", "layer_norm": True}
+        nn_params = {"latent": latent_nn, "mean": mean_nn, "std": std_nn}
 
         normalize_obs = False
         obs = [

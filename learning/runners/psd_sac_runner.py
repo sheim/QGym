@@ -7,6 +7,7 @@ from learning.utils import Logger
 from learning.runners import OffPolicyRunner
 from learning.modules import Critic, ChimeraActor
 from learning.modules.QRCritics import *  # noqa F401
+from learning.modules.TaylorCritics import *  # noqa F401
 
 from learning.storage import ReplayBuffer
 from learning.algorithms import SAC
