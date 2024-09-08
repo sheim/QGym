@@ -246,7 +246,11 @@ class LeggedRobotRunnerCfg(BaseConfig):
             "observation_b",
             "these_need_to_be_atributes_(states)_of_the_robot_env",
         ]
-        normalize_obs = True
+        critic_obs = [
+            "observation_x",
+            "observation_y",
+            "critic_obs_can_be_the_same_or_different_than_actor_obs",
+        ]
 
         actions = ["q_des"]
         disable_actions = False
@@ -309,8 +313,8 @@ class LeggedRobotRunnerCfg(BaseConfig):
         entropy_coef = 0.01
         schedule = "adaptive"  # could be adaptive, fixed
         desired_kl = 0.01
-        lr_range = [2e-4, 1e-2]
-        lr_ratio = 1.3
+        lr_range = [2e-5, 1e-2]
+        lr_ratio = 1.5
 
     class runner:
         policy_class_name = "ActorCritic"

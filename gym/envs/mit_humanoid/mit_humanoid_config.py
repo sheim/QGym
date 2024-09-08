@@ -250,20 +250,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
                 termination = 15
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        # * training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.001
-        num_learning_epochs = 5
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 4
-        learning_rate = 5.0e-4
-        schedule = "adaptive"  # could be adaptive, fixed
-        gamma = 0.999
-        lam = 0.95
-        desired_kl = 0.01
-        max_grad_norm = 1.0
+        pass
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
