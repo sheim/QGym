@@ -4,6 +4,10 @@ from tensordict import TensorDict
 from learning.utils import Logger
 from .on_policy_runner import OnPolicyRunner
 from learning.storage import DictStorage
+from learning.algorithms import PPO2  # noqa F401
+from learning.modules.actor import Actor
+from learning.modules.critic import Critic  # noqa F401
+from learning.modules.QRCritics import *  # noqa F401
 
 logger = Logger()
 storage = DictStorage()
@@ -18,6 +22,16 @@ class MyRunner(OnPolicyRunner):
             self.cfg["max_iterations"],
             self.device,
         )
+
+    def _set_up_alg(self):
+        num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
+        num_actions = self.get_action_size(self.actor_cfg["actions"])
+        num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])  # noqa: F841
+        actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
+        critic_class_name = self.critic_cfg["critic_class_name"]
+        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
+        alg_class = eval(self.cfg["algorithm_class_name"])
+        self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def learn(self, states_to_log_dict=None):
         self.set_up_logger()
@@ -44,7 +58,9 @@ class MyRunner(OnPolicyRunner):
                 "critic_obs": critic_obs,
                 "next_critic_obs": critic_obs,
                 "rewards": self.get_rewards({"termination": 0.0})["termination"],
-                "dones": self.get_timed_out(),
+                "timed_out": self.get_timed_out(),
+                "terminated": self.get_terminated(),
+                "dones": self.get_timed_out() | self.get_terminated(),
             }
         )
         storage.initialize(
@@ -53,6 +69,9 @@ class MyRunner(OnPolicyRunner):
             self.env.num_envs * self.num_steps_per_env,
             device=self.device,
         )
+
+        # burn in observation normalization.
+        self.burn_in_normalization()
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
@@ -168,7 +187,6 @@ class MyRunner(OnPolicyRunner):
             ["mean_value_loss", "mean_surrogate_loss", "learning_rate"],
         )
         logger.register_category("actor", self.alg.actor, ["action_std", "entropy"])
-
         logger.attach_torch_obj_to_wandb((self.alg.actor, self.alg.critic))
 
     def update_rewards(self, rewards_dict, terminated):

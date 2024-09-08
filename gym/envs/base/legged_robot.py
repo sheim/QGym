@@ -110,11 +110,11 @@ class LeggedRobot(BaseTask):
 
         self.base_height = self.root_states[:, 2:3]
 
-        self.dof_pos_history = self.dof_pos_history.roll(self.num_actuators)
-        self.dof_pos_history[:, : self.num_actuators] = (
-            self.dof_pos - self.default_dof_pos
-        )
         self.dof_pos_obs = self.dof_pos - self.default_dof_pos
+
+        self.dof_pos_history = self.dof_pos_history.roll(self.num_actuators)
+        # self.dof_pos_history[:, : self.num_actuators] = self.dof_pos_obs
+        self.dof_pos_history[:, : self.num_actuators] = self.dof_pos_target
 
         env_ids = (
             self.episode_length_buf % int(self.cfg.commands.resampling_time / self.dt)
@@ -133,9 +133,10 @@ class LeggedRobot(BaseTask):
         self._reset_system(env_ids)
         self._resample_commands(env_ids)
         # * reset buffers
-        self.dof_pos_history[env_ids] = (
-            self.dof_pos[env_ids] - self.default_dof_pos
-        ).tile(3)
+        self.dof_pos_obs[env_ids] = self.dof_pos[env_ids] - self.default_dof_pos
+        # self.dof_pos_history[env_ids] = self.dof_pos_obs[env_ids].tile(3)
+        self.dof_pos_target[env_ids] = self.default_dof_pos
+        self.dof_pos_history[env_ids] = self.dof_pos_target[env_ids].tile(3)
         self.episode_length_buf[env_ids] = 0
 
     def _initialize_sim(self):
@@ -990,11 +991,12 @@ class LeggedRobot(BaseTask):
 
         return heights.view(self.num_envs, -1) * self.terrain.cfg.vertical_scale
 
-    def _sqrdexp(self, x, scale=1.0):
+    def _sqrdexp(self, x, sigma=None):
         """shorthand helper for squared exponential"""
-        return torch.exp(
-            -torch.square(x / scale) / self.cfg.reward_settings.tracking_sigma
-        )
+        if sigma is None:
+            return torch.exp(-torch.square(x) / self.cfg.reward_settings.tracking_sigma)
+        else:
+            return torch.exp(-torch.square(x) / sigma)
 
     # ------------ reward functions----------------
 

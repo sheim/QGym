@@ -36,6 +36,7 @@ config_dict = {
     "PendulumCfg": ".pendulum.pendulum_config",
     "PendulumSACCfg": ".pendulum.pendulum_SAC_config",
     "LanderCfg": ".mit_humanoid.lander_config",
+    "PendulumPSDCfg": ".pendulum.pendulum_PSD_config",
 }
 
 runner_config_dict = {
@@ -51,6 +52,7 @@ runner_config_dict = {
     "PendulumRunnerCfg": ".pendulum.pendulum_config",
     "PendulumSACRunnerCfg": ".pendulum.pendulum_SAC_config",
     "LanderRunnerCfg": ".mit_humanoid.lander_config",
+    "PendulumPSDRunnerCfg": ".pendulum.pendulum_PSD_config",
 }
 
 task_dict = {
@@ -81,6 +83,7 @@ task_dict = {
     "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"],
     "sac_pendulum": ["Pendulum", "PendulumSACCfg", "PendulumSACRunnerCfg"],
     "lander": ["Lander", "LanderCfg", "LanderRunnerCfg"],
+    "psd_pendulum": ["Pendulum", "PendulumPSDCfg", "PendulumPSDRunnerCfg"],
 }
 
 for class_name, class_location in class_dict.items():

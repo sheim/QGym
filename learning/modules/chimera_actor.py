@@ -11,8 +11,9 @@ class ChimeraActor(nn.Module):
         self,
         num_obs,
         num_actions,
-        hidden_dims,
-        activation,
+        # hidden_dims,
+        # activation,
+        nn_params,
         std_init=1.0,
         log_std_max=4.0,
         log_std_min=-20.0,
@@ -34,21 +35,18 @@ class ChimeraActor(nn.Module):
 
         self.latent_NN = create_MLP(
             num_inputs=num_obs,
-            num_outputs=hidden_dims["latent"][-1],
-            hidden_dims=hidden_dims["latent"][:-1],
-            activation=activation["latent"],
+            num_outputs=nn_params["latent"]["hidden_dims"][-1],
+            **nn_params["latent"],
         )
         self.mean_NN = create_MLP(
-            num_inputs=hidden_dims["latent"][-1],
+            num_inputs=nn_params["latent"]["hidden_dims"][-1],
             num_outputs=num_actions,
-            hidden_dims=hidden_dims["mean"],
-            activation=activation["mean"],
+            **nn_params["mean"],
         )
         self.std_NN = create_MLP(
-            num_inputs=hidden_dims["latent"][-1],
+            num_inputs=nn_params["latent"]["hidden_dims"][-1],
             num_outputs=num_actions,
-            hidden_dims=hidden_dims["std"],
-            activation=activation["std"],
+            **nn_params["std"],
         )
 
         # maybe zap

@@ -45,6 +45,7 @@ class TaskSkeleton:
         """Reset all robots"""
         self._reset_idx(torch.arange(self.num_envs, device=self.device))
         self.step()
+        self.episode_length_buf[:] = 0
 
     def _reset_buffers(self):
         self.to_be_reset[:] = False
