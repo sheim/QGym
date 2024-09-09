@@ -24,7 +24,10 @@ class OnPolicyRunner(BaseRunner):
     def learn(self, states_to_log_dict=None):
         self.set_up_logger()
 
-        rewards_dict = {}
+        n_policy_steps = int((1 / self.env.dt) / self.actor_cfg["frequency"])
+        assert n_policy_steps > 0, "actor frequency should be less than ctrl_freq"
+
+        rewards_dict = self.initialize_rewards_dict(n_policy_steps)
 
         self.alg.switch_to_train()
         actor_obs = self.get_obs(self.actor_cfg["obs"])
@@ -86,37 +89,39 @@ class OnPolicyRunner(BaseRunner):
                             "critic_obs": critic_obs,
                         }
                     )
+                    for step in range(n_policy_steps):
+                        self.env.step()
+                        # put reward integration here
+                        self.update_rewards_dict(rewards_dict, step)
+                    else:
+                        # catch and reset failed envs
+                        to_be_reset = self.env.timed_out | self.env.terminated
+                        env_ids = (to_be_reset).nonzero(as_tuple=False).flatten()
+                        self.env._reset_idx(env_ids)
 
-                    self.env.step()
+                    total_rewards = torch.stack(
+                        tuple(rewards_dict.sum(dim=0).values())
+                    ).sum(dim=(0))
 
                     actor_obs = self.get_noisy_obs(
                         self.actor_cfg["obs"], self.actor_cfg["noise"]
                     )
                     critic_obs = self.get_obs(self.critic_cfg["obs"])
 
-                    # * get time_outs
-                    timed_out = self.get_timed_out()
-                    terminated = self.get_terminated()
-                    dones = timed_out | terminated
-
-                    self.update_rewards(rewards_dict, terminated)
-                    total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
-
                     transition.update(
                         {
                             "next_actor_obs": actor_obs,
                             "next_critic_obs": critic_obs,
                             "rewards": total_rewards,
-                            "timed_out": timed_out,
-                            "terminated": terminated,
-                            "dones": dones,
+                            "timed_out": self.env.timed_out,
+                            "dones": self.env.timed_out | self.env.terminated,
                         }
                     )
                     storage.add_transitions(transition)
 
-                    logger.log_rewards(rewards_dict)
+                    logger.log_rewards(rewards_dict.sum(dim=0))
                     logger.log_rewards({"total_rewards": total_rewards})
-                    logger.finish_step(dones)
+                    logger.finish_step(self.env.timed_out | self.env.terminated)
             logger.toc("collection")
 
             logger.tic("learning")
@@ -149,19 +154,39 @@ class OnPolicyRunner(BaseRunner):
             self.alg.critic.evaluate(critic_obs)
         self.env.reset()
 
-    def update_rewards(self, rewards_dict, terminated):
-        rewards_dict.update(
+    def update_rewards_dict(self, rewards_dict, step):
+        # sum existing rewards with new rewards
+        rewards_dict[step].update(
             self.get_rewards(
-                self.critic_cfg["reward"]["termination_weight"], mask=terminated
-            )
+                self.critic_cfg["reward"]["termination_weight"],
+                modifier=self.env.dt,
+                mask=self.env.terminated,
+            ),
+            inplace=True,
         )
-        rewards_dict.update(
+        rewards_dict[step].update(
             self.get_rewards(
                 self.critic_cfg["reward"]["weights"],
                 modifier=self.env.dt,
-                mask=~terminated,
-            )
+                mask=~self.env.terminated,
+            ),
+            inplace=True,
         )
+
+    def initialize_rewards_dict(self, n_steps):
+        # sum existing rewards with new rewards
+        rewards_dict = TensorDict(
+            {}, batch_size=(n_steps, self.env.num_envs), device=self.device
+        )
+        for key in self.critic_cfg["reward"]["termination_weight"]:
+            rewards_dict.update(
+                {key: torch.zeros(n_steps, self.env.num_envs, device=self.device)}
+            )
+        for key in self.critic_cfg["reward"]["weights"]:
+            rewards_dict.update(
+                {key: torch.zeros(n_steps, self.env.num_envs, device=self.device)}
+            )
+        return rewards_dict
 
     def set_up_logger(self):
         logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))

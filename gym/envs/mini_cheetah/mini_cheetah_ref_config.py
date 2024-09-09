@@ -26,7 +26,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
         gait_freq = 3.0
-        ctrl_frequency = 100
+        ctrl_frequency = 500
         desired_sim_frequency = 500
 
     class commands(MiniCheetahCfg.commands):
@@ -70,6 +70,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     runner_class_name = "OnPolicyRunner"
 
     class actor(MiniCheetahRunnerCfg.actor):
+        frequency = 100
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
@@ -122,12 +123,12 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
                 orientation = 1.0
-                torques = 5.0e-7
+                torques = 5.0e-8
                 dof_vel = 0.0
                 min_base_height = 1.5
                 collision = 0.0
-                action_rate = 0.1
-                action_rate2 = 0.01
+                action_rate = 1e-4
+                action_rate2 = 1e-5
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0

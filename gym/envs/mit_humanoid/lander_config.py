@@ -282,7 +282,7 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
                 power = 1e-6  # 1.0e-2
                 min_base_height = 1.5
                 lin_vel_xy = 1.0
-                action_rate = 1e-3
+                action_rate = 1e-2
                 action_rate2 = 1e-3
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
