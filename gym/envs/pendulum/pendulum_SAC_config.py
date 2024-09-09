@@ -43,10 +43,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
         nn_params = {"latent": latent_nn, "mean": mean_nn, "std": std_nn}
 
         normalize_obs = False
-        obs = [
-            "dof_pos_obs",
-            "dof_vel",
-        ]
+        obs = ["dof_pos_obs", "dof_vel"]
         actions = ["tau_ff"]
         disable_actions = False
 
