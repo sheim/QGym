@@ -18,33 +18,20 @@ class BaseTask(TaskSkeleton):
         # * env device is GPU only if sim is on GPU and use_gpu_pipeline=True,
         # * otherwise returned tensors are copied to CPU by physX.
         if sim_device_type == "cuda" and sim_params.use_gpu_pipeline:
-            self.device = self.sim_device
+            device = self.sim_device
         else:
-            self.device = "cpu"
+            device = "cpu"
 
         # * graphics device for rendering, -1 for no rendering
         self.graphics_device_id = self.sim_device_id
 
-        self.num_envs = cfg.env.num_envs
         self.num_actuators = cfg.env.num_actuators
 
         # * optimization flags for pytorch JIT
         torch._C._jit_set_profiling_mode(False)
         torch._C._jit_set_profiling_executor(False)
 
-        # allocate buffers
-        self.to_be_reset = torch.ones(
-            self.num_envs, device=self.device, dtype=torch.bool
-        )
-        self.terminated = torch.ones(
-            self.num_envs, device=self.device, dtype=torch.bool
-        )
-        self.episode_length_buf = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.long
-        )
-        self.timed_out = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.bool
-        )
+        super().__init__(num_envs=cfg.env.num_envs, device=device)
 
         # todo: read from config
         self.enable_viewer_sync = True

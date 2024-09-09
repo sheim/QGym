@@ -5,13 +5,15 @@ from gym.utils.helpers import class_to_dict
 
 
 class TaskSkeleton:
-    def __init__(
-        self, num_envs=1, max_episode_length=1.0, device="cpu", auto_reset=True
-    ):
+    def __init__(self, num_envs=1, device="cpu"):
         self.num_envs = num_envs
-        self.max_episode_length = max_episode_length
         self.device = device
-        self.auto_reset = auto_reset
+
+        self.to_be_reset = torch.ones(num_envs, device=device, dtype=torch.bool)
+        self.terminated = torch.ones(num_envs, device=device, dtype=torch.bool)
+        self.episode_length_buf = torch.zeros(num_envs, device=device, dtype=torch.long)
+        self.timed_out = torch.zeros(num_envs, device=device, dtype=torch.bool)
+        self.reward_buf = torch.zeros(num_envs, device=device, dtype=torch.float)
 
         return None
 
@@ -61,10 +63,11 @@ class TaskSkeleton:
         reward_weights: dict with keys matching reward names, and values
             matching weights
         """
-        reward = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
+        # reward = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
+        self.reward_buf[:] = 0
         for name, weight in reward_weights.items():
-            reward += weight * self._eval_reward(name)
-        return reward
+            self.reward_buf += weight * self._eval_reward(name)
+        return self.reward_buf
 
     def _eval_reward(self, name):
         return eval("self._reward_" + name + "()")
