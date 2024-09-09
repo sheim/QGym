@@ -60,6 +60,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         max_contact_force = 600.0
         base_height_target = 0.3
         tracking_sigma = 0.25
+        switch_scale = 0.1
 
     class scaling(MiniCheetahCfg.scaling):
         pass

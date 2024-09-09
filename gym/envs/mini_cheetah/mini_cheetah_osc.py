@@ -16,6 +16,9 @@ class MiniCheetahOsc(MiniCheetah):
 
     def _init_buffers(self):
         super()._init_buffers()
+
+        self._switch = torch.zeros(self.num_envs, 1, device=self.device)
+
         self.oscillators = torch.zeros(self.num_envs, 4, device=self.device)
         self.oscillator_obs = torch.zeros(self.num_envs, 8, device=self.device)
 
@@ -158,6 +161,7 @@ class MiniCheetahOsc(MiniCheetah):
         """Update all states that are not handled in PhysX"""
         super()._post_decimation_step()
         self.grf = self._compute_grf()
+        self._update_cmd_switch()
         # self._step_oscillators()
 
     def _post_physx_step(self):
@@ -266,12 +270,16 @@ class MiniCheetahOsc(MiniCheetah):
         else:
             return grf
 
-    def _switch(self):
+    def _update_cmd_switch(self):
         c_vel = torch.linalg.norm(self.commands, dim=1)
-        return torch.exp(
+        self._switch = torch.exp(
             -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1))
             / self.cfg.reward_settings.switch_scale
         )
+        # return torch.exp(
+        #     -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1))
+        #     / self.cfg.reward_settings.switch_scale
+        # )
 
     def _reward_cursorial(self):
         # penalize the abad joints being away from 0
@@ -357,10 +365,10 @@ class MiniCheetahOsc(MiniCheetah):
         return -torch.mean(rew, dim=1)
 
     def _reward_dof_vel(self):
-        return super()._reward_dof_vel() * self._switch()
+        return super()._reward_dof_vel() * self._switch
 
     def _reward_dof_near_home(self):
-        return super()._reward_dof_near_home() * self._switch()
+        return super()._reward_dof_near_home() * self._switch
 
     def _reward_stand_still(self):
         """Penalize motion at zero commands"""
@@ -371,11 +379,11 @@ class MiniCheetahOsc(MiniCheetah):
         rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
         rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
         rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
-        return (rew_vel + rew_pos - rew_base_vel) * self._switch()
+        return (rew_vel + rew_pos - rew_base_vel) * self._switch
 
     def _reward_standing_torques(self):
         """Penalize torques at zero commands"""
-        return super()._reward_torques() * self._switch()
+        return super()._reward_torques() * self._switch
 
     # * gait similarity scores
     def angle_difference(self, theta1, theta2):
