@@ -13,7 +13,6 @@ class TaskSkeleton:
         self.terminated = torch.ones(num_envs, device=device, dtype=torch.bool)
         self.episode_length_buf = torch.zeros(num_envs, device=device, dtype=torch.long)
         self.timed_out = torch.zeros(num_envs, device=device, dtype=torch.bool)
-        self.reward_buf = torch.zeros(num_envs, device=device, dtype=torch.float)
 
         return None
 
@@ -57,20 +56,6 @@ class TaskSkeleton:
         self.to_be_reset[:] = False
         self.terminated[:] = False
         self.timed_out[:] = False
-
-    def compute_reward(self, reward_weights):
-        """Compute and return a torch tensor of rewards
-        reward_weights: dict with keys matching reward names, and values
-            matching weights
-        """
-        # reward = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
-        self.reward_buf[:] = 0
-        for name, weight in reward_weights.items():
-            self.reward_buf += weight * self._eval_reward(name)
-        return self.reward_buf
-
-    def _eval_reward(self, name):
-        return eval("self._reward_" + name + "()")
 
     def _check_terminations_and_timeouts(self):
         """Check if environments need to be reset"""

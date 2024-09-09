@@ -8,8 +8,8 @@ class BaseRunner:
     def __init__(self, env, train_cfg, device="cpu"):
         self.device = device
         self.env = env
+        self.setup_reward_functions()
         self.parse_train_cfg(train_cfg)
-
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
         self.num_learning_iterations = self.cfg["max_iterations"]
@@ -17,6 +17,13 @@ class BaseRunner:
         self.it = 0
         self.log_dir = train_cfg["log_dir"]
         self._set_up_alg()
+
+    def setup_reward_functions(self):
+        self.reward_functions = {
+            method.replace("_reward_", ""): getattr(self.env, method)
+            for method in dir(self.env)
+            if callable(getattr(self.env, method)) and method.startswith("_reward_")
+        }
 
     def _set_up_alg(self):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
@@ -95,8 +102,8 @@ class BaseRunner:
         if mask is None:
             mask = 1.0
         for name, weight in reward_weights.items():
-            rewards_dict[name] = mask * self._get_reward({name: weight}, modifier)
+            rewards_dict[name] = mask * self._get_reward(name, weight * modifier)
         return rewards_dict
 
-    def _get_reward(self, name_weight, modifier=1):
-        return modifier * self.env.compute_reward(name_weight).to(self.device)
+    def _get_reward(self, name, weight):
+        return weight * self.reward_functions[name]().to(self.device)
