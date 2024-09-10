@@ -1030,26 +1030,18 @@ class LeggedRobot(BaseTask):
     def _reward_action_rate(self):
         """Penalize changes in actions"""
         n = self.num_actuators
-        dt2 = (self.dt * self.cfg.control.decimation) ** 2
-        error = (
-            torch.square(
-                self.dof_pos_history[:, :n] - self.dof_pos_history[:, n : 2 * n]
-            )
-            / dt2
+        error = torch.square(
+            self.dof_pos_history[:, :n] - self.dof_pos_history[:, 2 * n :]
         )
         return -torch.mean(error, dim=1)
 
     def _reward_action_rate2(self):
         """Penalize changes in actions"""
         n = self.num_actuators
-        dt2 = (self.dt * self.cfg.control.decimation) ** 2
-        error = (
-            torch.square(
-                self.dof_pos_history[:, :n]
-                - 2 * self.dof_pos_history[:, n : 2 * n]
-                + self.dof_pos_history[:, 2 * n :]
-            )
-            / dt2
+        error = torch.square(
+            self.dof_pos_history[:, :n]
+            - 2 * self.dof_pos_history[:, n : 2 * n]
+            + self.dof_pos_history[:, 2 * n :]
         )
         return -torch.mean(error, dim=1)
 

@@ -301,9 +301,6 @@ class LeggedRobotRunnerCfg(BaseConfig):
         batch_size = 2**15
         max_gradient_steps = 24
         # new
-        storage_size = 2**17  # new
-        batch_size = 2**15  #  new
-
         clip_param = 0.2
         learning_rate = 1.0e-3
         max_grad_norm = 1.0

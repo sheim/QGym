@@ -17,7 +17,7 @@ class PendulumSACCfg(PendulumCfg):
         dof_vel_range = {"theta": [-5, 5]}
 
     class control(PendulumCfg.control):
-        ctrl_frequency = 10
+        ctrl_frequency = 100
         desired_sim_frequency = 100
 
     class asset(PendulumCfg.asset):
@@ -37,6 +37,7 @@ class PendulumSACRunnerCfg(FixedRobotCfgPPO):
     runner_class_name = "OffPolicyRunner"
 
     class actor(FixedRobotCfgPPO.actor):
+        frequency = 10
         latent_nn = {"hidden_dims": [128, 64], "activation": "elu", "layer_norm": True}
         mean_nn = {"hidden_dims": [32], "activation": "elu", "layer_norm": True}
         std_nn = {"hidden_dims": [32], "activation": "elu", "layer_norm": True}

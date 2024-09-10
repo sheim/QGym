@@ -14,18 +14,11 @@ storage = DictStorage()
 class OnPolicyRunner(BaseRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
-        logger.initialize(
-            self.env.num_envs,
-            self.env.dt,
-            self.cfg["max_iterations"],
-            self.device,
-        )
 
     def learn(self, states_to_log_dict=None):
-        self.set_up_logger()
-
         n_policy_steps = int((1 / self.env.dt) / self.actor_cfg["frequency"])
         assert n_policy_steps > 0, "actor frequency should be less than ctrl_freq"
+        self.set_up_logger(dt=self.env.dt * n_policy_steps)
 
         rewards_dict = self.initialize_rewards_dict(n_policy_steps)
 
@@ -188,7 +181,13 @@ class OnPolicyRunner(BaseRunner):
             )
         return rewards_dict
 
-    def set_up_logger(self):
+    def set_up_logger(self, dt=None):
+        if dt is None:
+            dt = self.env.dt
+        logger.initialize(
+            self.env.num_envs, dt, self.cfg["max_iterations"], self.device
+        )
+
         logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))
         logger.register_rewards(
             list(self.critic_cfg["reward"]["termination_weight"].keys())

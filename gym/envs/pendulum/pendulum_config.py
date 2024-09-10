@@ -62,6 +62,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     runner_class_name = "OnPolicyRunner"
 
     class actor(FixedRobotCfgPPO.actor):
+        frequency = 25
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"

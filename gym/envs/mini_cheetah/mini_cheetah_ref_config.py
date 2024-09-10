@@ -85,7 +85,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "phase_obs",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -115,7 +115,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         class reward:
             class weights:
@@ -128,13 +128,13 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 dof_vel = 0.0
                 min_base_height = 1.5
                 collision = 0.0
-                action_rate = 1e-4
-                action_rate2 = 1e-5
+                action_rate = 1e-5
+                action_rate2 = 1e-6
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 1.5
+                reference_traj = 0.0
                 swing_grf = 1.5
                 stance_grf = 1.5
 
@@ -142,11 +142,28 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 termination = 0.15
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        pass
+        # both
+        gamma = 0.99
+        lam = 0.95
+        # shared
+        batch_size = 2 * 4096  # use all the data
+        max_gradient_steps = 50
+
+        clip_param = 0.2
+        learning_rate = 1.0e-3
+        max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [2e-5, 1e-2]
+        lr_ratio = 1.5
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 32  # deprecate
+        num_steps_per_env = 20  # deprecate
