@@ -25,6 +25,7 @@ from tensordict import TensorDict
 from learning.modules.lqrc.plotting import (
     plot_learning_progress,
     plot_binned_errors_ampc,
+    plot_variable_lr,
 )
 from learning.modules.lqrc.utils import get_latent_matrix
 from learning.modules.utils.neural_net import export_network
@@ -63,15 +64,26 @@ x0 = x0[mask]
 cost = cost[mask]
 optimal_u = optimal_u[mask]
 
+# min max normalization to put state and cost on [0, 1]
+x0_min = x0.min(axis=0)
+x0_max = x0.max(axis=0)
+x0 = (x0 - x0_min) / (x0_max - x0_min)
+cost_min = cost.min()
+cost_max = cost.max()
+cost = (cost - cost_min) / (cost_max - cost_min)
+
 # make batch for one step MPC eval before adding non-fs synthetic data points
 batch_terminal_eval = 100
 mpc_eval_ix = random.sample(list(range(x0.shape[0])), batch_terminal_eval)
-# mpc_eval_x0 = torch.from_numpy(x0[mpc_eval_ix]).float().to(DEVICE)
-# mpc_eval_cost = torch.from_numpy(cost[mpc_eval_ix]).float().to(DEVICE)
-# mpc_eval_optimal_u = torch.from_numpy(optimal_u[mpc_eval_ix]).float().to(DEVICE)
-mpc_eval_x0 = x0[mpc_eval_ix]
-mpc_eval_cost = cost[mpc_eval_ix]
-mpc_eval_optimal_u = optimal_u[mpc_eval_ix]
+mpc_mask = np.zeros(len(cost), dtype=bool)
+mpc_mask[mpc_eval_ix] = True
+mpc_eval_x0 = x0[mpc_mask]
+mpc_eval_cost = cost[mpc_mask]
+mpc_eval_optimal_u = optimal_u[mpc_mask]
+# ensure this validation batch is not seen in training data
+x0 = x0[~mpc_mask]
+cost = cost[~mpc_mask]
+optimal_u = optimal_u[~mpc_mask]
 
 # add in non-fs synthetic data points
 d_max = 0
@@ -81,10 +93,10 @@ print("Building KDTree")
 start = time.time()
 tree = KDTree(x0)
 
-# random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
-random_x0 = np.random.uniform(
-    low=cost.min(), high=cost.max(), size=(10000, x0.shape[1])
-)
+random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
+# random_x0 = np.random.uniform(
+#     low=cost.min(), high=cost.max(), size=(10000, x0.shape[1])
+# )
 
 
 def process_batch(batch):
@@ -111,10 +123,11 @@ cost_non_fs = np.ones((x0_non_fs.shape[0],))
 x0 = np.concatenate((x0, x0_non_fs))
 cost = np.concatenate((cost, cost_non_fs))
 
-# #hack to see data dist
-# import matplotlib.pyplot as plt
-# plt.hist(cost, bins=100)
-# plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
+# hack to see data dist
+import matplotlib.pyplot as plt
+
+plt.hist(cost, bins=100)
+plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
 
 # ampc imports and setup
 from collections import defaultdict
@@ -142,7 +155,7 @@ def in_box(x, x_min, x_max):
 
 terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
 onestepmpc = WheelbotOneStepMPC()
-check_terminal_nth_epoch = 2  # 500
+check_terminal_nth_epoch = 2  # 20  # 500
 eval_frac_in_terminal = defaultdict(list)
 
 # turn numpy arrays to torch before training
@@ -166,9 +179,10 @@ graphing_data = {
     ]
 }
 test_error = {name: [] for name in critic_names}
+lr_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 7  # 4000
+max_gradient_steps = 6  # 500  # 4000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -199,6 +213,9 @@ for ix, name in enumerate(critic_names):
     critic_class = globals()[name]
     critic = critic_class(**params).to(DEVICE)
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        critic_optimizer, mode="min", factor=0.5, patience=10
+    )
 
     # train new critic
     mean_value_loss = 0
@@ -235,6 +252,7 @@ for ix, name in enumerate(critic_names):
         critic_optimizer.zero_grad()
         value_loss.backward()
         critic_optimizer.step()
+        lr_scheduler.step(value_loss)
         counter += 1
         # pointwise prediction test error
         with torch.no_grad():
@@ -245,6 +263,7 @@ for ix, name in enumerate(critic_names):
                 ).pow(2)
             ).to("cpu")
         test_error[name].append(actual_error.detach().mean().numpy())
+        lr_history[name].append(lr_scheduler.get_last_lr()[0])
         # perform closed-loop simulation as test error metric
         if name != "Critic" and (counter % check_terminal_nth_epoch == 0):
             N_eval = int(3 * N)
@@ -269,6 +288,8 @@ for ix, name in enumerate(critic_names):
                     A = prediction["A"].squeeze().cpu().detach().numpy()
                     if "Latent" in name:
                         A = latent_weight.T @ A @ latent_weight
+                    # denormalize A before sending it to one step MPC
+                    A = (cost_max - cost_min) * A + cost_min
                     u, xnext, status = onestepmpc.run(X_sim_cl_[b, :, k], A)
                     # if k == 0:
                     #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
@@ -283,7 +304,9 @@ for ix, name in enumerate(critic_names):
                         u_diff_per_batch[epoch_ix, 1] += avg_diff
                     U_sim_cl_[b, :, k] = np.copy(u)
                     X_sim_cl_[b, :, k + 1] = np.copy(xnext)
-            u_diff_per_batch[:, 1] = u_diff_per_batch[:, 1] / batch_terminal_eval
+            u_diff_per_batch[epoch_ix, 1] = (
+                u_diff_per_batch[epoch_ix, 1] / batch_terminal_eval
+            )
             u_diff[name] = u_diff_per_batch
 
             # compute fraction of states in terminal set
@@ -294,7 +317,7 @@ for ix, name in enumerate(critic_names):
             )
             eval_frac_in_terminal[name].append(frac_in_terminal)
 
-            plot_outdir = f"plots/value_{time_str}/{counter}"
+            plot_outdir = f"{save_path}/traj_graphs"
             if not os.path.exists(plot_outdir):
                 os.makedirs(plot_outdir)
             random_indices = random.sample(list(range(batch_terminal_eval)), 5)
@@ -302,7 +325,7 @@ for ix, name in enumerate(critic_names):
                 X_sim_cl_[random_indices],
                 U_sim_cl_[random_indices],
                 plot_labels=["cl_sim"],
-                filename=f"{plot_outdir}/plot",
+                filename=f"{plot_outdir}/{counter}_plot",
                 show=False,
             )
             t_to_fail_samples = []
@@ -342,7 +365,12 @@ for key in critic_names:
     t_to_fail[key] = np.array(t_to_fail[key])
 plot_time_to_failure(t_to_fail, f"{save_path}/time_to_fail")
 plot_u_diff(u_diff, f"{save_path}/u_error")
-plot_learning_progress(test_error, "AMPC VF Test Error", fn=f"{save_path}/test_error")
+plot_learning_progress(
+    test_error,
+    "Pointwise Error on Test Set \n (Comparison of Normed Vals Used in Supervised Training)",
+    fn=f"{save_path}/test_error",
+)
+plot_variable_lr(lr_history, f"{save_path}/lr_history")
 
 
 # plot_binned_errors_ampc(

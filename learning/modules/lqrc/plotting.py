@@ -88,6 +88,24 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
+def plot_variable_lr(data, fn, title="Scheduled Learning Rate", extension="png"):
+    fig, axes = plt.subplots(
+        nrows=len(list(data.keys())),
+        ncols=1,
+    )
+    for ix, name in enumerate(data.keys()):
+        ax = axes[ix] if isinstance(axes, list) else axes
+        values = data[name]
+        ax.plot(values, label=name)
+        ax.legend()
+        ax.set_ylabel("Learning Rate")
+        ax.set_xlabel("Epoch")
+    fig.suptitle(title, fontsize=18)
+    plt.tight_layout()
+    plt.savefig(f"{fn}.{extension}", dpi=300, bbox_inches="tight")
+    print("Learning rate change as a functin of epoch saved to", f"{fn}.{extension}")
+
+
 def plot_binned_errors_ampc(
     data,
     fn,

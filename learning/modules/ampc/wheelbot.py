@@ -184,11 +184,13 @@ def plot_time_to_failure(data, filename):
     for ix, name in enumerate(data.keys()):
         ax = axes[ix] if isinstance(axes, list) else axes
         values = data[name]
-        ax.scatter(values[:, 0], values[:, 1], label="mean")
-        ax.scatter(values[:, 0], values[:, 2], label="std")
-        ax.legend(loc=1)
+        # ax.scatter(values[:, 0], values[:, 1], label="mean")
+        # ax.scatter(values[:, 0], values[:, 2], label="std")
+        ax.errorbar(values[:, 0], values[:, 1], yerr=values[:, 2], fmt="ro", capsize=2)
+        # ax.legend(loc=1)
         ax.set_ylabel(f"{name} Index of Flatline")
         ax.set_xlabel("Epochs")
+        ax.set_title("# of One-Step MPC Rollouts Before Flatline")
     plt.savefig(f"{filename}.pdf", format="pdf")
     print("Saving time to failure plot to", filename)
 
@@ -203,8 +205,12 @@ def plot_u_diff(data, filename):
         values = data[name]
         ax.scatter(values[:, 0], values[:, 1], label="U Error")
         ax.legend(loc=1)
-        ax.set_ylabel(f"{name} Average Error to Optimal U")
+        ax.set_ylabel(f"{name} Average Error to Optimal U (Nm)")
         ax.set_xlabel("Epochs")
+        ax.set_title(
+            "Error Between 1st Step MPC U and Optimal Dataset U (Avg Across Batch)"
+        )
+        ax.set_yscale("log")
     plt.savefig(f"{filename}.pdf", format="pdf")
     print("Saving U error plot to", filename)
 
