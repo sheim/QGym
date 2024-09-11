@@ -60,6 +60,9 @@ def export_wheelbot_ode_model():
     K_R = cs.horzcat(-1.3e0,  -1.6e-1,  -0.8e-04, -4e-04)
     tau_W_ = -K_W@cs.vertcat(theta, dtheta, q_W, omega_W) + tau_W
     tau_R_ = -K_R@cs.vertcat(phi, dphi, q_R, omega_R) + tau_R
+    
+    constraint = cs.types.SimpleNamespace()
+    constraint.expr = cs.vertcat(tau_W_, tau_R_)
 
     # dynamics
     M = fM(phi, theta, m_WR, m_B, m_WR, I_Wxz_Ryz, I_Wy_Rx, I_Wxz_Ryz, I_Bx, I_By, I_Bz, I_Wy_Rx, I_Wxz_Ryz, I_Wxz_Ryz, r_W, l_WB)

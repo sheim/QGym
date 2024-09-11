@@ -78,7 +78,7 @@ class WheelbotBatchSimulation:
     ):
         self.batch_size = batch_size
         self.sim = AcadosSim()
-        self.sim.model = export_wheelbot_ode_model()
+        self.sim.model,_ = export_wheelbot_ode_model()
         self.sim.solver_options.T = dt
         self.sim.solver_options.integrator_type = "IRK"
         self.sim.solver_options.collocation_type = "GAUSS_RADAU_IIA"
@@ -126,7 +126,7 @@ class WheelbotBatchSimulation:
 class WheelbotSimulation:
     def __init__(self):
         self.sim = AcadosSim()
-        self.sim.model = export_wheelbot_ode_model()
+        self.sim.model,_ = export_wheelbot_ode_model()
         self.sim.solver_options.T = dt
         self.sim.solver_options.integrator_type = "IRK"
         self.sim.solver_options.collocation_type = "GAUSS_RADAU_IIA"
@@ -369,7 +369,7 @@ class WheelbotOneStepMPC:
         ocp = AcadosOcp()
 
         # set model
-        model = export_wheelbot_ode_model()
+        model, constraint= export_wheelbot_ode_model()
         ocp.model = model
 
         nx = model.x.rows()
@@ -402,8 +402,9 @@ class WheelbotOneStepMPC:
         ocp.cost.yref_e = np.zeros((ny_e,))
 
         # set constraints
-        ocp.constraints.lbu = np.array([-0.5, -0.5])
-        ocp.constraints.ubu = np.array([0.5, 0.5])
+        ocp.constraints.con_h_expr = constraint.expr
+        ocp.constraints.lh = np.array([-0.5, -0.5])
+        ocp.constraints.uh = np.array([ 0.5,  0.5])
 
         ocp.constraints.x0 = np.zeros(10)
         ocp.constraints.idxbu = np.array([0, 1])
