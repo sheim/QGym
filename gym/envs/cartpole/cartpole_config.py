@@ -7,7 +7,7 @@ class CartpoleCfg(FixedRobotCfg):
     class env(FixedRobotCfg.env):
         num_envs = 4024
         num_actuators = 1  # 1 for the cart force
-        episode_length_s = 20
+        episode_length_s = 5.0
 
     class terrain(FixedRobotCfg.terrain):
         pass
@@ -35,7 +35,8 @@ class CartpoleCfg(FixedRobotCfg):
             1,  # slider_to_cart
             0,
         ]  # cart_to_pole
-
+        stiffness = {"slider_to_cart": 0.0}
+        damping = {"slider_to_cart": 0.0}
         ctrl_frequency = 250
         desired_sim_frequency = 500
 
@@ -119,25 +120,12 @@ class CartpoleRunnerCfg(FixedRobotCfgPPO):
                 termination = 0.0
 
     class algorithm(FixedRobotCfgPPO.algorithm):
-        # training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 5
-        # * mini batch size = num_envs*nsteps / nminibatches
-        num_mini_batches = 4
-        learning_rate = 1.0e-3
-        schedule = "adaptive"  # could be adaptive, fixed
-        discount_horizon = 1.0  # [s]
-        GAE_bootstrap_horizon = 0.2  # [s]
-        desired_kl = 0.01
-        max_grad_norm = 1.0
+        pass
 
     class runner(FixedRobotCfgPPO.runner):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 96  # per iteration
+        num_steps_per_env = 32  # per iteration
         max_iterations = 500  # number of policy updates
 
         # * logging

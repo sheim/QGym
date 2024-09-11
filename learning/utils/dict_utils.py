@@ -1,21 +1,29 @@
+import numpy as np
 import torch
 from tensordict import TensorDict
 
 
 @torch.no_grad
 def compute_MC_returns(data: TensorDict, gamma, critic=None):
+    # todo not as accurate as taking
     if critic is None:
         last_values = torch.zeros_like(data["rewards"][0])
     else:
         last_values = critic.evaluate(data["critic_obs"][-1])
 
     returns = torch.zeros_like(data["rewards"])
-    returns[-1] = last_values * ~data["dones"][-1]
+    returns[-1] = data["rewards"][-1] + gamma * last_values * ~data["terminated"][-1]
     for k in reversed(range(data["rewards"].shape[0] - 1)):
         not_done = ~data["dones"][k]
         returns[k] = data["rewards"][k] + gamma * returns[k + 1] * not_done
-
-    return normalize(returns)
+        if critic is not None:
+            returns[k] += (
+                gamma
+                * critic.evaluate(data["critic_obs"][k])
+                * data["timed_out"][k]
+                * ~data["terminated"][k]
+            )
+    return returns
 
 
 @torch.no_grad
@@ -29,7 +37,6 @@ def compute_generalized_advantages(data, gamma, lam, critic):
     advantages = torch.zeros_like(data["values"])
     if last_values is not None:
         # todo check this
-        # since we don't have observations for the last step, need last value plugged in
         not_done = ~data["dones"][-1]
         advantages[-1] = (
             data["rewards"][-1]
@@ -53,22 +60,16 @@ def compute_generalized_advantages(data, gamma, lam, critic):
 
 # todo change num_epochs to num_batches
 @torch.no_grad
-def create_uniform_generator(
-    data, batch_size, num_epochs=1, max_gradient_steps=None, keys=None
-):
+def create_uniform_generator(data, batch_size, max_gradient_steps=100):
     n, m = data.shape
     total_data = n * m
 
     if batch_size > total_data:
-        Warning("Batch size is larger than total data, using available data only.")
         batch_size = total_data
 
     num_batches_per_epoch = total_data // batch_size
-    if max_gradient_steps:
-        if max_gradient_steps < num_batches_per_epoch:
-            num_batches_per_epoch = max_gradient_steps
-        num_epochs = max_gradient_steps // num_batches_per_epoch
-        num_epochs = max(num_epochs, 1)
+    num_epochs = max_gradient_steps // num_batches_per_epoch
+    last_epoch_batches = max_gradient_steps - num_epochs * num_batches_per_epoch
 
     for epoch in range(num_epochs):
         indices = torch.randperm(total_data, device=data.device)
@@ -77,3 +78,19 @@ def create_uniform_generator(
                 indices[i * batch_size : (i + 1) * batch_size]
             ]
             yield batched_data
+    else:
+        indices = torch.randperm(total_data, device=data.device)
+        for i in range(last_epoch_batches):
+            batched_data = data.flatten(0, 1)[
+                indices[i * batch_size : (i + 1) * batch_size]
+            ]
+            yield batched_data
+
+
+@torch.no_grad
+def export_to_numpy(data, path):
+    # check if path ends iwth ".npz", and if not append it.
+    if not path.endswith(".npz"):
+        path += ".npz"
+    np.savez_compressed(path, **{key: val.cpu().numpy() for key, val in data.items()})
+    return

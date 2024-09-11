@@ -5,10 +5,15 @@ from gym.utils.helpers import class_to_dict
 
 
 class TaskSkeleton:
-    def __init__(self, num_envs=1, max_episode_length=1.0, device="cpu"):
+    def __init__(self, num_envs=1, device="cpu"):
         self.num_envs = num_envs
-        self.max_episode_length = max_episode_length
         self.device = device
+
+        self.to_be_reset = torch.ones(num_envs, device=device, dtype=torch.bool)
+        self.terminated = torch.ones(num_envs, device=device, dtype=torch.bool)
+        self.episode_length_buf = torch.zeros(num_envs, device=device, dtype=torch.long)
+        self.timed_out = torch.zeros(num_envs, device=device, dtype=torch.bool)
+
         return None
 
     def get_states(self, obs_list):
@@ -45,31 +50,19 @@ class TaskSkeleton:
         """Reset all robots"""
         self._reset_idx(torch.arange(self.num_envs, device=self.device))
         self.step()
+        self.episode_length_buf[:] = 0
 
     def _reset_buffers(self):
         self.to_be_reset[:] = False
         self.terminated[:] = False
         self.timed_out[:] = False
 
-    def compute_reward(self, reward_weights):
-        """Compute and return a torch tensor of rewards
-        reward_weights: dict with keys matching reward names, and values
-            matching weights
-        """
-        reward = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
-        for name, weight in reward_weights.items():
-            reward += weight * self._eval_reward(name)
-        return reward
-
-    def _eval_reward(self, name):
-        return eval("self._reward_" + name + "()")
-
     def _check_terminations_and_timeouts(self):
         """Check if environments need to be reset"""
         contact_forces = self.contact_forces[:, self.termination_contact_indices, :]
         self.terminated |= torch.any(torch.norm(contact_forces, dim=-1) > 1.0, dim=1)
         self.timed_out = self.episode_length_buf >= self.max_episode_length
-        self.to_be_reset = self.timed_out | self.terminated
+        # self.to_be_reset = self.timed_out | self.terminated
 
     def step(self, actions):
         raise NotImplementedError

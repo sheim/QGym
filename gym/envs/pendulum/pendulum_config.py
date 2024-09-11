@@ -33,7 +33,7 @@ class PendulumCfg(FixedRobotCfg):
 
     class control(FixedRobotCfg.control):
         actuated_joints_mask = [1]  # angle
-        ctrl_frequency = 100
+        ctrl_frequency = 25
         desired_sim_frequency = 200
         stiffness = {"theta": 0.0}  # [N*m/rad]
         damping = {"theta": 0.0}  # [N*m*s/rad]
@@ -62,6 +62,7 @@ class PendulumRunnerCfg(FixedRobotCfgPPO):
     runner_class_name = "OnPolicyRunner"
 
     class actor(FixedRobotCfgPPO.actor):
+        frequency = 25
         hidden_dims = [128, 64, 32]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "tanh"

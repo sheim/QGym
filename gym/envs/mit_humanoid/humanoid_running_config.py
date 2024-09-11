@@ -142,7 +142,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         #         +'humanoid_fixed_arms_full.urdf')
         file = (
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
-            + "mit_humanoid/urdf/humanoid_F_sf.urdf"
+            + "mit_humanoid/urdf/humanoid_F_sf_learnt.urdf"
         )
         keypoints = ["base"]
         end_effectors = ["left_foot", "right_foot"]
@@ -273,19 +273,7 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
                 termination = 1
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        # algorithm training hyperparameters
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 5
-        num_mini_batches = 4  # minibatch size = num_envs*nsteps/nminibatches
-        learning_rate = 1.0e-5
-        schedule = "adaptive"  # could be adaptive, fixed
-        gamma = 0.999
-        lam = 0.99
-        desired_kl = 0.01
-        max_grad_norm = 1.0
+        pass
 
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"

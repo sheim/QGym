@@ -178,6 +178,9 @@ class TaskRegistry:
                 f" to {env_cfg.sim_dt}."
             )
 
+        if not hasattr(train_cfg.actor, "frequency"):
+            train_cfg.actor.frequency = env_cfg.control.ctrl_frequency
+
     def set_discount_rates(self, train_cfg, dt):
         if hasattr(train_cfg.algorithm, "discount_horizon"):
             hrzn = train_cfg.algorithm.discount_horizon

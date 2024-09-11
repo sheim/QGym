@@ -26,7 +26,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
         gait_freq = 3.0
-        ctrl_frequency = 100
+        ctrl_frequency = 500
         desired_sim_frequency = 500
 
     class commands(MiniCheetahCfg.commands):
@@ -60,6 +60,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         max_contact_force = 600.0
         base_height_target = 0.3
         tracking_sigma = 0.25
+        switch_scale = 0.1
 
     class scaling(MiniCheetahCfg.scaling):
         pass
@@ -70,8 +71,10 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     runner_class_name = "OnPolicyRunner"
 
     class actor(MiniCheetahRunnerCfg.actor):
+        frequency = 100
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        layer_norm = [True, True, False]
         activation = "elu"
         smooth_exploration = False
         exploration_sample_freq = 16
@@ -83,7 +86,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "phase_obs",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -100,6 +103,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
 
     class critic(MiniCheetahRunnerCfg.critic):
         hidden_dims = [256, 256, 128]
+        layer_norm = [True, True, False]
+        dropouts = [0.1, 0.0, 0.0]
+
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [
@@ -113,7 +119,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         class reward:
             class weights:
@@ -122,17 +128,17 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
                 orientation = 1.0
-                torques = 5.0e-7
+                torques = 5.0e-8
                 dof_vel = 0.0
                 min_base_height = 1.5
                 collision = 0.0
-                action_rate = 0.01
-                action_rate2 = 0.001
+                action_rate = 1e-5
+                action_rate2 = 1e-6
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 1.5
+                reference_traj = 0.0
                 swing_grf = 1.5
                 stance_grf = 1.5
 
@@ -140,11 +146,28 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 termination = 0.15
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
-        pass
+        # both
+        gamma = 0.99
+        lam = 0.95
+        # shared
+        batch_size = 2 * 4096  # use all the data
+        max_gradient_steps = 50
+
+        clip_param = 0.2
+        learning_rate = 1.0e-3
+        max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [2e-5, 1e-2]
+        lr_ratio = 1.5
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 32  # deprecate
+        num_steps_per_env = 20  # deprecate
