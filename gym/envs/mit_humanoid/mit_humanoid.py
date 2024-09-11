@@ -32,29 +32,28 @@ class MIT_Humanoid(LeggedRobot):
         self.sampled_history_threshold = int(
             self.cfg.control.ctrl_frequency / self.cfg.env.sampled_history_frequency
         )
+        self.J = torch.eye(self.num_dof).to(self.device)
+        self.J[4, 3] = 1
+        self.J[9, 8] = 1
+        self.J_inv_T = torch.inverse(self.J.T)
 
     def _apply_coupling(self, q, qd, q_des, qd_des, kp, kd, tau_ff):
         # Create a Jacobian matrix and move it to the same device as input tensors
-        J = torch.eye(q.shape[-1]).to(q.device)
-        J[4, 3] = 1
-        J[9, 8] = 1
 
         # Perform transformations using Jacobian
-        q = torch.matmul(q, J.T)
-        qd = torch.matmul(qd, J.T)
-        q_des = torch.matmul(q_des, J.T)
-        qd_des = torch.matmul(qd_des, J.T)
-
-        # Inverse of the transpose of Jacobian
-        J_inv_T = torch.inverse(J.T)
+        q = torch.matmul(q, self.J.T)
+        qd = torch.matmul(qd, self.J.T)
+        q_des = torch.matmul(q_des, self.J.T)
+        qd_des = torch.matmul(qd_des, self.J.T)
 
         # Compute feed-forward torques
-        tau_ff = torch.matmul(J_inv_T, tau_ff.T).T
+        tau_ff = torch.matmul(self.J_inv_T, tau_ff.T).T
 
         # Compute kp and kd terms
         kp = torch.diagonal(
             torch.matmul(
-                torch.matmul(J_inv_T, torch.diag_embed(kp, dim1=-2, dim2=-1)), J_inv_T.T
+                torch.matmul(self.J_inv_T, torch.diag_embed(kp, dim1=-2, dim2=-1)),
+                self.J_inv_T.T,
             ),
             dim1=-2,
             dim2=-1,
@@ -62,7 +61,8 @@ class MIT_Humanoid(LeggedRobot):
 
         kd = torch.diagonal(
             torch.matmul(
-                torch.matmul(J_inv_T, torch.diag_embed(kd, dim1=-2, dim2=-1)), J_inv_T.T
+                torch.matmul(self.J_inv_T, torch.diag_embed(kd, dim1=-2, dim2=-1)),
+                self.J_inv_T.T,
             ),
             dim1=-2,
             dim2=-1,
@@ -70,7 +70,7 @@ class MIT_Humanoid(LeggedRobot):
 
         # Compute torques
         torques = kp * (q_des - q) + kd * (qd_des - qd) + tau_ff
-        torques = torch.matmul(torques, J)
+        torques = torch.matmul(torques, self.J)
 
         return torques
 

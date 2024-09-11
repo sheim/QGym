@@ -19,7 +19,7 @@ def init_weights(m):
         m.bias.data.fill_(0.01)
 
 
-class Critic(nn.Module):
+class Critic2(nn.Module):
     def __init__(
         self,
         num_obs,

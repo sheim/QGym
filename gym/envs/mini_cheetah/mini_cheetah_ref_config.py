@@ -74,6 +74,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         frequency = 100
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        layer_norm = [True, True, False]
         activation = "elu"
         smooth_exploration = False
         exploration_sample_freq = 16
@@ -102,6 +103,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
 
     class critic(MiniCheetahRunnerCfg.critic):
         hidden_dims = [256, 256, 128]
+        layer_norm = [True, True, False]
+        dropouts = [0.1, 0.0, 0.0]
+
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [

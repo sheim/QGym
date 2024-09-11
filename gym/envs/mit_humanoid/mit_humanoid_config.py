@@ -112,7 +112,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
         }  # [N*m*s/rad]
 
         ctrl_frequency = 100
-        desired_sim_frequency = 1000
+        desired_sim_frequency = 500
 
         filter_gain = 0.1586  # 1: no filtering, 0: wall
 
@@ -123,7 +123,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
         resampling_time = 10.0  # time before command are changed[s]
 
         class ranges:
-            lin_vel_x = [-0.0, 0.0]  # min max [m/s] [-0.75, 0.75]
+            lin_vel_x = [-0.0, 4.0]  # min max [m/s] [-0.75, 0.75]
             lin_vel_y = 0.0  # max [m/s]
             yaw_vel = 0.0  # max [rad/s]
 
@@ -227,10 +227,12 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
     runner_class_name = "OnPolicyRunner"
 
     class actor(LeggedRobotRunnerCfg.actor):
+        frequency = 100
         init_noise_std = 1.0
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        layer_norm = [True, True, False]
         smooth_exploration = False
 
         obs = [
@@ -238,16 +240,15 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
-            # "commands",
+            "commands",
             "dof_pos_obs",
             "dof_vel",
-            "dof_pos_history",
-            # "sampled_history_dof_pos",
-            # "sampled_history_dof_vel",
-            # "sampled_history_dof_pos_target",
-            "oscillator_obs",
+            # "dof_pos_history",
+            "sampled_history_dof_pos",
+            "sampled_history_dof_vel",
+            "sampled_history_dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -264,26 +265,28 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
+        layer_norm = [True, True, False]
 
         obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
-            "commands",
             "dof_pos_obs",
             "dof_vel",
-            "dof_pos_history",
+            "sampled_history_dof_pos",
+            "sampled_history_dof_vel",
+            "sampled_history_dof_pos_target",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         class reward:
             class weights:
-                # tracking_lin_vel = 0.0
-                # tracking_ang_vel = 1.5
+                tracking_lin_vel = 4.0
+                tracking_ang_vel = 0.5
                 # orientation = 1.0
                 torques = 5.0e-4
-                # min_base_height = 1.5
+                min_base_height = 1.5
                 action_rate = 1e-3
                 action_rate2 = 1e-3
                 lin_vel_z = 0.0
@@ -292,8 +295,6 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
                 # stand_still = 0.25
                 dof_pos_limits = 0.25
                 dof_near_home = 0.25
-                stance = 1.0
-                swing = 1.0
                 hips_forward = 0.0
                 walk_freq = 0.0  # 2.5
 
@@ -305,12 +306,8 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 2**15
-        max_gradient_steps = 24
-        # new
-        storage_size = 2**17  # new
-        batch_size = 2**15  #  new
-
+        batch_size = 4096
+        max_gradient_steps = 48
         clip_param = 0.2
         learning_rate = 1.0e-3
         max_grad_norm = 1.0
