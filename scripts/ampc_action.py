@@ -10,6 +10,7 @@ from torch import nn  # noqa F401
 import numpy as np
 from scipy.spatial.distance import pdist
 from scipy.spatial import KDTree
+import itertools
 
 from tqdm import tqdm
 
@@ -41,7 +42,7 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    # "Critic",
+    "Critic",
     # "OuterProduct",
     # "PDCholeskyInput",
     # "CholeskyLatent",
@@ -85,15 +86,47 @@ x0 = x0[~mpc_mask]
 cost = cost[~mpc_mask]
 optimal_u = optimal_u[~mpc_mask]
 
+
 # add in non-fs synthetic data points
-d_max = 0
+def max_pairwise_distance(kdtree):
+    # Get all points from the KDTree
+    points = kdtree.data
+
+    # Find the bounding box
+    min_coords = np.min(points, axis=0)
+    max_coords = np.max(points, axis=0)
+
+    # Find the corners of the bounding box
+    corners = np.array(list(itertools.product(*zip(min_coords, max_coords))))
+
+    # Find the points closest to each corner
+    _, corner_points_indices = kdtree.query(corners)
+
+    # Get the actual points closest to the corners
+    corner_points = points[corner_points_indices]
+
+    max_distance = 0
+    # Calculate pairwise distances between corner points
+    for i in range(len(corner_points)):
+        for j in range(i + 1, len(corner_points)):
+            distance = np.sqrt(np.sum(np.square(corner_points[i] - corner_points[j])))
+            max_distance = max(max_distance, distance)
+
+    return max_distance
+
 
 print("Building KDTree")
 # Build the KDTree to get pairwise point distances
 start = time.time()
 tree = KDTree(x0)
+d_max = max_pairwise_distance(tree)
 
-random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
+random_x0 = np.concatenate(
+    (
+        np.random.uniform(low=0.2 - d_max, high=0.2, size=(5000, x0.shape[1])),
+        np.random.uniform(low=0.8, high=0.8 + d_max, size=(5000, x0.shape[1])),
+    )
+)
 # random_x0 = np.random.uniform(
 #     low=cost.min(), high=cost.max(), size=(10000, x0.shape[1])
 # )
@@ -107,7 +140,7 @@ def process_batch(batch):
 
 print("Creating non feasible state data points")
 # filter random_x0 in batches
-chunk_size = 3
+chunk_size = 100
 x0_non_fs_list = []
 for i in range(0, len(random_x0), chunk_size):
     batch = random_x0[i : i + chunk_size]
