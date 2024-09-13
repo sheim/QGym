@@ -188,7 +188,7 @@ def in_box(x, x_min, x_max):
 
 terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
 onestepmpc = WheelbotOneStepMPC()
-check_terminal_nth_epoch = 2  # 20  # 500
+check_terminal_nth_epoch = 20  # 500
 eval_frac_in_terminal = defaultdict(list)
 
 # turn numpy arrays to torch before training
@@ -215,7 +215,7 @@ test_error = {name: [] for name in critic_names}
 lr_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 6  # 500  # 4000
+max_gradient_steps = 2000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -247,7 +247,7 @@ for ix, name in enumerate(critic_names):
     critic = critic_class(**params).to(DEVICE)
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        critic_optimizer, mode="min", factor=0.5, patience=10
+        critic_optimizer, mode="min", factor=0.5, patience=50, threshold=1e-5
     )
 
     # train new critic

@@ -178,11 +178,13 @@ default_subplot_labels_u = ["torque driving [Nm]", "torque reaction [Nm]"]
 
 def plot_time_to_failure(data, filename):
     fig, axes = plt.subplots(
-        nrows=len(list(data.keys())),
+        nrows=len(set(data.keys()) - {"Critic"}),
         ncols=1,
     )
     for ix, name in enumerate(data.keys()):
-        ax = axes[ix] if isinstance(axes, list) else axes
+        if name == "Critic":
+            continue
+        ax = axes[ix] if isinstance(axes, np.ndarray) else axes
         values = data[name]
         # ax.scatter(values[:, 0], values[:, 1], label="mean")
         # ax.scatter(values[:, 0], values[:, 2], label="std")
@@ -197,11 +199,13 @@ def plot_time_to_failure(data, filename):
 
 def plot_u_diff(data, filename):
     fig, axes = plt.subplots(
-        nrows=len(list(data.keys())),
+        nrows=len(set(data.keys()) - {"Critic"}),
         ncols=1,
     )
     for ix, name in enumerate(data.keys()):
-        ax = axes[ix] if isinstance(axes, list) else axes
+        if name == "Critic":
+            continue
+        ax = axes[ix] if isinstance(axes, np.ndarray) else axes
         values = data[name]
         ax.scatter(values[:, 0], values[:, 1], label="U Error")
         ax.legend(loc=1)

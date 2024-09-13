@@ -94,7 +94,7 @@ def plot_variable_lr(data, fn, title="Scheduled Learning Rate", extension="png")
         ncols=1,
     )
     for ix, name in enumerate(data.keys()):
-        ax = axes[ix] if isinstance(axes, list) else axes
+        ax = axes[ix] if isinstance(axes, np.ndarray) else axes
         values = data[name]
         ax.plot(values, label=name)
         ax.legend()
