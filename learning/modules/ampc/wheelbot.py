@@ -407,7 +407,7 @@ class WheelbotOneStepMPC:
         ocp.constraints.uh = np.array([0.5, 0.5])
 
         ocp.constraints.x0 = np.zeros(10)
-        ocp.constraints.idxbu = np.array([0, 1])
+        # ocp.constraints.idxbu = np.array([0, 1])
 
         ocp.solver_options.qp_solver = (
             "PARTIAL_CONDENSING_HPIPM"  # FULL_CONDENSING_QPOASES
