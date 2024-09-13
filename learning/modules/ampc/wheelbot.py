@@ -402,7 +402,7 @@ class WheelbotOneStepMPC:
         ocp.cost.yref_e = np.zeros((ny_e,))
 
         # set constraints
-        ocp.constraints.con_h_expr = constraint.expr
+        ocp.model.con_h_expr = constraint.expr
         ocp.constraints.lh = np.array([-0.5, -0.5])
         ocp.constraints.uh = np.array([0.5, 0.5])
 
