@@ -373,7 +373,7 @@ class WheelbotOneStepMPC:
         ocp = AcadosOcp()
 
         # set model
-        model, constraint = export_wheelbot_ode_model()
+        model = export_wheelbot_ode_model()
         ocp.model = model
 
         nx = model.x.rows()
@@ -406,7 +406,7 @@ class WheelbotOneStepMPC:
         ocp.cost.yref_e = np.zeros((ny_e,))
 
         # set constraints
-        ocp.model.con_h_expr = constraint.expr
+        # ocp.model.con_h_expr = constraint.expr
         ocp.constraints.lh = np.array([-0.5, -0.5])
         ocp.constraints.uh = np.array([0.5, 0.5])
 

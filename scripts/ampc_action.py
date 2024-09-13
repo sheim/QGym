@@ -42,7 +42,7 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    "Critic",
+    # "Critic",
     # "OuterProduct",
     # "PDCholeskyInput",
     # "CholeskyLatent",
@@ -181,6 +181,15 @@ from learning.modules.ampc.wheelbot import (
     WheelbotOneStepMPC,
 )
 
+K_W = np.array([400e-3, 40e-3, 3e-3, 3e-3])
+K_R = np.array([1.3e0, 1.6e-1, 0.8e-04, 4e-04])
+K = np.array(
+    [
+        [0, 0, K_W[0], 0, 0, K_W[1], K_W[2], 0, K_W[3], 0],
+        [0, K_R[0], 0, 0, K_R[1], 0, 0, K_R[2], 0, K_R[3]],
+    ]
+)
+
 
 def in_box(x, x_min, x_max):
     return np.all(np.logical_and(x >= x_min, x <= x_max))
@@ -247,7 +256,7 @@ for ix, name in enumerate(critic_names):
     critic = critic_class(**params).to(DEVICE)
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        critic_optimizer, mode="min", factor=0.5, patience=50, threshold=1e-5
+        critic_optimizer, mode="min", factor=0.5, patience=100, threshold=1e-5
     )
 
     # train new critic
@@ -324,8 +333,10 @@ for ix, name in enumerate(critic_names):
                     # denormalize A before sending it to one step MPC
                     A = (cost_max - cost_min) * A + cost_min
                     u, xnext, status = onestepmpc.run(X_sim_cl_[b, :, k], A)
+                    u_applied = K @ X_sim_cl_[b, :, k] + u
                     # if k == 0:
                     #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
+                    # print("applied torque", u_applied, "at step", k)
                     if k == 0:
                         row_ix = (
                             np.asarray(mpc_eval_x0 == X_sim_cl_[b, :, k])
