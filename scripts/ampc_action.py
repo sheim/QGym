@@ -27,6 +27,7 @@ from learning.modules.lqrc.plotting import (
     plot_learning_progress,
     plot_binned_errors_ampc,
     plot_variable_lr,
+    plot_eigenval_hist,
 )
 from learning.modules.lqrc.utils import get_latent_matrix
 from learning.modules.utils.neural_net import export_network
@@ -42,11 +43,11 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    # "Critic",
     # "OuterProduct",
     # "PDCholeskyInput",
     # "CholeskyLatent",
     "DenseSpectralLatent",
+    "Critic",
 ]
 print("Loading data")
 # load data
@@ -197,7 +198,7 @@ def in_box(x, x_min, x_max):
 
 terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
 onestepmpc = WheelbotOneStepMPC()
-check_terminal_nth_epoch = 20  # 500
+check_terminal_nth_epoch = 50  # 500
 eval_frac_in_terminal = defaultdict(list)
 
 # turn numpy arrays to torch before training
@@ -224,7 +225,7 @@ test_error = {name: [] for name in critic_names}
 lr_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 2000
+max_gradient_steps = 1000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -254,7 +255,8 @@ for ix, name in enumerate(critic_names):
 
     critic_class = globals()[name]
     critic = critic_class(**params).to(DEVICE)
-    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
+    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3, weight_decay=0.01)
+    # critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         critic_optimizer, mode="min", factor=0.5, patience=100, threshold=1e-5
     )
@@ -277,7 +279,6 @@ for ix, name in enumerate(critic_names):
             with torch.no_grad():
                 critic.value_offset.copy_(standard_offset)
             print(f"{name} value offset after mean assigning", critic.value_offset)
-
         # extract matrix transform for latent if applicable
         if "Latent" in name:
             latent_weight = get_latent_matrix(
@@ -309,29 +310,39 @@ for ix, name in enumerate(critic_names):
         # perform closed-loop simulation as test error metric
         if name != "Critic" and (counter % check_terminal_nth_epoch == 0):
             N_eval = int(3 * N)
-            X_sim_ = mpc_eval_x0
+            X_sim_ = (x0_max - x0_min) * mpc_eval_x0 + x0_min
             X_sim_cl_ = np.repeat(X_sim_[:, :, np.newaxis], N_eval + 1, axis=2)
             U_sim_cl_ = np.zeros((np.shape(X_sim_cl_)[0], nu, N_eval))
 
             epoch_ix = (counter // check_terminal_nth_epoch) - 1
             u_diff_per_batch[epoch_ix, 0] = counter
+            eigen_vals = []
             for b in range(batch_terminal_eval):
                 onestepmpc.reset()
                 for k in range(N_eval):
-                    # print("k", k)
                     # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
                     prediction = critic.evaluate(
-                        torch.from_numpy(X_sim_cl_[b, :, k])
+                        torch.from_numpy(
+                            (X_sim_cl_[b, :, k] - x0_min) / (x0_max - x0_min)
+                        )
                         .float()
                         .to(DEVICE)
                         .unsqueeze(0),
                         return_all=True,
                     )
                     A = prediction["A"].squeeze().cpu().detach().numpy()
+                    eigen_vals.extend(
+                        [eig.real for eig in np.linalg.eigvals(A).tolist()]
+                    )
                     if "Latent" in name:
                         A = latent_weight.T @ A @ latent_weight
                     # denormalize A before sending it to one step MPC
+                    if np.isnan(np.amax(A)):
+                        print(f"Max elem of A is nan at batch {b} and step {k}")
+                    if k == N_eval - 1:
+                        print("Max elem of A at final step", np.amax(A))
                     A = (cost_max - cost_min) * A + cost_min
+                    # print(f"k {k} max A after denorm", np.amax(A))
                     u, xnext, status = onestepmpc.run(X_sim_cl_[b, :, k], A)
                     u_applied = K @ X_sim_cl_[b, :, k] + u
                     # if k == 0:
@@ -339,7 +350,10 @@ for ix, name in enumerate(critic_names):
                     # print("applied torque", u_applied, "at step", k)
                     if k == 0:
                         row_ix = (
-                            np.asarray(mpc_eval_x0 == X_sim_cl_[b, :, k])
+                            np.asarray(
+                                mpc_eval_x0
+                                == (X_sim_cl_[b, :, k] - x0_min) / (x0_max - x0_min)
+                            )
                             .all(axis=1)
                             .nonzero()
                         )
@@ -361,15 +375,15 @@ for ix, name in enumerate(critic_names):
             )
             eval_frac_in_terminal[name].append(frac_in_terminal)
 
-            plot_outdir = f"{save_path}/traj_graphs"
-            if not os.path.exists(plot_outdir):
-                os.makedirs(plot_outdir)
+            plot_traj_outdir = f"{save_path}/traj_graphs"
+            if not os.path.exists(plot_traj_outdir):
+                os.makedirs(plot_traj_outdir)
             random_indices = random.sample(list(range(batch_terminal_eval)), 5)
             plot_wheelbot_all_inits(
                 X_sim_cl_[random_indices],
                 U_sim_cl_[random_indices],
                 plot_labels=["cl_sim"],
-                filename=f"{plot_outdir}/{counter}_plot",
+                filename=f"{plot_traj_outdir}/{counter}_plot",
                 show=False,
             )
             t_to_fail_samples = []
@@ -387,6 +401,14 @@ for ix, name in enumerate(critic_names):
                 t_to_fail_samples.mean(),
                 "and std",
                 t_to_fail_samples.std(),
+            )
+            plot_eig_outdir = f"{save_path}/traj_graphs"
+            if not os.path.exists(plot_eig_outdir):
+                os.makedirs(plot_eig_outdir)
+            plot_eigenval_hist(
+                eigen_vals,
+                fn=f"{plot_traj_outdir}/{counter}_plot",
+                title="Histogram of Eigenvalues Across Batch",
             )
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())

@@ -29,7 +29,7 @@ def compose_cholesky(L):
 
 
 def quadratify_xAx(x, A):
-    res  = torch.einsum(
+    res = torch.einsum(
         "...ij, ...jk -> ...ik",
         torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A),
         x.unsqueeze(-1),
@@ -164,7 +164,11 @@ class OuterProductLatent(OuterProduct):
             **kwargs,
         )
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
+            num_obs,
+            latent_dim,
+            latent_hidden_dims,
+            latent_activation,
+            bias_in_linear_layers=False,
         )
 
     def forward(self, x, return_all=False):
@@ -270,7 +274,11 @@ class CholeskyLatent(CholeskyInput):
         )
 
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
+            num_obs,
+            latent_dim,
+            latent_hidden_dims,
+            latent_activation,
+            bias_in_linear_layers=False,
         )
 
         # self.latent_NN.apply(init_weights)
@@ -381,7 +389,11 @@ class SpectralLatent(nn.Module):
             num_obs, n_outputs, hidden_dims, activation, dropouts
         )
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
+            num_obs,
+            latent_dim,
+            latent_hidden_dims,
+            latent_activation,
+            bias_in_linear_layers=False,
         )
 
     def forward(self, x, return_all=False):
@@ -485,7 +497,11 @@ class DenseSpectralLatent(nn.Module):
             num_obs, n_outputs, hidden_dims, activation, dropouts
         )
         self.latent_NN = create_MLP(
-            num_obs, latent_dim, latent_hidden_dims, latent_activation, bias_in_linear_layers=False
+            num_obs,
+            latent_dim,
+            latent_hidden_dims,
+            latent_activation,
+            bias_in_linear_layers=False,
         )
 
     def forward(self, x, return_all=False):
@@ -503,7 +519,7 @@ class DenseSpectralLatent(nn.Module):
         L[..., :, self.relative_dim :] = y[
             ..., self.relative_dim + tril_indices.shape[1] :
         ].view(L[..., :, self.relative_dim :].shape)
-        
+
         # Compute (L^T A_diag) L
         A = torch.einsum(
             "...ij,...jk->...ik",

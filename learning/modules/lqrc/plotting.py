@@ -88,6 +88,18 @@ def create_custom_pink_green_colormap():
     return custom_pink_green
 
 
+def plot_eigenval_hist(
+    data, fn, n_bins=100, title="Histogram of Eigenvalues", extension="png"
+):
+    fig, ax = plt.subplots(1, tight_layout=True)
+    ax.hist(data, bins=n_bins)
+    ax.set_xlabel("Eigenvalue")
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.savefig(f"{fn}.{extension}", dpi=300, bbox_inches="tight")
+    print("Histogram of eigenvalues saved to", f"{fn}.{extension}")
+
+
 def plot_variable_lr(data, fn, title="Scheduled Learning Rate", extension="png"):
     fig, axes = plt.subplots(
         nrows=len(list(data.keys())),
