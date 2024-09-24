@@ -216,6 +216,7 @@ def plot_u_diff(data, filename):
         )
         ax.set_yscale("log")
     plt.savefig(f"{filename}.pdf", format="pdf")
+    plt.tight_layout(pad=0.0, w_pad=0.75, h_pad=0.0)
     print("Saving U error plot to", filename)
 
 

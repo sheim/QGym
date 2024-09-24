@@ -32,6 +32,8 @@ from learning.modules.lqrc.plotting import (
 from learning.modules.lqrc.utils import get_latent_matrix
 from learning.modules.utils.neural_net import export_network
 
+ONE_STEP_MPC = False
+
 # make dir for saving this run's results
 time_str = time.strftime("%Y%m%d_%H%M%S")
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
@@ -128,9 +130,6 @@ random_x0 = np.concatenate(
         np.random.uniform(low=0.8, high=0.8 + d_max, size=(5000, x0.shape[1])),
     )
 )
-# random_x0 = np.random.uniform(
-#     low=cost.min(), high=cost.max(), size=(10000, x0.shape[1])
-# )
 
 
 def process_batch(batch):
@@ -225,7 +224,7 @@ test_error = {name: [] for name in critic_names}
 lr_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 1000
+max_gradient_steps = 200  # 500  # 1000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -308,8 +307,13 @@ for ix, name in enumerate(critic_names):
         test_error[name].append(actual_error.detach().mean().numpy())
         lr_history[name].append(lr_scheduler.get_last_lr()[0])
         # perform closed-loop simulation as test error metric
-        if name != "Critic" and (counter % check_terminal_nth_epoch == 0):
-            N_eval = int(3 * N)
+        if (
+            ONE_STEP_MPC
+            and name != "Critic"
+            and (counter % check_terminal_nth_epoch == 0)
+        ):
+            # N_eval = int(3 * N)
+            N_eval = 30
             X_sim_ = (x0_max - x0_min) * mpc_eval_x0 + x0_min
             X_sim_cl_ = np.repeat(X_sim_[:, :, np.newaxis], N_eval + 1, axis=2)
             U_sim_cl_ = np.zeros((np.shape(X_sim_cl_)[0], nu, N_eval))
@@ -331,16 +335,22 @@ for ix, name in enumerate(critic_names):
                         return_all=True,
                     )
                     A = prediction["A"].squeeze().cpu().detach().numpy()
-                    eigen_vals.extend(
-                        [eig.real for eig in np.linalg.eigvals(A).tolist()]
-                    )
+                    try:
+                        eigen_vals.extend(
+                            [eig.real for eig in np.linalg.eigvals(A).tolist()]
+                        )
+                    except:
+                        print(
+                            "NaNs stopped eigenvalue computation, adding NaNs to eigenvalue list"
+                        )
+                        eigen_vals.extend([float("nan") for _ in range(A.shape[0])])
                     if "Latent" in name:
                         A = latent_weight.T @ A @ latent_weight
                     # denormalize A before sending it to one step MPC
-                    if np.isnan(np.amax(A)):
-                        print(f"Max elem of A is nan at batch {b} and step {k}")
-                    if k == N_eval - 1:
-                        print("Max elem of A at final step", np.amax(A))
+                    # if np.isnan(np.amax(A)):
+                    #     print(f"Max elem of A is nan at batch {b} and step {k}")
+                    # if k == N_eval - 1:
+                    #     print("Max elem of A at final step", np.amax(A))
                     A = (cost_max - cost_min) * A + cost_min
                     # print(f"k {k} max A after denorm", np.amax(A))
                     u, xnext, status = onestepmpc.run(X_sim_cl_[b, :, k], A)
@@ -383,7 +393,7 @@ for ix, name in enumerate(critic_names):
                 X_sim_cl_[random_indices],
                 U_sim_cl_[random_indices],
                 plot_labels=["cl_sim"],
-                filename=f"{plot_traj_outdir}/{counter}_plot",
+                filename=f"{plot_traj_outdir}/{counter}_plot_traj",
                 show=False,
             )
             t_to_fail_samples = []
@@ -402,12 +412,9 @@ for ix, name in enumerate(critic_names):
                 "and std",
                 t_to_fail_samples.std(),
             )
-            plot_eig_outdir = f"{save_path}/traj_graphs"
-            if not os.path.exists(plot_eig_outdir):
-                os.makedirs(plot_eig_outdir)
             plot_eigenval_hist(
                 eigen_vals,
-                fn=f"{plot_traj_outdir}/{counter}_plot",
+                fn=f"{plot_traj_outdir}/{counter}_plot_eigenval",
                 title="Histogram of Eigenvalues Across Batch",
             )
     print(f"{name} average error: ", actual_error.mean().item())
@@ -421,16 +428,15 @@ for ix, name in enumerate(critic_names):
 
     print(
         f"{name} mean",
-        graphing_data["values"][name].mean(),
+        graphing_data["values"][name].mean().item(),
         "median",
-        graphing_data["values"][name].median(),
+        graphing_data["values"][name].median().item(),
         "std dev",
-        graphing_data["values"][name].std(),
+        graphing_data["values"][name].std().item(),
     )
 for key in critic_names:
     t_to_fail[key] = np.array(t_to_fail[key])
-plot_time_to_failure(t_to_fail, f"{save_path}/time_to_fail")
-plot_u_diff(u_diff, f"{save_path}/u_error")
+
 plot_learning_progress(
     test_error,
     "Pointwise Error on Test Set \n (Comparison of Normed Vals Used in Supervised Training)",
@@ -438,9 +444,16 @@ plot_learning_progress(
 )
 plot_variable_lr(lr_history, f"{save_path}/lr_history")
 
+plot_binned_errors_ampc(
+    graphing_data,
+    save_path + "/ampc",
+    title_add_on=f"Value Function at {max_gradient_steps} Epochs, With Offset (log scale)",
+    lb=0.0,
+    ub=0.75,
+    step=0.025,
+    tick_step=10,
+)
 
-# plot_binned_errors_ampc(
-#     graphing_data,
-#     save_path + "/ampc",
-#     title_add_on=f"Value Function for AMPC",
-# )
+if ONE_STEP_MPC:
+    plot_time_to_failure(t_to_fail, f"{save_path}/time_to_fail")
+    plot_u_diff(u_diff, f"{save_path}/u_error")

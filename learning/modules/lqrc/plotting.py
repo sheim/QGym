@@ -95,6 +95,7 @@ def plot_eigenval_hist(
     ax.hist(data, bins=n_bins)
     ax.set_xlabel("Eigenvalue")
     ax.set_title(title)
+    ax.set_yscale("log")
     plt.tight_layout()
     plt.savefig(f"{fn}.{extension}", dpi=300, bbox_inches="tight")
     print("Histogram of eigenvalues saved to", f"{fn}.{extension}")
@@ -134,7 +135,12 @@ def plot_binned_errors_ampc(
         "DenseSpectralLatent": "Spectral Latent",
         "Critic": "Critic",
     }
-    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(16, 15), layout="constrained")
+    fig, axes = plt.subplots(
+        nrows=len(list(data["critic_obs"].keys())),
+        ncols=1,
+        figsize=(16, 15),
+        layout="constrained",
+    )
     fig.suptitle(f"Pointwise Prediction Error for {title_add_on} \n", fontsize=27)
 
     bins = np.arange(lb, ub, step)
@@ -153,7 +159,7 @@ def plot_binned_errors_ampc(
         y_min = bincount.min() if bincount.min() < y_min else y_min
         y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
 
-        axes.bar(
+        axes[ix].bar(
             np.arange(len(bincount)),
             bincount,
             alpha=0.5,
@@ -166,8 +172,11 @@ def plot_binned_errors_ampc(
             -min((tick_step / 2.0), 2.0),
             min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
         )
-        axes[ix].tick_params(axis="both", which="major", labelsize=15)
-    for ix, critic in enumerate(data.keys()):
+        axes[ix].tick_params(axis="both", which="major", labelsize=20)
+        axes[ix].set_yscale("log")
+        axes[ix].set_ylabel("# of Pointwise Comparisons", fontsize=20)
+        axes[ix].set_xlabel("Error Magnitude", fontsize=20)
+    for ix, critic in enumerate(data["critic_obs"].keys()):
         axes[ix].set_ylim(y_min, y_max)
     fig.legend(
         loc=" outside upper right", fontsize=20, ncol=3, bbox_to_anchor=(0.85, 0.2)
