@@ -96,7 +96,6 @@ def plot_eigenval_hist(
     ax.set_xlabel("Eigenvalue")
     ax.set_title(title)
     ax.set_yscale("log")
-    plt.tight_layout()
     plt.savefig(f"{fn}.{extension}", dpi=300, bbox_inches="tight")
     print("Histogram of eigenvalues saved to", f"{fn}.{extension}")
 
