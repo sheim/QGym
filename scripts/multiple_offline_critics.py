@@ -74,6 +74,7 @@ critic_optimizers = {
     for name, critic in test_critics.items()
 }
 
+num_trials = 5
 gamma = 0.95
 lam = 1.0
 tot_iter = 200

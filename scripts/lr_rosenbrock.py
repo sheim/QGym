@@ -51,7 +51,7 @@ critic_names = [
 ]
 
 # generate data
-n_dims = 2
+n_dims = 3
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
@@ -140,8 +140,10 @@ for trial in range(num_trials):
                             ).pow(2)
                         ).to("cpu")
                     test_error[lr][name].append(actual_error.detach().mean().numpy())
-                print(f"{name} average error: ", actual_error.mean().item())
-                print(f"{name} max error: ", actual_error.max().item())
+                # print(f"{name} average error: ", actual_error.mean().item())
+                # print(f"{name} max error: ", actual_error.max().item())
+                # print(f"{name} min error: ", actual_error.min().item())
+                # print(f"{name} error std: ", actual_error.std().item())
 
                 with torch.no_grad():
                     graphing_data[lr]["error"][name][trial, ...] = actual_error
@@ -150,6 +152,11 @@ for trial in range(num_trials):
                         data[0, :]["critic_obs"]
                     )
                     graphing_data[lr]["returns"][name] = data[0, :]["returns"]
+            print(f"At trial {trial}")
+            print(f"{name} average error: ", actual_error.mean().item())
+            print(f"{name} max error: ", actual_error.max().item())
+            print(f"{name} min error: ", actual_error.min().item())
+            print(f"{name} error std: ", actual_error.std().item())
 
 # compare new and old critics
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
@@ -176,7 +183,8 @@ plot_binned_errors(
     g_data_no_ground_truth,
     save_path + "/rosenbrock",
     title_add_on=f"{n_dims}D Rosenbrock Function at Different Learning Rates \n Averaged Across {num_trials} Trials",
-    multi_trial=False
+    multi_trial=True,
+    extension="pdf"
 )
 
 if n_dims == 2:
@@ -191,7 +199,8 @@ if n_dims == 2:
             fn=save_path + f"/{len(critic_names)}_lr_{lr}",
             data=data[0, train_idx]["critic_obs"],
             grid_size=grid_resolution,
-            task="Rosenbrock"
+            task="Rosenbrock",
+            extension="pdf"
         )
 
 this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "lr_rosenbrock.py")

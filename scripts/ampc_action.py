@@ -32,6 +32,7 @@ from learning.modules.lqrc.plotting import (
 from learning.modules.lqrc.utils import get_latent_matrix
 from learning.modules.utils.neural_net import export_network
 
+
 ONE_STEP_MPC = False
 
 # make dir for saving this run's results
@@ -45,7 +46,7 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    # "OuterProduct",
+    "OuterProduct",
     # "PDCholeskyInput",
     # "CholeskyLatent",
     "DenseSpectralLatent",
@@ -133,7 +134,7 @@ random_x0 = np.concatenate(
 
 
 def process_batch(batch):
-    indices = tree.query_ball_point(batch, d_max)
+    indices = tree.query_ball_point(batch, 0.1)
     mask = np.array([len(idx) == 0 for idx in indices])
     return batch[mask]
 
@@ -275,9 +276,9 @@ for ix, name in enumerate(critic_names):
             if ix == 0:
                 standard_offset = batch["cost"].mean()
             print(f"{name} value offset before mean assigning", critic.value_offset)
-            with torch.no_grad():
-                critic.value_offset.copy_(standard_offset)
-            print(f"{name} value offset after mean assigning", critic.value_offset)
+            # with torch.no_grad():
+            #     critic.value_offset.copy_(standard_offset)
+            # print(f"{name} value offset after mean assigning", critic.value_offset)
         # extract matrix transform for latent if applicable
         if "Latent" in name:
             latent_weight = get_latent_matrix(
@@ -447,7 +448,7 @@ plot_variable_lr(lr_history, f"{save_path}/lr_history")
 plot_binned_errors_ampc(
     graphing_data,
     save_path + "/ampc",
-    title_add_on=f"Value Function at {max_gradient_steps} Epochs, With Offset (log scale)",
+    title_add_on=f"Value Function at {max_gradient_steps} Epochs, No Offset (log scale)",
     lb=0.0,
     ub=0.75,
     step=0.025,

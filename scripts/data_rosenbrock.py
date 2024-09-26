@@ -56,6 +56,7 @@ n_dims = 2
 grid_resolution = 50
 total_data = grid_resolution**n_dims
 x, target = generate_bounded_rosenbrock(n_dims, lb=0.0, ub=2.0, steps=grid_resolution)
+print("rosenbrock min", target.min().item(), "max", target.max().item(), "mean", target.mean().item(), "median", target.median().item())
 # test train split
 ideal_training_data = int(0.6 * total_data)
 rand_perm = torch.randperm(total_data)
@@ -64,11 +65,11 @@ n_validation_data = total_data - ideal_training_data
 
 
 # set up training
-num_trials = 2
+num_trials = 5
 tot_iter = 1
 iter_offset = 0
 iter_step = 1
-max_gradient_steps = 200 #1000
+max_gradient_steps = 1000
 # max_grad_norm = 1.0
 batch_size = 128
 

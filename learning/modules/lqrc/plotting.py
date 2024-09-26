@@ -184,6 +184,7 @@ def plot_binned_errors_ampc(
     print(f"Saved to {fn}.{extension}")
 
 
+
 def plot_binned_errors(
     data,
     fn,
@@ -238,12 +239,27 @@ def plot_binned_errors(
                 for jx, row in enumerate(digitized):
                     bincount_by_row[jx, ...] = np.bincount(row, minlength=num_bins)
                 # print out mean error binned and std deviation of error binning across trials
+                # print(f"************{critic} at {param}****************")
+                # print("Bins", bins)
+                # print(np.vstack((bincount, bincount_by_row.std(axis=0))))
+                # Calculate percentages
+                total_count = np.sum(bincount)
+                percentages = (bincount / total_count) * 100
+                
+                # Prepare data for the table
+                table_data = []
+                for i in range(len(bins)-1):
+                    bin_range = f"{bins[i]:.2f} - {bins[i+1]:.2f}"
+                    frequency = bincount[i]
+                    percentage = percentages[i]
+                    table_data.append([bin_range, frequency, f"{percentage:.2f}%"])
+                
+                # Create and print the table
+                headers = ["Bin Range", "Frequency", "Percentage"]
+                table = tabulate(table_data, headers=headers, tablefmt="grid")
                 print(f"************{critic} at {param}****************")
-                print("Bins", bins)
-                print(np.vstack((bincount, bincount_by_row.std(axis=0))))
-                # print(bin_labels)
-                # print(bincount)
-                # print(bincount_by_row.std(axis=0))
+                print(table)
+
 
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max
