@@ -130,6 +130,7 @@ def plot_binned_errors_ampc(
 ):
     display_names = {
         "OuterProduct": "Outer Product",
+        "OuterProductLatent": "Outer Product Latent",
         "CholeskyLatent": "Cholesky Latent",
         "DenseSpectralLatent": "Spectral Latent",
         "Critic": "Critic",
@@ -172,7 +173,7 @@ def plot_binned_errors_ampc(
             min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
         )
         axes[ix].tick_params(axis="both", which="major", labelsize=20)
-        # axes[ix].set_yscale("log")
+        axes[ix].set_yscale("log")
         axes[ix].set_ylabel("# of Pointwise Comparisons", fontsize=20)
         axes[ix].set_xlabel("Error Magnitude", fontsize=20)
     for ix, critic in enumerate(data["critic_obs"].keys()):

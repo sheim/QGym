@@ -33,7 +33,7 @@ from learning.modules.lqrc.utils import get_latent_matrix
 from learning.modules.utils.neural_net import export_network
 
 
-ONE_STEP_MPC = False
+ONE_STEP_MPC = True
 
 # make dir for saving this run's results
 time_str = time.strftime("%Y%m%d_%H%M%S")
@@ -46,7 +46,8 @@ for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
 critic_names = [
-    "OuterProduct",
+    # "OuterProduct",
+    # "OuterProductLatent",
     # "PDCholeskyInput",
     "CholeskyLatent",
     "DenseSpectralLatent",
@@ -190,6 +191,35 @@ import matplotlib.pyplot as plt
 
 plt.hist(cost, bins=100)
 plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
+
+
+def is_lipschitz_continuous(X, y, threshold=1e6):
+    sample_ix = random.sample(list(range(X.shape[0])), 1000)
+    mask = np.zeros(len(y), dtype=bool)
+    mask[sample_ix] = True
+    X = X[mask]
+    y = y[mask]
+    n_samples = X.shape[0]
+    max_ratio = 0
+
+    for i in range(n_samples):
+        for j in range(i + 1, n_samples):
+            x_diff = np.linalg.norm(X[i] - X[j])
+            y_diff = np.abs(y[i] - y[j])
+
+            if x_diff != 0:
+                ratio = y_diff / x_diff
+                max_ratio = max(max_ratio, ratio)
+
+    return max_ratio < threshold, max_ratio
+
+
+print(
+    "Dataset Lipschitz continuity with threshold of 1e-6",
+    is_lipschitz_continuous(
+        x0, cost, threshold=100
+    ),  # reduced threshold due to 0 to 1 normalization
+)
 
 # ampc imports and setup
 from collections import defaultdict
@@ -422,7 +452,7 @@ for ix, name in enumerate(critic_names):
                 X_sim_cl_[random_indices],
                 U_sim_cl_[random_indices],
                 plot_labels=["cl_sim"],
-                filename=f"{plot_traj_outdir}/{counter}_plot_traj",
+                filename=f"{plot_traj_outdir}/{name}_{counter}_plot_traj",
                 show=False,
             )
             t_to_fail_samples = []
@@ -443,7 +473,7 @@ for ix, name in enumerate(critic_names):
             )
             plot_eigenval_hist(
                 eigen_vals,
-                fn=f"{plot_traj_outdir}/{counter}_plot_eigenval",
+                fn=f"{plot_traj_outdir}/{name}_{counter}_plot_eigenval",
                 title="Histogram of Eigenvalues Across Batch",
             )
     print(f"{name} average error: ", actual_error.mean().item())
