@@ -172,7 +172,7 @@ def plot_binned_errors_ampc(
             min(len(bins) + (tick_step / 2.0), len(bins) + 2.0),
         )
         axes[ix].tick_params(axis="both", which="major", labelsize=20)
-        axes[ix].set_yscale("log")
+        # axes[ix].set_yscale("log")
         axes[ix].set_ylabel("# of Pointwise Comparisons", fontsize=20)
         axes[ix].set_xlabel("Error Magnitude", fontsize=20)
     for ix, critic in enumerate(data["critic_obs"].keys()):
@@ -182,7 +182,6 @@ def plot_binned_errors_ampc(
     )
     plt.savefig(fn + f".{extension}", bbox_inches="tight", dpi=300)
     print(f"Saved to {fn}.{extension}")
-
 
 
 def plot_binned_errors(
@@ -245,21 +244,20 @@ def plot_binned_errors(
                 # Calculate percentages
                 total_count = np.sum(bincount)
                 percentages = (bincount / total_count) * 100
-                
+
                 # Prepare data for the table
                 table_data = []
-                for i in range(len(bins)-1):
+                for i in range(len(bins) - 1):
                     bin_range = f"{bins[i]:.2f} - {bins[i+1]:.2f}"
                     frequency = bincount[i]
                     percentage = percentages[i]
                     table_data.append([bin_range, frequency, f"{percentage:.2f}%"])
-                
+
                 # Create and print the table
                 headers = ["Bin Range", "Frequency", "Percentage"]
                 table = tabulate(table_data, headers=headers, tablefmt="grid")
                 print(f"************{critic} at {param}****************")
                 print(table)
-
 
             y_min = bincount.min() if bincount.min() < y_min else y_min
             y_max = bincount.max() + 10 if bincount.max() + 10 > y_max else y_max

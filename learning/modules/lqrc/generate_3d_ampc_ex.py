@@ -51,7 +51,7 @@ def plot_data(title, fn):
 
 
 # Generate samples
-n_samples = 2000
+n_samples = 1000
 x0, cost = generate_data(n_samples)
 
 # remove top 1% of cost values and corresponding states
@@ -119,18 +119,19 @@ start = time.time()
 tree = KDTree(x0)
 d_max = max_pairwise_distance(tree)
 midpt = np.mean(x0, axis=0)
+n_synthetic = 0.03 * n_samples
 
 random_x0 = np.concatenate(
     (
         np.random.uniform(
             low=midpt[0] - 2.0 * d_max,
             high=midpt[0] + 2.0 * d_max,
-            size=(5000, x0.shape[1]),
+            size=(int(n_synthetic // 2), x0.shape[1]),
         ),
         np.random.uniform(
             low=midpt[1] - 2.0 * d_max,
             high=midpt[1] + 2.0 * d_max,
-            size=(5000, x0.shape[1]),
+            size=(int(n_synthetic // 2), x0.shape[1]),
         ),
     )
 )

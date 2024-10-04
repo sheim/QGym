@@ -48,7 +48,7 @@ for critic_param in critic_params.values():
 critic_names = [
     "OuterProduct",
     # "PDCholeskyInput",
-    # "CholeskyLatent",
+    "CholeskyLatent",
     "DenseSpectralLatent",
     "Critic",
 ]
@@ -68,6 +68,7 @@ mask[top_indices] = False
 x0 = x0[mask]
 cost = cost[mask]
 optimal_u = optimal_u[mask]
+n_samples = x0.shape[0]
 
 # min max normalization to put state and cost on [0, 1]
 x0_min = x0.min(axis=0)
@@ -125,27 +126,54 @@ start = time.time()
 tree = KDTree(x0)
 d_max = max_pairwise_distance(tree)
 
+# random_x0 = np.concatenate(
+#     (
+#         np.random.uniform(low=0.2 - d_max, high=0.2, size=(50000, x0.shape[1])),
+#         np.random.uniform(low=0.8, high=0.8 + d_max, size=(50000, x0.shape[1])),
+#     )
+# )
+midpt = np.mean(x0, axis=0)
+n_synthetic = 0.03 * n_samples
 random_x0 = np.concatenate(
     (
-        np.random.uniform(low=0.2 - d_max, high=0.2, size=(5000, x0.shape[1])),
-        np.random.uniform(low=0.8, high=0.8 + d_max, size=(5000, x0.shape[1])),
+        np.random.uniform(
+            low=midpt[0] - 2.0 * d_max,
+            high=midpt[0] + 2.0 * d_max,
+            size=(int(n_synthetic // 2), x0.shape[1]),
+        ),
+        np.random.uniform(
+            low=midpt[1] - 2.0 * d_max,
+            high=midpt[1] + 2.0 * d_max,
+            size=(int(n_synthetic // 2), x0.shape[1]),
+        ),
     )
 )
 
 
-def process_batch(batch):
-    indices = tree.query_ball_point(batch, 0.1)
+def calc_neighborhood_radius(tree):
+    subset_ix = random.sample(list(range(x0.shape[0])), 1000)
+    subset_mask = np.zeros(x0.shape[0], dtype=bool)
+    subset_mask[subset_ix] = True
+    x0_subset = x0[subset_mask]
+    distances, _ = tree.query(x0_subset, k=2)
+    nn_dist = distances[:, 1]
+    return np.mean(nn_dist)
+
+
+def process_batch(batch, radius=0.1):
+    indices = tree.query_ball_point(batch, radius)
     mask = np.array([len(idx) == 0 for idx in indices])
     return batch[mask]
 
 
+radius = calc_neighborhood_radius(tree)
 print("Creating non feasible state data points")
 # filter random_x0 in batches
 chunk_size = 100
 x0_non_fs_list = []
 for i in range(0, len(random_x0), chunk_size):
     batch = random_x0[i : i + chunk_size]
-    Y_filtered_batch = process_batch(batch)
+    Y_filtered_batch = process_batch(batch, radius)
     if len(Y_filtered_batch) > 0:
         x0_non_fs_list.append(Y_filtered_batch)
 print("")
@@ -225,7 +253,7 @@ test_error = {name: [] for name in critic_names}
 lr_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 200  # 500  # 1000
+max_gradient_steps = 500  # 1000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -448,7 +476,7 @@ plot_variable_lr(lr_history, f"{save_path}/lr_history")
 plot_binned_errors_ampc(
     graphing_data,
     save_path + "/ampc",
-    title_add_on=f"Value Function at {max_gradient_steps} Epochs, No Offset (log scale)",
+    title_add_on=f"Value Function at {max_gradient_steps} Epochs, No Offset",
     lb=0.0,
     ub=0.75,
     step=0.025,

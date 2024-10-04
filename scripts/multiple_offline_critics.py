@@ -10,9 +10,9 @@ from learning.utils import (
     create_uniform_generator,
 )
 from learning.modules.lqrc.plotting import (
-    plot_pendulum_multiple_critics_w_data,
+    # plot_pendulum_multiple_critics_w_data,
     plot_learning_progress,
-    plot_multiple_critics_w_data
+    plot_multiple_critics_w_data,
 )
 from gym import LEGGED_GYM_ROOT_DIR
 import os
@@ -151,7 +151,7 @@ for iteration in range(iter_offset, tot_iter, iter_step):
             # print("episode_rollouts[0, test_idx] shape", episode_rollouts[0, test_idx].shape)
             # print("critic.evaluate(data['critic_obs'][0, test_idx]).shape", critic.evaluate(data["critic_obs"][0, test_idx]).shape)
             # print("error shape", error.detach().numpy().shape)
-            
+
             mean_training_loss[name].append(value_loss.item())
             test_error[name].append(error.detach().numpy())
         print(f"{name} average error: ", error.mean().item())
@@ -183,7 +183,13 @@ for iteration in range(iter_offset, tot_iter, iter_step):
         graphing_data["values"],
         graphing_data["returns"],
         title=f"Learning an Inverted Pendulum's Ground Truth Value Function: Linear Latent Activation",
-        display_names = {"Ground Truth MC Returns": "Ground Truth MC Returns", "OuterProduct": "Outer Product", "CholeskyLatent": "Cholesky Latent", "DenseSpectralLatent": "Spectral Latent", "Critic": "Critic"},
+        display_names={
+            "Ground Truth MC Returns": "Ground Truth MC Returns",
+            "OuterProduct": "Outer Product",
+            "CholeskyLatent": "Cholesky Latent",
+            "DenseSpectralLatent": "Spectral Latent",
+            "Critic": "Critic",
+        },
         fn=save_path + f"/{len(critic_names)}_CRITIC_it{iteration}",
         data=data[:num_steps, traj_idx]["critic_obs"],
         log_norm=False,
@@ -201,4 +207,3 @@ this_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "multiple_offline_criti
 params_file = os.path.join(LEGGED_GYM_ROOT_DIR, "scripts", "critic_params.py")
 shutil.copy(this_file, os.path.join(save_path, os.path.basename(this_file)))
 shutil.copy(params_file, os.path.join(save_path, os.path.basename(params_file)))
-
