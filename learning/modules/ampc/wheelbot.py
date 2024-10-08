@@ -126,7 +126,7 @@ class WheelbotBatchSimulation:
 class WheelbotSimulation:
     def __init__(self):
         self.sim = AcadosSim()
-        self.sim.model, _ = export_wheelbot_ode_model()
+        self.sim.model = export_wheelbot_ode_model()
         self.sim.solver_options.T = dt
         self.sim.solver_options.integrator_type = "IRK"
         self.sim.solver_options.collocation_type = "GAUSS_RADAU_IIA"
@@ -140,7 +140,7 @@ class WheelbotSimulation:
     def run(self, X_, U_):
         self.integrator.set("u", U_)
         self.integrator.set("x", X_)
-        self.solve()
+        self.integrator.solve()
         X_res = self.integrator.get("x")
         return X_res
 
@@ -209,11 +209,12 @@ def plot_u_diff(data, filename):
         values = data[name]
         ax.scatter(values[:, 0], values[:, 1], label="U Error")
         ax.legend(loc=1)
-        ax.set_ylabel(f"{name} Average Error to Optimal U (Nm)")
-        ax.set_xlabel("Epochs")
-        ax.set_title(
-            "Error Between 1st Step MPC U and Optimal Dataset U (Avg Across Batch)"
-        )
+        ax.set_ylabel(f"{name}")
+        if ix == 0:
+            ax.set_title(
+                "Error Between 1st Step MPC U and Optimal Dataset U (Avg Across Batch)"
+            )
+            ax.set_xlabel("Epochs")
         ax.set_yscale("log")
     plt.savefig(f"{filename}.pdf", format="pdf")
     plt.tight_layout(pad=0.0, w_pad=0.75, h_pad=0.0)

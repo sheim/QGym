@@ -10,7 +10,8 @@ from torch import nn  # noqa F401
 import numpy as np
 from scipy.spatial.distance import pdist
 from scipy.spatial import KDTree
-import itertools
+import matplotlib.pyplot as plt
+
 
 from tqdm import tqdm
 
@@ -19,7 +20,16 @@ from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
     create_uniform_generator,
 )
-from utils import DEVICE, find_flatline_index
+from utils import (
+    DEVICE,
+    find_flatline_index,
+    is_lipschitz_continuous,
+    max_pairwise_distance,
+    calc_neighborhood_radius,
+    process_batch,
+    in_box,
+    grid_search_u,
+)
 from critic_params_ampc import critic_params
 from tensordict import TensorDict
 
@@ -30,10 +40,29 @@ from learning.modules.lqrc.plotting import (
     plot_eigenval_hist,
 )
 from learning.modules.lqrc.utils import get_latent_matrix
-from learning.modules.utils.neural_net import export_network
 
+# ampc imports and setup
+from collections import defaultdict
+import functools
+from learning.modules.ampc.wheelbot import (
+    load_dataset,
+    N,
+    nu,
+    nx,
+    ntheta,
+    x_max,
+    x_min,
+    WheelbotBatchSimulation,
+    plot_wheelbot,
+    plot_wheelbot_all_inits,
+    plot_time_to_failure,
+    plot_u_diff,
+    WheelbotOneStepMPC,
+    WheelbotSimulation,
+)
 
 ONE_STEP_MPC = True
+GRID_SEARCH = True
 
 # make dir for saving this run's results
 time_str = time.strftime("%Y%m%d_%H%M%S")
@@ -94,33 +123,6 @@ optimal_u = optimal_u[~mpc_mask]
 
 
 # add in non-fs synthetic data points
-def max_pairwise_distance(kdtree):
-    # Get all points from the KDTree
-    points = kdtree.data
-
-    # Find the bounding box
-    min_coords = np.min(points, axis=0)
-    max_coords = np.max(points, axis=0)
-
-    # Find the corners of the bounding box
-    corners = np.array(list(itertools.product(*zip(min_coords, max_coords))))
-
-    # Find the points closest to each corner
-    _, corner_points_indices = kdtree.query(corners)
-
-    # Get the actual points closest to the corners
-    corner_points = points[corner_points_indices]
-
-    max_distance = 0
-    # Calculate pairwise distances between corner points
-    for i in range(len(corner_points)):
-        for j in range(i + 1, len(corner_points)):
-            distance = np.sqrt(np.sum(np.square(corner_points[i] - corner_points[j])))
-            max_distance = max(max_distance, distance)
-
-    return max_distance
-
-
 print("Building KDTree")
 # Build the KDTree to get pairwise point distances
 start = time.time()
@@ -151,30 +153,14 @@ random_x0 = np.concatenate(
 )
 
 
-def calc_neighborhood_radius(tree):
-    subset_ix = random.sample(list(range(x0.shape[0])), 1000)
-    subset_mask = np.zeros(x0.shape[0], dtype=bool)
-    subset_mask[subset_ix] = True
-    x0_subset = x0[subset_mask]
-    distances, _ = tree.query(x0_subset, k=2)
-    nn_dist = distances[:, 1]
-    return np.mean(nn_dist)
-
-
-def process_batch(batch, radius=0.1):
-    indices = tree.query_ball_point(batch, radius)
-    mask = np.array([len(idx) == 0 for idx in indices])
-    return batch[mask]
-
-
-radius = calc_neighborhood_radius(tree)
+radius = calc_neighborhood_radius(tree, x0)
 print("Creating non feasible state data points")
 # filter random_x0 in batches
 chunk_size = 100
 x0_non_fs_list = []
 for i in range(0, len(random_x0), chunk_size):
     batch = random_x0[i : i + chunk_size]
-    Y_filtered_batch = process_batch(batch, radius)
+    Y_filtered_batch = process_batch(batch, tree, radius)
     if len(Y_filtered_batch) > 0:
         x0_non_fs_list.append(Y_filtered_batch)
 print("")
@@ -187,31 +173,8 @@ x0 = np.concatenate((x0, x0_non_fs))
 cost = np.concatenate((cost, cost_non_fs))
 
 # hack to see data dist
-import matplotlib.pyplot as plt
-
 plt.hist(cost, bins=100)
 plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
-
-
-def is_lipschitz_continuous(X, y, threshold=1e6):
-    sample_ix = random.sample(list(range(X.shape[0])), 1000)
-    mask = np.zeros(len(y), dtype=bool)
-    mask[sample_ix] = True
-    X = X[mask]
-    y = y[mask]
-    n_samples = X.shape[0]
-    max_ratio = 0
-
-    for i in range(n_samples):
-        for j in range(i + 1, n_samples):
-            x_diff = np.linalg.norm(X[i] - X[j])
-            y_diff = np.abs(y[i] - y[j])
-
-            if x_diff != 0:
-                ratio = y_diff / x_diff
-                max_ratio = max(max_ratio, ratio)
-
-    return max_ratio < threshold, max_ratio
 
 
 print(
@@ -221,25 +184,7 @@ print(
     ),  # reduced threshold due to 0 to 1 normalization
 )
 
-# ampc imports and setup
-from collections import defaultdict
-import functools
-from learning.modules.ampc.wheelbot import (
-    load_dataset,
-    N,
-    nu,
-    nx,
-    ntheta,
-    x_max,
-    x_min,
-    WheelbotBatchSimulation,
-    plot_wheelbot,
-    plot_wheelbot_all_inits,
-    plot_time_to_failure,
-    plot_u_diff,
-    WheelbotOneStepMPC,
-)
-
+# ampc set up
 K_W = np.array([400e-3, 40e-3, 3e-3, 3e-3])
 K_R = np.array([1.3e0, 1.6e-1, 0.8e-04, 4e-04])
 K = np.array(
@@ -249,14 +194,9 @@ K = np.array(
     ]
 )
 
-
-def in_box(x, x_min, x_max):
-    return np.all(np.logical_and(x >= x_min, x <= x_max))
-
-
 terminal_set_fcn = functools.partial(in_box, x_min=x_min, x_max=x_max)
 onestepmpc = WheelbotOneStepMPC()
-check_terminal_nth_epoch = 50  # 500
+check_terminal_nth_epoch = 100  # 500
 eval_frac_in_terminal = defaultdict(list)
 
 # turn numpy arrays to torch before training
@@ -328,15 +268,19 @@ for ix, name in enumerate(critic_names):
         batch_size,
         max_gradient_steps=max_gradient_steps,
     )
+
+    if GRID_SEARCH:
+        model = WheelbotSimulation()
+
     for batch in generator:
         # print offset to check it's working as intended
         if counter == 0:
             if ix == 0:
                 standard_offset = batch["cost"].mean()
             print(f"{name} value offset before mean assigning", critic.value_offset)
-            # with torch.no_grad():
-            #     critic.value_offset.copy_(standard_offset)
-            # print(f"{name} value offset after mean assigning", critic.value_offset)
+            with torch.no_grad():
+                critic.value_offset.copy_(standard_offset)
+            print(f"{name} value offset after mean assigning", critic.value_offset)
         # extract matrix transform for latent if applicable
         if "Latent" in name:
             latent_weight = get_latent_matrix(
@@ -383,36 +327,46 @@ for ix, name in enumerate(critic_names):
             for b in range(batch_terminal_eval):
                 onestepmpc.reset()
                 for k in range(N_eval):
-                    # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
-                    prediction = critic.evaluate(
-                        torch.from_numpy(
-                            (X_sim_cl_[b, :, k] - x0_min) / (x0_max - x0_min)
+                    if GRID_SEARCH:
+                        u, xnext = grid_search_u(
+                            critic,
+                            (X_sim_cl_[b, :, k] - x0_min) / (x0_max - x0_min),
+                            model,
+                            np.array([-0.5, -0.5]),
+                            np.array([0.5, 0.5]),
+                            0.02,
                         )
-                        .float()
-                        .to(DEVICE)
-                        .unsqueeze(0),
-                        return_all=True,
-                    )
-                    A = prediction["A"].squeeze().cpu().detach().numpy()
-                    try:
-                        eigen_vals.extend(
-                            [eig.real for eig in np.linalg.eigvals(A).tolist()]
+                    else:
+                        # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))
+                        prediction = critic.evaluate(
+                            torch.from_numpy(
+                                (X_sim_cl_[b, :, k] - x0_min) / (x0_max - x0_min)
+                            )
+                            .float()
+                            .to(DEVICE)
+                            .unsqueeze(0),
+                            return_all=True,
                         )
-                    except:
-                        print(
-                            "NaNs stopped eigenvalue computation, adding NaNs to eigenvalue list"
-                        )
-                        eigen_vals.extend([float("nan") for _ in range(A.shape[0])])
-                    if "Latent" in name:
-                        A = latent_weight.T @ A @ latent_weight
-                    # denormalize A before sending it to one step MPC
-                    # if np.isnan(np.amax(A)):
-                    #     print(f"Max elem of A is nan at batch {b} and step {k}")
-                    # if k == N_eval - 1:
-                    #     print("Max elem of A at final step", np.amax(A))
-                    A = (cost_max - cost_min) * A + cost_min
-                    # print(f"k {k} max A after denorm", np.amax(A))
-                    u, xnext, status = onestepmpc.run(X_sim_cl_[b, :, k], A)
+                        A = prediction["A"].squeeze().cpu().detach().numpy()
+                        try:
+                            eigen_vals.extend(
+                                [eig.real for eig in np.linalg.eigvals(A).tolist()]
+                            )
+                        except:
+                            print(
+                                "NaNs stopped eigenvalue computation, adding NaNs to eigenvalue list"
+                            )
+                            eigen_vals.extend([float("nan") for _ in range(A.shape[0])])
+                        if "Latent" in name:
+                            A = latent_weight.T @ A @ latent_weight
+                        # denormalize A before sending it to one step MPC
+                        # if np.isnan(np.amax(A)):
+                        #     print(f"Max elem of A is nan at batch {b} and step {k}")
+                        # if k == N_eval - 1:
+                        #     print("Max elem of A at final step", np.amax(A))
+                        A = (cost_max - cost_min) * A + cost_min
+                        # print(f"k {k} max A after denorm", np.amax(A))
+                        u, xnext, _ = onestepmpc.run(X_sim_cl_[b, :, k], A)
                     u_applied = K @ X_sim_cl_[b, :, k] + u
                     # if k == 0:
                     #     print(f"{np.count_nonzero(A)=}, {np.linalg.eigvals(A)=}, {A=}")
@@ -471,11 +425,12 @@ for ix, name in enumerate(critic_names):
                 "and std",
                 t_to_fail_samples.std(),
             )
-            plot_eigenval_hist(
-                eigen_vals,
-                fn=f"{plot_traj_outdir}/{name}_{counter}_plot_eigenval",
-                title="Histogram of Eigenvalues Across Batch",
-            )
+            if not GRID_SEARCH:
+                plot_eigenval_hist(
+                    eigen_vals,
+                    fn=f"{plot_traj_outdir}/{name}_{counter}_plot_eigenval",
+                    title="Histogram of Eigenvalues Across Batch",
+                )
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
 
@@ -506,7 +461,7 @@ plot_variable_lr(lr_history, f"{save_path}/lr_history")
 plot_binned_errors_ampc(
     graphing_data,
     save_path + "/ampc",
-    title_add_on=f"Value Function at {max_gradient_steps} Epochs, No Offset",
+    title_add_on=f"Value Function at {max_gradient_steps} Epochs, With Offset",
     lb=0.0,
     ub=0.75,
     step=0.025,
