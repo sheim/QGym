@@ -1,10 +1,13 @@
 import time
+import pickle
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist
 from scipy.spatial import KDTree
 import itertools
+
+from gym import LEGGED_GYM_ROOT_DIR
 
 
 def is_in_union(x, y):
@@ -51,7 +54,7 @@ def plot_data(title, fn):
 
 
 # Generate samples
-n_samples = 1000
+n_samples = 5000  # 1000
 x0, cost = generate_data(n_samples)
 
 # remove top 1% of cost values and corresponding states
@@ -119,7 +122,7 @@ start = time.time()
 tree = KDTree(x0)
 d_max = max_pairwise_distance(tree)
 midpt = np.mean(x0, axis=0)
-n_synthetic = 0.03 * n_samples
+n_synthetic = 0.2 * n_samples
 
 random_x0 = np.concatenate(
     (
@@ -169,3 +172,7 @@ plt.savefig("test.png")
 
 # graph data after transform
 plot_data("Data After Transform", "after_transform")
+
+data_to_save = {"x0": x0, "X": None, "U": None, "J": None, "cost": cost}
+with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/v_dataset.pkl", "wb") as f:
+    pickle.dump(data_to_save, f)

@@ -61,8 +61,8 @@ from learning.modules.ampc.wheelbot import (
     WheelbotSimulation,
 )
 
-ONE_STEP_MPC = True
-GRID_SEARCH = True
+ONE_STEP_MPC = False
+GRID_SEARCH = False
 
 # make dir for saving this run's results
 time_str = time.strftime("%Y%m%d_%H%M%S")
@@ -84,11 +84,17 @@ critic_names = [
 ]
 print("Loading data")
 # load data
-with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f:
+# with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f:
+#     data = pickle.load(f)
+with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/v_dataset.pkl", "rb") as f:
     data = pickle.load(f)
 x0 = np.array(data["x0"])  # (3478114, 10)
 cost = np.array(data["cost"])  # (3478114,)
-optimal_u = np.array(data["U"])  # (3478114, 2)
+# optimal_u = np.array(data["U"])  # (3478114, 2)
+
+print(
+    f"Raw data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
+)
 
 # remove top 1% of cost values and corresponding states
 num_to_remove = int(0.01 * len(cost))
@@ -97,7 +103,7 @@ mask = np.ones(len(cost), dtype=bool)
 mask[top_indices] = False
 x0 = x0[mask]
 cost = cost[mask]
-optimal_u = optimal_u[mask]
+# optimal_u = optimal_u[mask]
 n_samples = x0.shape[0]
 
 # min max normalization to put state and cost on [0, 1]
@@ -108,6 +114,10 @@ cost_min = cost.min()
 cost_max = cost.max()
 cost = (cost - cost_min) / (cost_max - cost_min)
 
+print(
+    f"Normalized data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
+)
+
 # make batch for one step MPC eval before adding non-fs synthetic data points
 batch_terminal_eval = 100
 mpc_eval_ix = random.sample(list(range(x0.shape[0])), batch_terminal_eval)
@@ -115,11 +125,11 @@ mpc_mask = np.zeros(len(cost), dtype=bool)
 mpc_mask[mpc_eval_ix] = True
 mpc_eval_x0 = x0[mpc_mask]
 mpc_eval_cost = cost[mpc_mask]
-mpc_eval_optimal_u = optimal_u[mpc_mask]
+# mpc_eval_optimal_u = optimal_u[mpc_mask]
 # ensure this validation batch is not seen in training data
 x0 = x0[~mpc_mask]
 cost = cost[~mpc_mask]
-optimal_u = optimal_u[~mpc_mask]
+# optimal_u = optimal_u[~mpc_mask]
 
 
 # add in non-fs synthetic data points
@@ -129,12 +139,6 @@ start = time.time()
 tree = KDTree(x0)
 d_max = max_pairwise_distance(tree)
 
-# random_x0 = np.concatenate(
-#     (
-#         np.random.uniform(low=0.2 - d_max, high=0.2, size=(50000, x0.shape[1])),
-#         np.random.uniform(low=0.8, high=0.8 + d_max, size=(50000, x0.shape[1])),
-#     )
-# )
 midpt = np.mean(x0, axis=0)
 n_synthetic = 0.03 * n_samples
 random_x0 = np.concatenate(
@@ -334,7 +338,7 @@ for ix, name in enumerate(critic_names):
                             model,
                             np.array([-0.5, -0.5]),
                             np.array([0.5, 0.5]),
-                            0.02,
+                            0.05,
                         )
                     else:
                         # A = cost_scale*np.copy(compute_single_A_filtered(model, X_sim_cl_[b,:,k]))

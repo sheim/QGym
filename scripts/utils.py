@@ -1,5 +1,6 @@
 import torch
 import itertools
+import math
 import random
 import numpy as np
 from learning.modules.ampc.wheelbot import WheelbotSimulation
@@ -154,18 +155,28 @@ def grid_search_u(nn, X, model, u_lb, u_ub, step):
     state_dim = X.shape[0]
     vf = np.zeros((grid_size, grid_size, 3))
     x_results = np.zeros((grid_size, grid_size, state_dim))
+    u_inf = []
     for i, u_1 in enumerate(np.arange(u_lb[0], u_ub[0], step)):
         for j, u_2 in enumerate(np.arange(u_lb[1], u_ub[1], step)):
             x_res = model.run(X, np.array([u_1, u_2]))
             with torch.no_grad():
                 vf[i, j, 0] = u_1
                 vf[i, j, 1] = u_2
-                vf[i, j, 2] = (
+                nn_val = (
                     nn.evaluate(torch.from_numpy(x_res).float().to(DEVICE).unsqueeze(0))
                     .cpu()
                     .detach()
                     .numpy()
                 )
+                nn_val = (
+                    nn_val.item() if not math.isnan(nn_val.item()) else float("inf")
+                )
+                vf[i, j, 2] = nn_val
+                if math.isinf(nn_val):
+                    print(
+                        f"at i {i} and j {j} and state {x_res} we got nan value from NN"
+                    )
+                    u_inf.append([u_1, u_2])
                 x_results[i, j, :] = x_res
     ix = np.unravel_index(np.argmin(vf[:, :, -1]), vf[:, :, -1].shape)
     return vf[ix][:2], x_results[ix]
