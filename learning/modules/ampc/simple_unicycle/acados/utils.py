@@ -57,7 +57,7 @@ def plot_robot(
 
     axs[0].set_xlim([t[0], t[-1]])
 
-    if plt_show:
-        plt.show()
+    # if plt_show:
+    #     plt.show()
 
     plt.savefig("plot.png")

@@ -19,11 +19,13 @@ user/wandb_config.json
 *trajectories/
 gym/graphing/data
 learning/modules/lqrc/graphs
-# Henrik's ampc byproduct
+# ampc byproduct
 c_generated_code/*
 scripts/c_generated_code/*
 plots/*
 scripts/plots/*
+learning/modules/ampc/acados_unicycle/*
+learning/modules/ampc/simple_unicycle/acados/c_generated_code/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

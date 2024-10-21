@@ -21,36 +21,35 @@ def export_robot_model() -> AcadosModel:
     # F = SX.sym("F")
     # T = SX.sym("T")
     # u = vertcat(F, T)
-    u_s = SX.sym("u_s")
-    u_w = SX.sym("u_w")
-    u = vertcat(u_s, u_w)
+    v = SX.sym("v")
+    theta = SX.sym("theta")
+    u = vertcat(v, theta)
 
     # xdot
-    # x_dot = SX.sym("x_dot")
-    # y_dot = SX.sym("y_dot")
+    x_dot = SX.sym("x_dot")
+    y_dot = SX.sym("y_dot")
     # v_dot = SX.sym("v_dot")
     # theta_dot = SX.sym("theta_dot")
     # theta_ddot = SX.sym("theta_ddot")
 
-    # xdot = vertcat(x_dot, y_dot, v_dot, theta_dot, theta_ddot)
+    xdot = vertcat(x_dot, y_dot)
 
     # dynamics
-    # f_expl = vertcat(v * cos(theta), v * sin(theta), F, theta_d, T)
+    f_expl = vertcat(v * cos(theta), v * sin(theta))
 
-    # f_impl = xdot - f_expl
+    f_impl = f_expl - xdot
 
     model = AcadosModel()
 
-    # model.f_impl_expr = f_impl
-    # model.f_expl_expr = f_expl
+    model.f_impl_expr = f_impl
+    model.f_expl_expr = f_expl
     model.x = x
-    # model.xdot = xdot
+    model.xdot = xdot
     model.u = u
     model.name = model_name
 
     model.t_label = "$t$ [s]"
-    # model.x_labels = ["$x$", "$y$", "$v$", "$\\theta$", "$\\dot{\\theta}$"]
     model.x_labels = ["$x$", "$y$"]
-    model.u_labels = ["$u_s$", "$u_w$"]
+    model.u_labels = ["$v$", "$\\theta$"]
 
     return model
