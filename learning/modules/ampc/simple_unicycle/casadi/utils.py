@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 def plot_robot(
     shooting_nodes,
     u_max,
@@ -10,8 +13,11 @@ def plot_robot(
     X_traj,
     x_labels,
     u_labels,
+    obst_pos=None,  # List of obstacle positions (x, y)
+    obst_rad=None,  # List of obstacle radii
     time_label="t",
     plt_show=True,
+    plt_name=None
 ):
     """
     Params:
@@ -19,37 +25,88 @@ def plot_robot(
         u_max: maximum absolute value of u
         U: arrray with shape (N_sim-1, nu) or (N_sim, nu)
         X_traj: arrray with shape (N_sim, nx)
+        obst_pos: List of (x, y) obstacle positions
+        obst_rad: List of obstacle radii corresponding to obst_pos
     """
 
     N_sim = X_traj.shape[0]
     nx = X_traj.shape[1]
     nu = U.shape[1]
-    fig, axs = plt.subplots(nx + nu, 1, figsize=(9, 9), sharex=True)
-
+    
+    # Create gridspec layout: 1 column on the right spanning all rows, and nx + nu rows on the left
+    fig = plt.figure(figsize=(12, 9))
+    gs = fig.add_gridspec(nx + nu, 2, width_ratios=[3, 1], wspace=0.3)
+    
     t = shooting_nodes
     for i in range(nu):
-        plt.subplot(nx + nu, 1, i + 1)
-        (line,) = plt.step(t, np.append([U[0, i]], U[:, i]))
+        ax_u = fig.add_subplot(gs[i, 0])
+        (line,) = ax_u.step(t, np.append([U[0, i]], U[:, i]))
 
-        plt.ylabel(u_labels[i])
-        plt.xlabel(time_label)
+        ax_u.set_ylabel(u_labels[i])
+        ax_u.set_xlabel(time_label)
         if u_max[i] is not None:
-            plt.hlines(u_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
-            plt.hlines(-u_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
-            plt.ylim([-1.2 * u_max[i], 1.2 * u_max[i]])
-        plt.grid()
+            ax_u.hlines(u_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
+            ax_u.hlines(-u_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
+            ax_u.set_ylim([-1.2 * u_max[i], 1.2 * u_max[i]])
+        ax_u.grid()
 
     for i in range(nx):
-        plt.subplot(nx + nu, 1, i + nu + 1)
-        (line,) = plt.plot(t, X_traj[:, i])
+        ax_x = fig.add_subplot(gs[i + nu, 0])
+        (line,) = ax_x.plot(t, X_traj[:, i])
 
-        plt.ylabel(x_labels[i])
-        plt.xlabel(time_label)
-        plt.ylim(-0.5, 0.5)
-        plt.grid()
+        ax_x.set_ylabel(x_labels[i])
+        ax_x.set_xlabel(time_label)
+        ax_x.set_ylim(-0.5, 0.5)
+        ax_x.grid()
 
+    # New plot for X_traj[:, 0] vs X_traj[:, 1] with equal axis scaling
+    ax_xy = fig.add_subplot(gs[:, 1])  # Span the entire right column
+    ax_xy.plot(X_traj[:, 0], X_traj[:, 1], label="Trajectory")
+    ax_xy.set_xlabel('x')
+    ax_xy.set_ylabel('y')
+    ax_xy.set_xlim([-0.5, 0.5])
+    ax_xy.set_ylim([-0.5, 0.5])
+    ax_xy.set_aspect('equal')  # Ensure equal scaling of axes
+    ax_xy.grid()
+
+    # Plot obstacles as gray circles
+    if obst_pos is not None and obst_rad is not None:
+        for (x, y), r in zip(obst_pos, obst_rad):
+            circle = plt.Circle((x, y), r, color='gray', alpha=0.5)
+            ax_xy.add_patch(circle)
+
+    plt.legend()
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, hspace=0.4)
 
-    axs[0].set_xlim([t[0], t[-1]])
+    if plt_name:
+        plt.savefig(f"{plt_name}")
+        
+    if plt_show:
+        plt.show()
+        
+    plt.close()
+    
+    
+    
+def plot_3d_costs(xy_coords, costs):
+    # Unpack x and y coordinates
+    x_values = [coord[0] for coord in xy_coords]
+    y_values = [coord[1] for coord in xy_coords]
 
-    plt.savefig("casadi_plot.png")
+    # Create a 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the points
+    ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o')
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Cost')
+
+    # Set aspect ratio of the x and y axes to be equal
+    ax.set_box_aspect([1, 1, 0.75])  # x, y, z aspect ratio
+
+    # Show the plot
+    plt.show()
