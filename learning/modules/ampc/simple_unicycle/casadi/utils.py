@@ -88,7 +88,7 @@ def plot_robot(
     
     
     
-def plot_3d_costs(xy_coords, costs):
+def plot_3d_costs(xy_coords, costs, plt_show=True, plt_name=None):
     # Unpack x and y coordinates
     x_values = [coord[0] for coord in xy_coords]
     y_values = [coord[1] for coord in xy_coords]
@@ -98,6 +98,8 @@ def plot_3d_costs(xy_coords, costs):
     ax = fig.add_subplot(111, projection='3d')
 
     # Plot the points
+    # ax_clip becomes available in matplotlib 3.10
+    # ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o', axlim_clip=True)
     ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o')
 
     # Set axis labels
@@ -107,6 +109,60 @@ def plot_3d_costs(xy_coords, costs):
 
     # Set aspect ratio of the x and y axes to be equal
     ax.set_box_aspect([1, 1, 0.75])  # x, y, z aspect ratio
+    ax.set_zlim(0, 20)
 
-    # Show the plot
-    plt.show()
+    if plt_name:
+        plt.savefig(f"{plt_name}")
+        
+    if plt_show:
+        plt.show()
+        
+    plt.close()
+    
+def plot_3d_surface(xy_coords, costs, zlim=(0, 20), plt_show=True, plt_name=None):
+    # Unpack x and y coordinates
+    x_values = [coord[0] for coord in xy_coords]
+    y_values = [coord[1] for coord in xy_coords]
+
+    # Convert to numpy arrays for easier reshaping
+    x_values = np.array(x_values)
+    y_values = np.array(y_values)
+    costs = np.array(costs)
+
+    # Reshape the data assuming it's a grid (N x N)
+    N = int(np.sqrt(len(xy_coords)))  # Assuming a perfect square number of points
+    X = x_values.reshape(N, N)
+    Y = y_values.reshape(N, N)
+    Z = costs.reshape(N, N)
+
+    # Create a 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Create a surface plot
+    # ax_clip becomes available in matplotlib 3.10
+    # surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', axlim_clip=True)
+    surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none')
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Cost')
+
+    # Set aspect ratio of the x and y axes to be equal
+    ax.set_box_aspect([1, 1, 0.75])  # x, y, z aspect ratio
+
+    # Set limits for the z-axis (cost)
+    ax.set_zlim(zlim)
+
+    # Add a color bar which maps values to colors
+    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+
+    if plt_name:
+        plt.savefig(f"{plt_name}")
+        
+    if plt_show:
+        plt.show()
+        
+    plt.close()
+    
