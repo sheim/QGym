@@ -5,6 +5,7 @@ import tqdm
 
 def solve_open_loop(x0, soft_constraint_scale=1e3, soft_state_constr=False, silent=False, plt_show=False, plt_save=False):
     N = 30  # number of control intervals
+    dt = 0.2  # length of a control interval
 
     opti = Opti()  # Optimization problem
 
@@ -20,21 +21,15 @@ def solve_open_loop(x0, soft_constraint_scale=1e3, soft_state_constr=False, sile
     Q = np.diag([1, 1])  # [x,y]
     R = np.diag([1e-1, 1e-1])
     Qf = 100.0 * Q
-    # state_cost = horzcat(*[mtimes(Q, X[:, i]) for i in range(X.shape[1])])
-    # control_cost = horzcat(*[mtimes(R, U[:, i]) for i in range(U.shape[1])])
-    # opti.minimize(sum1(sum2(state_cost)) + sum1(sum2(control_cost)))  # get to (0, 0)
     cost = 0
     for i in range(N):
         cost += X[:, i].T @ Q @ X[:, i]
         cost += U[:, i].T @ R @ U[:, i]
-    # make state terminal cost especially high
+
     cost += X[:, -1].T@ Qf @X[:, -1]
-    # set objective
 
     # ---- dynamic constraints --------
     f = lambda x, u: vertcat(u[0] * cos(u[1]), u[0] * sin(u[1]))  # dx/dt = f(x,u)
-
-    dt = 0.2  # length of a control interval
     for k in range(N):  # constrain optimization to dynamics
         x_next = X[:, k] + dt * f(X[:, k], U[:, k])
         opti.subject_to(X[:, k + 1] == x_next)  # close the gaps
@@ -42,6 +37,7 @@ def solve_open_loop(x0, soft_constraint_scale=1e3, soft_state_constr=False, sile
     opti.subject_to(opti.bounded(-0.1, v, 0.1))
     opti.subject_to(opti.bounded(np.deg2rad(-50), theta, np.deg2rad(50)))
 
+    # obstacle and x-y bounds
     obstacle_positions = [[0, 0.5], [0.2,-0.2]]
     obstacle_radiuses = [0.3, 0.2]
     if not soft_state_constr:
@@ -63,16 +59,14 @@ def solve_open_loop(x0, soft_constraint_scale=1e3, soft_state_constr=False, sile
     # ---- boundary conditions --------
     opti.subject_to(x[0] == x0[0])  # initial pos
     opti.subject_to(y[0] == x0[1])  # initial pos
-    # opti.subject_to(v[0] == 0.0)  # start from standstill
 
     # ---- initial values for solver ---
     opti.set_initial(x, np.linspace(x0[0], 0, N+1))
     opti.set_initial(y, np.linspace(x0[1], 0, N+1))
-    # these can be guesses right?^
 
-    opti.minimize(cost)  # get to (0, 0)
     
     # ---- solve NLP              ------
+    opti.minimize(cost)  # get to (0, 0)
     if silent:
         opti.solver('ipopt', {
             'ipopt.print_level': 0,   # Suppress output from Ipopt
