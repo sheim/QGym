@@ -10,10 +10,7 @@
         "constr_type_0": "BGH",
         "constr_type_e": "BGH",
         "has_x0": true,
-        "idxbu": [
-            0,
-            1
-        ],
+        "idxbu": [],
         "idxbx": [],
         "idxbx_0": [
             0,
@@ -51,10 +48,7 @@
         "idxsphi": [],
         "idxsphi_0": [],
         "idxsphi_e": [],
-        "lbu": [
-            -0.5,
-            -0.5
-        ],
+        "lbu": [],
         "lbx": [],
         "lbx_0": [
             0.0,
@@ -71,7 +65,10 @@
         "lbx_e": [],
         "lg": [],
         "lg_e": [],
-        "lh": [],
+        "lh": [
+            -0.5,
+            -0.5
+        ],
         "lh_0": [],
         "lh_e": [],
         "lphi": [],
@@ -88,10 +85,7 @@
         "lsphi": [],
         "lsphi_0": [],
         "lsphi_e": [],
-        "ubu": [
-            0.5,
-            0.5
-        ],
+        "ubu": [],
         "ubx": [],
         "ubx_0": [
             0.0,
@@ -108,7 +102,10 @@
         "ubx_e": [],
         "ug": [],
         "ug_e": [],
-        "uh": [],
+        "uh": [
+            0.5,
+            0.5
+        ],
         "uh_0": [],
         "uh_e": [],
         "uphi": [],
@@ -667,14 +664,14 @@
     ],
     "dims": {
         "N": 1,
-        "nbu": 2,
+        "nbu": 0,
         "nbx": 0,
         "nbx_0": 10,
         "nbx_e": 0,
         "nbxe_0": 10,
         "ng": 0,
         "ng_e": 0,
-        "nh": 0,
+        "nh": 2,
         "nh_0": 0,
         "nh_e": 0,
         "np": 11,
@@ -707,7 +704,7 @@
     },
     "json_file": "acados_ocp_wheelbot_ode.json",
     "model": {
-        "con_h_expr": null,
+        "con_h_expr": "jhpnnagiieahaaaadaaaaaaaaaaaaaaaaaeggaaaaaaaaaaaaaaacaaaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaacaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaaacaaaaaaaaaaaaaaaegbaaaaaaaaaaaaaaaegbaaaaaaaaaaaaaaaegbaaaaaaaaaaaaaaaegbaaaaaaaaaaaaaaaegdaaaaaaaaaaaaaaaegmcaaaaaaaaaaaaaachkjjjjjjjjjjjjnpdegpcaaaaaaaaaaaaaafaaaaaaaehigfgehbgegdaaaaaaaaaaaaaaaegmcaaaaaaaaaaaaaachlhebokhebokhekpdegpcaaaaaaaaaaaaaagaaaaaaaegehigfgehbgegdaaaaaaaaaaaaaaaegmcaaaaaaaaaaaaaachkpohkgmlehdjigpdegpcaaaaaaaaaaaaaadaaaaaaabhpfhfegdaaaaaaaaaaaaaaachiaaaaaaaaaaaaaaaegpcaaaaaaaaaaaaaahaaaaaaapgngfghgbgpfhfegpcaaaaaaaaaaaaaafaaaaaaaehbgfhpfhfegbaaaaaaaaaaaaaaaegbaaaaaaaaaaaaaaaegbaaaaaaaaaaaaaaaegbaaaaaaaaaaaaaaaegdaaaaaaaaaaaaaaaegmcaaaaaaaaaaaaaachnmmmmmmmmmmmeppdegpcaaaaaaaaaaaaaadaaaaaaaahigjgegdaaaaaaaaaaaaaaaegmcaaaaaaaaaaaaaachlhebokhebokhempdegpcaaaaaaaaaaaaaaeaaaaaaaegahigjgegdaaaaaaaaaaaaaaaegmcaaaaaaaaaaaaaachbpigdoiiflipebpdegpcaaaaaaaaaaaaaadaaaaaaabhpfcfegdaaaaaaaaaaaaaaaegmcaaaaaaaaaaaaaachncdemblocogdkdpdegpcaaaaaaaaaaaaaahaaaaaaapgngfghgbgpfcfegpcaaaaaaaaaaaaaafaaaaaaaehbgfhpfcf",
         "con_h_expr_0": null,
         "con_h_expr_e": null,
         "con_phi_expr": null,

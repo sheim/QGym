@@ -569,6 +569,10 @@ def plot_multiple_critics_w_data(
         x_coord = data[:, :, 0] * 2 * np.pi
         y_coord = data[:, :, 1] * 5
         ground_truth = "Ground Truth MC Returns"
+    elif "Unicycle" in task:
+        x_coord = data[:, 0]
+        y_coord = data[:, 1]
+        ground_truth = "Unicycle"
     else:
         raise ValueError(
             "Please specify prediction task when calling plotting function."
@@ -632,7 +636,7 @@ def plot_multiple_critics_w_data(
 
         # skip error plotting in bottom left subplot so it
         # can later be used for plotting training data distribution
-        if ix == 0:
+        if ix == len(list(x.keys())) - 1:
             continue
 
         # plot pointwise error
@@ -646,10 +650,17 @@ def plot_multiple_critics_w_data(
         axes[1, ix].set_title(f"{display_names[critic_name]} Error", fontsize=25)
 
     # plot training data distribution
-    axes[1, 0].scatter(x_coord, y_coord, alpha=0.75, s=3)
-    axes[1, 0].set_title(data_title, fontsize=25)
-    axes[1, 0].set_xlabel("x" if ground_truth == "Rosenbrock" else "theta", fontsize=25)
-    axes[1, 0].set_ylabel("y" if ground_truth == "Rosenbrock" else "omega", fontsize=25)
+    final_ix = len(list(x.keys())) - 1
+    axes[1, final_ix].scatter(x_coord, y_coord, alpha=0.75, s=3)
+    axes[1, final_ix].set_title(data_title, fontsize=25)
+    axes[1, final_ix].set_xlabel(
+        "x" if ground_truth == "Rosenbrock" or ground_truth == "Unicycle" else "theta",
+        fontsize=15,
+    )
+    axes[1, 0].set_ylabel(
+        "y" if ground_truth == "Rosenbrock" or ground_truth == "Unicycle" else "omega",
+        fontsize=15,
+    )
 
     # Ensure the axes are the same for all plots
     for ax in axes.flat:

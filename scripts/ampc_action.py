@@ -38,6 +38,7 @@ from learning.modules.lqrc.plotting import (
     plot_binned_errors_ampc,
     plot_variable_lr,
     plot_eigenval_hist,
+    plot_multiple_critics_w_data,
 )
 from learning.modules.lqrc.utils import get_latent_matrix
 
@@ -64,6 +65,7 @@ from learning.modules.ampc.wheelbot import (
 ONE_STEP_MPC = False
 GRID_SEARCH = False
 
+
 # make dir for saving this run's results
 time_str = time.strftime("%Y%m%d_%H%M%S")
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
@@ -86,7 +88,12 @@ print("Loading data")
 # load data
 # with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f:
 #     data = pickle.load(f)
-with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/v_dataset.pkl", "rb") as f:
+# with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/v_dataset.pkl", "rb") as f:
+#     data = pickle.load(f)
+with open(
+    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/100_unicycle_dataset.pkl",
+    "rb",
+) as f:
     data = pickle.load(f)
 x0 = np.array(data["x0"])  # (3478114, 10)
 cost = np.array(data["cost"])  # (3478114,)
@@ -97,7 +104,7 @@ print(
 )
 
 # remove top 1% of cost values and corresponding states
-num_to_remove = int(0.01 * len(cost))
+num_to_remove = math.ceil(0.01 * len(cost))
 top_indices = np.argsort(cost)[-num_to_remove:]
 mask = np.ones(len(cost), dtype=bool)
 mask[top_indices] = False
@@ -119,7 +126,7 @@ print(
 )
 
 # make batch for one step MPC eval before adding non-fs synthetic data points
-batch_terminal_eval = 100
+batch_terminal_eval = 10
 mpc_eval_ix = random.sample(list(range(x0.shape[0])), batch_terminal_eval)
 mpc_mask = np.zeros(len(cost), dtype=bool)
 mpc_mask[mpc_eval_ix] = True
@@ -140,22 +147,35 @@ tree = KDTree(x0)
 d_max = max_pairwise_distance(tree)
 
 midpt = np.mean(x0, axis=0)
-n_synthetic = 0.03 * n_samples
+n_synthetic = 0.2 * n_samples
+# random_x0 = np.concatenate(
+#     (
+#         np.random.uniform(
+#             low=midpt[0] - d_max,
+#             high=midpt[0] + d_max,
+#             size=(int(n_synthetic // 2), x0.shape[1]),
+#         ),
+#         np.random.uniform(
+#             low=midpt[1] - d_max,
+#             high=midpt[1] + d_max,
+#             size=(int(n_synthetic // 2), x0.shape[1]),
+#         ),
+#     )
+# )
 random_x0 = np.concatenate(
     (
         np.random.uniform(
-            low=midpt[0] - 2.0 * d_max,
-            high=midpt[0] + 2.0 * d_max,
+            low=-0.5,
+            high=1.5,
             size=(int(n_synthetic // 2), x0.shape[1]),
         ),
         np.random.uniform(
-            low=midpt[1] - 2.0 * d_max,
-            high=midpt[1] + 2.0 * d_max,
+            low=-0.5,
+            high=1.5,
             size=(int(n_synthetic // 2), x0.shape[1]),
         ),
     )
 )
-
 
 radius = calc_neighborhood_radius(tree, x0)
 print("Creating non feasible state data points")
@@ -470,6 +490,41 @@ plot_binned_errors_ampc(
     ub=0.75,
     step=0.025,
     tick_step=10,
+)
+
+graphing_data["critic_obs"]["Unicycle"] = x0
+graphing_data["values"]["Unicycle"] = cost
+graphing_data["cost"]["Unicycle"] = cost
+graphing_data["error"]["Unicycle"] = torch.zeros_like(cost)
+
+# make data square number
+sqrt_num = math.isqrt(x0.shape[0])
+sq_num = sqrt_num**2
+for critic in graphing_data["critic_obs"].keys():
+    graphing_data["critic_obs"][critic] = graphing_data["critic_obs"][critic][
+        :sq_num, :
+    ]
+    graphing_data["values"][critic] = graphing_data["values"][critic][:sq_num]
+    graphing_data["cost"][critic] = graphing_data["cost"][critic][:sq_num]
+
+plot_multiple_critics_w_data(
+    graphing_data["critic_obs"],
+    graphing_data["values"],
+    graphing_data["cost"],
+    title=f"Learning Unicycle MPC",
+    display_names={
+        "Unicycle": "Unicycle Ground Truth",
+        "OuterProduct": "Outer Product",
+        "CholeskyLatent": "Cholesky Latent",
+        "DenseSpectralLatent": "Spectral Latent",
+        "Critic": "Critic",
+    },
+    grid_size=sqrt_num,
+    fn=save_path + f"/{len(critic_names)}",
+    data=data[0, train_idx]["critic_obs"],
+    extension="png",
+    task="Unicycle",
+    log_norm=False,
 )
 
 if ONE_STEP_MPC:

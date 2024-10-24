@@ -79,7 +79,7 @@ def find_flatline_index(data, threshold=5):
 
 
 def is_lipschitz_continuous(X, y, threshold=1e6):
-    sample_ix = random.sample(list(range(X.shape[0])), 1000)
+    sample_ix = random.sample(list(range(X.shape[0])), math.ceil(0.1 * X.shape[0]))
     mask = np.zeros(len(y), dtype=bool)
     mask[sample_ix] = True
     X = X[mask]
@@ -127,7 +127,7 @@ def max_pairwise_distance(kdtree):
 
 
 def calc_neighborhood_radius(tree, x0):
-    subset_ix = random.sample(list(range(x0.shape[0])), 1000)
+    subset_ix = random.sample(list(range(x0.shape[0])), math.ceil(0.1 * x0.shape[0]))
     subset_mask = np.zeros(x0.shape[0], dtype=bool)
     subset_mask[subset_ix] = True
     x0_subset = x0[subset_mask]
