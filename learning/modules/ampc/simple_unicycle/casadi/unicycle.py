@@ -166,18 +166,29 @@ def create_dataset(Ngrid, lb, ub):
     x0s, Utrajs, Xtrajs, costs = [], [], [], []
 
     X, Y = np.meshgrid(x_values, y_values)
-    for i in tqdm(range(Ngrid)):
-        for j in range(Ngrid):
-            x0 = [X[i, j], Y[i, j]]
-            Utraj, Xtraj, cost = solve_open_loop(x0, silent=True, plt_show=False)
-            if cost is not None:
-                x0s.append(x0)
-                Utrajs.append(Utraj)
-                Xtrajs.append(Xtraj)
-                costs.append(cost)
+    with tqdm.tqdm(total=Ngrid * Ngrid) as pbar:
+        for i in range(Ngrid):
+            for j in range(Ngrid):
+                x0 = [X[i, j], Y[i, j]]
+                Utraj, Xtraj, cost = solve_open_loop(
+                    x0,
+                    soft_constraint_scale=1e3,
+                    soft_state_constr=True,
+                    silent=True,
+                    plt_show=False,
+                )
+                if cost is not None:
+                    x0s.append(x0)
+                    Utrajs.append(Utraj)
+                    Xtrajs.append(Xtraj)
+                    costs.append(cost)
+                pbar.set_postfix(
+                    {"last_cost": cost if cost is not None else "N/A"}
+                )  # Update with last cost
+                pbar.update(1)  # Update the progress bar for each iteration
     data_to_save = {"x0": x0s, "X": Xtrajs, "U": Utrajs, "J": None, "cost": costs}
     with open(
-        f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/100_unicycle_dataset.pkl",
+        f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/100_unicycle_dataset_soft_constraints.pkl",
         "wb",
     ) as f:
         pickle.dump(data_to_save, f)
@@ -190,4 +201,4 @@ if __name__ == "__main__":
     #     solve_open_loop(x0, silent=False, plt_show=True, plt_save=True)
 
     # evaluate_grid()
-    create_dataset(100, [-0.5, -0.5], [0.5, 0.5])
+    create_dataset(50, [-0.52, -0.52], [0.52, 0.52])

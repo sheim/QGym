@@ -91,7 +91,7 @@ print("Loading data")
 # with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/v_dataset.pkl", "rb") as f:
 #     data = pickle.load(f)
 with open(
-    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/100_unicycle_dataset.pkl",
+    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/50_unicycle_dataset_soft_constraints.pkl",
     "rb",
 ) as f:
     data = pickle.load(f)
@@ -104,7 +104,7 @@ print(
 )
 
 # remove top 1% of cost values and corresponding states
-num_to_remove = math.ceil(0.01 * len(cost))
+num_to_remove = math.ceil(0.1 * len(cost))
 top_indices = np.argsort(cost)[-num_to_remove:]
 mask = np.ones(len(cost), dtype=bool)
 mask[top_indices] = False
@@ -193,8 +193,8 @@ print("")
 x0_non_fs = np.concatenate(x0_non_fs_list) if x0_non_fs_list else None
 cost_non_fs = np.ones((x0_non_fs.shape[0],))
 # union non feasible and feasible states
-x0 = np.concatenate((x0, x0_non_fs))
-cost = np.concatenate((cost, cost_non_fs))
+# x0 = np.concatenate((x0, x0_non_fs))
+# cost = np.concatenate((cost, cost_non_fs))
 
 # hack to see data dist
 plt.hist(cost, bins=100)
@@ -247,7 +247,7 @@ test_error = {name: [] for name in critic_names}
 lr_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 500  # 1000
+max_gradient_steps = 500  # 300  # 1000
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -302,9 +302,9 @@ for ix, name in enumerate(critic_names):
             if ix == 0:
                 standard_offset = batch["cost"].mean()
             print(f"{name} value offset before mean assigning", critic.value_offset)
-            with torch.no_grad():
-                critic.value_offset.copy_(standard_offset)
-            print(f"{name} value offset after mean assigning", critic.value_offset)
+            # with torch.no_grad():
+            #     critic.value_offset.copy_(standard_offset)
+            # print(f"{name} value offset after mean assigning", critic.value_offset)
         # extract matrix transform for latent if applicable
         if "Latent" in name:
             latent_weight = get_latent_matrix(
@@ -485,7 +485,7 @@ plot_variable_lr(lr_history, f"{save_path}/lr_history")
 plot_binned_errors_ampc(
     graphing_data,
     save_path + "/ampc",
-    title_add_on=f"Value Function at {max_gradient_steps} Epochs, With Offset",
+    title_add_on=f"Value Function at {max_gradient_steps} Epochs, w/out Offset",
     lb=0.0,
     ub=0.75,
     step=0.025,
@@ -497,21 +497,16 @@ graphing_data["values"]["Unicycle"] = cost
 graphing_data["cost"]["Unicycle"] = cost
 graphing_data["error"]["Unicycle"] = torch.zeros_like(cost)
 
-# make data square number
-sqrt_num = math.isqrt(x0.shape[0])
-sq_num = sqrt_num**2
 for critic in graphing_data["critic_obs"].keys():
-    graphing_data["critic_obs"][critic] = graphing_data["critic_obs"][critic][
-        :sq_num, :
-    ]
-    graphing_data["values"][critic] = graphing_data["values"][critic][:sq_num]
-    graphing_data["cost"][critic] = graphing_data["cost"][critic][:sq_num]
+    graphing_data["critic_obs"][critic] = graphing_data["critic_obs"][critic]
+    graphing_data["values"][critic] = graphing_data["values"][critic]
+    graphing_data["cost"][critic] = graphing_data["cost"][critic]
 
 plot_multiple_critics_w_data(
     graphing_data["critic_obs"],
     graphing_data["values"],
     graphing_data["cost"],
-    title=f"Learning Unicycle MPC",
+    title=f"Learning Unicycle MPC in {max_gradient_steps} Epochs w/out Offset",
     display_names={
         "Unicycle": "Unicycle Ground Truth",
         "OuterProduct": "Outer Product",
@@ -519,12 +514,13 @@ plot_multiple_critics_w_data(
         "DenseSpectralLatent": "Spectral Latent",
         "Critic": "Critic",
     },
-    grid_size=sqrt_num,
     fn=save_path + f"/{len(critic_names)}",
     data=data[0, train_idx]["critic_obs"],
     extension="png",
     task="Unicycle",
     log_norm=False,
+    data_dist_ix=len(list(graphing_data["critic_obs"].keys())) - 1,
+    scatter=True,
 )
 
 if ONE_STEP_MPC:

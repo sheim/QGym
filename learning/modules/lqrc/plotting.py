@@ -543,6 +543,8 @@ def plot_multiple_critics_w_data(
     data_title="Training Data Distribution",
     log_norm=True,
     task=None,
+    data_dist_ix=0,
+    scatter=False,
 ):
     num_critics = len(x.keys())
     fig, axes = plt.subplots(
@@ -610,20 +612,26 @@ def plot_multiple_critics_w_data(
 
     for ix, critic_name in enumerate(x):
         np_x = x[critic_name].detach().cpu().numpy().reshape(-1, 2)
-        np_x[:, 0] = np_x[:, 0]
-        np_x[:, 1] = np_x[:, 1]
         np_predictions = predictions[critic_name].detach().cpu().numpy().reshape(-1)
         np_targets = targets[ground_truth].detach().cpu().numpy().reshape(-1)
         np_error = np_predictions - np_targets
 
-        # plot pointwise predictions
-        axes[0, ix].imshow(
-            np_predictions.reshape(grid_size, grid_size).T,
-            origin="lower",
-            extent=(x_coord.min(), x_coord.max(), y_coord.min(), y_coord.max()),
-            cmap=prediction_cmap,
-            norm=prediction_norm,
-        )
+        if scatter:
+            axes[0, ix].scatter(
+                np_x[:, 0],
+                np_x[:, 1],
+                c=np_predictions,
+                cmap=prediction_cmap,
+                norm=prediction_norm,
+            )
+        else:
+            axes[0, ix].imshow(
+                np_predictions.reshape(grid_size, grid_size).T,
+                origin="lower",
+                extent=(x_coord.min(), x_coord.max(), y_coord.min(), y_coord.max()),
+                cmap=prediction_cmap,
+                norm=prediction_norm,
+            )
         ax_title = (
             ground_truth
             if ground_truth in critic_name
@@ -636,24 +644,28 @@ def plot_multiple_critics_w_data(
 
         # skip error plotting in bottom left subplot so it
         # can later be used for plotting training data distribution
-        if ix == len(list(x.keys())) - 1:
+        if ix == data_dist_ix:
             continue
 
         # plot pointwise error
-        axes[1, ix].imshow(
-            np_error.reshape(grid_size, grid_size).T,
-            origin="lower",
-            extent=(x_coord.min(), x_coord.max(), y_coord.min(), y_coord.max()),
-            cmap=error_cmap,
-            norm=error_norm,
-        )
+        if scatter:
+            axes[1, ix].scatter(
+                np_x[:, 0], np_x[:, 1], c=np_error, cmap=error_cmap, norm=error_norm
+            )
+        else:
+            axes[1, ix].imshow(
+                np_error.reshape(grid_size, grid_size).T,
+                origin="lower",
+                extent=(x_coord.min(), x_coord.max(), y_coord.min(), y_coord.max()),
+                cmap=error_cmap,
+                norm=error_norm,
+            )
         axes[1, ix].set_title(f"{display_names[critic_name]} Error", fontsize=25)
 
     # plot training data distribution
-    final_ix = len(list(x.keys())) - 1
-    axes[1, final_ix].scatter(x_coord, y_coord, alpha=0.75, s=3)
-    axes[1, final_ix].set_title(data_title, fontsize=25)
-    axes[1, final_ix].set_xlabel(
+    axes[1, data_dist_ix].scatter(x_coord, y_coord, alpha=0.75, s=3)
+    axes[1, data_dist_ix].set_title(data_title, fontsize=25)
+    axes[1, data_dist_ix].set_xlabel(
         "x" if ground_truth == "Rosenbrock" or ground_truth == "Unicycle" else "theta",
         fontsize=15,
     )
