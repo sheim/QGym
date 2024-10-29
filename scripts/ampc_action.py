@@ -455,6 +455,7 @@ for ix, name in enumerate(critic_names):
                     fn=f"{plot_traj_outdir}/{name}_{counter}_plot_eigenval",
                     title="Histogram of Eigenvalues Across Batch",
                 )
+
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
 
