@@ -5,13 +5,16 @@ from utils import plot_robot, plot_3d_costs, plot_3d_surface
 import numpy as np
 import tqdm
 import pickle
-from gym import LEGGED_GYM_ROOT_DIR
+import fire
+# from gym import LEGGED_GYM_ROOT_DIR
 
-graph_path = (
-    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/graphs"
-)
-if not os.path.exists(graph_path):
-    os.makedirs(graph_path)
+
+# graph_path = (
+#     f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/graphs"
+# )
+# savepath = f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/100_unicycle_dataset.pkl"
+# if not os.path.exists(graph_path):
+#     os.makedirs(graph_path)
 
 
 def solve_open_loop(
@@ -34,6 +37,8 @@ def solve_open_loop(
     U = opti.variable(2, N)  # control trajectory
     v = U[0, :]
     theta = U[1, :]
+    
+    x0_param = opti.parameter(2)
 
     # ---- objective          ---------
     Q = np.diag([1, 1])  # [x,y]
@@ -75,12 +80,25 @@ def solve_open_loop(
         cost += soft_constraint_scale * eps**2 + soft_constraint_scale * eps
 
     # ---- boundary conditions --------
-    opti.subject_to(x[0] == x0[0])  # initial pos
-    opti.subject_to(y[0] == x0[1])  # initial pos
+    opti.subject_to(x[0]-x0_param[0] == 0)  # initial pos
+    opti.subject_to(y[0]-x0_param[1] == 0)  # initial pos
+    
+    # min f(x), s.t. g_lb <= g(x,p) <= g_ub
+    # 
+    # L = f(x) + lam.T @ g(x,p)
+    # 
+    # diehl numerical optimization 11.22
+    # df(x*(p),p)/dp = dL/dp(x*(p),lam*(p), p)
+    # 
+    # dL/dp = lam.T@ dg/dp(x,p)
+    # df(x*(p),p)/dp = lam*.T @ dg/dp(x*(p),p)
 
     # ---- initial values for solver ---
     opti.set_initial(x, np.linspace(x0[0], 0, N + 1))
     opti.set_initial(y, np.linspace(x0[1], 0, N + 1))
+    
+    # set x0 parameter
+    opti.set_value(x0_param, x0)
 
     # ---- solve NLP              ------
     opti.minimize(cost)  # get to (0, 0)
@@ -91,6 +109,8 @@ def solve_open_loop(
                 "ipopt.print_level": 0,  # Suppress output from Ipopt
                 "ipopt.sb": "yes",  # Suppress information messages
                 "print_time": 0,  # Suppress timing information
+                # "ipopt.tol": 1e-12,
+                # "ipopt.dual_inf_tol": 0.1
             },
         )
     else:
@@ -98,47 +118,56 @@ def solve_open_loop(
     try:
         sol = opti.solve()  # actual solve
 
-        # print(f"cost: {sol.value(cost)}")
-
         plt_name = None
         if plt_save:
             plt_name = f"open_loop_x0=[{x0[0]:.2f},{x0[1]:.2f}].png"
 
         # ---- post-processing        ------
-        plot_robot(
-            np.linspace(0, N, N + 1),
-            [0.1, np.deg2rad(50)],
-            sol.value(U).T,
-            sol.value(X).T,
-            x_labels=["x", "y"],
-            u_labels=["v", "theta"],
-            obst_pos=obstacle_positions,
-            obst_rad=obstacle_radiuses,
-            time_label="Sim steps",
-            plt_show=plt_show,
-            plt_name=plt_name,
-        )
+        if plt_show or plt_name:
+            plot_robot(
+                np.linspace(0, N, N + 1),
+                [0.1, np.deg2rad(50)],
+                sol.value(U).T,
+                sol.value(X).T,
+                x_labels=["x", "y"],
+                u_labels=["v", "theta"],
+                obst_pos=obstacle_positions,
+                obst_rad=obstacle_radiuses,
+                time_label="Sim steps",
+                plt_show=plt_show,
+                plt_name=plt_name,
+            )
 
-        return sol.value(U), sol.value(X), sol.value(cost)
+        dg_dp_fcn = Function("constraint_parameter_gradient", [opti.x, opti.p], [jacobian(opti.g, opti.p)], ['primal', 'param'], ['dg_dp'])
+        cost_gradient = sol.value(opti.lam_g).reshape(-1,1).T @ dg_dp_fcn(sol.value(opti.x), x0)
+    
+        U_res = np.array(sol.value(U)),
+        X_res = np.array(sol.value(X)),
+        cost_res = float(sol.value(cost))
+        cost_gradient_res = np.array(cost_gradient).flatten()
+        # print(f"{cost_gradient=}")
+        
+        return U_res, X_res, cost_res, cost_gradient_res
 
     except RuntimeError as e:
         if "Infeasible" in str(e):
             return None, None, None
 
 
-def evaluate_grid():
-    Ngrid = 20
+def evaluate_grid(Ngrid=20, filename=None):
+    filename = f"{filename}_{Ngrid**2}"
+    # Ngrid = 20
     x_values = np.linspace(-0.52, 0.52, Ngrid)
     y_values = np.linspace(-0.52, 0.52, Ngrid)
 
-    x0s, Utrajs, Xtrajs, costs = [], [], [], []
+    x0s, Utrajs, Xtrajs, costs, cost_gradients = [], [], [], [], []
 
     X, Y = np.meshgrid(x_values, y_values)
     with tqdm.tqdm(total=Ngrid * Ngrid) as pbar:
         for i in range(Ngrid):
             for j in range(Ngrid):
                 x0 = [X[i, j], Y[i, j]]
-                Utraj, Xtraj, cost = solve_open_loop(
+                Utraj, Xtraj, cost, dcost_dx0 = solve_open_loop(
                     x0,
                     soft_constraint_scale=1e3,
                     soft_state_constr=True,
@@ -150,44 +179,63 @@ def evaluate_grid():
                     Utrajs.append(Utraj)
                     Xtrajs.append(Xtraj)
                     costs.append(cost)
+                    cost_gradients.append(dcost_dx0)
                 pbar.set_postfix(
                     {"last_cost": cost if cost is not None else "N/A"}
                 )  # Update with last cost
                 pbar.update(1)  # Update the progress bar for each iteration
 
+    data_to_save = {"x0": x0s, "X": Xtrajs, "U": Utrajs, "cost": costs, "cost_gradient": cost_gradients}
+    if filename is not None:
+        with open(f"data/{filename}.pkl", "wb") as f:
+            pickle.dump(data_to_save, f)
+        plot_3d_costs(x0s, costs, plt_show=True, plt_name=f"plots/{filename}_cost_landscape.png", cost_gradient=cost_gradients)
     # plot_3d_surface(x0s, costs, plt_show=True, plt_name="cost_grid.png")
-    plot_3d_costs(x0s, costs, plt_show=True, plt_name="cost_grid.png")
+    else:
+        plot_3d_costs(x0s, costs, plt_show=True, plt_name=None)
 
 
-def create_dataset(Ngrid, lb, ub):
-    x_values = np.linspace(lb[0], ub[0], Ngrid)
-    y_values = np.linspace(lb[1], ub[1], Ngrid)
+# def create_dataset(Ngrid, lb, ub, savepath=None):
+#     x_values = np.linspace(lb[0], ub[0], Ngrid)
+#     y_values = np.linspace(lb[1], ub[1], Ngrid)
 
-    x0s, Utrajs, Xtrajs, costs = [], [], [], []
+#     x0s, Utrajs, Xtrajs, costs = [], [], [], []
 
-    X, Y = np.meshgrid(x_values, y_values)
-    for i in tqdm(range(Ngrid)):
-        for j in range(Ngrid):
-            x0 = [X[i, j], Y[i, j]]
-            Utraj, Xtraj, cost = solve_open_loop(x0, silent=True, plt_show=False)
-            if cost is not None:
-                x0s.append(x0)
-                Utrajs.append(Utraj)
-                Xtrajs.append(Xtraj)
-                costs.append(cost)
-    data_to_save = {"x0": x0s, "X": Xtrajs, "U": Utrajs, "J": None, "cost": costs}
-    with open(
-        f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/100_unicycle_dataset.pkl",
-        "wb",
-    ) as f:
-        pickle.dump(data_to_save, f)
+#     X, Y = np.meshgrid(x_values, y_values)
+#     for i in tqdm(range(Ngrid)):
+#         for j in range(Ngrid):
+#             x0 = [X[i, j], Y[i, j]]
+#             Utraj, Xtraj, cost = solve_open_loop(x0, silent=True, plt_show=False)
+#             if cost is not None:
+#                 x0s.append(x0)
+#                 Utrajs.append(Utraj)
+#                 Xtrajs.append(Xtraj)
+#                 costs.append(cost)
+#     data_to_save = {"x0": x0s, "X": Xtrajs, "U": Utrajs, "J": None, "cost": costs}
+#     if savepath is not None:
+#         with open(
+#             savepath,
+#             "wb",
+#         ) as f:
+#             pickle.dump(data_to_save, f)
+#     else:
+#         return data_to_save
 
+
+def test():
+    # interesting initial conditions:
+    x0s = [[0.5, 0.5], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5]]
+    for x0 in x0s:
+        solve_open_loop(x0, silent=False, plt_show=True, plt_save=True)
 
 if __name__ == "__main__":
-    # interesting initial conditions:
+    fire.Fire({
+        "evaluate_grid": evaluate_grid,
+        "test": test
+    })
     # x0s = [[0.5, 0.5], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5]]
     # for x0 in x0s:
     #     solve_open_loop(x0, silent=False, plt_show=True, plt_save=True)
 
     # evaluate_grid()
-    create_dataset(100, [-0.5, -0.5], [0.5, 0.5])
+    # create_dataset(100, [-0.5, -0.5], [0.5, 0.5])
