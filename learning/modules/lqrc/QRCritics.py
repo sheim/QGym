@@ -90,6 +90,7 @@ class OuterProduct(nn.Module):
         dropouts=None,
         normalize_obs=False,
         minimize=False,
+        offset_hidden_dims=None,
         device="cuda",
         **kwargs,
     ):
@@ -110,14 +111,18 @@ class OuterProduct(nn.Module):
             self.obs_rms = RunningMeanStd(num_obs)
 
         self.NN = create_MLP(num_obs, latent_dim, hidden_dims, activation, dropouts)
-        # todo: have a linear NN to automatically coord-shift input
+        self.offset_NN = (
+            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            if offset_hidden_dims
+            else lambda x: torch.zeros_like(x)
+        )
 
     def forward(self, x, return_all=False):
         z = self.NN(x)
         # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
-        value = self.sign * quadratify_xAx(x, A)
+        value = self.sign * quadratify_xAx(x - self.offset_NN(x), A)
         # value = quadratify_xAx(x, A)
         # value *= 1.0 if self.minimize else -1.0
         # value += self.value_offset
@@ -149,6 +154,7 @@ class OuterProductLatent(OuterProduct):
         minimize=False,
         latent_hidden_dims=[128, 128],
         latent_activation="tanh",
+        offset_hidden_dims=None,
         device="cuda",
         **kwargs,
     ):
@@ -176,7 +182,7 @@ class OuterProductLatent(OuterProduct):
         # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
-        value = self.sign * quadratify_xAx(self.latent_NN(x), A)
+        value = self.sign * quadratify_xAx(self.latent_NN(x - self.offset_NN(x)), A)
         value += self.value_offset
 
         if return_all:
@@ -196,6 +202,7 @@ class CholeskyInput(nn.Module):
         dropouts=None,
         normalize_obs=False,
         minimize=False,
+        offset_hidden_dims=None,
         device="cuda",
         **kwargs,
     ):
@@ -221,13 +228,18 @@ class CholeskyInput(nn.Module):
         self.lower_diag_NN = create_MLP(
             num_obs, num_lower_diag_elements, hidden_dims, activation, dropouts
         )
+        self.offset_NN = (
+            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            if offset_hidden_dims
+            else lambda x: torch.zeros_like(x)
+        )
         # self.lower_diag_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
         output = self.lower_diag_NN(x)
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
-        value = self.sign * quadratify_xAx(x, A)
+        value = self.sign * quadratify_xAx(x - self.offset_NN(x), A)
         value += self.value_offset
         # value *= self.scaling_quadratic
 
@@ -258,6 +270,7 @@ class CholeskyLatent(CholeskyInput):
         dropouts=None,
         normalize_obs=False,
         minimize=False,
+        offset_hidden_dims=None,
         device="cuda",
         **kwargs,
     ):
@@ -284,7 +297,7 @@ class CholeskyLatent(CholeskyInput):
         # self.latent_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x)
+        z = self.latent_NN(x - self.offset_NN(x))
         output = self.lower_diag_NN(x)
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
@@ -318,7 +331,7 @@ class PDCholeskyInput(CholeskyInput):
         L = create_PD_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
         # assert (torch.linalg.eigvals(A).real > 0).all()
-        value = self.sign * quadratify_xAx(x, A)
+        value = self.sign * quadratify_xAx(x - self.offset_NN(x), A)
         # value = quadratify_xAx(x, A)
         # value *= 1.0 if self.minimize else -1.0
         # value += self.value_offset
@@ -334,7 +347,7 @@ class PDCholeskyInput(CholeskyInput):
 
 class PDCholeskyLatent(CholeskyLatent):
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x)
+        z = self.latent_NN(x - self.offset_NN(x))
         output = self.lower_diag_NN(x)
         L = create_PD_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
@@ -364,6 +377,7 @@ class SpectralLatent(nn.Module):
         latent_activation="tanh",
         latent_dropouts=None,
         minimize=False,
+        offset_hidden_dims=None,
         device="cuda",
         **kwargs,
     ):
@@ -403,9 +417,14 @@ class SpectralLatent(nn.Module):
             latent_activation,
             # bias_in_linear_layers=False,
         )
+        self.offset_NN = (
+            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            if offset_hidden_dims
+            else lambda x: torch.zeros_like(x)
+        )
 
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x)
+        z = self.latent_NN(x - self.offset_NN(x))
         y = self.spectral_NN(x)
         A_diag = torch.diag_embed(F.softplus(y[..., : self.relative_dim]))
         # tril_indices = torch.tril_indices(self.latent_dim, self.relative_dim)
@@ -468,6 +487,7 @@ class DenseSpectralLatent(nn.Module):
         latent_activation="tanh",
         latent_dropouts=None,
         minimize=False,
+        offset_hidden_dims=None,
         device="cuda",
         **kwargs,
     ):
@@ -511,9 +531,14 @@ class DenseSpectralLatent(nn.Module):
             latent_activation,
             # bias_in_linear_layers=False,
         )
+        self.offset_NN = (
+            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            if offset_hidden_dims
+            else lambda x: torch.zeros_like(x)
+        )
 
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x)
+        z = self.latent_NN(x - self.offset_NN(x))
         y = self.spectral_NN(x)
         A_diag = torch.diag_embed(F.softplus(y[..., : self.relative_dim]))
         # tril_indices = torch.tril_indices(self.latent_dim, self.relative_dim)

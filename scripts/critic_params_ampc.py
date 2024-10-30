@@ -7,6 +7,7 @@ critic_params = {
         "normalize_obs": True,
         # "latent_dim": 16,  # 16,
         "minimize": True,
+        "offset_hidden_dims": [64],
     },
     "PDCholeskyInput": {
         "num_obs": 10,
@@ -15,6 +16,7 @@ critic_params = {
         "normalize_obs": False,
         "latent_dim": None,
         "minimize": True,
+        "offset_hidden_dims": [64],
     },
     "CholeskyLatent": {
         "num_obs": 10,
@@ -25,6 +27,7 @@ critic_params = {
         "latent_dim": 16,
         "latent_hidden_dims": [64, 64],
         "latent_activation": None,
+        "offset_hidden_dims": [64],
     },
     "PDCholeskyLatent": {
         "num_obs": 10,
@@ -35,6 +38,7 @@ critic_params = {
         "latent_dim": 16,
         "latent_hidden_dims": [64, 64],
         "latent_activation": None,
+        "offset_hidden_dims": [64],
     },
     "SpectralLatent": {
         "num_obs": 10,
@@ -46,13 +50,11 @@ critic_params = {
         "latent_dim": 16,
         "latent_hidden_dims": [64, 64],
         "latent_activation": None,
+        "offset_hidden_dims": [64],
     },
     "DenseSpectralLatent": {
         "num_obs": 10,
         "hidden_dims": [256, 128],
-        # "hidden_dims": [128, 64],
-        # "hidden_dims": [64, 32],
-        # "hidden_dims": [512, 256],
         "activation": "tanh",
         "normalize_obs": False,
         "minimize": True,
@@ -60,6 +62,7 @@ critic_params = {
         "latent_dim": 16,  # 18,
         "latent_hidden_dims": [32, 32],
         "latent_activation": None,
+        "offset_hidden_dims": [64],
     },
     "OuterProduct": {
         "num_obs": 10,
@@ -67,6 +70,7 @@ critic_params = {
         "minimize": True,
         "activation": "tanh",
         "normalize_obs": False,
+        "offset_hidden_dims": [64],
     },
     "OuterProductLatent": {
         "num_obs": 10,
@@ -77,53 +81,12 @@ critic_params = {
         "latent_dim": 16,
         "latent_hidden_dims": [32, 32],
         "latent_activation": None,
+        "offset_hidden_dims": [64],
     },
     "Critic": {
         "num_obs": 10,
         "hidden_dims": [256, 128],
         "activation": "tanh",
         "normalize_obs": False,
-    },
-    "Cholesky": {
-        "num_obs": 10,
-        "hidden_dims": None,
-        "activation": "tanh",
-        "normalize_obs": False,
-    },
-    "CholeskyPlusConst": {
-        "num_obs": 10,
-        "hidden_dims": None,
-        "activation": "tanh",
-        "normalize_obs": False,
-    },
-    "CholeskyOffset1": {
-        "num_obs": 10,
-        "hidden_dims": None,
-        "activation": "tanh",
-        "normalize_obs": False,
-    },
-    "CholeskyOffset2": {
-        "num_obs": 10,
-        "hidden_dims": None,
-        "activation": "tanh",
-        "normalize_obs": False,
-    },
-    "QPNet": {
-        "num_obs": 10,
-        "hidden_dims": [256, 128],
-        "activation": "tanh",
-        "normalize_obs": True,
-        "latent_dim": 16,  # 16,
-        "minimize": True,
-    },
-    "NN_wQR": {
-        "critic_name": "SpectralLatent",
-        "action_dim": 2,
-        "regularization": "sequential",  # alternative is "interleaved"
-    },
-    "NN_wLinearLatent": {
-        "critic_name": "DenseSpectralLatent",
-        "action_dim": 12,
-        "regularization": "sequential",  # alternative is "interleaved"
     },
 }
