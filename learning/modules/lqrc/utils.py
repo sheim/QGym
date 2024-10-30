@@ -272,6 +272,7 @@ def train_interleaved(critic, value_opt, reg_opt, value_generator, **kwargs):
     mean_reg_loss /= reg_counter
     return mean_value_loss, mean_reg_loss
 
+
 def get_latent_matrix(input_size, model, device):
     dummy_input = torch.randn(*input_size, device=device)
     # Use torch.jit.trace to create a traced version of the model
@@ -280,12 +281,14 @@ def get_latent_matrix(input_size, model, device):
     for i in range(1, len(list(model.children()))):
         final_weight = traced_model.get_parameter(f"{i}.weight") @ final_weight
 
-    # try:
-    #     final_bias = traced_model.get_parameter("0.bias")
-    #     for i in range(1, len(list(model.children()))):
-    #         final_bias = traced_model.get_parameter(f"{i}.weight") @ final_bias + traced_model.get_parameter(f"{i}.bias")
-    #         return final_weight, final_bias
-    # except:
-    #     print("No bias found.")
-    
-    return final_weight #, final_bias
+    try:
+        final_bias = traced_model.get_parameter("0.bias")
+        for i in range(1, len(list(model.children()))):
+            final_bias = traced_model.get_parameter(
+                f"{i}.weight"
+            ) @ final_bias + traced_model.get_parameter(f"{i}.bias")
+        return final_weight, final_bias
+    except:
+        print("No bias found.")
+
+    return final_weight

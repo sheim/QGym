@@ -1230,24 +1230,6 @@ def plot_loss(loss_arr, fn, title="Training Loss Across Epochs"):
     plt.savefig(f"{fn}.png")
 
 
-# def plot_learning_progress(test_error, fn="test_error"):
-#     _, ax = plt.subplots()
-#     for name, error in test_error.items():
-#         error_mean = [x.mean() for x in error]
-#         error_std = [x.std() for x in error]
-
-#         # plot shaded error region
-#         ax.plot(error_mean, label=name)
-#         ax.fill_between(
-#             range(len(error_mean)),
-#             [x - y for x, y in zip(error_mean, error_std)],
-#             [x + y for x, y in zip(error_mean, error_std)],
-#             alpha=0.3,
-#         )
-#     ax.set_ylabel("Average Test Error")
-#     plt.savefig(f"{fn}.png")
-
-
 def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
 
@@ -1287,3 +1269,138 @@ def plot_learning_progress(
     plt.tight_layout()
     plt.savefig(f"{fn}.{extension}", dpi=300, bbox_inches="tight")
     print("Learning progress plot saved to", f"{fn}.{extension}")
+
+
+def plot_critic_3d_interactive(
+    x,
+    targets,
+    A,
+    xy_eval,
+    cost_true,
+    cost_eval,
+    display_names,
+    offset=[0, 0],
+    W_latent=None,
+    b_latent=None,
+    ground_truth="Unicycle",
+):
+    num_critics = len(A.keys())
+    # create figure
+    fig = plt.figure(figsize=(20, 8))
+    axes = []
+    for i in range(num_critics):
+        num = int(f"1{num_critics}{i+1}")
+        axes.append(fig.add_subplot(num, projection="3d"))
+
+    for ix, critic_name in enumerate(A):
+        if critic_name == ground_truth:
+            continue
+        # turn torch tensors to numpy arrays for graphing
+        np_x = x.detach().cpu().numpy().reshape(-1, 2)
+        np_targets = targets.detach().cpu().numpy().reshape(-1)
+        np_A = A[critic_name].detach().cpu().numpy()
+        np_W_latent = W_latent[critic_name]  # already numpified
+        np_b_latent = b_latent[critic_name]  # already numpified
+        np_xy_eval = xy_eval[critic_name].detach().cpu().numpy()
+        np_cost_true = cost_true[critic_name].detach().cpu().numpy()
+        np_cost_eval = cost_eval[critic_name].detach().cpu().numpy()
+
+        # plot targets
+        axes[ix].scatter(
+            np_x[:, 0], np_x[:, 1], np_targets, c=np_targets, cmap="viridis", marker="o"
+        )
+        # plot eval points
+        axes[ix].scatter(
+            np_xy_eval[0],
+            np_xy_eval[1],
+            np_cost_true,
+            color="blue",
+            marker="X",
+            s=100,
+            label="Cost True",
+        )
+        axes[ix].scatter(
+            np_xy_eval[0],
+            np_xy_eval[1],
+            np_cost_eval,
+            color="red",
+            marker="X",
+            s=100,
+            label="Cost Eval",
+        )
+
+        # plot predictions
+        x_range = np.linspace(min(np_x[:, 0]), max(np_x[:, 0]), 50)
+        y_range = np.linspace(min(np_x[:, 1]), max(np_x[:, 1]), 50)
+        X, Y = np.meshgrid(x_range, y_range)
+
+        if np_W_latent is not None and np_b_latent is not None:
+            # Compute Z based on the quadratic surface equation
+            Z = np.array(
+                [
+                    [
+                        ((np.array([xi, yi]) - offset) @ np_W_latent.T + np_b_latent)
+                        @ np_A
+                        @ ((np.array([xi, yi]) - offset) @ np_W_latent.T + np_b_latent)
+                        for xi in x_range
+                    ]
+                    for yi in y_range
+                ]
+            )
+        else:
+            # Compute Z based on the quadratic surface equation
+            Z = np.array(
+                [
+                    [
+                        (np.array([xi, yi]) - offset)
+                        @ np_A
+                        @ (np.array([xi, yi]) - offset)
+                        for xi in x_range
+                    ]
+                    for yi in y_range
+                ]
+            )
+
+        # Plot the surface
+        axes[ix].plot_surface(X, Y, Z, cmap="viridis", alpha=0.5, edgecolor="none")
+
+        axes[ix].set_xlabel("X")
+        axes[ix].set_ylabel("Y")
+        axes[ix].set_zlabel("Z")
+        axes[ix].set_title(f"{display_names[critic_name]} Prediction")
+        axes[ix].legend()
+
+        # Set initial viewing angle
+        axes[ix].view_init(elev=20, azim=45)
+
+    # Variables to track which axis is being interacted with
+    active_ax = None
+    button_pressed = False
+
+    # Mouse button press event handler
+    def on_button_press(event):
+        global active_ax, button_pressed
+        if event.inaxes in axes:
+            active_ax = event.inaxes
+            button_pressed = True
+
+    # Mouse button release event handler
+    def on_button_release(event):
+        global button_pressed
+        button_pressed = False
+
+    # Mouse motion event handler
+    def on_move(event):
+        if button_pressed and active_ax is not None:
+            active_ax.view_init(elev=active_ax.elev, azim=active_ax.azim)
+            fig.canvas.draw_idle()
+
+    # Connect event handlers
+    fig.canvas.mpl_connect("button_press_event", on_button_press)
+    fig.canvas.mpl_connect("button_release_event", on_button_release)
+    fig.canvas.mpl_connect("motion_notify_event", on_move)
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    plt.show()

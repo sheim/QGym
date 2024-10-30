@@ -117,10 +117,10 @@ class OuterProduct(nn.Module):
         # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
-        # value = self.sign * quadratify_xAx(x, A)
-        value = quadratify_xAx(x, A)
-        value *= 1.0 if self.minimize else -1.0
-        value += self.value_offset
+        value = self.sign * quadratify_xAx(x, A)
+        # value = quadratify_xAx(x, A)
+        # value *= 1.0 if self.minimize else -1.0
+        # value += self.value_offset
 
         if return_all:
             # return value, A, L
@@ -168,7 +168,7 @@ class OuterProductLatent(OuterProduct):
             latent_dim,
             latent_hidden_dims,
             latent_activation,
-            bias_in_linear_layers=False,
+            # bias_in_linear_layers=False,
         )
 
     def forward(self, x, return_all=False):
@@ -278,7 +278,7 @@ class CholeskyLatent(CholeskyInput):
             latent_dim,
             latent_hidden_dims,
             latent_activation,
-            bias_in_linear_layers=False,
+            # bias_in_linear_layers=False,
         )
 
         # self.latent_NN.apply(init_weights)
@@ -302,6 +302,14 @@ class CholeskyLatent(CholeskyInput):
 
     def evaluate(self, obs, return_all=False):
         return self.forward(obs, return_all)
+
+    def loss_fn(self, obs, target, **kwargs):
+        obs.requires_grad_(True)
+        output = self.forward(obs)
+        gradients = torch.autograd.grad(
+            output, obs, grad_outputs=torch.ones_like(output), retain_graph=True
+        )[0]
+        return F.mse_loss(self.forward(obs), target, reduction="mean")
 
 
 class PDCholeskyInput(CholeskyInput):
@@ -393,7 +401,7 @@ class SpectralLatent(nn.Module):
             latent_dim,
             latent_hidden_dims,
             latent_activation,
-            bias_in_linear_layers=False,
+            # bias_in_linear_layers=False,
         )
 
     def forward(self, x, return_all=False):
@@ -501,7 +509,7 @@ class DenseSpectralLatent(nn.Module):
             latent_dim,
             latent_hidden_dims,
             latent_activation,
-            bias_in_linear_layers=False,
+            # bias_in_linear_layers=False,
         )
 
     def forward(self, x, return_all=False):

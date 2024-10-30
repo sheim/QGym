@@ -1,62 +1,82 @@
 import pickle
 import math
+import random
+import os
 import time
 from gym import LEGGED_GYM_ROOT_DIR
 
 import torch
 from torch import nn  # noqa F401
 import numpy as np
-from scipy.spatial.distance import pdist
 from scipy.spatial import KDTree
-
-from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from learning.modules.critic import Critic  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
 from learning.utils import (
     create_uniform_generator,
 )
-from utils import DEVICE
+from utils import (
+    DEVICE,
+    is_lipschitz_continuous,
+    max_pairwise_distance,
+    calc_neighborhood_radius,
+    process_batch,
+)
 from critic_params_ampc import critic_params
 from tensordict import TensorDict
 
 from learning.modules.lqrc.plotting import (
-    plot_learning_progress,
-    plot_binned_errors_ampc
+    plot_critic_3d_interactive,
 )
-from learning.modules.utils.neural_net import export_network
+
+from learning.modules.lqrc.utils import get_latent_matrix
+
+# choose critics to include in comparison
+critic_names = [
+    "OuterProduct",
+    # "OuterProductLatent",
+    # "PDCholeskyInput",
+    "CholeskyLatent",
+    "DenseSpectralLatent",
+]
 
 # make dir for saving this run's results
-time_str = time.strftime("%Y%m%d_%H%M%S")
-save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
+# time_str = time.strftime("%Y%m%d_%H%M%S")
+# save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
+# if not os.path.exists(save_path):
+#     os.makedirs(save_path)
 
+latent_weight = None
+latent_bias = None
 # set up critics
 for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
-critic_names = [
-    "Critic",
-    # "OuterProduct",
-    # "PDCholeskyInput",
-    # "CholeskyLatent",
-    "DenseSpectralLatent",
-]
-print("Loading data")
-# load data
-with open(f"{LEGGED_GYM_ROOT_DIR}/learning/modules/lqrc/dataset.pkl", "rb") as f:
-    data = pickle.load(f)
-x0 = np.array(data["x0"]) # (3478114, 10)
-cost = np.array(data["cost"]) # (3478114,)
 
-# remove top 1% of cost values and corresponding states
-num_to_remove = int(0.01 * len(cost))
+print("Loading data")
+with open(
+    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/50_unicycle_dataset_soft_constraints.pkl",
+    "rb",
+) as f:
+    data = pickle.load(f)
+x0 = np.array(data["x0"])
+cost = np.array(data["cost"])
+eval_ix = len(x0) // 4
+
+print(
+    f"Raw data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
+)
+
+# remove top 10% of cost values and corresponding states
+num_to_remove = math.ceil(0.1 * len(cost))
 top_indices = np.argsort(cost)[-num_to_remove:]
 mask = np.ones(len(cost), dtype=bool)
 mask[top_indices] = False
 x0 = x0[mask]
 cost = cost[mask]
+# optimal_u = optimal_u[mask]
+n_samples = x0.shape[0]
 
 # min max normalization to put state and cost on [0, 1]
 x0_min = x0.min(axis=0)
@@ -66,27 +86,56 @@ cost_min = cost.min()
 cost_max = cost.max()
 cost = (cost - cost_min) / (cost_max - cost_min)
 
-d_max = 0
+print(
+    f"Normalized data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
+)
 
+# make batch for one step MPC eval before adding non-fs synthetic data points
+batch_terminal_eval = 10
+mpc_eval_ix = random.sample(list(range(x0.shape[0])), batch_terminal_eval)
+mpc_mask = np.zeros(len(cost), dtype=bool)
+mpc_mask[mpc_eval_ix] = True
+mpc_eval_x0 = x0[mpc_mask]
+mpc_eval_cost = cost[mpc_mask]
+# mpc_eval_optimal_u = optimal_u[mpc_mask]
+# ensure this validation batch is not seen in training data
+x0 = x0[~mpc_mask]
+cost = cost[~mpc_mask]
+# optimal_u = optimal_u[~mpc_mask]
+
+
+# add in non-fs synthetic data points
 print("Building KDTree")
 # Build the KDTree to get pairwise point distances
 start = time.time()
 tree = KDTree(x0)
+d_max = max_pairwise_distance(tree)
 
-random_x0 = np.random.uniform(low=-0.2, high=1.2, size=(10000, x0.shape[1]))
+midpt = np.mean(x0, axis=0)
+n_synthetic = 0.2 * n_samples
+random_x0 = np.concatenate(
+    (
+        np.random.uniform(
+            low=-0.5,
+            high=1.5,
+            size=(int(n_synthetic // 2), x0.shape[1]),
+        ),
+        np.random.uniform(
+            low=-0.5,
+            high=1.5,
+            size=(int(n_synthetic // 2), x0.shape[1]),
+        ),
+    )
+)
 
-def process_batch(batch):
-    indices = tree.query_ball_point(batch, d_max)
-    mask = np.array([len(idx) == 0 for idx in indices])
-    return batch[mask]
-
+radius = calc_neighborhood_radius(tree, x0)
 print("Creating non feasible state data points")
 # filter random_x0 in batches
-chunk_size = 10000
+chunk_size = 100
 x0_non_fs_list = []
 for i in range(0, len(random_x0), chunk_size):
-    batch = random_x0[i:i+chunk_size]
-    Y_filtered_batch = process_batch(batch)
+    batch = random_x0[i : i + chunk_size]
+    Y_filtered_batch = process_batch(batch, tree, radius)
     if len(Y_filtered_batch) > 0:
         x0_non_fs_list.append(Y_filtered_batch)
 print("")
@@ -95,34 +144,48 @@ print("")
 x0_non_fs = np.concatenate(x0_non_fs_list) if x0_non_fs_list else None
 cost_non_fs = np.ones((x0_non_fs.shape[0],))
 # union non feasible and feasible states
-x0 = np.concatenate((x0, x0_non_fs))
-cost = np.concatenate((cost, cost_non_fs))
+# x0 = np.concatenate((x0, x0_non_fs))
+# cost = np.concatenate((cost, cost_non_fs))
 
-# #hack to see data dist
-# import matplotlib.pyplot as plt
+# hack to see data dist
 # plt.hist(cost, bins=100)
 # plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
+
+
+print(
+    "Dataset Lipschitz continuity with threshold of 1e-6",
+    is_lipschitz_continuous(
+        x0, cost, threshold=100
+    ),  # reduced threshold due to 0 to 1 normalization
+)
 
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
 cost = torch.from_numpy(cost).float().to(DEVICE)
 
-print("cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std())
+print(
+    "cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std()
+)
 
 # set up constants
 total_data = x0.shape[0]
 n_dims = x0.shape[1]
-graphing_data = {data_name: {name: {} for name in critic_names}
-            for data_name in [
-                "critic_obs",
-                "values",
-                "cost",
-                "error",
-            ]}
+graphing_data = {
+    data_name: {name: {} for name in critic_names}
+    for data_name in [
+        "xy_eval",
+        "cost_eval",
+        "A",
+        "W_latent",
+        "b_latent",
+        "cost_true",
+    ]
+}
 test_error = {name: [] for name in critic_names}
+lr_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 3000
+max_gradient_steps = 500
 batch_size = 512
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
@@ -139,8 +202,6 @@ data = TensorDict(
 
 standard_offset = 0
 for ix, name in enumerate(critic_names):
-    torch.cuda.empty_cache()
-    print("")
     params = critic_params[name]
     if "critic_name" in params.keys():
         params.update(critic_params[params["critic_name"]])
@@ -148,7 +209,10 @@ for ix, name in enumerate(critic_names):
 
     critic_class = globals()[name]
     critic = critic_class(**params).to(DEVICE)
-    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
+    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3, weight_decay=0.01)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        critic_optimizer, mode="min", factor=0.5, patience=100, threshold=1e-5
+    )
 
     # train new critic
     mean_value_loss = 0
@@ -159,7 +223,9 @@ for ix, name in enumerate(critic_names):
         batch_size,
         max_gradient_steps=max_gradient_steps,
     )
+
     for batch in generator:
+        # print offset to check it's working as intended
         if counter == 0:
             if ix == 0:
                 standard_offset = batch["cost"].mean()
@@ -167,14 +233,24 @@ for ix, name in enumerate(critic_names):
             with torch.no_grad():
                 critic.value_offset.copy_(standard_offset)
             print(f"{name} value offset after mean assigning", critic.value_offset)
+
+        if "Latent" in name:
+            latent_weight, latent_bias = get_latent_matrix(
+                batch["critic_obs"].shape, critic.latent_NN, device=DEVICE
+            )
+            latent_weight = latent_weight.cpu().detach().numpy()
+            latent_bias = latent_bias.cpu().detach().numpy()
+
+        # calculate loss and optimize
         value_loss = critic.loss_fn(
             batch["critic_obs"].squeeze(), batch["cost"].squeeze()
         )
-
         critic_optimizer.zero_grad()
         value_loss.backward()
         critic_optimizer.step()
+        lr_scheduler.step(value_loss)
         counter += 1
+        # pointwise prediction test error
         with torch.no_grad():
             actual_error = (
                 (
@@ -183,25 +259,33 @@ for ix, name in enumerate(critic_names):
                 ).pow(2)
             ).to("cpu")
         test_error[name].append(actual_error.detach().mean().numpy())
+        lr_history[name].append(lr_scheduler.get_last_lr()[0])
+
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
 
     with torch.no_grad():
-        graphing_data["error"][name] = actual_error
-        graphing_data["critic_obs"][name] = data[0, :]["critic_obs"]
-        graphing_data["values"][name] = critic.evaluate(
-            data[0, :]["critic_obs"]
-        )
-        graphing_data["cost"][name] = data[0, :]["cost"]
-    # print("exporting", name)
-    # export_network(critic, name, save_path, n_dims)
-    print(f"{name} mean", graphing_data["values"][name].mean(), "median", graphing_data["values"][name].median(), "std dev", graphing_data["values"][name].std())
+        graphing_data["xy_eval"][name] = data[0, eval_ix]["critic_obs"]
+        prediction = critic.evaluate(data[0, eval_ix]["critic_obs"], return_all=True)
+        graphing_data["cost_eval"][name] = prediction.get("value")
+        graphing_data["A"][name] = prediction.get("A")
+        graphing_data["W_latent"][name] = latent_weight if "Latent" in name else None
+        graphing_data["b_latent"][name] = latent_bias if "Latent" in name else None
+        graphing_data["cost_true"][name] = data[0, eval_ix]["cost"]
 
-plot_learning_progress(test_error, "AMPC VF Test Error", fn=f"{save_path}/test_error")
-
-
-# plot_binned_errors_ampc(
-#     graphing_data,
-#     save_path + "/ampc",
-#     title_add_on=f"Value Function for AMPC",
-# )
+plot_critic_3d_interactive(
+    x0,
+    cost,
+    graphing_data["A"],
+    graphing_data["xy_eval"],
+    graphing_data["cost_true"],
+    graphing_data["cost_eval"],
+    display_names={
+        "OuterProduct": "Outer Product",
+        "CholeskyLatent": "Cholesky Latent",
+        "DenseSpectralLatent": "Spectral Latent",
+        "Critic": "Critic",
+    },
+    W_latent=graphing_data["W_latent"],
+    b_latent=graphing_data["b_latent"],
+)
