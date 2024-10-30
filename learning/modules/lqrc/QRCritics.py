@@ -318,10 +318,10 @@ class PDCholeskyInput(CholeskyInput):
         L = create_PD_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
         # assert (torch.linalg.eigvals(A).real > 0).all()
-        # value = self.sign * quadratify_xAx(x, A)
-        value = quadratify_xAx(x, A)
-        value *= 1.0 if self.minimize else -1.0
-        value += self.value_offset
+        value = self.sign * quadratify_xAx(x, A)
+        # value = quadratify_xAx(x, A)
+        # value *= 1.0 if self.minimize else -1.0
+        # value += self.value_offset
         # value *= self.scaling_quadratic
 
         if return_all:

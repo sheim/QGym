@@ -5,7 +5,7 @@ critic_params = {
         "hidden_dims": [256, 128],
         "activation": "tanh",
         "normalize_obs": True,
-        "latent_dim": 16,  # 16,
+        # "latent_dim": 16,  # 16,
         "minimize": True,
     },
     "PDCholeskyInput": {

@@ -37,6 +37,7 @@ critic_names = [
     "OuterProduct",
     # "OuterProductLatent",
     # "PDCholeskyInput",
+    "CholeskyInput",
     "CholeskyLatent",
     "DenseSpectralLatent",
 ]
@@ -281,6 +282,7 @@ plot_critic_3d_interactive(
     graphing_data["cost_true"],
     graphing_data["cost_eval"],
     display_names={
+        "CholeskyInput": "Cholesky",
         "OuterProduct": "Outer Product",
         "CholeskyLatent": "Cholesky Latent",
         "DenseSpectralLatent": "Spectral Latent",
