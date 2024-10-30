@@ -4,7 +4,7 @@ import fire
 
 # from psdnets import PDCholeskyInput
 from utils import plot_costs_histogram, plot_3d_costs
-from psdnets import create_PD_lower_diagonal, compose_cholesky, quadratify_xAx
+from psdnets import create_PD_lower_diagonal, compose_cholesky, quadratify_xAx, gradient_xAx
 
 import torch
 # from torch. import Dataset, DataLoader, random_split
@@ -150,17 +150,19 @@ def scaling_function(d, dmax):
     mask = d >= dmax
     scaling[mask]=0
     mask = (d > 0) & (d < dmax)
-    # scaling[mask] = 0.5 * (1 + torch.cos(np.pi * d[mask] / dmax))
+    scaling[mask] = 0.5 * (1 + torch.cos(np.pi * d[mask] / dmax))
     return scaling
 
 class LocalShapeLoss(torch.nn.Module):
-    def __init__(self, loss = torch.nn.L1Loss(reduction='none'), dmax=0.1):
+    def __init__(self, V_loss = torch.nn.L1Loss(reduction='none'), dV_loss = torch.nn.L1Loss(reduction='none'), dmax=0.2, dV_scaling=0.5):
         super(LocalShapeLoss, self).__init__()
         self.dmax = dmax
         # self.l1_loss = torch.nn.MSELoss(reduction='none')
-        self.l1_loss = loss
+        self.V_loss = V_loss
+        self.dV_loss = dV_loss
+        self.dV_scaling = dV_scaling
 
-    def forward(self, x_batch, psd_matrices, x_offsets, v_batch):
+    def forward(self, x_batch, psd_matrices, x_offsets, v_batch, dV_batch):
         batch_size,feature_dim = x_batch.size()
         
         x_batch_exp = x_batch.unsqueeze(1).expand(batch_size, batch_size, feature_dim)  # Shape: [batch_size, batch_size, feature_dim]
@@ -172,9 +174,11 @@ class LocalShapeLoss(torch.nn.Module):
         diff_j = x_batch_exp.transpose(0, 1) - x_offsets_exp  # Shape: [batch_size, batch_size, feature_dim]
     
         pred_values = torch.vmap(quadratify_xAx)(diff_j, psd_matrices)  # Shape: [batch_size, batch_size]
+        pred_values_grad = torch.vmap(gradient_xAx)(diff_j, psd_matrices)  # Shape: [batch_size, batch_size]
 
-        l1_losses = self.l1_loss(pred_values, v_batch.unsqueeze(0).expand(batch_size, batch_size))  # Shape: [batch_size, batch_size]
-        scaled_l1_losses = scaling * l1_losses  # Element-wise scaling
+        V_losses = self.V_loss(pred_values, v_batch.unsqueeze(0).expand(batch_size, batch_size))  # Shape: [batch_size, batch_size]
+        dV_losses = self.dV_loss(pred_values_grad, dV_batch.unsqueeze(0).expand(batch_size, batch_size, feature_dim)).mean(dim=-1)  # Shape: [batch_size, batch_size, feature_dim]
+        scaled_l1_losses = scaling * (V_losses+self.dV_scaling*dV_losses)  # Element-wise scaling
         
         nonzero_counts = torch.count_nonzero(scaling, dim=1).clamp(min=1)  # Shape: [batch_size, 1]
         normalized_losses = scaled_l1_losses.sum(dim=1) / nonzero_counts.squeeze()  # Shape: [batch_size]
@@ -190,7 +194,7 @@ class SobolLoss(torch.nn.Module):
 
     def forward(self, x_batch, psd_matrices, x_offsets, v_batch, dV_batch):
         V_pred = quadratify_xAx(x_batch-x_offsets, psd_matrices)
-        dV_pred = torch.einsum("...ij, ...jk -> ...ik", x_batch.unsqueeze(-1).transpose(-2, -1), psd_matrices)
+        dV_pred = gradient_xAx(x_batch-x_offsets, psd_matrices)
 
         # Calculate Sobol loss as the difference between predicted and true gradients
         sobol_loss = self.V_loss(V_pred, v_batch) + self.scaling * self.dV_loss(dV_pred, dV_batch)
@@ -289,7 +293,8 @@ def train(filename, plt_show=False):
         plot_costs_histogram(np.array(dVdx_scaled), plt_show=plt_show, plt_name=f"plots/{filename}_cost_gradient_scaled_histogram.png")
         print(f"Normalization V: min={V_min:.3f}, max={V_max:.3f}")
         
-        plot_3d_costs(X_normalized, V_scaled, cost_gradient=dVdx_scaled, zlim=1)
+        # verify that scaled gradients are correct!
+        # plot_3d_costs(X_normalized, V_scaled, cost_gradient=dVdx_scaled, zlim=1)
 
         train_ratio = 0.8
         X_tensor = torch.tensor(X_normalized, dtype=torch.float32)
@@ -310,9 +315,10 @@ def train(filename, plt_show=False):
     # model = PsdCholLatentLin(input_dim=len(X_clip[0]))
     # criterion = torch.nn.MSELoss()
     # criterion = torch.nn.L1Loss()
-    # criterion = LocalShapeLoss(torch.nn.L1Loss(reduction='none'))
-    criterion = SobolLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    dmax = 0.2
+    criterion = LocalShapeLoss(dmax=dmax)
+    # criterion = SobolLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
     
     epochs = 300
@@ -327,9 +333,7 @@ def train(filename, plt_show=False):
                 loss = criterion(predictions.squeeze(), v_batch)
             if type(model) is PsdCholOff:
                 predictions, psd_matrices, x_offset = model(x_batch)
-                if type(criterion) is LocalShapeLoss:
-                    loss = criterion(x_batch, psd_matrices, x_offset, v_batch)
-                elif type(criterion) is SobolLoss:
+                if type(criterion) in (LocalShapeLoss, SobolLoss):
                     loss = criterion(x_batch, psd_matrices, x_offset, v_batch, dV_batch)
                 else:
                     loss = criterion(predictions.squeeze(), v_batch)+10*criterion(x_offset.squeeze(), torch.zeros_like(x_offset.squeeze()))
@@ -348,9 +352,7 @@ def train(filename, plt_show=False):
                     loss = criterion(predictions.squeeze(), v_batch)
                 if type(model) is PsdCholOff:
                     predictions, psd_matrices, x_offsets = model(x_batch)
-                    if type(criterion) is LocalShapeLoss:
-                        loss = criterion(x_batch, psd_matrices, x_offsets, v_batch)
-                    elif type(criterion) is SobolLoss:
+                    if type(criterion) in (LocalShapeLoss, SobolLoss):
                         loss = criterion(x_batch, psd_matrices, x_offsets, v_batch, dV_batch)
                     else:
                         loss = criterion(predictions.squeeze(), v_batch)+10*criterion(x_offset.squeeze(), torch.zeros_like(x_offset.squeeze()))
@@ -373,7 +375,7 @@ def train(filename, plt_show=False):
                 plot_3d_costs(X_normalized, V_scaled, xy, v_true, v_predict, P_predict, [0,0], zlim=1)
     if type(model) is PsdCholOff:
         for xy, v_true, v_predict, P_predict, x_off in zip(x_batch.detach().cpu().numpy(), v_batch.detach().cpu().numpy(), predictions.detach().cpu().numpy(), psd_matrices.detach().cpu().numpy(), x_offsets.detach().cpu().numpy()):
-            plot_3d_costs(X_normalized, V_scaled, xy, v_true, v_predict, P_predict, x_off, zlim=1)
+            plot_3d_costs(X_normalized, V_scaled, xy, v_true, v_predict, P_predict, x_off, zlim=1,dmax=dmax)
     
 if __name__=="__main__":
     # fire.Fire({

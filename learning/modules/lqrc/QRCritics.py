@@ -38,6 +38,9 @@ def quadratify_xAx(x, A):
         return res.squeeze(0)
     return res.squeeze()
 
+def gradient_xAx(x,A):
+    res = 2*torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A).squeeze(1)
+    return res
 
 def init_weights(m):
     if isinstance(m, nn.Linear):

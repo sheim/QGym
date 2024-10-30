@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     description="Isaac Gym environments",
     install_requires=[
-        "isaacgym",
+        # "isaacgym",
         "setuptools==59.5.0",
         "torch>=1.4.0",
         "torchvision>=0.5.0",

@@ -1,10 +1,8 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.cm as cm
 
-
-import matplotlib.pyplot as plt
-import numpy as np
 
 def plot_robot(
     shooting_nodes,
@@ -119,7 +117,6 @@ def plot_robot(
         
 #     plt.close()
     
-    
 def plot_3d_costs(
     xy_coords, 
     costs, 
@@ -133,18 +130,39 @@ def plot_3d_costs(
     plt_show=True, 
     plt_name=None,
     zlim=20,
-    cost_gradient=None  # New parameter for cost gradient
+    cost_gradient=None,  # New parameter for cost gradient
+    dmax=None
 ):
-    # Unpack x and y coordinates
-    x_values = [coord[0] for coord in xy_coords]
-    y_values = [coord[1] for coord in xy_coords]
+    # Check if the input is nested or flattened
+    is_nested = isinstance(xy_coords[0][0], list)  # Assumes that nested lists indicate a list of lists
 
     # Create a 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    # Scatter plot of costs
-    ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o')
+    if is_nested:
+        # Use a colormap to assign colors to each set of points
+        colors = cm.viridis(np.linspace(0, 1, len(xy_coords)))
+
+        # Loop through each set of points in the nested lists
+        for idx, (outer_x0_set, cost_set, color) in enumerate(zip(xy_coords, costs, colors)):
+            x_values = [coord[0] for coord in outer_x0_set]
+            y_values = [coord[1] for coord in outer_x0_set]
+
+            # Scatter plot for each set of points
+            ax.scatter(
+                x_values, y_values, cost_set, c=[color]*len(cost_set), marker='o', label=f'Set {idx}'
+            )
+            # Mark the outer_x0 with a larger star
+            ax.scatter(
+                x_values[0], y_values[0], cost_set[0], color=color, marker='*', s=150, edgecolor='k'
+            )
+
+    else:
+        # Flattened data, retain original functionality
+        x_values = [coord[0] for coord in xy_coords]
+        y_values = [coord[1] for coord in xy_coords]
+        ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o')
 
     # Plot cost_true and cost_eval as bold blue and red crosses at xy_eval
     if xy_eval is not None and cost_true is not None:
@@ -165,46 +183,73 @@ def plot_3d_costs(
         x_range = np.linspace(min(x_values), max(x_values), 50)
         y_range = np.linspace(min(y_values), max(y_values), 50)
         X, Y = np.meshgrid(x_range, y_range)
-        
+
+        # Check if dmax is specified and limit the plot range
+        if xy_eval is not None and dmax is not None:
+            distances = np.sqrt((X - xy_eval[0])**2 + (Y - xy_eval[1])**2)
+            mask = distances <= dmax  # Mask for points within dmax radius
+        else:
+            mask = np.ones_like(X, dtype=bool)  # No restriction if dmax is None
+
+        # Compute Z based on the quadratic surface equation
         if linLatW is not None and linLatb is not None:
-            # Compute Z based on the quadratic surface equation
             Z = np.array([
-                [((np.array([xi, yi]) - offset)@linLatW.T+linLatb) @ P @ ((np.array([xi, yi]) - offset)@linLatW.T+linLatb) for xi in x_range]
-                for yi in y_range
+                [((np.array([xi, yi]) - offset)@linLatW.T + linLatb) @ P @ ((np.array([xi, yi]) - offset)@linLatW.T + linLatb) 
+                 if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
+                for i, yi in enumerate(y_range)
             ])
         else:
-            # Compute Z based on the quadratic surface equation
             Z = np.array([
-                [(np.array([xi, yi]) - offset) @ P @ (np.array([xi, yi]) - offset) for xi in x_range]
-                for yi in y_range
+                [(np.array([xi, yi]) - offset) @ P @ (np.array([xi, yi]) - offset) 
+                 if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
+                for i, yi in enumerate(y_range)
             ])
 
-        # Plot the surface
+        # Plot the surface, masking values outside the dmax radius
         ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.5, edgecolor='none')
+
 
     # Plot cost gradients as arrows if provided
     if cost_gradient is not None:
-        cost_gradient_plotting = [(-grad[0]/np.linalg.norm(grad), -grad[1]/np.linalg.norm(grad), -np.linalg.norm(grad)) for grad in cost_gradient]
-        
-        cost_gradient_plotting_normalized = [
-            (
-                grad[0]/np.linalg.norm(grad),
-                grad[1]/np.linalg.norm(grad),
-                grad[2]/np.linalg.norm(grad)
-                ) for grad in cost_gradient_plotting]
-        
-        gradient_x, gradient_y, gradient_z = zip(*cost_gradient_plotting)
-        
-        ax.quiver(
-            x_values, y_values, costs,   # Starting points (x, y, z)
-            gradient_x, gradient_y, gradient_z,  # Gradient directions (dx, dy, dz)
-            length=0.1, color='blue', 
-            pivot='middle',
-            arrow_length_ratio=0, alpha=0.5,
-            # normalize=True
-        )
-        
-        
+        # Adjust gradient arrows based on data structure (flattened or nested)
+        if is_nested:
+            for x0_set, cost_grad_set, color in zip(xy_coords, cost_gradient, colors):
+                gradient_x, gradient_y, gradient_z = zip(*[
+                    (-grad[0] / np.linalg.norm(grad), -grad[1] / np.linalg.norm(grad), -np.linalg.norm(grad))
+                    for grad in cost_grad_set
+                ])
+                ax.quiver(
+                    [coord[0] for coord in x0_set],
+                    [coord[1] for coord in x0_set],
+                    cost_grad_set,
+                    gradient_x,
+                    gradient_y,
+                    gradient_z,
+                    length=0.02,
+                    color=color,
+                    pivot='middle',
+                    arrow_length_ratio=0,
+                    alpha=0.5,
+                )
+        else:
+            gradient_x, gradient_y, gradient_z = zip(*[
+                (-grad[0] / np.linalg.norm(grad), -grad[1] / np.linalg.norm(grad), -np.linalg.norm(grad))
+                for grad in cost_gradient
+            ])
+            ax.quiver(
+                x_values,
+                y_values,
+                costs,
+                gradient_x,
+                gradient_y,
+                gradient_z,
+                length=0.02,
+                color='blue',
+                pivot='middle',
+                arrow_length_ratio=0,
+                alpha=0.5,
+            )
+
     # Set axis labels and limits
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -267,20 +312,40 @@ def plot_3d_surface(xy_coords, costs, zlim=(0, 20), plt_show=True, plt_name=None
         
     plt.close()
     
-def plot_costs_histogramm(costs, plt_show=True, plt_name=None):
-    plt.figure()
-    plt.hist(costs, bins=50)
-    plt.xlabel("Cost")
-    plt.ylabel("Frequency")
-    plt.title(f"Cost Distribution")
+def plot_costs_histogram(costs, plt_show=True, plt_name=None):
+    # Check if costs is 1D or 2D
+    if costs.ndim == 1:
+        plt.figure()
+        plt.hist(costs, bins=50)
+        plt.xlabel("Cost")
+        plt.ylabel("Frequency")
+        plt.title("Cost Distribution")
+        
+        # Save the plot
+        if plt_name:
+            plt.savefig(f"{plt_name}")
+            
+        if plt_show:
+            plt.show()
+        
+        plt.close()
     
-    # Save the plot
-    if plt_name:
-        plt.savefig(f"{plt_name}")
+    elif costs.ndim == 2:
+        nx = costs.shape[1]
+        fig, axs = plt.subplots(1, nx, figsize=(5 * nx, 5))
         
-    if plt_show:
-        plt.show()
+        for i in range(nx):
+            axs[i].hist(costs[:, i], bins=50)
+            axs[i].set_xlabel("Cost")
+            axs[i].set_ylabel("Frequency")
+            axs[i].set_title(f"Cost Distribution (Column {i+1})")
         
-    plt.close()
-
+        # Save the plot
+        if plt_name:
+            plt.savefig(f"{plt_name}")
+            
+        if plt_show:
+            plt.show()
+        
+        plt.close(fig)
 
