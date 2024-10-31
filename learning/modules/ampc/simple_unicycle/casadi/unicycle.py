@@ -16,6 +16,12 @@ import fire
 # if not os.path.exists(graph_path):
 #     os.makedirs(graph_path)
 
+obstacle_positions = [[0, 0.5], [0.25, -0.25]]
+obstacle_radiuses = [0.25, 0.15]
+R = np.diag([0.5e-1, 0.5e-1])
+umin = np.array([-0.1, np.deg2rad(-50)])
+umax = -umin
+dt = 0.2  # length of a control interval
 
 def solve_open_loop(
     x0,
@@ -26,7 +32,6 @@ def solve_open_loop(
     plt_save=False,
 ):
     N = 30  # number of control intervals
-    dt = 0.2  # length of a control interval
 
     opti = Opti()  # Optimization problem
 
@@ -41,8 +46,8 @@ def solve_open_loop(
     x0_param = opti.parameter(2)
 
     # ---- objective          ---------
-    Q = np.diag([1, 1])  # [x,y]
-    R = np.diag([1e-1, 1e-1])
+    Q = np.diag([2, 2])  # [x,y]
+    # R = np.diag([1e-1, 1e-1])
     Qf = 100.0 * Q
     cost = 0
     for i in range(N):
@@ -57,12 +62,10 @@ def solve_open_loop(
         x_next = X[:, k] + dt * f(X[:, k], U[:, k])
         opti.subject_to(X[:, k + 1] == x_next)  # close the gaps
 
-    opti.subject_to(opti.bounded(-0.1, v, 0.1))
-    opti.subject_to(opti.bounded(np.deg2rad(-50), theta, np.deg2rad(50)))
+    opti.subject_to(opti.bounded(umin[0], v, umax[0]))
+    opti.subject_to(opti.bounded(umin[1], theta, umax[1]))
 
     # obstacle and x-y bounds
-    obstacle_positions = [[0, 0.5], [0.2, -0.2]]
-    obstacle_radiuses = [0.3, 0.2]
     if not soft_state_constr:
         opti.subject_to(opti.bounded(-0.5, X, 0.5))
         for (xobs, yobs), r in zip(obstacle_positions, obstacle_radiuses):
@@ -72,12 +75,13 @@ def solve_open_loop(
         eps = opti.variable()
         opti.subject_to(eps >= 0)
         # opti.subject_to(opti.bounded(-0.5, X, 0.5))  # lower bound
-        opti.subject_to(opti.bounded(-0.5, X + eps, inf))  # lower bound
-        opti.subject_to(opti.bounded(-inf, X - eps, 0.5))  # upper bound
+        inflation=0.01
+        opti.subject_to(opti.bounded(-0.5+inflation, X + eps, inf-inflation))  # lower bound
+        opti.subject_to(opti.bounded(-inf+inflation, X - eps, 0.5-inflation))  # upper bound
         for (xobs, yobs), r in zip(obstacle_positions, obstacle_radiuses):
             for k in range(N + 1):
-                opti.subject_to((x[k] - xobs) ** 2 + (y[k] - yobs) ** 2 >= (r-eps)**2)
-        cost += soft_constraint_scale * eps**2 + soft_constraint_scale/10 * eps
+                opti.subject_to((x[k] - xobs) ** 2 + (y[k] - yobs) ** 2 >= (r+inflation-eps)**2)
+        cost += 10*soft_constraint_scale * eps**2 + soft_constraint_scale * eps
 
     # ---- boundary conditions --------
     opti.subject_to(x[0]-x0_param[0] == 0)  # initial pos
@@ -120,7 +124,7 @@ def solve_open_loop(
 
         plt_name = None
         if plt_save:
-            plt_name = f"open_loop_x0=[{x0[0]:.2f},{x0[1]:.2f}].png"
+            plt_name = f"plots/open_loop_ipopt_x0=[{x0[0]:.2f},{x0[1]:.2f}].pdf"
 
         # ---- post-processing        ------
         if plt_show or plt_name:
@@ -157,8 +161,8 @@ def solve_open_loop(
 def evaluate_grid(Ngrid=20, filename=None):
     filename = f"{filename}_{Ngrid**2}"
     # Ngrid = 20
-    x_values = np.linspace(-0.55, 0.55, Ngrid)
-    y_values = np.linspace(-0.55, 0.55, Ngrid)
+    x_values = np.linspace(-0.52, 0.52, Ngrid)
+    y_values = np.linspace(-0.52, 0.52, Ngrid)
 
     x0s, Utrajs, Xtrajs, costs, cost_gradients = [], [], [], [], []
 
@@ -169,7 +173,7 @@ def evaluate_grid(Ngrid=20, filename=None):
                 x0 = [X[i, j], Y[i, j]]
                 Utraj, Xtraj, cost, dcost_dx0 = solve_open_loop(
                     x0,
-                    soft_constraint_scale=7e2,
+                    soft_constraint_scale=1e2,
                     soft_state_constr=True,
                     silent=True,
                     plt_show=False,
@@ -288,17 +292,53 @@ def evaluate_local_batch(Ntotal=5, filename=None, cost_threshold=50, resample_th
         plot_3d_costs(all_x0s, all_costs, plt_show=True, plt_name=None)
 
 
-def test():
+def solve_closed_loop(xinit):
+    Nsim = 100
+    Usim = []
+    Xsim = [xinit]
+    u = np.zeros(2)
+    print(f"Simulating x0={xinit}")
+    for i in tqdm.tqdm(range(Nsim)):
+        # print(f"Sim: {i}")
+        U_res, X_res, cost_res, cost_gradient_res = solve_open_loop(Xsim[i], silent=True, plt_show=False, plt_save=False)
+        u = U_res[0].T[0]
+        Usim.append(u)
+        Xsim.append(Xsim[i]+dt*np.array([u[0]*np.cos(u[1]), u[0]*np.sin(u[1])]))
+    
+    plot_robot(
+            np.linspace(0, Nsim, Nsim + 1),
+            list(umax),
+            np.array(Usim),
+            np.array(Xsim),
+            x_labels=["x", "y"],
+            u_labels=["v", "theta"],
+            obst_pos=obstacle_positions,
+            obst_rad=obstacle_radiuses,
+            time_label="Sim steps",
+            plt_show=True,
+            plt_name=f"plots/closed_loop_ipopt_x0=[{xinit[0]:.2f},{xinit[1]:.2f}].pdf"
+        )
+
+def test_open_loop():
     # interesting initial conditions:
     x0s = [[0.5, 0.5], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5]]
     for x0 in x0s:
         solve_open_loop(x0, silent=False, plt_show=True, plt_save=True)
 
+def test_closed_loop():
+    # interesting initial conditions:
+    x0s = [[0.5, 0.5], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5]]
+
+    for x0 in x0s:
+        solve_closed_loop(x0)
+
 if __name__ == "__main__":
+    # test()
     fire.Fire({
         "evaluate_grid": evaluate_grid,
         "evaluate_local_batch": evaluate_local_batch,
-        "test": test
+        "test_open_loop": test_open_loop,
+        "test_closed_loop": test_closed_loop
     })
     # x0s = [[0.5, 0.5], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5]]
     # for x0 in x0s:

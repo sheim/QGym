@@ -86,21 +86,21 @@ class PsdCholOff(torch.nn.Module):
         num_lower_diag_elements = sum(range(input_dim + 1))
         self.lower_diag_NN = torch.nn.Sequential(
             torch.nn.Linear(input_dim, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 64),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear(64, num_lower_diag_elements)
         )
         
         self.cone_center_offset_NN = torch.nn.Sequential(
             torch.nn.Linear(input_dim, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, 64),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear(64, input_dim)
         )
 
@@ -161,6 +161,10 @@ class LocalShapeLoss(torch.nn.Module):
         self.V_loss = V_loss
         self.dV_loss = dV_loss
         self.dV_scaling = dV_scaling
+        
+        self.offset_loss = torch.nn.L1Loss(reduction='none')
+        self.x_setpoint = torch.zeros(2)
+        self.x_threshold = 0.2
 
     def forward(self, x_batch, psd_matrices, x_offsets, v_batch, dV_batch):
         batch_size,feature_dim = x_batch.size()
@@ -179,10 +183,21 @@ class LocalShapeLoss(torch.nn.Module):
         V_losses = self.V_loss(pred_values, v_batch.unsqueeze(0).expand(batch_size, batch_size))  # Shape: [batch_size, batch_size]
         dV_losses = self.dV_loss(pred_values_grad, dV_batch.unsqueeze(0).expand(batch_size, batch_size, feature_dim)).mean(dim=-1)  # Shape: [batch_size, batch_size, feature_dim]
         scaled_l1_losses = scaling * (V_losses+self.dV_scaling*dV_losses)  # Element-wise scaling
-        
+    
         nonzero_counts = torch.count_nonzero(scaling, dim=1).clamp(min=1)  # Shape: [batch_size, 1]
         normalized_losses = scaled_l1_losses.sum(dim=1) / nonzero_counts.squeeze()  # Shape: [batch_size]
-        loss = normalized_losses.mean()  # Average over the batch size
+    
+        # extra loss penalizing x0offset when close to origin:
+        offset_losses = self.offset_loss(x_offsets, self.x_setpoint)
+        # Compute the distance between x_batch and x_setpoint
+        distances = torch.norm(x_batch - self.x_setpoint, dim=1, keepdim=True)  # Shape: [batch_size, 1]
+        # Compute the scaling factor
+        # scaling_factors = torch.clamp(1 - distances / self.x_threshold, min=0.0)  # Shape: [batch_size, 1]
+        scaling_factors = scaling_function(distances, self.x_threshold)  # Shape: [batch_size]
+        # Apply scaling to the L1 losses
+        scaled_losses = scaling_factors * offset_losses  # Broadcasting applies scaling factor per element
+        
+        loss = normalized_losses.mean() + 10*scaled_losses.mean() # Average over the batch size
         return loss
 
 class SobolLoss(torch.nn.Module):
@@ -264,7 +279,7 @@ def train(filename, plt_show=False):
         plot_costs_histogram(np.array(V), plt_show=plt_show, plt_name=f"plots/{filename}_cost_histogram.png")
         plot_costs_histogram(np.array(dVdx), plt_show=plt_show, plt_name=f"plots/{filename}_cost_gradient_histogram.png")
         
-        def remove_high_cost(X, V, dVdx, threshold=30):
+        def remove_high_cost(X, V, dVdx, threshold=20):
             filtered_X = [x for x, v in zip(X, V) if v <= threshold]
             filtered_V = [v for v in V if v <= threshold]
             filtered_dVdx = [dv for dv, v in zip(dVdx, V) if v <= threshold]
@@ -316,12 +331,13 @@ def train(filename, plt_show=False):
     # criterion = torch.nn.MSELoss()
     # criterion = torch.nn.L1Loss()
     dmax = 0.2
-    criterion = LocalShapeLoss(dmax=dmax)
+    dV_scaling=0.2
+    criterion = LocalShapeLoss( torch.nn.L1Loss(reduction='none'),  torch.nn.L1Loss(reduction='none'), dmax=dmax, dV_scaling=dV_scaling)
     # criterion = SobolLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
     
-    epochs = 300
+    epochs = 1000
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -366,6 +382,10 @@ def train(filename, plt_show=False):
         current_lr = optimizer.param_groups[0]['lr']
         print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {current_lr:.6f}")
     
+    torch.save(model.state_dict(), f"models/{filename}_{type(model).__name__}.pth")
+    with open(f"models/{filename}_{type(model).__name__}.pkl", "wb") as f:
+        pickle.dump({"V_max": V_max, "V_min": V_min, "X_max": X_max, "X_min": X_min}, f)
+    
     if type(model) in (PsdChol,PsdCholLatentLin):
         for xy, v_true, v_predict, P_predict in zip(x_batch.detach().cpu().numpy(), v_batch.detach().cpu().numpy(), predictions.detach().cpu().numpy(), psd_matrices.detach().cpu().numpy()):
             if type(model) is PsdCholLatentLin:
@@ -382,4 +402,4 @@ if __name__=="__main__":
     #     "train": train
     # })
     
-    train(filename="unicycle_2D_900")
+    train(filename="unicycle_2D_64")
