@@ -39,6 +39,80 @@ def quadratify_xAx(x, A):
     return res.squeeze()
 
 
+def gradient_xAx(x, A):
+    res = 2 * torch.einsum(
+        "...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A
+    ).squeeze(1)
+    return res
+
+
+def shape_loss(loss_fn, obs, x_offsets, A):
+    batch_size, feature_dim = obs.size()
+
+    obs_exp = obs.unsqueeze(1).expand(
+        batch_size, batch_size, feature_dim
+    )  # Shape: [batch_size, batch_size, feature_dim]
+    x_offsets_exp = x_offsets.unsqueeze(1).expand(
+        batch_size, batch_size, feature_dim
+    )  # Shape: [batch_size, batch_size, feature_dim]
+
+    diff_i = obs_exp - obs_exp.transpose(
+        0, 1
+    )  # Shape: [batch_size, batch_size, feature_dim]
+    scaling = scaling_function(
+        torch.norm(diff_i, dim=-1), self.dmax
+    )  # Shape: [batch_size, batch_size]
+
+    diff_j = (
+        obs_exp.transpose(0, 1) - x_offsets_exp
+    )  # Shape: [batch_size, batch_size, feature_dim]
+
+    pred_values = torch.vmap(quadratify_xAx)(
+        diff_j, A
+    )  # Shape: [batch_size, batch_size]
+    pred_values_grad = torch.vmap(gradient_xAx)(
+        diff_j, A
+    )  # Shape: [batch_size, batch_size]
+    # ! TODO: continue cleaning up
+    V_losses = loss_fn(
+        pred_values, v_batch.unsqueeze(0).expand(batch_size, batch_size)
+    )  # Shape: [batch_size, batch_size]
+    dV_losses = loss_fn(
+        pred_values_grad,
+        dV_batch.unsqueeze(0).expand(batch_size, batch_size, feature_dim),
+    ).mean(dim=-1)  # Shape: [batch_size, batch_size, feature_dim]
+    scaled_l1_losses = scaling * (
+        V_losses + self.dV_scaling * dV_losses
+    )  # Element-wise scaling
+
+    nonzero_counts = torch.count_nonzero(scaling, dim=1).clamp(
+        min=1
+    )  # Shape: [batch_size, 1]
+    normalized_losses = (
+        scaled_l1_losses.sum(dim=1) / nonzero_counts.squeeze()
+    )  # Shape: [batch_size]
+
+    # extra loss penalizing x0offset when close to origin:
+    offset_losses = self.offset_loss(x_offsets, self.x_setpoint)
+    # Compute the distance between x_batch and x_setpoint
+    distances = torch.norm(
+        x_batch - self.x_setpoint, dim=1, keepdim=True
+    )  # Shape: [batch_size, 1]
+    # Compute the scaling factor
+    # scaling_factors = torch.clamp(1 - distances / self.x_threshold, min=0.0)  # Shape: [batch_size, 1]
+    scaling_factors = scaling_function(
+        distances, self.x_threshold
+    )  # Shape: [batch_size]
+    # Apply scaling to the L1 losses
+    scaled_losses = (
+        scaling_factors * offset_losses
+    )  # Broadcasting applies scaling factor per element
+
+    loss = (
+        normalized_losses.mean() + 10 * scaled_losses.mean()
+    )  # Average over the batch size
+
+
 def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform_(m.weight)
@@ -91,6 +165,8 @@ class OuterProduct(nn.Module):
         normalize_obs=False,
         minimize=False,
         offset_hidden_dims=None,
+        loss="mse_loss",
+        loss_type="standard",
         device="cuda",
         **kwargs,
     ):
@@ -105,6 +181,8 @@ class OuterProduct(nn.Module):
         else:
             self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        self.loss = loss
+        self.loss_type = loss_type
 
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
@@ -122,14 +200,15 @@ class OuterProduct(nn.Module):
         # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
-        value = self.sign * quadratify_xAx(x - self.offset_NN(x), A)
+        x_offsets = self.offset_NN(x)
+        value = self.sign * quadratify_xAx(x - x_offsets, A)
         # value = quadratify_xAx(x, A)
         # value *= 1.0 if self.minimize else -1.0
         # value += self.value_offset
 
         if return_all:
             # return value, A, L
-            return {"value": value, "A": A}
+            return {"value": value, "A": A, "x_offsets": x_offsets}
         else:
             return value
 
@@ -137,9 +216,20 @@ class OuterProduct(nn.Module):
         return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
-        loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
-
-        return loss_NN
+        fn = eval(f"F.{self.loss}")
+        output = self.forward(obs, return_all=True)
+        value = output["value"]
+        if self.loss_type == "standard":
+            return fn(value, target, reduction="mean")
+        elif self.loss_type == "sobol":
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Sobol loss called with missing kwargs.")
+            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+        elif self.loss_type == "shape":
+            raise NotImplementedError
+        else:
+            raise ValueError("Loss type unspecified")
 
 
 class OuterProductLatent(OuterProduct):
@@ -155,6 +245,8 @@ class OuterProductLatent(OuterProduct):
         latent_hidden_dims=[128, 128],
         latent_activation="tanh",
         offset_hidden_dims=None,
+        loss="mse_loss",
+        loss_type="standard",
         device="cuda",
         **kwargs,
     ):
@@ -166,6 +258,8 @@ class OuterProductLatent(OuterProduct):
             dropouts,
             normalize_obs,
             minimize,
+            loss,
+            loss_type,
             device,
             **kwargs,
         )
@@ -178,16 +272,17 @@ class OuterProductLatent(OuterProduct):
         )
 
     def forward(self, x, return_all=False):
+        x_offsets = self.offset_NN(x)
         z = self.NN(x)
         # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
-        value = self.sign * quadratify_xAx(self.latent_NN(x - self.offset_NN(x)), A)
+        value = self.sign * quadratify_xAx(self.latent_NN(x - x_offsets), A)
         value += self.value_offset
 
         if return_all:
             # return value, A, L
-            return {"value": value, "A": A, "z": z}
+            return {"value": value, "A": A, "z": z, "x_offsets": x_offsets}
         else:
             return value
 
@@ -203,6 +298,8 @@ class CholeskyInput(nn.Module):
         normalize_obs=False,
         minimize=False,
         offset_hidden_dims=None,
+        loss="mse_loss",
+        loss_type="standard",
         device="cuda",
         **kwargs,
     ):
@@ -218,7 +315,8 @@ class CholeskyInput(nn.Module):
             self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
         # V = x'Ax + b = a* x'Ax + b, and add a regularization for det(A) ~= 1
-        # self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
+        self.loss = loss
+        self.loss_type = loss_type
 
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
@@ -239,13 +337,14 @@ class CholeskyInput(nn.Module):
         output = self.lower_diag_NN(x)
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
-        value = self.sign * quadratify_xAx(x - self.offset_NN(x), A)
+        x_offsets = self.offset_NN(x)
+        value = self.sign * quadratify_xAx(x - x_offsets, A)
         value += self.value_offset
         # value *= self.scaling_quadratic
 
         if return_all:
             # return value, A, L
-            return {"value": value, "A": A, "L": L}
+            return {"value": value, "A": A, "L": L, "x_offsets": x_offsets}
         else:
             return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
@@ -254,7 +353,20 @@ class CholeskyInput(nn.Module):
         return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
-        return F.mse_loss(self.forward(obs), target, reduction="mean")
+        fn = eval(f"F.{self.loss}")
+        output = self.forward(obs, return_all=True)
+        value = output["value"]
+        if self.loss_type == "standard":
+            return fn(value, target, reduction="mean")
+        elif self.loss_type == "sobol":
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Sobol loss called with missing kwargs.")
+            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+        elif self.loss_type == "shape":
+            raise NotImplementedError
+        else:
+            raise ValueError("Loss type unspecified")
 
 
 class CholeskyLatent(CholeskyInput):
@@ -271,6 +383,8 @@ class CholeskyLatent(CholeskyInput):
         normalize_obs=False,
         minimize=False,
         offset_hidden_dims=None,
+        loss="mse_loss",
+        loss_type="standard",
         device="cuda",
         **kwargs,
     ):
@@ -282,6 +396,8 @@ class CholeskyLatent(CholeskyInput):
             dropouts=dropouts,
             normalize_obs=normalize_obs,
             minimize=minimize,
+            loss=loss,
+            loss_type=loss_type,
             device="cuda",
             **kwargs,
         )
@@ -297,7 +413,8 @@ class CholeskyLatent(CholeskyInput):
         # self.latent_NN.apply(init_weights)
 
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x - self.offset_NN(x))
+        x_offsets = self.offset_NN(x)
+        z = self.latent_NN(x - x_offsets)
         output = self.lower_diag_NN(x)
         L = create_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
@@ -309,7 +426,7 @@ class CholeskyLatent(CholeskyInput):
 
         if return_all:
             # return value, A, L, z
-            return {"value": value, "A": A, "L": L, "z": z}
+            return {"value": value, "A": A, "L": L, "z": z, "x_offsets": x_offsets}
         else:
             return value
 
@@ -317,29 +434,36 @@ class CholeskyLatent(CholeskyInput):
         return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
-        obs.requires_grad_(True)
-        output = self.forward(obs)
-        gradients = torch.autograd.grad(
-            output, obs, grad_outputs=torch.ones_like(output), retain_graph=True
-        )[0]
-        return F.mse_loss(self.forward(obs), target, reduction="mean")
+        fn = eval(f"F.{self.loss}")
+        output = self.forward(obs, return_all=True)
+        value = output["value"]
+        if self.loss_type == "standard":
+            return fn(value, target, reduction="mean")
+        elif self.loss_type == "sobol":
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Sobol loss called with missing kwargs.")
+            pred_grad = gradient_xAx(
+                self.latent_NN(obs - output["x_offsets"]), output["A"]
+            )
+            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+        elif self.loss_type == "shape":
+            raise NotImplementedError
+        else:
+            raise ValueError("Loss type unspecified")
 
 
 class PDCholeskyInput(CholeskyInput):
     def forward(self, x, return_all=False):
+        x_offsets = self.offset_NN(x)
         output = self.lower_diag_NN(x)
         L = create_PD_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
         # assert (torch.linalg.eigvals(A).real > 0).all()
-        value = self.sign * quadratify_xAx(x - self.offset_NN(x), A)
-        # value = quadratify_xAx(x, A)
-        # value *= 1.0 if self.minimize else -1.0
-        # value += self.value_offset
-        # value *= self.scaling_quadratic
+        value = self.sign * quadratify_xAx(x - x_offsets, A)
 
         if return_all:
             # return value, A, L
-            return {"value": value, "A": A, "L": L}
+            return {"value": value, "A": A, "L": L, "x_offsets": x_offsets}
         else:
             return value
         # return self.sign * quadratify_xAx(x, A) + self.value_offset
@@ -347,7 +471,8 @@ class PDCholeskyInput(CholeskyInput):
 
 class PDCholeskyLatent(CholeskyLatent):
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x - self.offset_NN(x))
+        x_offsets = self.offset_NN(x)
+        z = self.latent_NN(x - x_offsets)
         output = self.lower_diag_NN(x)
         L = create_PD_lower_diagonal(output, self.latent_dim, self.device)
         A = compose_cholesky(L)
@@ -358,7 +483,7 @@ class PDCholeskyLatent(CholeskyLatent):
 
         if return_all:
             # return value, A, L
-            return {"value": value, "A": A, "L": L}
+            return {"value": value, "A": A, "L": L, "x_offsets": x_offsets}
         else:
             return value
 
@@ -378,6 +503,8 @@ class SpectralLatent(nn.Module):
         latent_dropouts=None,
         minimize=False,
         offset_hidden_dims=None,
+        loss="mse_loss",
+        loss_type="standard",
         device="cuda",
         **kwargs,
     ):
@@ -397,7 +524,8 @@ class SpectralLatent(nn.Module):
         else:
             self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
-        # self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
+        self.loss = loss
+        self.loss_type = loss_type
 
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
@@ -424,7 +552,8 @@ class SpectralLatent(nn.Module):
         )
 
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x - self.offset_NN(x))
+        x_offsets = self.offset_NN(x)
+        z = self.latent_NN(x - x_offsets)
         y = self.spectral_NN(x)
         A_diag = torch.diag_embed(F.softplus(y[..., : self.relative_dim]))
         # tril_indices = torch.tril_indices(self.latent_dim, self.relative_dim)
@@ -453,6 +582,7 @@ class SpectralLatent(nn.Module):
                 # "A_diag": torch.diag(A_diag), #! throws shape error
                 "L": L,
                 "A": A,
+                "x_offsets": x_offsets,
             }
         else:
             return value
@@ -461,16 +591,20 @@ class SpectralLatent(nn.Module):
         return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
-        loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
-
-        # if self.minimize:
-        #     loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
-        # else:
-        #     loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
-
-        # loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
-
-        return loss_NN  # + loss_offset  # + loss_scaling
+        fn = eval(f"F.{self.loss}")
+        output = self.forward(obs, return_all=True)
+        value = output["value"]
+        if self.loss_type == "standard":
+            return fn(value, target, reduction="mean")
+        elif self.loss_type == "sobol":
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Sobol loss called with missing kwargs.")
+            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+        elif self.loss_type == "shape":
+            raise NotImplementedError
+        else:
+            raise ValueError("Loss type unspecified")
 
 
 class DenseSpectralLatent(nn.Module):
@@ -488,6 +622,8 @@ class DenseSpectralLatent(nn.Module):
         latent_dropouts=None,
         minimize=False,
         offset_hidden_dims=None,
+        loss="mse_loss",
+        loss_type="standard",
         device="cuda",
         **kwargs,
     ):
@@ -507,7 +643,8 @@ class DenseSpectralLatent(nn.Module):
         else:
             self.sign = -torch.ones(1, device=device)
         self.value_offset = nn.Parameter(torch.zeros(1, device=device))
-        # self.scaling_quadratic = nn.Parameter(torch.ones(1, device=device))
+        self.loss = loss
+        self.loss_type = loss_type
 
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
@@ -538,7 +675,8 @@ class DenseSpectralLatent(nn.Module):
         )
 
     def forward(self, x, return_all=False):
-        z = self.latent_NN(x - self.offset_NN(x))
+        x_offsets = self.offset_NN(x)
+        z = self.latent_NN(x - x_offsets)
         y = self.spectral_NN(x)
         A_diag = torch.diag_embed(F.softplus(y[..., : self.relative_dim]))
         # tril_indices = torch.tril_indices(self.latent_dim, self.relative_dim)
@@ -578,6 +716,7 @@ class DenseSpectralLatent(nn.Module):
                 # "A_diag": torch.diag(A_diag), #! throws shape error
                 "L": L,
                 "A": A,
+                "x_offsets": x_offsets,
             }
         else:
             return value
@@ -586,16 +725,20 @@ class DenseSpectralLatent(nn.Module):
         return self.forward(obs, return_all)
 
     def loss_fn(self, obs, target, **kwargs):
-        loss_NN = F.mse_loss(self.forward(obs), target, reduction="mean")
-
-        # if self.minimize:
-        #     loss_offset = (self.value_offset / target.min() - 1.0).pow(2)
-        # else:
-        #     loss_offset = (self.value_offset / target.max() - 1.0).pow(2)
-
-        # loss_scaling = (self.scaling_quadratic - target.mean()).pow(2)
-
-        return loss_NN  # + loss_offset  # + loss_scaling
+        fn = eval(f"F.{self.loss}")
+        output = self.forward(obs, return_all=True)
+        value = output["value"]
+        if self.loss_type == "standard":
+            return fn(value, target, reduction="mean")
+        elif self.loss_type == "sobol":
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Sobol loss called with missing kwargs.")
+            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+        elif self.loss_type == "shape":
+            raise NotImplementedError
+        else:
+            raise ValueError("Loss type unspecified")
 
 
 class QR(nn.Module):

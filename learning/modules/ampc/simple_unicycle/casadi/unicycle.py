@@ -14,6 +14,14 @@ if not os.path.exists(graph_path):
     os.makedirs(graph_path)
 
 
+obstacle_positions = [[0, 0.5], [0.25, -0.25]]
+obstacle_radiuses = [0.25, 0.15]
+R = np.diag([0.5e-1, 0.5e-1])
+umin = np.array([-0.1, np.deg2rad(-50)])
+umax = -umin
+dt = 0.2  # length of a control interval
+
+
 def solve_open_loop(
     x0,
     soft_constraint_scale=1e3,
@@ -23,7 +31,6 @@ def solve_open_loop(
     plt_save=False,
 ):
     N = 30  # number of control intervals
-    dt = 0.2  # length of a control interval
 
     opti = Opti()  # Optimization problem
 
@@ -35,9 +42,11 @@ def solve_open_loop(
     v = U[0, :]
     theta = U[1, :]
 
+    x0_param = opti.parameter(2)
+
     # ---- objective          ---------
-    Q = np.diag([1, 1])  # [x,y]
-    R = np.diag([1e-1, 1e-1])
+    Q = np.diag([2, 2])  # [x,y]
+    # R = np.diag([1e-1, 1e-1])
     Qf = 100.0 * Q
     cost = 0
     for i in range(N):
@@ -52,12 +61,10 @@ def solve_open_loop(
         x_next = X[:, k] + dt * f(X[:, k], U[:, k])
         opti.subject_to(X[:, k + 1] == x_next)  # close the gaps
 
-    opti.subject_to(opti.bounded(-0.1, v, 0.1))
-    opti.subject_to(opti.bounded(np.deg2rad(-50), theta, np.deg2rad(50)))
+    opti.subject_to(opti.bounded(umin[0], v, umax[0]))
+    opti.subject_to(opti.bounded(umin[1], theta, umax[1]))
 
     # obstacle and x-y bounds
-    obstacle_positions = [[0, 0.5], [0.2, -0.2]]
-    obstacle_radiuses = [0.3, 0.2]
     if not soft_state_constr:
         opti.subject_to(opti.bounded(-0.5, X, 0.5))
         for (xobs, yobs), r in zip(obstacle_positions, obstacle_radiuses):
@@ -67,20 +74,41 @@ def solve_open_loop(
         eps = opti.variable()
         opti.subject_to(eps >= 0)
         # opti.subject_to(opti.bounded(-0.5, X, 0.5))  # lower bound
-        opti.subject_to(opti.bounded(-0.5, X + eps, inf))  # lower bound
-        opti.subject_to(opti.bounded(-inf, X - eps, 0.5))  # upper bound
+        inflation = 0.01
+        opti.subject_to(
+            opti.bounded(-0.5 + inflation, X + eps, inf - inflation)
+        )  # lower bound
+        opti.subject_to(
+            opti.bounded(-inf + inflation, X - eps, 0.5 - inflation)
+        )  # upper bound
         for (xobs, yobs), r in zip(obstacle_positions, obstacle_radiuses):
             for k in range(N + 1):
-                opti.subject_to((x[k] - xobs) ** 2 + (y[k] - yobs) ** 2 >= r**2 - eps)
-        cost += soft_constraint_scale * eps**2 + soft_constraint_scale * eps
+                opti.subject_to(
+                    (x[k] - xobs) ** 2 + (y[k] - yobs) ** 2
+                    >= (r + inflation - eps) ** 2
+                )
+        cost += 10 * soft_constraint_scale * eps**2 + soft_constraint_scale * eps
 
     # ---- boundary conditions --------
-    opti.subject_to(x[0] == x0[0])  # initial pos
-    opti.subject_to(y[0] == x0[1])  # initial pos
+    opti.subject_to(x[0] - x0_param[0] == 0)  # initial pos
+    opti.subject_to(y[0] - x0_param[1] == 0)  # initial pos
+
+    # min f(x), s.t. g_lb <= g(x,p) <= g_ub
+    #
+    # L = f(x) + lam.T @ g(x,p)
+    #
+    # diehl numerical optimization 11.22
+    # df(x*(p),p)/dp = dL/dp(x*(p),lam*(p), p)
+    #
+    # dL/dp = lam.T@ dg/dp(x,p)
+    # df(x*(p),p)/dp = lam*.T @ dg/dp(x*(p),p)
 
     # ---- initial values for solver ---
     opti.set_initial(x, np.linspace(x0[0], 0, N + 1))
     opti.set_initial(y, np.linspace(x0[1], 0, N + 1))
+
+    # set x0 parameter
+    opti.set_value(x0_param, x0)
 
     # ---- solve NLP              ------
     opti.minimize(cost)  # get to (0, 0)
@@ -91,6 +119,8 @@ def solve_open_loop(
                 "ipopt.print_level": 0,  # Suppress output from Ipopt
                 "ipopt.sb": "yes",  # Suppress information messages
                 "print_time": 0,  # Suppress timing information
+                # "ipopt.tol": 1e-12,
+                # "ipopt.dual_inf_tol": 0.1
             },
         )
     else:
@@ -98,28 +128,44 @@ def solve_open_loop(
     try:
         sol = opti.solve()  # actual solve
 
-        # print(f"cost: {sol.value(cost)}")
-
         plt_name = None
         if plt_save:
-            plt_name = f"open_loop_x0=[{x0[0]:.2f},{x0[1]:.2f}].png"
+            plt_name = f"plots/open_loop_ipopt_x0=[{x0[0]:.2f},{x0[1]:.2f}].pdf"
 
         # ---- post-processing        ------
-        plot_robot(
-            np.linspace(0, N, N + 1),
-            [0.1, np.deg2rad(50)],
-            sol.value(U).T,
-            sol.value(X).T,
-            x_labels=["x", "y"],
-            u_labels=["v", "theta"],
-            obst_pos=obstacle_positions,
-            obst_rad=obstacle_radiuses,
-            time_label="Sim steps",
-            plt_show=plt_show,
-            plt_name=plt_name,
+        if plt_show or plt_name:
+            plot_robot(
+                np.linspace(0, N, N + 1),
+                [0.1, np.deg2rad(50)],
+                sol.value(U).T,
+                sol.value(X).T,
+                x_labels=["x", "y"],
+                u_labels=["v", "theta"],
+                obst_pos=obstacle_positions,
+                obst_rad=obstacle_radiuses,
+                time_label="Sim steps",
+                plt_show=plt_show,
+                plt_name=plt_name,
+            )
+
+        dg_dp_fcn = Function(
+            "constraint_parameter_gradient",
+            [opti.x, opti.p],
+            [jacobian(opti.g, opti.p)],
+            ["primal", "param"],
+            ["dg_dp"],
+        )
+        cost_gradient = sol.value(opti.lam_g).reshape(-1, 1).T @ dg_dp_fcn(
+            sol.value(opti.x), x0
         )
 
-        return sol.value(U), sol.value(X), sol.value(cost)
+        U_res = (np.array(sol.value(U)),)
+        X_res = (np.array(sol.value(X)),)
+        cost_res = float(sol.value(cost))
+        cost_gradient_res = np.array(cost_gradient).flatten()
+        # print(f"{cost_gradient=}")
+
+        return U_res, X_res, cost_res, cost_gradient_res
 
     except RuntimeError as e:
         if "Infeasible" in str(e):
@@ -163,16 +209,16 @@ def create_dataset(Ngrid, lb, ub):
     x_values = np.linspace(lb[0], ub[0], Ngrid)
     y_values = np.linspace(lb[1], ub[1], Ngrid)
 
-    x0s, Utrajs, Xtrajs, costs = [], [], [], []
+    x0s, Utrajs, Xtrajs, costs, gradients = [], [], [], [], []
 
     X, Y = np.meshgrid(x_values, y_values)
     with tqdm.tqdm(total=Ngrid * Ngrid) as pbar:
         for i in range(Ngrid):
             for j in range(Ngrid):
                 x0 = [X[i, j], Y[i, j]]
-                Utraj, Xtraj, cost = solve_open_loop(
+                Utraj, Xtraj, cost, gradient = solve_open_loop(
                     x0,
-                    soft_constraint_scale=1e3,
+                    soft_constraint_scale=1e2,
                     soft_state_constr=True,
                     silent=True,
                     plt_show=False,
@@ -182,13 +228,21 @@ def create_dataset(Ngrid, lb, ub):
                     Utrajs.append(Utraj)
                     Xtrajs.append(Xtraj)
                     costs.append(cost)
+                    gradients.append(gradient)
                 pbar.set_postfix(
                     {"last_cost": cost if cost is not None else "N/A"}
                 )  # Update with last cost
                 pbar.update(1)  # Update the progress bar for each iteration
-    data_to_save = {"x0": x0s, "X": Xtrajs, "U": Utrajs, "J": None, "cost": costs}
+    data_to_save = {
+        "x0": x0s,
+        "X": Xtrajs,
+        "U": Utrajs,
+        "J": None,
+        "cost": costs,
+        "gradients": gradients,
+    }
     with open(
-        f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/100_unicycle_dataset_soft_constraints.pkl",
+        f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/50_unicycle_soft_constraints_grad.pkl",
         "wb",
     ) as f:
         pickle.dump(data_to_save, f)

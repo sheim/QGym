@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def plot_robot(
     shooting_nodes,
     u_max,
@@ -17,7 +18,7 @@ def plot_robot(
     obst_rad=None,  # List of obstacle radii
     time_label="t",
     plt_show=True,
-    plt_name=None
+    plt_name=None,
 ):
     """
     Params:
@@ -32,11 +33,11 @@ def plot_robot(
     N_sim = X_traj.shape[0]
     nx = X_traj.shape[1]
     nu = U.shape[1]
-    
+
     # Create gridspec layout: 1 column on the right spanning all rows, and nx + nu rows on the left
     fig = plt.figure(figsize=(12, 9))
     gs = fig.add_gridspec(nx + nu, 2, width_ratios=[3, 1], wspace=0.3)
-    
+
     t = shooting_nodes
     for i in range(nu):
         ax_u = fig.add_subplot(gs[i, 0])
@@ -62,17 +63,17 @@ def plot_robot(
     # New plot for X_traj[:, 0] vs X_traj[:, 1] with equal axis scaling
     ax_xy = fig.add_subplot(gs[:, 1])  # Span the entire right column
     ax_xy.plot(X_traj[:, 0], X_traj[:, 1], label="Trajectory")
-    ax_xy.set_xlabel('x')
-    ax_xy.set_ylabel('y')
+    ax_xy.set_xlabel("x")
+    ax_xy.set_ylabel("y")
     ax_xy.set_xlim([-0.5, 0.5])
     ax_xy.set_ylim([-0.5, 0.5])
-    ax_xy.set_aspect('equal')  # Ensure equal scaling of axes
+    ax_xy.set_aspect("equal")  # Ensure equal scaling of axes
     ax_xy.grid()
 
     # Plot obstacles as gray circles
     if obst_pos is not None and obst_rad is not None:
         for (x, y), r in zip(obst_pos, obst_rad):
-            circle = plt.Circle((x, y), r, color='gray', alpha=0.5)
+            circle = plt.Circle((x, y), r, color="gray", alpha=0.5)
             ax_xy.add_patch(circle)
 
     plt.legend()
@@ -80,14 +81,13 @@ def plot_robot(
 
     if plt_name:
         plt.savefig(f"{plt_name}")
-        
+
     if plt_show:
         plt.show()
-        
+
     plt.close()
-    
-    
-    
+
+
 def plot_3d_costs(xy_coords, costs, plt_show=True, plt_name=None):
     # Unpack x and y coordinates
     x_values = [coord[0] for coord in xy_coords]
@@ -95,17 +95,17 @@ def plot_3d_costs(xy_coords, costs, plt_show=True, plt_name=None):
 
     # Create a 3D plot
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
 
     # Plot the points
     # ax_clip becomes available in matplotlib 3.10
     # ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o', axlim_clip=True)
-    ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o')
+    ax.scatter(x_values, y_values, costs, c=costs, cmap="viridis", marker="o")
 
     # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Cost')
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Cost")
 
     # Set aspect ratio of the x and y axes to be equal
     ax.set_box_aspect([1, 1, 0.75])  # x, y, z aspect ratio
@@ -113,12 +113,13 @@ def plot_3d_costs(xy_coords, costs, plt_show=True, plt_name=None):
 
     if plt_name:
         plt.savefig(f"{plt_name}")
-        
+
     if plt_show:
         plt.show()
-        
+
     plt.close()
-    
+
+
 def plot_3d_surface(xy_coords, costs, zlim=(0, 20), plt_show=True, plt_name=None):
     # Unpack x and y coordinates
     x_values = [coord[0] for coord in xy_coords]
@@ -137,17 +138,17 @@ def plot_3d_surface(xy_coords, costs, zlim=(0, 20), plt_show=True, plt_name=None
 
     # Create a 3D plot
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
 
     # Create a surface plot
     # ax_clip becomes available in matplotlib 3.10
     # surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', axlim_clip=True)
-    surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none')
+    surf = ax.plot_surface(X, Y, Z, cmap="viridis", edgecolor="none")
 
     # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Cost')
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Cost")
 
     # Set aspect ratio of the x and y axes to be equal
     ax.set_box_aspect([1, 1, 0.75])  # x, y, z aspect ratio
@@ -160,9 +161,8 @@ def plot_3d_surface(xy_coords, costs, zlim=(0, 20), plt_show=True, plt_name=None
 
     if plt_name:
         plt.savefig(f"{plt_name}")
-        
+
     if plt_show:
         plt.show()
-        
+
     plt.close()
-    

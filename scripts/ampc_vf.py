@@ -18,10 +18,6 @@ from learning.utils import (
 )
 from utils import (
     DEVICE,
-    is_lipschitz_continuous,
-    max_pairwise_distance,
-    calc_neighborhood_radius,
-    process_batch,
 )
 from critic_params_ampc import critic_params
 from tensordict import TensorDict
@@ -31,6 +27,8 @@ from learning.modules.lqrc.plotting import (
 )
 
 from learning.modules.lqrc.utils import get_latent_matrix
+
+SAVE_LOCALLY = False
 
 # choose critics to include in comparison
 critic_names = [
@@ -43,10 +41,10 @@ critic_names = [
 ]
 
 # make dir for saving this run's results
-# time_str = time.strftime("%Y%m%d_%H%M%S")
-# save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
-# if not os.path.exists(save_path):
-#     os.makedirs(save_path)
+time_str = time.strftime("%Y%m%d_%H%M%S")
+save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
+if SAVE_LOCALLY and not os.path.exists(save_path):
+    os.makedirs(save_path)
 
 latent_weight = None
 latent_bias = None
@@ -57,12 +55,13 @@ for critic_param in critic_params.values():
 
 print("Loading data")
 with open(
-    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/50_unicycle_dataset_soft_constraints.pkl",
+    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/50_unicycle_soft_constraints_grad.pkl",
     "rb",
 ) as f:
     data = pickle.load(f)
 x0 = np.array(data["x0"])
 cost = np.array(data["cost"])
+grad = np.array(data["gradients"])
 eval_ix = len(x0) // 4
 
 print(
@@ -76,93 +75,27 @@ mask = np.ones(len(cost), dtype=bool)
 mask[top_indices] = False
 x0 = x0[mask]
 cost = cost[mask]
+grad = grad[mask]
 # optimal_u = optimal_u[mask]
 n_samples = x0.shape[0]
 
 # min max normalization to put state and cost on [0, 1]
 x0_min = x0.min(axis=0)
 x0_max = x0.max(axis=0)
-x0 = (x0 - x0_min) / (x0_max - x0_min)
+x0 = 2 * (x0 - x0_min) / (x0_max - x0_min) - 1
 cost_min = cost.min()
 cost_max = cost.max()
 cost = (cost - cost_min) / (cost_max - cost_min)
+grad = (x0_max - x0_min) / 2 * grad / (cost_max - cost_min)
 
 print(
     f"Normalized data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
 )
 
-# make batch for one step MPC eval before adding non-fs synthetic data points
-batch_terminal_eval = 10
-mpc_eval_ix = random.sample(list(range(x0.shape[0])), batch_terminal_eval)
-mpc_mask = np.zeros(len(cost), dtype=bool)
-mpc_mask[mpc_eval_ix] = True
-mpc_eval_x0 = x0[mpc_mask]
-mpc_eval_cost = cost[mpc_mask]
-# mpc_eval_optimal_u = optimal_u[mpc_mask]
-# ensure this validation batch is not seen in training data
-x0 = x0[~mpc_mask]
-cost = cost[~mpc_mask]
-# optimal_u = optimal_u[~mpc_mask]
-
-
-# add in non-fs synthetic data points
-print("Building KDTree")
-# Build the KDTree to get pairwise point distances
-start = time.time()
-tree = KDTree(x0)
-d_max = max_pairwise_distance(tree)
-
-midpt = np.mean(x0, axis=0)
-n_synthetic = 0.2 * n_samples
-random_x0 = np.concatenate(
-    (
-        np.random.uniform(
-            low=-0.5,
-            high=1.5,
-            size=(int(n_synthetic // 2), x0.shape[1]),
-        ),
-        np.random.uniform(
-            low=-0.5,
-            high=1.5,
-            size=(int(n_synthetic // 2), x0.shape[1]),
-        ),
-    )
-)
-
-radius = calc_neighborhood_radius(tree, x0)
-print("Creating non feasible state data points")
-# filter random_x0 in batches
-chunk_size = 100
-x0_non_fs_list = []
-for i in range(0, len(random_x0), chunk_size):
-    batch = random_x0[i : i + chunk_size]
-    Y_filtered_batch = process_batch(batch, tree, radius)
-    if len(Y_filtered_batch) > 0:
-        x0_non_fs_list.append(Y_filtered_batch)
-print("")
-
-# concatenate all filtered batches and create matching cost array
-x0_non_fs = np.concatenate(x0_non_fs_list) if x0_non_fs_list else None
-cost_non_fs = np.ones((x0_non_fs.shape[0],))
-# union non feasible and feasible states
-# x0 = np.concatenate((x0, x0_non_fs))
-# cost = np.concatenate((cost, cost_non_fs))
-
-# hack to see data dist
-# plt.hist(cost, bins=100)
-# plt.savefig(os.path.join(save_path, "data_dist.png"), dpi=300)
-
-
-print(
-    "Dataset Lipschitz continuity with threshold of 1e-6",
-    is_lipschitz_continuous(
-        x0, cost, threshold=100
-    ),  # reduced threshold due to 0 to 1 normalization
-)
-
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
 cost = torch.from_numpy(cost).float().to(DEVICE)
+grad = torch.from_numpy(grad).float().to(DEVICE)
 
 print(
     "cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std()
@@ -196,7 +129,11 @@ train_idx = rand_perm[0:n_training_data]
 test_idx = rand_perm[n_training_data:]
 
 data = TensorDict(
-    {"critic_obs": x0.unsqueeze(dim=0), "cost": cost.unsqueeze(dim=0)},
+    {
+        "critic_obs": x0.unsqueeze(dim=0),
+        "cost": cost.unsqueeze(dim=0),
+        "grad": grad.unsqueeze(dim=0),
+    },
     batch_size=(1, total_data),
     device=DEVICE,
 )
@@ -244,7 +181,9 @@ for ix, name in enumerate(critic_names):
 
         # calculate loss and optimize
         value_loss = critic.loss_fn(
-            batch["critic_obs"].squeeze(), batch["cost"].squeeze()
+            batch["critic_obs"].squeeze(),
+            batch["cost"].squeeze(),
+            batch_grad=batch["grad"].squeeze(),
         )
         critic_optimizer.zero_grad()
         value_loss.backward()
