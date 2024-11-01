@@ -1299,8 +1299,8 @@ def plot_critic_3d_interactive(
         np_x = x.detach().cpu().numpy().reshape(-1, 2)
         np_targets = targets.detach().cpu().numpy().reshape(-1)
         np_A = A[critic_name].detach().cpu().numpy()
-        np_W_latent = W_latent[critic_name]  # already numpified
-        np_b_latent = b_latent[critic_name]  # already numpified
+        np_W_latent = W_latent[critic_name]
+        np_b_latent = b_latent[critic_name]
         np_xy_eval = xy_eval[critic_name].detach().cpu().numpy()
         np_cost_true = cost_true[critic_name].detach().cpu().numpy()
         np_cost_eval = cost_eval[critic_name].detach().cpu().numpy()
@@ -1335,6 +1335,8 @@ def plot_critic_3d_interactive(
         X, Y = np.meshgrid(x_range, y_range)
 
         if np_W_latent is not None and np_b_latent is not None:
+            np_W_latent = np_W_latent.detach().cpu().numpy()
+            np_b_latent = np_b_latent.detach().cpu().numpy()
             # Compute Z based on the quadratic surface equation
             Z = np.array(
                 [
@@ -1368,6 +1370,7 @@ def plot_critic_3d_interactive(
         axes[ix].set_ylabel("Y")
         axes[ix].set_zlabel("Z")
         axes[ix].set_title(f"{display_names[critic_name]} Prediction")
+        axes[ix].set_box_aspect([1, 1, 0.75])
         axes[ix].legend()
 
         # Set initial viewing angle

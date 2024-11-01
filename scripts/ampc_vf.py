@@ -35,7 +35,7 @@ critic_names = [
     "OuterProduct",
     # "OuterProductLatent",
     # "PDCholeskyInput",
-    "CholeskyInput",
+    # "CholeskyInput",
     "CholeskyLatent",
     "DenseSpectralLatent",
 ]
@@ -176,14 +176,16 @@ for ix, name in enumerate(critic_names):
             latent_weight, latent_bias = get_latent_matrix(
                 batch["critic_obs"].shape, critic.latent_NN, device=DEVICE
             )
-            latent_weight = latent_weight.cpu().detach().numpy()
-            latent_bias = latent_bias.cpu().detach().numpy()
+            # latent_weight = latent_weight.cpu().detach().numpy()
+            # latent_bias = latent_bias.cpu().detach().numpy()
 
         # calculate loss and optimize
         value_loss = critic.loss_fn(
             batch["critic_obs"].squeeze(),
             batch["cost"].squeeze(),
             batch_grad=batch["grad"].squeeze(),
+            W_latent=latent_weight,
+            b_latent=latent_bias,
         )
         critic_optimizer.zero_grad()
         value_loss.backward()

@@ -40,9 +40,26 @@ def quadratify_xAx(x, A):
 
 
 def gradient_xAx(x, A):
-    res = 2 * torch.einsum(
-        "...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A
-    ).squeeze(1)
+    res = 2 * torch.einsum("...ij, ...jk -> ...ik", A, x.unsqueeze(-1)).squeeze()
+    return res
+
+
+def gradient_zAz(x, A, W_latent, b_latent):
+    batch_size, feature_dim = x.shape
+    z = torch.einsum(
+        "...ij, ...jk -> ...ik",
+        x.unsqueeze(1),
+        W_latent.T.unsqueeze(0).repeat(batch_size, 1, 1),
+    ) + b_latent.unsqueeze(0).repeat(batch_size, 1, 1)
+    Pz = torch.einsum("...ij, ...jk -> ...ik", A, z.transpose(-2, -1))
+    res = (
+        2
+        * torch.einsum(
+            "...ij, ...jk -> ...ik",
+            Pz.transpose(-2, -1),
+            W_latent.repeat(batch_size, 1, 1),
+        ).squeeze()
+    )
     return res
 
 
@@ -190,7 +207,7 @@ class OuterProduct(nn.Module):
 
         self.NN = create_MLP(num_obs, latent_dim, hidden_dims, activation, dropouts)
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -327,7 +344,7 @@ class CholeskyInput(nn.Module):
             num_obs, num_lower_diag_elements, hidden_dims, activation, dropouts
         )
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -440,10 +457,13 @@ class CholeskyLatent(CholeskyInput):
         if self.loss_type == "standard":
             return fn(value, target, reduction="mean")
         elif self.loss_type == "sobol":
-            if "batch_grad" not in kwargs.keys():
+            if not {"batch_grad", "W_latent", "b_latent"}.issubset(kwargs.keys()):
                 raise ValueError("Sobol loss called with missing kwargs.")
-            pred_grad = gradient_xAx(
-                self.latent_NN(obs - output["x_offsets"]), output["A"]
+            pred_grad = gradient_zAz(
+                obs - output["x_offsets"],
+                output["A"],
+                kwargs["W_latent"],
+                kwargs["b_latent"],
             )
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
@@ -546,7 +566,7 @@ class SpectralLatent(nn.Module):
             # bias_in_linear_layers=False,
         )
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -597,9 +617,14 @@ class SpectralLatent(nn.Module):
         if self.loss_type == "standard":
             return fn(value, target, reduction="mean")
         elif self.loss_type == "sobol":
-            if "batch_grad" not in kwargs.keys():
+            if not {"batch_grad", "W_latent", "b_latent"}.issubset(kwargs.keys()):
                 raise ValueError("Sobol loss called with missing kwargs.")
-            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            pred_grad = gradient_zAz(
+                obs - output["x_offsets"],
+                output["A"],
+                kwargs["W_latent"],
+                kwargs["b_latent"],
+            )
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
             raise NotImplementedError
@@ -669,7 +694,7 @@ class DenseSpectralLatent(nn.Module):
             # bias_in_linear_layers=False,
         )
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, None)
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -731,9 +756,14 @@ class DenseSpectralLatent(nn.Module):
         if self.loss_type == "standard":
             return fn(value, target, reduction="mean")
         elif self.loss_type == "sobol":
-            if "batch_grad" not in kwargs.keys():
+            if not {"batch_grad", "W_latent", "b_latent"}.issubset(kwargs.keys()):
                 raise ValueError("Sobol loss called with missing kwargs.")
-            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            pred_grad = gradient_zAz(
+                obs - output["x_offsets"],
+                output["A"],
+                kwargs["W_latent"],
+                kwargs["b_latent"],
+            )
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
             raise NotImplementedError
