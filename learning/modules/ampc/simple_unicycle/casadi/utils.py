@@ -15,7 +15,8 @@ def plot_robot(
     obst_rad=None,  # List of obstacle radii
     time_label="t",
     plt_show=True,
-    plt_name=None
+    plt_name=None,
+    x_max=None
 ):
     """
     Params:
@@ -54,7 +55,10 @@ def plot_robot(
 
         ax_x.set_ylabel(x_labels[i])
         ax_x.set_xlabel(time_label)
-        ax_x.set_ylim(-0.5, 0.5)
+        if x_max is not None and x_max[i] is not None:
+            ax_x.hlines( x_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
+            ax_x.hlines(-x_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
+            ax_x.set_ylim(-1.2*x_max[i], 1.2*x_max[i])
         ax_x.grid()
 
     # New plot for X_traj[:, 0] vs X_traj[:, 1] with equal axis scaling
