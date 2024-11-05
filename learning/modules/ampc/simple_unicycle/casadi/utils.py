@@ -34,7 +34,7 @@ def plot_robot(
     
     # Create gridspec layout: 1 column on the right spanning all rows, and nx + nu rows on the left
     fig = plt.figure(figsize=(12, 9))
-    gs = fig.add_gridspec(nx + nu, 2, width_ratios=[3, 1], wspace=0.3)
+    gs = fig.add_gridspec(nx + nu, 2, width_ratios=[2, 3], wspace=0.3)
     
     t = shooting_nodes
     for i in range(nu):
@@ -54,12 +54,12 @@ def plot_robot(
         (line,) = ax_x.plot(t, X_traj[:, i])
 
         ax_x.set_ylabel(x_labels[i])
-        ax_x.set_xlabel(time_label)
         if x_max is not None and x_max[i] is not None:
             ax_x.hlines( x_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
             ax_x.hlines(-x_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
             ax_x.set_ylim(-1.2*x_max[i], 1.2*x_max[i])
         ax_x.grid()
+    ax_x.set_xlabel(time_label)
 
     # New plot for X_traj[:, 0] vs X_traj[:, 1] with equal axis scaling
     ax_xy = fig.add_subplot(gs[:, 1])  # Span the entire right column
@@ -196,15 +196,16 @@ def plot_3d_costs(
             mask = np.ones_like(X, dtype=bool)  # No restriction if dmax is None
 
         # Compute Z based on the quadratic surface equation
+        zero_padding = [0 for _ in range(offset.shape[0]-2)]
         if linLatW is not None and linLatb is not None:
             Z = np.array([
-                [((np.array([xi, yi]) - offset)@linLatW.T + linLatb) @ P @ ((np.array([xi, yi]) - offset)@linLatW.T + linLatb) 
+                [((np.array([xi, yi,*zero_padding]) - offset)@linLatW.T + linLatb) @ P @ ((np.array([xi, yi, *zero_padding]) - offset)@linLatW.T + linLatb) 
                  if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
                 for i, yi in enumerate(y_range)
             ])
         else:
             Z = np.array([
-                [(np.array([xi, yi]) - offset) @ P @ (np.array([xi, yi]) - offset) 
+                [(np.array([xi, yi, *zero_padding]) - offset) @ P @ (np.array([xi, yi, *zero_padding]) - offset) 
                  if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
                 for i, yi in enumerate(y_range)
             ])
@@ -217,15 +218,15 @@ def plot_3d_costs(
     if cost_gradient is not None:
         # Adjust gradient arrows based on data structure (flattened or nested)
         if is_nested:
-            for x0_set, cost_grad_set, color in zip(xy_coords, cost_gradient, colors):
+            for x0_set, costs_, cost_gradient_, color in zip(xy_coords, costs, cost_gradient, colors):
                 gradient_x, gradient_y, gradient_z = zip(*[
                     (-grad[0] / np.linalg.norm(grad), -grad[1] / np.linalg.norm(grad), -np.linalg.norm(grad))
-                    for grad in cost_grad_set
+                    for grad in cost_gradient_
                 ])
                 ax.quiver(
                     [coord[0] for coord in x0_set],
                     [coord[1] for coord in x0_set],
-                    cost_grad_set,
+                    costs_,
                     gradient_x,
                     gradient_y,
                     gradient_z,

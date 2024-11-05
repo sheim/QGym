@@ -6,6 +6,7 @@ import numpy as np
 import tqdm
 import pickle
 import fire
+import random
 # from gym import LEGGED_GYM_ROOT_DIR
 
 
@@ -20,11 +21,24 @@ obstacle_positions = [[0, 0.5], [0.25, -0.25]]
 obstacle_radiuses = [0.25, 0.15]
 # Q = np.diag([1e3, 1e3, 1e-4, 1e-3, 1e-3])  # [x,y,x_d,y_d,th,th_d]
 # R = np.diag([0.5e-1, 0.5e-1])
-Q = np.diag([2, 2, 1, 1e-3])  # [x,y,x_d,y_d,th,th_d]
-R = np.diag([0.5e-1, 0.5])
+Q = np.diag([2, 2, 1e-2, 3e-2])  # [x,y,x_d,y_d,th,th_d]
+R = np.diag([0.5e-1, 0.01])
 # umin = np.array([-0.1, np.deg2rad(-50)])
 # umax = -umin
 amax = 1
+dthetamax = np.pi/2
+umin = np.array([-amax, -dthetamax])
+umax = -umin
+
+def f(x_,u_):
+    # px_, py_, v_, theta_ = x_
+    # a_, dtheta_ = u_
+    return vertcat(
+        x_[2]*cos(x_[3]),
+        x_[2]*sin(x_[3]),
+        u_[0],
+        u_[1]
+    )
 
 dt = 0.1  # length of a control interval
 
@@ -64,15 +78,6 @@ def make_run_fcn(
     cost += X[:, -1].T @ Qf @ X[:, -1]
 
     # ---- dynamic constraints --------
-    def f(x_,u_):
-        # px_, py_, v_, theta_ = x_
-        # a_, dtheta_ = u_
-        return vertcat(
-            x_[2]*cos(x_[3]),
-            x_[2]*sin(x_[3]),
-            u_[0],
-            u_[1]
-        )
         
     for k in range(N):  # constrain optimization to dynamics
         k1 = f(X[:,k],         U[:,k])
@@ -83,6 +88,7 @@ def make_run_fcn(
         opti.subject_to(X[:,k+1]==x_next) # close the gaps
 
     opti.subject_to(opti.bounded(-amax,  a,  amax))
+    opti.subject_to(opti.bounded(-dthetamax,  dtheta,  dthetamax))
     # opti.subject_to(opti.bounded(umin[1], dtheta, umax[1]))
 
     # obstacle and x-y bounds
@@ -97,8 +103,8 @@ def make_run_fcn(
     # opti.subject_to(opti.bounded(-0.5, X, 0.5))  # lower bound
     opti.subject_to(opti.bounded(-0.5, X[:2,:] + eps[0], inf))  # lower bound
     opti.subject_to(opti.bounded(-inf, X[:2,:] - eps[0], 0.5))  # upper bound
-    opti.subject_to(opti.bounded(-0.3, X[2,:] + eps[1], inf))  # lower bound
-    opti.subject_to(opti.bounded(-inf, X[2,:] - eps[1], 0.3))  # upper bound
+    opti.subject_to(opti.bounded(-0.2, X[2,:] + eps[1], inf))  # lower bound
+    opti.subject_to(opti.bounded(-inf, X[2,:] - eps[1], 0.2))  # upper bound
     
     # opti.subject_to(opti.bounded(-0.3, X[2,:]+10*eps, inf))  # lower bound
     # opti.subject_to(opti.bounded(-inf, X[2,:]-10*eps, 0.3))  # lower bound
@@ -109,9 +115,9 @@ def make_run_fcn(
         for k in range(N + 1):
             opti.subject_to((px[k] - xobs) ** 2 + (py[k] - yobs) ** 2 >= (r+inflation-eps_obst[k])**2)
     for i in range(eps.shape[0]):
-        cost += 50*soft_constraint_scale * eps[i]**2 + soft_constraint_scale * eps[i]
+        cost += 10*soft_constraint_scale * eps[i]**2 + soft_constraint_scale/2 * eps[i]
     for i in range(eps_obst.shape[0]):
-        cost += 50*soft_constraint_scale * eps_obst[i]**2 + soft_constraint_scale * eps_obst[i]
+        cost += 10*soft_constraint_scale * eps_obst[i]**2 + soft_constraint_scale/2 * eps_obst[i]
     # ---- boundary conditions --------
     opti.subject_to(X[:,0]-x0_param == 0)  # initial pos
     # opti.subject_to(py[0]-x0_param[1] == 0)  # initial pos
@@ -134,6 +140,9 @@ def make_run_fcn(
     # opti.set_value(x0_param, x0)
 
     # ---- solve NLP              ------
+    # jit_options = {"flags": ["-Ofast", "-march=native"], "compiler": "ccache gcc", "verbose": True}
+    # options = {"jit": True, "compiler": "shell", "jit_options": jit_options}
+    options={}
     opti.minimize(cost)  # get to (0, 0)
     if silent:
         opti.solver(
@@ -144,10 +153,10 @@ def make_run_fcn(
                 "print_time": 0,  # Suppress timing information
                 # "ipopt.tol": 1e-12,
                 # "ipopt.dual_inf_tol": 0.1
-            },
+            } | options,
         )
     else:
-        opti.solver("ipopt")  # set numerical backend
+        opti.solver("ipopt", options)  # set numerical backend
         
     def run(x0):
         opti.set_value(x0_param, x0)
@@ -162,14 +171,14 @@ def make_run_fcn(
             if plt_show or plt_name:
                 plot_robot(
                     np.linspace(0, N, N + 1),
-                    [amax, None],
+                    [amax, dthetamax],
                     sol.value(U).T,
                     sol.value(X).T,
-                    x_labels=["x", "y", "v", "theta", "dtheta"],
-                    u_labels=["a", "ddtheta"],
+                    x_labels=["x [m]", "y [m]", "v [m/s]", "theta [rad]"],
+                    u_labels=["a [m/s^2]", "dtheta [rad/s]"],
                     obst_pos=obstacle_positions,
                     obst_rad=obstacle_radiuses,
-                    time_label="Sim steps",
+                    time_label="time [s]",
                     plt_show=plt_show,
                     plt_name=plt_name,
                 )
@@ -230,132 +239,86 @@ def evaluate_grid(Ngrid=20, filename=None):
     # plot_3d_surface(x0s, costs, plt_show=True, plt_name="cost_grid.png")
     else:
         plot_3d_costs(x0s, costs, plt_show=True, plt_name=None)
+        
+def evaluate_grid_closed_loop(Ngrid=5, filename=None):
+    filename = f"{filename}_{Ngrid**3}"
+    # Ngrid = 20
+    x_values = np.linspace(-0.52, 0.52, Ngrid)
+    y_values = np.linspace(-0.52, 0.52, Ngrid)
+    theta_values = np.linspace(-np.pi, np.pi, Ngrid)
 
+    x0s, Utrajs, Xtrajs, costs, cost_gradients = [], [], [], [], []
 
-def evaluate_local_batch(Ntotal=5, filename=None, cost_threshold=50, resample_threshold=50, num_samples=64, sample_variance_scale=0.5):
-    filename = f"{filename}_{Ntotal}"
-    xy_min, xy_max = -0.52, 0.52
-    # xmin, xmax = np.array([xy_min, xy_min]), np.array([xy_max, xy_max])
+    X, Y, theta = np.meshgrid(x_values, y_values, theta_values)
+    with tqdm.tqdm(total=Ngrid**3) as pbar:
+        for i in range(Ngrid):
+            for j in range(Ngrid):
+                for k in range(Ngrid):
+                    x0 = [X[i, j,k], Y[i, j,k],0,theta[i,j,k]]
+                    Utraj, Xtraj, costtraj, dcost_dx0traj = solve_closed_loop(xinit=x0)
+                    if costtraj is not None:
+                        x0s.append(Xtraj)
+                        Utrajs.append(Utraj)
+                        # Xtrajs.append(Xtraj)
+                        costs.append(costtraj)
+                        cost_gradients.append(dcost_dx0traj)
+                    pbar.set_postfix(
+                        {"cost": costtraj[0]}
+                    )  # Update with last cost
+                    pbar.update(1)  # Update the progress bar for each iteration
 
-    # Covariance for sampling around each grid point
-    covariance = sample_variance_scale**2*(xy_max - xy_min)/Ntotal**0.5
-    cov_matrix = np.array([[covariance, 0], [0, covariance]])
-
-    # Outer lists to store lists of lists
-    all_x0s, all_Utrajs, all_Xtrajs, all_costs, all_cost_gradients = [], [], [], [], []
-    
-    valid_points_found = 0
-    total_required_points = Ntotal
-
-    with tqdm.tqdm(total=total_required_points) as pbar:
-        while valid_points_found < total_required_points:
-            outer_x0 = np.random.uniform(low=xy_min, high=xy_max, size=2)
-            Utraj, Xtraj, cost, dcost_dx0 = solve_open_loop(
-                outer_x0,
-                soft_constraint_scale=1e3,
-                soft_state_constr=True,
-                silent=True,
-                plt_show=False,
-            )
-            
-            # Skip this grid point if the cost exceeds the threshold
-            if cost is None or cost > cost_threshold:
-                continue
-            valid_points_found += 1
-
-            # Initialize inner lists, starting with the grid point
-            x0s, Utrajs, Xtrajs, costs, cost_gradients = [outer_x0], [Utraj], [Xtraj], [cost], [dcost_dx0]
-
-            # Sample additional points around the grid point
-            samples_added = 1
-            while samples_added < num_samples:
-                sampled_x0 = np.random.multivariate_normal(outer_x0, cov_matrix)
-                Utraj, Xtraj, cost, dcost_dx0 = solve_open_loop(
-                    sampled_x0,
-                    soft_constraint_scale=1e3,
-                    soft_state_constr=True,
-                    silent=True,
-                    plt_show=False,
-                )
-                
-                # Only add if cost is within the acceptable range
-                if cost is not None and cost <= resample_threshold:
-                    x0s.append(sampled_x0)
-                    Utrajs.append(Utraj)
-                    Xtrajs.append(Xtraj)
-                    costs.append(cost)
-                    cost_gradients.append(dcost_dx0)
-                    samples_added += 1
-
-            # Append inner lists to the outer lists
-            all_x0s.append(x0s)
-            all_Utrajs.append(Utrajs)
-            all_Xtrajs.append(Xtrajs)
-            all_costs.append(costs)
-            all_cost_gradients.append(cost_gradients)
-
-            # Progress bar update
-            pbar.set_postfix({"last_cost": cost})
-            pbar.update(1)
-
-    # Flatten lists for saving and plotting
-    flat_x0s = [item for sublist in all_x0s for item in sublist]
-    flat_Utrajs = [item for sublist in all_Utrajs for item in sublist]
-    flat_Xtrajs = [item for sublist in all_Xtrajs for item in sublist]
-    flat_costs = [item for sublist in all_costs for item in sublist]
-    flat_cost_gradients = [item for sublist in all_cost_gradients for item in sublist]
-
-    data_to_save = {
-        "x0": flat_x0s,
-        "X": flat_Xtrajs,
-        "U": flat_Utrajs,
-        "cost": flat_costs,
-        "cost_gradient": flat_cost_gradients,
-        "nested_x0": all_x0s,
-        "nested_U": all_Utrajs,
-        "nested_cost": all_costs,
-        "nested_cost_gradient": all_cost_gradients,
-    }
-    
+    data_to_save = {"x0": x0s, "U": Utrajs, "cost": costs, "cost_gradient": cost_gradients}
     if filename is not None:
         with open(f"data/{filename}.pkl", "wb") as f:
             pickle.dump(data_to_save, f)
-        plot_3d_costs(all_x0s, all_costs, plt_show=True, plt_name=f"plots/{filename}_cost_landscape.png", cost_gradient=None)
+        plot_3d_costs([x[0] for x in x0s], [c[0] for c in costs], plt_show=True, plt_name=f"plots/{filename}_cost_landscape.png", cost_gradient=[dc[0] for dc in cost_gradients])
+    # plot_3d_surface(x0s, costs, plt_show=True, plt_name="cost_grid.png")
     else:
-        plot_3d_costs(all_x0s, all_costs, plt_show=True, plt_name=None)
+        plot_3d_costs([x[0] for x in x0s], [c[0] for c in costs], plt_show=True, plt_name=None)
 
 
-def solve_closed_loop(xinit):
+# def solve_closed_loop(xinit, noise=[0.01,0.01,0.01,0.]):
+def solve_closed_loop(xinit, noise=[0.005,0.005,0.05,0.5], plt_show=None):
     run_fcn = make_run_fcn(xinit,silent=True, plt_show=False, plt_save=False)
-    Nsim = 50
+    # Nsim = 50
     Usim = []
     Xsim = [xinit]
     costsim = []
+    costgradsim = []
     u = np.zeros(2)
-    print(f"Simulating x0={xinit}")
-    for i in tqdm.tqdm(range(Nsim)):
+    # print(f"Simulating x0={xinit}")
+    dist = np.inf
+    while dist > 0.1:
         # print(f"Sim: {i}")
-        U_res, X_res, cost_res, cost_gradient_res = run_fcn(Xsim[i])
+        U_res, X_res, cost_res, cost_gradient_res = run_fcn(Xsim[-1])
         # print()
         u = U_res[0].T[0]
         Usim.append(u)
-        Xsim.append(X_res[0].T[1])
+        xnext = np.array(X_res[0].T[1])
+        dist = np.linalg.norm(xnext)
+        # print(dist)
+        xnext = xnext+np.random.uniform(-np.array(noise), np.array(noise))
+        Xsim.append(xnext)
         costsim.append(cost_res)
+        costgradsim.append(cost_gradient_res)
     
-    plot_robot(
-            np.linspace(0, dt*Nsim, Nsim + 1),
-            [amax, None,None],
-            np.concatenate((np.array(Usim),np.array(costsim).reshape(-1, 1)), axis=1),
-            np.array(Xsim),
-            x_labels=["x", "y", "v", "theta", "dtheta"],
-            u_labels=["a", "ddtheta","cost"],
-            obst_pos=obstacle_positions,
-            obst_rad=obstacle_radiuses,
-            time_label="Sim steps",
-            plt_show=True,
-            plt_name=f"plots/closed_loop_ipopt_x0=[{xinit[0]:.2f},{xinit[1]:.2f}].pdf",
-            x_max = [0.5,0.5,0.3,None]
-        )
+    Nsim = len(Usim)
+    if plt_show:
+        plot_robot(
+                np.linspace(0, dt*Nsim, Nsim + 1),
+                [None, amax, dthetamax],
+                np.concatenate((np.array(costsim).reshape(-1, 1),np.array(Usim)), axis=1),
+                np.array(Xsim),
+                x_labels=["x [m]", "y [m]", "v [m/s]", "theta [rad]"],
+                u_labels=["cost", "a [m/s^2]", "dtheta [rad/s]"],
+                obst_pos=obstacle_positions,
+                obst_rad=obstacle_radiuses,
+                time_label="time [s]",
+                plt_show=True,
+                plt_name=f"plots/closed_loop_ipopt_x0=[{xinit[0]:.2f},{xinit[1]:.2f}].pdf",
+                x_max = [0.5,0.5,0.2,None]
+            )
+    return np.array(Usim), np.array(Xsim[:-1]), np.array(costsim), np.array(costgradsim)
 
 def test_open_loop():
     # interesting initial conditions:
@@ -374,10 +337,12 @@ def test_closed_loop():
         solve_closed_loop(x0)
 
 if __name__ == "__main__":
-    # test()
+    
+    # evaluate_grid_closed_loop(4,"unicycle_4D_cl")
+    
     fire.Fire({
         "evaluate_grid": evaluate_grid,
-        "evaluate_local_batch": evaluate_local_batch,
+        "evaluate_grid_closed_loop": evaluate_grid_closed_loop,
         "test_open_loop": test_open_loop,
         "test_closed_loop": test_closed_loop
     })
