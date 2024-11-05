@@ -62,7 +62,7 @@ with open(
 x0 = np.array(data["x0"])
 cost = np.array(data["cost"])
 grad = np.array(data["gradients"])
-eval_ix = len(x0) // 4
+eval_ix = len(x0) // 3
 
 print(
     f"Raw data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
@@ -110,6 +110,7 @@ graphing_data = {
         "xy_eval",
         "cost_eval",
         "A",
+        "x_offsets",
         "W_latent",
         "b_latent",
         "cost_true",
@@ -168,9 +169,10 @@ for ix, name in enumerate(critic_names):
             if ix == 0:
                 standard_offset = batch["cost"].mean()
             print(f"{name} value offset before mean assigning", critic.value_offset)
-            with torch.no_grad():
-                critic.value_offset.copy_(standard_offset)
-            print(f"{name} value offset after mean assigning", critic.value_offset)
+            if params["c_offset"]:
+                with torch.no_grad():
+                    critic.value_offset.copy_(standard_offset)
+                print(f"{name} value offset after mean assigning", critic.value_offset)
 
         if "Latent" in name:
             latent_weight, latent_bias = get_latent_matrix(
@@ -210,7 +212,8 @@ for ix, name in enumerate(critic_names):
         graphing_data["xy_eval"][name] = data[0, eval_ix]["critic_obs"]
         prediction = critic.evaluate(data[0, eval_ix]["critic_obs"], return_all=True)
         graphing_data["cost_eval"][name] = prediction.get("value")
-        graphing_data["A"][name] = prediction.get("A")
+        graphing_data["A"][name] = prediction["A"]
+        graphing_data["x_offsets"][name] = prediction["x_offsets"]
         graphing_data["W_latent"][name] = latent_weight if "Latent" in name else None
         graphing_data["b_latent"][name] = latent_bias if "Latent" in name else None
         graphing_data["cost_true"][name] = data[0, eval_ix]["cost"]
@@ -222,6 +225,7 @@ plot_critic_3d_interactive(
     graphing_data["xy_eval"],
     graphing_data["cost_true"],
     graphing_data["cost_eval"],
+    graphing_data["x_offsets"],
     display_names={
         "CholeskyInput": "Cholesky",
         "OuterProduct": "Outer Product",

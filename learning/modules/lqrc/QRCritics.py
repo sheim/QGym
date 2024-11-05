@@ -143,6 +143,7 @@ class Critic(nn.Module):
         hidden_dims=None,
         activation="elu",
         normalize_obs=True,
+        c_offset=False,
         device="cuda",
         **kwargs,
     ):
@@ -152,7 +153,11 @@ class Critic(nn.Module):
         self._normalize_obs = normalize_obs
         if self._normalize_obs:
             self.obs_rms = RunningMeanStd(num_obs)
-        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        self.value_offset = (
+            nn.Parameter(torch.zeros(1, device=device))
+            if c_offset
+            else torch.zeros(1, device=device)
+        )
 
     def forward(self, x, return_all=False):
         if self._normalize_obs:
@@ -180,6 +185,7 @@ class OuterProduct(nn.Module):
         activation="elu",
         dropouts=None,
         normalize_obs=False,
+        c_offset=False,
         minimize=False,
         offset_hidden_dims=None,
         loss="mse_loss",
@@ -197,7 +203,11 @@ class OuterProduct(nn.Module):
             self.sign = torch.ones(1, device=device)
         else:
             self.sign = -torch.ones(1, device=device)
-        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        self.value_offset = (
+            nn.Parameter(torch.zeros(1, device=device))
+            if c_offset
+            else torch.zeros(1, device=device)
+        )
         self.loss = loss
         self.loss_type = loss_type
 
@@ -214,20 +224,14 @@ class OuterProduct(nn.Module):
 
     def forward(self, x, return_all=False):
         z = self.NN(x)
-        # outer product. Both of these are equivalent
         A = z.unsqueeze(-1) @ z.unsqueeze(-2)
         # A2 = torch.einsum("nmx,nmy->nmxy", z, z)
         x_offsets = self.offset_NN(x)
         value = self.sign * quadratify_xAx(x - x_offsets, A)
-        # value = quadratify_xAx(x, A)
-        # value *= 1.0 if self.minimize else -1.0
-        # value += self.value_offset
 
         if return_all:
-            # return value, A, L
             return {"value": value, "A": A, "x_offsets": x_offsets}
-        else:
-            return value
+        return value
 
     def evaluate(self, obs, return_all=False):
         return self.forward(obs, return_all)
@@ -258,6 +262,7 @@ class OuterProductLatent(OuterProduct):
         activation="elu",
         dropouts=None,
         normalize_obs=False,
+        c_offset=False,
         minimize=False,
         latent_hidden_dims=[128, 128],
         latent_activation="tanh",
@@ -274,6 +279,7 @@ class OuterProductLatent(OuterProduct):
             activation,
             dropouts,
             normalize_obs,
+            c_offset,
             minimize,
             loss,
             loss_type,
@@ -313,6 +319,7 @@ class CholeskyInput(nn.Module):
         activation="elu",
         dropouts=None,
         normalize_obs=False,
+        c_offset=False,
         minimize=False,
         offset_hidden_dims=None,
         loss="mse_loss",
@@ -330,7 +337,11 @@ class CholeskyInput(nn.Module):
             self.sign = torch.ones(1, device=device)
         else:
             self.sign = -torch.ones(1, device=device)
-        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        self.value_offset = (
+            nn.Parameter(torch.zeros(1, device=device))
+            if c_offset
+            else torch.zeros(1, device=device)
+        )
         # V = x'Ax + b = a* x'Ax + b, and add a regularization for det(A) ~= 1
         self.loss = loss
         self.loss_type = loss_type
@@ -398,6 +409,7 @@ class CholeskyLatent(CholeskyInput):
         activation="elu",
         dropouts=None,
         normalize_obs=False,
+        c_offset=False,
         minimize=False,
         offset_hidden_dims=None,
         loss="mse_loss",
@@ -412,6 +424,7 @@ class CholeskyLatent(CholeskyInput):
             activation=activation,
             dropouts=dropouts,
             normalize_obs=normalize_obs,
+            c_offset=c_offset,
             minimize=minimize,
             loss=loss,
             loss_type=loss_type,
@@ -516,12 +529,13 @@ class SpectralLatent(nn.Module):
         activation="elu",
         dropouts=None,
         normalize_obs=False,
+        c_offset=False,
+        minimize=False,
         relative_dim=None,
         latent_dim=None,
         latent_hidden_dims=[64],
         latent_activation="tanh",
         latent_dropouts=None,
-        minimize=False,
         offset_hidden_dims=None,
         loss="mse_loss",
         loss_type="standard",
@@ -543,7 +557,11 @@ class SpectralLatent(nn.Module):
             self.sign = torch.ones(1, device=device)
         else:
             self.sign = -torch.ones(1, device=device)
-        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        self.value_offset = (
+            nn.Parameter(torch.zeros(1, device=device))
+            if c_offset
+            else torch.zeros(1, device=device)
+        )
         self.loss = loss
         self.loss_type = loss_type
 
@@ -640,12 +658,13 @@ class DenseSpectralLatent(nn.Module):
         activation="elu",
         dropouts=None,
         normalize_obs=False,
+        c_offset=False,
+        minimize=False,
         relative_dim=None,
         latent_dim=None,
         latent_hidden_dims=[64],
         latent_activation="tanh",
         latent_dropouts=None,
-        minimize=False,
         offset_hidden_dims=None,
         loss="mse_loss",
         loss_type="standard",
@@ -667,7 +686,11 @@ class DenseSpectralLatent(nn.Module):
             self.sign = torch.ones(1, device=device)
         else:
             self.sign = -torch.ones(1, device=device)
-        self.value_offset = nn.Parameter(torch.zeros(1, device=device))
+        self.value_offset = (
+            nn.Parameter(torch.zeros(1, device=device))
+            if c_offset
+            else torch.zeros(1, device=device)
+        )
         self.loss = loss
         self.loss_type = loss_type
 

@@ -1278,8 +1278,8 @@ def plot_critic_3d_interactive(
     xy_eval,
     cost_true,
     cost_eval,
+    x_offsets,
     display_names,
-    offset=[0, 0],
     W_latent=None,
     b_latent=None,
     ground_truth="Unicycle",
@@ -1299,11 +1299,17 @@ def plot_critic_3d_interactive(
         np_x = x.detach().cpu().numpy().reshape(-1, 2)
         np_targets = targets.detach().cpu().numpy().reshape(-1)
         np_A = A[critic_name].detach().cpu().numpy()
-        np_W_latent = W_latent[critic_name]
-        np_b_latent = b_latent[critic_name]
         np_xy_eval = xy_eval[critic_name].detach().cpu().numpy()
         np_cost_true = cost_true[critic_name].detach().cpu().numpy()
         np_cost_eval = cost_eval[critic_name].detach().cpu().numpy()
+        # optionals
+        np_x_offset = (
+            np.zeros_like(np_x[0])
+            if x_offsets[critic_name] is None
+            else x_offsets[critic_name].detach().cpu().numpy()
+        )
+        np_W_latent = W_latent[critic_name]
+        np_b_latent = b_latent[critic_name]
 
         # plot targets
         axes[ix].scatter(
@@ -1341,9 +1347,15 @@ def plot_critic_3d_interactive(
             Z = np.array(
                 [
                     [
-                        ((np.array([xi, yi]) - offset) @ np_W_latent.T + np_b_latent)
+                        (
+                            (np.array([xi, yi]) - np_x_offset) @ np_W_latent.T
+                            + np_b_latent
+                        )
                         @ np_A
-                        @ ((np.array([xi, yi]) - offset) @ np_W_latent.T + np_b_latent)
+                        @ (
+                            (np.array([xi, yi]) - np_x_offset) @ np_W_latent.T
+                            + np_b_latent
+                        )
                         for xi in x_range
                     ]
                     for yi in y_range
@@ -1354,9 +1366,9 @@ def plot_critic_3d_interactive(
             Z = np.array(
                 [
                     [
-                        (np.array([xi, yi]) - offset)
+                        (np.array([xi, yi]) - np_x_offset)
                         @ np_A
-                        @ (np.array([xi, yi]) - offset)
+                        @ (np.array([xi, yi]) - np_x_offset)
                         for xi in x_range
                     ]
                     for yi in y_range
@@ -1371,6 +1383,7 @@ def plot_critic_3d_interactive(
         axes[ix].set_zlabel("Z")
         axes[ix].set_title(f"{display_names[critic_name]} Prediction")
         axes[ix].set_box_aspect([1, 1, 0.75])
+        axes[ix].set_zlim(0, 1)
         axes[ix].legend()
 
         # Set initial viewing angle
