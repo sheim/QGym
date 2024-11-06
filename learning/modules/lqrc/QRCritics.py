@@ -63,63 +63,98 @@ def gradient_zAz(x, A, W_latent, b_latent):
     return res
 
 
-def shape_loss(loss_fn, obs, x_offsets, A):
+def scaling_function(d, dmax):
+    scaling = torch.ones_like(d)  # Default to 1.0
+    mask = d >= dmax
+    scaling[mask] = 0
+    mask = (d > 0) & (d < dmax)
+    scaling[mask] = 0.5 * (1 + torch.cos(torch.pi * d[mask] / dmax))
+    return scaling
+
+
+def shape_loss(
+    loss_fn,
+    obs,
+    x_offsets,
+    A,
+    target,
+    batch_grad,
+    x_setpoint,
+    dV_scaling=0.2,
+    x_threshold=0.2,
+    dmax=0.2,
+    W_latent=None,
+    b_latent=None,
+):
     batch_size, feature_dim = obs.size()
 
-    obs_exp = obs.unsqueeze(1).expand(
+    x_batch_exp = obs.unsqueeze(1).expand(
         batch_size, batch_size, feature_dim
     )  # Shape: [batch_size, batch_size, feature_dim]
     x_offsets_exp = x_offsets.unsqueeze(1).expand(
         batch_size, batch_size, feature_dim
     )  # Shape: [batch_size, batch_size, feature_dim]
 
-    diff_i = obs_exp - obs_exp.transpose(
+    diff_i = x_batch_exp - x_batch_exp.transpose(
         0, 1
     )  # Shape: [batch_size, batch_size, feature_dim]
     scaling = scaling_function(
-        torch.norm(diff_i, dim=-1), self.dmax
+        torch.norm(diff_i, dim=-1), dmax
     )  # Shape: [batch_size, batch_size]
-
-    diff_j = (
-        obs_exp.transpose(0, 1) - x_offsets_exp
-    )  # Shape: [batch_size, batch_size, feature_dim]
+    # ! TODO: add latent here
+    if W_latent is not None and b_latent is not None:
+        x_bar = (
+            x_batch_exp.transpose(0, 1) - x_offsets_exp
+        )  # Shape: [batch_size, batch_size, feature_dim]
+        pred_values_grad = torch.vmap(gradient_zAz)(
+            x_bar,
+            A,
+            W_latent.unsqueeze(0).expand(batch_size, -1, -1),
+            b_latent.unsqueeze(0).expand(batch_size, -1),
+        )  # Shape: [batch_size, batch_size]
+        diff_j = torch.einsum(
+            "...ij, ...jk -> ...ik",
+            x_bar,
+            W_latent.T.unsqueeze(0).expand(batch_size, -1, -1),
+        ) + b_latent.unsqueeze(0).expand(batch_size, -1)
+    else:
+        diff_j = (
+            x_batch_exp.transpose(0, 1) - x_offsets_exp
+        )  # Shape: [batch_size, batch_size, feature_dim]
+        pred_values_grad = torch.vmap(gradient_xAx)(
+            diff_j, A
+        )  # Shape: [batch_size, batch_size]
 
     pred_values = torch.vmap(quadratify_xAx)(
         diff_j, A
     )  # Shape: [batch_size, batch_size]
-    pred_values_grad = torch.vmap(gradient_xAx)(
-        diff_j, A
-    )  # Shape: [batch_size, batch_size]
-    # ! TODO: continue cleaning up
+
     V_losses = loss_fn(
-        pred_values, v_batch.unsqueeze(0).expand(batch_size, batch_size)
+        pred_values, target.unsqueeze(0).expand(batch_size, batch_size)
     )  # Shape: [batch_size, batch_size]
     dV_losses = loss_fn(
         pred_values_grad,
-        dV_batch.unsqueeze(0).expand(batch_size, batch_size, feature_dim),
+        batch_grad.unsqueeze(0).expand(batch_size, batch_size, feature_dim),
     ).mean(dim=-1)  # Shape: [batch_size, batch_size, feature_dim]
-    scaled_l1_losses = scaling * (
-        V_losses + self.dV_scaling * dV_losses
+    scaled_losses = scaling * (
+        V_losses + dV_scaling * dV_losses
     )  # Element-wise scaling
 
     nonzero_counts = torch.count_nonzero(scaling, dim=1).clamp(
         min=1
     )  # Shape: [batch_size, 1]
     normalized_losses = (
-        scaled_l1_losses.sum(dim=1) / nonzero_counts.squeeze()
+        scaled_losses.sum(dim=1) / nonzero_counts.squeeze()
     )  # Shape: [batch_size]
 
     # extra loss penalizing x0offset when close to origin:
-    offset_losses = self.offset_loss(x_offsets, self.x_setpoint)
+    offset_losses = loss_fn(x_offsets, x_setpoint)
     # Compute the distance between x_batch and x_setpoint
     distances = torch.norm(
-        x_batch - self.x_setpoint, dim=1, keepdim=True
+        obs - x_setpoint, dim=1, keepdim=True
     )  # Shape: [batch_size, 1]
     # Compute the scaling factor
-    # scaling_factors = torch.clamp(1 - distances / self.x_threshold, min=0.0)  # Shape: [batch_size, 1]
-    scaling_factors = scaling_function(
-        distances, self.x_threshold
-    )  # Shape: [batch_size]
+    scaling_factors = scaling_function(distances, x_threshold)  # Shape: [batch_size]
     # Apply scaling to the L1 losses
     scaled_losses = (
         scaling_factors * offset_losses
@@ -128,6 +163,7 @@ def shape_loss(loss_fn, obs, x_offsets, A):
     loss = (
         normalized_losses.mean() + 10 * scaled_losses.mean()
     )  # Average over the batch size
+    return loss
 
 
 def init_weights(m):
@@ -248,7 +284,17 @@ class OuterProduct(nn.Module):
             pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
-            raise NotImplementedError
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Shape loss called with missing kwargs.")
+            return shape_loss(
+                fn,
+                obs,
+                output["x_offsets"],
+                output["A"],
+                target,
+                kwargs["batch_grad"],
+                torch.zeros_like(output["x_offsets"]),
+            )
         else:
             raise ValueError("Loss type unspecified")
 
@@ -392,7 +438,17 @@ class CholeskyInput(nn.Module):
             pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
-            raise NotImplementedError
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Shape loss called with missing kwargs.")
+            return shape_loss(
+                fn,
+                obs,
+                output["x_offsets"],
+                output["A"],
+                target,
+                kwargs["batch_grad"],
+                torch.zeros_like(output["x_offsets"]),
+            )
         else:
             raise ValueError("Loss type unspecified")
 
@@ -480,7 +536,19 @@ class CholeskyLatent(CholeskyInput):
             )
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
-            raise NotImplementedError
+            if not {"batch_grad", "W_latent", "b_latent"}.issubset(set(kwargs.keys())):
+                raise ValueError("Shape loss called with missing kwargs.")
+            return shape_loss(
+                fn,
+                obs,
+                output["x_offsets"],
+                output["A"],
+                target,
+                kwargs["batch_grad"],
+                torch.zeros_like(output["x_offsets"]),
+                W_latent=kwargs["W_latent"],
+                b_latent=kwargs["b_latent"],
+            )
         else:
             raise ValueError("Loss type unspecified")
 
@@ -617,7 +685,6 @@ class SpectralLatent(nn.Module):
             return {
                 "value": value,
                 "z": z,
-                # "A_diag": torch.diag(A_diag), #! throws shape error
                 "L": L,
                 "A": A,
                 "x_offsets": x_offsets,
@@ -645,7 +712,17 @@ class SpectralLatent(nn.Module):
             )
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
-            raise NotImplementedError
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Shape loss called with missing kwargs.")
+            return shape_loss(
+                fn,
+                obs,
+                output["x_offsets"],
+                output["A"],
+                target,
+                kwargs["batch_grad"],
+                torch.zeros_like(output["x_offsets"]),
+            )
         else:
             raise ValueError("Loss type unspecified")
 
@@ -789,7 +866,19 @@ class DenseSpectralLatent(nn.Module):
             )
             return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
         elif self.loss_type == "shape":
-            raise NotImplementedError
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Shape loss called with missing kwargs.")
+            return shape_loss(
+                fn,
+                obs,
+                output["x_offsets"],
+                output["A"],
+                target,
+                kwargs["batch_grad"],
+                torch.zeros_like(output["x_offsets"]),
+                W_latent=kwargs["W_latent"],
+                b_latent=kwargs["b_latent"],
+            )
         else:
             raise ValueError("Loss type unspecified")
 

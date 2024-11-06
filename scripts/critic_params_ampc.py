@@ -9,7 +9,7 @@ critic_params = {
         "minimize": True,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "PDCholeskyInput": {
@@ -21,7 +21,7 @@ critic_params = {
         "minimize": True,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "CholeskyLatent": {
@@ -35,7 +35,7 @@ critic_params = {
         "latent_activation": None,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "PDCholeskyLatent": {
@@ -49,7 +49,7 @@ critic_params = {
         "latent_activation": None,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "SpectralLatent": {
@@ -64,7 +64,7 @@ critic_params = {
         "latent_activation": None,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "DenseSpectralLatent": {
@@ -79,7 +79,7 @@ critic_params = {
         "latent_activation": None,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "OuterProduct": {
@@ -90,7 +90,7 @@ critic_params = {
         "normalize_obs": False,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "OuterProductLatent": {
@@ -104,7 +104,7 @@ critic_params = {
         "latent_activation": None,
         "offset_hidden_dims": [64],
         "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
-        "loss_type": "sobol",  # [standard, sobol, shape]
+        "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
     "Critic": {

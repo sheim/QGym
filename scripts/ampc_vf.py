@@ -32,11 +32,11 @@ SAVE_LOCALLY = False
 
 # choose critics to include in comparison
 critic_names = [
-    "OuterProduct",
+    # "OuterProduct",
     # "OuterProductLatent",
     # "PDCholeskyInput",
     # "CholeskyInput",
-    "CholeskyLatent",
+    # "CholeskyLatent",
     "DenseSpectralLatent",
 ]
 
@@ -178,8 +178,6 @@ for ix, name in enumerate(critic_names):
             latent_weight, latent_bias = get_latent_matrix(
                 batch["critic_obs"].shape, critic.latent_NN, device=DEVICE
             )
-            # latent_weight = latent_weight.cpu().detach().numpy()
-            # latent_bias = latent_bias.cpu().detach().numpy()
 
         # calculate loss and optimize
         value_loss = critic.loss_fn(
