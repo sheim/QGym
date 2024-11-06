@@ -115,9 +115,9 @@ def make_run_fcn(
         for k in range(N + 1):
             opti.subject_to((px[k] - xobs) ** 2 + (py[k] - yobs) ** 2 >= (r+inflation-eps_obst[k])**2)
     for i in range(eps.shape[0]):
-        cost += 10*soft_constraint_scale * eps[i]**2 + soft_constraint_scale/2 * eps[i]
+        cost += 50*soft_constraint_scale * eps[i]**2 + soft_constraint_scale * eps[i]
     for i in range(eps_obst.shape[0]):
-        cost += 10*soft_constraint_scale * eps_obst[i]**2 + soft_constraint_scale/2 * eps_obst[i]
+        cost += 50*soft_constraint_scale * eps_obst[i]**2 + soft_constraint_scale * eps_obst[i]
     # ---- boundary conditions --------
     opti.subject_to(X[:,0]-x0_param == 0)  # initial pos
     # opti.subject_to(py[0]-x0_param[1] == 0)  # initial pos
@@ -278,7 +278,7 @@ def evaluate_grid_closed_loop(Ngrid=5, filename=None):
 
 
 # def solve_closed_loop(xinit, noise=[0.01,0.01,0.01,0.]):
-def solve_closed_loop(xinit, noise=[0.005,0.005,0.05,0.5], plt_show=None):
+def solve_closed_loop(xinit, noise=[0.005,0.005,0.005,0.5], plt_show=None):
     run_fcn = make_run_fcn(xinit,silent=True, plt_show=False, plt_save=False)
     # Nsim = 50
     Usim = []
@@ -334,7 +334,7 @@ def test_closed_loop():
     # x0s = [[0.5, 0.5,0,0], [0.5, -0.5,0,0], [-0.5, 0.5,0,0], [-0.5, -0.5,0,0]]
 
     for x0 in x0s:
-        solve_closed_loop(x0)
+        solve_closed_loop(x0, noise=[0,0,0,0], plt_show=True)
 
 if __name__ == "__main__":
     

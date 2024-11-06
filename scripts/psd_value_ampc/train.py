@@ -209,82 +209,104 @@ class LocalShapeLoss(torch.nn.Module):
         loss = normalized_losses.mean() + 10*scaled_losses.mean() # Average over the batch size
         return loss
 
-def train(filename, plt_show=False):
+def process_data(filename, load_norm=False, plt_show=False):
+    # Load data from pickle file
     with open(f"data/{filename}.pkl", "rb") as file:
         data = pickle.load(file)
-  
-    X = data["x0"]
-    V = data["cost"]
-    dVdx = data["cost_gradient"]
+
+    X, V, dVdx = data["x0"], data["cost"], data["cost_gradient"]
+
+    # Filter and prepare data for plotting
     if type(X[0]) is not list:
         X_plot = [x[0, :] for x in X if abs(x[0, 3]) <= 0.2]
         V_plot = [v[0] for x, v in zip(X, V) if abs(x[0, 3]) <= 0.2]
         dVdx_plot = [dv[0, :] for x, dv in zip(X, dVdx) if abs(x[0, 3]) <= 0.2]
-        early_stopping = 0.8
-        X_earlystop    = [    x[:int(early_stopping*x.shape[0]), :]  for x in X ]
-        V_earlystop    = [    v[:int(early_stopping*v.shape[0])]     for v in V ]
-        dVdx_earlystop = [   dv[:int(early_stopping*dv.shape[0]), :] for dv in dVdx ]
         
-        X    = np.concatenate(X_earlystop, axis=0)
-        V    = np.concatenate(V_earlystop, axis=0)
+        early_stopping = 0.8
+        X_earlystop = [x[:int(early_stopping * x.shape[0]), :] for x in X]
+        V_earlystop = [v[:int(early_stopping * v.shape[0])] for v in V]
+        dVdx_earlystop = [dv[:int(early_stopping * dv.shape[0]), :] for dv in dVdx]
+
+        X = np.concatenate(X_earlystop, axis=0)
+        V = np.concatenate(V_earlystop, axis=0)
         dVdx = np.concatenate(dVdx_earlystop, axis=0)
     else:
-        X_plot = X
-        V_plot = V
-        dVdx_plot = dVdx
-    
+        X_plot, V_plot, dVdx_plot = X, V, dVdx
+
+    # Histogram plotting
     plot_costs_histogram(np.array(V), plt_show=plt_show, plt_name=f"plots/{filename}_cost_histogram.png")
     plot_costs_histogram(np.array(dVdx), plt_show=plt_show, plt_name=f"plots/{filename}_cost_gradient_histogram.png")
-    
+
+    # Filter high costs
     def remove_high_cost(X, V, dVdx, threshold=20):
         filtered_X = [x for x, v in zip(X, V) if v <= threshold]
         filtered_V = [v for v in V if v <= threshold]
         filtered_dVdx = [dv for dv, v in zip(dVdx, V) if v <= threshold]
         return filtered_X, filtered_V, filtered_dVdx
-    
+
     X_clip, V_clip, dVdx_clip = remove_high_cost(X, V, dVdx)
     X_clip_plot, V_clip_plot, dVdx_clip_plot = remove_high_cost(X_plot, V_plot, dVdx_plot)
-    
+
     plot_costs_histogram(np.array(V_clip), plt_show=plt_show, plt_name=f"plots/{filename}_cost_clip_histogram.png")
     plot_costs_histogram(np.array(dVdx_clip), plt_show=plt_show, plt_name=f"plots/{filename}_cost_gradient_clip_histogram.png")
 
-    X_clip = np.array(X_clip)
-    # X_mean = X_clip.mean(axis=0)
-    # X_std  = X_clip.std(axis=0)
-    # X_normalized = (X_clip - X_mean) / X_std
-    # print(f"Normalization X: mean={X_mean}, std={X_std}")
-    # Perform min-max scaling
-    X_min = X_clip.min(axis=0)
-    X_max = X_clip.max(axis=0)
-    X_normalized = 2*(X_clip - X_min) / (X_max - X_min)-1
-    X_normalized_plot = 2*(np.array(X_clip_plot) - X_min) / (X_max - X_min)-1
-    print(f"Min-Max Scaling X: min={X_min}, max={X_max}")
-    
-    V_clip = np.array(V_clip)
-    V_min = V_clip.min()
-    V_max = V_clip.max()
-    V_scaled = (V_clip - V_min) / (V_max - V_min)
-    V_scaled_plot = (np.array(V_clip_plot) - V_min) / (V_max - V_min)
-    dVdx_scaled = (X_max - X_min) / 2 * dVdx_clip / (V_max-V_min)
-    plot_costs_histogram(np.array(dVdx_scaled), plt_show=plt_show, plt_name=f"plots/{filename}_cost_gradient_scaled_histogram.png")
-    print(f"Normalization V: min={V_min:.3f}, max={V_max:.3f}")
-    
-    # verify that scaled gradients are correct!
-    # plot_3d_costs(X_normalized, V_scaled, cost_gradient=dVdx_scaled, zlim=1)
+    # Normalization
+    if load_norm:
+        with open(f"models/{filename}_normalization.pkl", "rb") as f:
+            normalization_data = pickle.load(f)
+            X_min, X_max = normalization_data["X_min"], normalization_data["X_max"]
+            V_min, V_max = normalization_data["V_min"], normalization_data["V_max"]
+    else:
+        X_min = np.array(X_clip).min(axis=0)
+        X_max = np.array(X_clip).max(axis=0)
+        V_min = np.array(V_clip).min()
+        V_max = np.array(V_clip).max()
 
+        # Save normalization values if not provided
+        with open(f"models/{filename}_normalization.pkl", "wb") as f:
+            pickle.dump({"X_min": X_min, "X_max": X_max, "V_min": V_min, "V_max": V_max}, f)
+
+    # Min-Max Scaling for X and V
+    X_normalized = 2 * (np.array(X_clip) - X_min) / (X_max - X_min) - 1
+    X_normalized_plot = 2 * (np.array(X_clip_plot) - X_min) / (X_max - X_min) - 1
+    V_scaled = (np.array(V_clip) - V_min) / (V_max - V_min)
+    V_scaled_plot = (np.array(V_clip_plot) - V_min) / (V_max - V_min)
+
+    # Scale dVdx
+    dVdx_scaled = (X_max - X_min) / 2 * dVdx_clip / (V_max - V_min)
+    dVdx_scaled_plot = (X_max - X_min) / 2 * dVdx_clip_plot / (V_max - V_min)
+    plot_costs_histogram(np.array(dVdx_scaled), plt_show=plt_show, plt_name=f"plots/{filename}_cost_gradient_scaled_histogram.png")
+
+    print(f"Normalization X: min={X_min}, max={X_max}")
+    print(f"Normalization V: min={V_min:.3f}, max={V_max:.3f}")
+
+    return X_normalized, V_scaled, dVdx_scaled, X_min, X_max, V_min, V_max, X_normalized_plot, V_scaled_plot, dVdx_scaled_plot
+    
+
+def train(filename, plt_show=False):
+    
+    X_normalized, V_scaled, dVdx_scaled, X_min, X_max, V_min, V_max, X_normalized_plot, V_scaled_plot, dVdx_scaled_plot = process_data(filename, plt_show=plt_show)
+    
+    # Prepare data for training and validation
     train_ratio = 0.8
     X_tensor = torch.tensor(X_normalized, dtype=torch.float32)
     V_tensor = torch.tensor(V_scaled, dtype=torch.float32)
     dVdx_tensor = torch.tensor(dVdx_scaled, dtype=torch.float32)
+
     dataset_size = len(X_tensor)
     train_size = int(dataset_size * train_ratio)
     val_size = dataset_size - train_size
-    train_data, val_data = torch.utils.data.random_split(list(zip(X_tensor, V_tensor, dVdx_tensor)), [train_size, val_size])
     
+
+    train_data, val_data = torch.utils.data.random_split(
+        list(zip(X_tensor, V_tensor, dVdx_tensor)), [train_size, val_size]
+    )
+
+    # Create DataLoaders
     batch_size = 1024
     train_loader = torch.utils.data.DataLoader(AmpcValueDataset(train_data), batch_size=batch_size, shuffle=True)
     val_loader   = torch.utils.data.DataLoader(AmpcValueDataset(val_data), batch_size=batch_size, shuffle=False)
-
+    
     # model = MLP(input_dim=len(X_clip[0]))
     # model = PsdChol(input_dim=len(X_clip[0]))
     model = PsdCholOff(input_dim=len(X_min))
@@ -298,7 +320,7 @@ def train(filename, plt_show=False):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
     
-    epochs = 10
+    epochs = 250
     for epoch in tqdm.tqdm(range(epochs)):
         model.train()
         train_loss = 0.0
@@ -347,25 +369,44 @@ def train(filename, plt_show=False):
     with open(f"models/{filename}_{type(model).__name__}.pkl", "wb") as f:
         pickle.dump({"V_max": V_max, "V_min": V_min, "X_max": X_max, "X_min": X_min}, f)
     
-    # if type(model) in (PsdChol,PsdCholLatentLin):
-    #     for xy, v_true, v_predict, P_predict in zip(x_batch.detach().cpu().numpy(), v_batch.detach().cpu().numpy(), predictions.detach().cpu().numpy(), psd_matrices.detach().cpu().numpy()):
-    #         if type(model) is PsdCholLatentLin:
-    #             W, b = model.get_W_b()
-    #             plot_3d_costs(X_normalized, V_scaled, xy, v_true, v_predict, P_predict, [0,0], linLatW=W, linLatb=b, zlim=1)
-    #         else:
-    #             plot_3d_costs(X_normalized, V_scaled, xy, v_true, v_predict, P_predict, [0,0], zlim=1)
+    # model.eval()
+    # with torch.no_grad():
+    #     predictions, psd_matrices, x_offsets = model(torch.tensor(X_normalized_plot,dtype=torch.float32))
     
+    # if type(model) is PsdCholOff:
+    #     for xy, v_true, v_predict, P_predict, x_off in zip(X_normalized_plot, V_scaled_plot, predictions.detach().cpu().numpy(), psd_matrices.detach().cpu().numpy(), x_offsets.detach().cpu().numpy()):
+    #         plot_3d_costs(X_normalized_plot, V_scaled_plot, xy, v_true, v_predict, P_predict, x_off, zlim=1,dmax=dmax)
+            
+def eval_model(filename):
+    _,_,_, X_min, X_max, V_min, V_max, X_normalized_plot, V_scaled_plot, dVdx_scaled_plot = process_data(filename, load_norm=True)
+    
+    model = PsdCholOff(np.shape(X_min)[0])  # Make sure to define or initialize your model appropriately
+    model.load_state_dict(torch.load(f"models/{filename}_{type(model).__name__}.pth"))
     model.eval()
+
     with torch.no_grad():
-        predictions, psd_matrices, x_offsets = model(torch.tensor(X_normalized_plot,dtype=torch.float32))
+        # Model predictions
+        predictions, psd_matrices, x_offsets = model(torch.tensor(X_normalized_plot, dtype=torch.float32))
+
+    # Convert to NumPy for plotting
+    predictions = predictions.detach().cpu().numpy()
+    psd_matrices = psd_matrices.detach().cpu().numpy()
+    x_offsets = x_offsets.detach().cpu().numpy()
+
+    # Only take every 10th entry for plotting
+    for xy, v_true, v_predict, P_predict, x_off in zip(
+            X_normalized_plot[::10], V_scaled_plot[::10],
+            predictions[::10], psd_matrices[::10], x_offsets[::10]):
+        
+        plot_3d_costs(X_normalized_plot, V_scaled_plot, xy, v_true, v_predict, P_predict, x_off, zlim=1, dmax=0.3)
+
     
-    if type(model) is PsdCholOff:
-        for xy, v_true, v_predict, P_predict, x_off in zip(X_normalized_plot, V_scaled_plot, predictions.detach().cpu().numpy(), psd_matrices.detach().cpu().numpy(), x_offsets.detach().cpu().numpy()):
-            plot_3d_costs(X_normalized_plot, V_scaled_plot, xy, v_true, v_predict, P_predict, x_off, zlim=1,dmax=dmax)
     
 if __name__=="__main__":
     # fire.Fire({
     #     "train": train
     # })
+    filename="unicycle_4D_lessnoise_cl_3375"
     
-    train(filename="unicycle_4D_cl_8000")
+    train(filename=filename)
+    eval_model(filename=filename)

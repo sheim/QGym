@@ -42,7 +42,7 @@ def plot_robot(
         (line,) = ax_u.step(t, np.append([U[0, i]], U[:, i]))
 
         ax_u.set_ylabel(u_labels[i])
-        ax_u.set_xlabel(time_label)
+        # ax_u.set_xlabel(time_label)
         if u_max[i] is not None:
             ax_u.hlines(u_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
             ax_u.hlines(-u_max[i], t[0], t[-1], linestyles="dashed", alpha=0.7)
