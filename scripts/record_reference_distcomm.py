@@ -37,12 +37,14 @@ def setup(args):
 
 
 def play(env, runner, train_cfg):
-    # * set up recording
+    saveLogs = True
+    mode = 'straight'
+
+        # * set up recording
     if env.cfg.viewer.record:
         recorder = VisualizationRecorder(
             env, train_cfg.runner.experiment_name, train_cfg.runner.load_run
         )
-    saveLogs = False
     log = {
         "dof_pos_obs": [],
         "dof_vel": [],
@@ -55,14 +57,12 @@ def play(env, runner, train_cfg):
         "dof_pos_error": [],
         "reward": [],
         "dof_names": [],
-        "pca_scalings":[]
+        "pca_scalings":[],
+        "phase":[],
     }
 
     # * set up interface: GamepadInterface(env) or KeyboardInterface(env)
-    COMMANDS_INTERFACE = hasattr(env, "commands")
-    if COMMANDS_INTERFACE:
-        #interface = GamepadInterface(env)
-        interface = KeyboardInterface(env)
+
     pca_scalings_logged = torch.zeros((0,2)).to(device=env.device)
     noiseplots = False
     count=False
@@ -73,10 +73,11 @@ def play(env, runner, train_cfg):
         #print(env.pca_scalings.shape)
         #pca_scalings_logged = torch.vstack((pca_scalings_logged, env.pca_scalings[0,0:2]))
         #print(i)
-        if saveLogs:
+        if saveLogs and i >=500:
             log["dof_pos_obs"] += env.dof_pos_obs.tolist()
             log["dof_vel"] += env.dof_vel.tolist()
             log["torques"] += env.torques.tolist()
+            log["phase"] += env.phase.tolist()
             #log["grf"] += env.grf.tolist()
             # log["oscillators"] += env.oscillators.tolist()
             # log["base_lin_vel"] += env.base_lin_vel.tolist()
@@ -87,26 +88,36 @@ def play(env, runner, train_cfg):
             #reward_weights = runner.policy_cfg["reward"]["weights"]
             #log["reward"] += runner.get_rewards(reward_weights).tolist()
 
-            if i == 1000:
+            if i == 1500:
                 log["dof_names"] = env.dof_names
-                np.savez("data_source_baselineref", **log)
+                np.savez(f"data_source_{mode}_v3_a0", **log)
+                print('done')
                 if noiseplots:
                     plt.plot(pca_scalings_logged[:,1].cpu(),pca_scalings_logged[:,0].cpu())
                     plt.xlabel("PCA scaling 1", fontsize=20)
                     plt.ylabel("PCA scaling 2", fontsize=20)
                     plt.show()
+        if 'turn' in mode:
+            env.commands[:, 0] = torch.clamp(
+                        env.commands[:, 0] + 0.5,
+                        max=1.0,
+                        )
+            if mode == 'turn_left':
+                env.commands[:, 2] = torch.clamp(
+                        env.commands[:, 2] + 0.5,
+                        max=2.0,
+                    )
+            else:
+                env.commands[:, 2] = torch.clamp(
+                        env.commands[:, 2] - 0.5,
+                        min=-2.0,
+                    )
+        else:
+            env.commands[:, 0] = torch.clamp(
+                        env.commands[:, 0] + 0.5,
+                        max=3.0,
+                        )
 
-        # env.commands[:, 0] = torch.clamp(
-        #             env.commands[:, 0] + 0.5,
-        #             max=4.0,
-        #             )
-
-        # env.commands[:, 2] = torch.clamp(
-        #         env.commands[:, 2] + 0.5,
-        #         max=2.0,
-        #     )
-        if COMMANDS_INTERFACE:
-            interface.update(env)
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(

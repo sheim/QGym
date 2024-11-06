@@ -4,7 +4,7 @@ from torch.distributions import Normal
 from .utils import create_MLP
 from .utils import export_network
 from .utils import RunningMeanStd
-
+import numpy as np
 
 class Actor(nn.Module):
     def __init__(
@@ -35,6 +35,16 @@ class Actor(nn.Module):
         # Action noise
         self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))
         self.distribution = None
+
+        # # #pc shaped noise
+        # noise = torch.randn(6, dtype=torch.float32)
+        # eigenvectors = torch.from_numpy(np.load("/home/aileen/QGym/scripts/humanoid_pcas.npy")).to(dtype=torch.float32).T
+        # shaped_noise = (noise @ eigenvectors[0:6, :]).view(-1)
+        # shaped_noise = torch.abs(shaped_noise / torch.norm(shaped_noise))
+
+        # self.std = nn.Parameter(init_noise_std * shaped_noise)
+        # # self.register_buffer("shaped_noise", shaped_noise)
+
         # disable args validation for speedup
         Normal.set_default_validate_args = False
 
@@ -54,6 +64,7 @@ class Actor(nn.Module):
         if self._normalize_obs:
             observations = self.normalize(observations)
         mean = self.NN(observations)
+        # mean = mean + self.shaped_noise
         self.distribution = Normal(mean, mean * 0.0 + self.std)
 
     def act(self, observations):

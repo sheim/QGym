@@ -61,25 +61,6 @@ def play(env, runner, train_cfg):
 
     for i in range(10*int(env.max_episode_length)):
 
-   
-
-        #print(env.num_envs)
-        #print(env.torques.size())
-        # log['dof_pos_obs'] += (env.dof_pos_obs.tolist())
-        # log['dof_vel'] += (env.dof_vel.tolist())
-        # log['torques'] += (env.torques.tolist())
-        # log['grf'] += env.grf.tolist()
-        # log['oscillators'] += env.oscillators.tolist()
-        # log['base_lin_vel'] += env.base_lin_vel.tolist()
-        # log['base_ang_vel'] += env.base_ang_vel.tolist()
-        # log['commands'] += env.commands.tolist()
-        # log['dof_pos_error']+=(env.default_dof_pos - env.dof_pos).tolist()
-        
-        # reward_weights = runner.policy_cfg['reward']['weights']
-        #print(runner.get_rewards(reward_weights))
-        # log['reward'] += runner.get_rewards(reward_weights).tolist()
-         
-        #print(i)
         if env.cfg.viewer.record:
             recorder.update(i)
         if i ==1000 and saveLogs:

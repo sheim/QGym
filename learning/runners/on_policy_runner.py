@@ -24,6 +24,8 @@ class OnPolicyRunner(BaseRunner):
 
         rewards_dict = {}
 
+        evaluation_dict = {}
+
         self.alg.actor_critic.train()
         actor_obs = self.get_obs(self.policy_cfg["actor_obs"])
         critic_obs = self.get_obs(self.policy_cfg["critic_obs"])
@@ -60,9 +62,13 @@ class OnPolicyRunner(BaseRunner):
 
                     self.update_rewards(rewards_dict, terminated)
                     total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
+                    self.update_evaluation(evaluation_dict, terminated)
+                    eval_total = torch.stack(tuple(evaluation_dict.values())).sum(dim=0)
 
                     logger.log_rewards(rewards_dict)
                     logger.log_rewards({"total_rewards": total_rewards})
+                    logger.log_eval(evaluation_dict)
+                    logger.log_eval({"eval_total": eval_total})
                     logger.finish_step(dones)
 
                     self.alg.process_env_step(total_rewards, dones, timed_out)
@@ -85,14 +91,19 @@ class OnPolicyRunner(BaseRunner):
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):
-        rewards_dict.update(
-            self.get_rewards(
-                self.policy_cfg["reward"]["termination_weight"], mask=terminated
-            )
-        )
+        rewards_dict.update(self.get_rewards(self.policy_cfg["reward"]["termination_weight"], mask=terminated))
         rewards_dict.update(
             self.get_rewards(
                 self.policy_cfg["reward"]["weights"],
+                modifier=self.env.dt,
+                mask=~terminated,
+            )
+        )
+
+    def update_evaluation(self, rewards_dict, terminated):
+        rewards_dict.update(
+            self.get_rewards(
+                self.cfg['evaluation']["weights"],
                 modifier=self.env.dt,
                 mask=~terminated,
             )
@@ -104,6 +115,8 @@ class OnPolicyRunner(BaseRunner):
             list(self.policy_cfg["reward"]["termination_weight"].keys())
         )
         logger.register_rewards(["total_rewards"])
+        logger.register_eval(list(self.cfg["evaluation"]["weights"].keys()))
+        logger.register_eval(["eval_total"])
         logger.register_category(
             "algorithm", self.alg, ["mean_value_loss", "mean_surrogate_loss"]
         )

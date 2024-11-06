@@ -37,12 +37,13 @@ def setup(args):
 
 
 def play(env, runner, train_cfg):
-    # * set up recording
+    saveLogs = True
+
+        # * set up recording
     if env.cfg.viewer.record:
         recorder = VisualizationRecorder(
             env, train_cfg.runner.experiment_name, train_cfg.runner.load_run
         )
-    saveLogs = False
     log = {
         "dof_pos_obs": [],
         "dof_vel": [],
@@ -59,10 +60,7 @@ def play(env, runner, train_cfg):
     }
 
     # * set up interface: GamepadInterface(env) or KeyboardInterface(env)
-    COMMANDS_INTERFACE = hasattr(env, "commands")
-    if COMMANDS_INTERFACE:
-        #interface = GamepadInterface(env)
-        interface = KeyboardInterface(env)
+
     pca_scalings_logged = torch.zeros((0,2)).to(device=env.device)
     noiseplots = False
     count=False
@@ -87,26 +85,47 @@ def play(env, runner, train_cfg):
             #reward_weights = runner.policy_cfg["reward"]["weights"]
             #log["reward"] += runner.get_rewards(reward_weights).tolist()
 
-            if i == 1000:
+            if i == 3000:
                 log["dof_names"] = env.dof_names
-                np.savez("data_source_baselineref", **log)
+                np.savez("data_source_randomized", **log)
+                print('done')
                 if noiseplots:
                     plt.plot(pca_scalings_logged[:,1].cpu(),pca_scalings_logged[:,0].cpu())
                     plt.xlabel("PCA scaling 1", fontsize=20)
                     plt.ylabel("PCA scaling 2", fontsize=20)
                     plt.show()
 
-        # env.commands[:, 0] = torch.clamp(
-        #             env.commands[:, 0] + 0.5,
-        #             max=4.0,
-        #             )
+            if i % 150 == 0:
+                command_dt, ang_dt = 0.1, 0.1
+                ideal_command = ((torch.rand(1) * 8) - 4).to('cuda')
+                if abs(ideal_command) < 0.1:
+                    command_dt = abs(ideal_command)
+                ideal_angvel = ((torch.rand(1) * 4) - 2).to('cuda')
+                if abs(ideal_angvel) < 0.1:
+                    ang_dt = abs(ideal_angvel)
+            if ideal_command > 0:
+                env.commands[:, 0] = torch.clamp(
+                        env.commands[:, 0] + command_dt,
+                        max=ideal_command
+                        )
+            else:
+                env.commands[:, 0] = torch.clamp(
+                    env.commands[:, 0] - command_dt,
+                    min = ideal_command
+                    )
 
-        # env.commands[:, 2] = torch.clamp(
-        #         env.commands[:, 2] + 0.5,
-        #         max=2.0,
-        #     )
-        if COMMANDS_INTERFACE:
-            interface.update(env)
+            if ideal_angvel > 0:
+                env.commands[:, 2] = torch.clamp(
+                        env.commands[:, 2] + ang_dt,
+                        max=ideal_angvel,
+                    )
+            else:
+                env.commands[:, 2] = torch.clamp(
+                        env.commands[:, 2] - ang_dt,
+                        min=ideal_angvel,
+                    )
+
+
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
@@ -151,6 +170,7 @@ def play(env, runner, train_cfg):
             print(sum(success))
         env.step()
         env.check_exit()
+
 
 
 if __name__ == "__main__":

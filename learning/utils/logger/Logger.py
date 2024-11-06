@@ -15,7 +15,7 @@ class Logger:
         self.device = device
 
         self.reward_logs = EpisodicLogs(num_envs, episode_dt, device=device)
-
+        self.evaluation_logs = EpisodicLogs(num_envs, episode_dt, device=device)
         self.iteration_logs = PerIterationLogs()
 
         self.iteration_counter = 0
@@ -33,11 +33,18 @@ class Logger:
     def register_rewards(self, reward_names):
         self.reward_logs.add_buffer(reward_names)
 
+    def register_eval(self, eval_names):
+        self.evaluation_logs.add_buffer(eval_names)
+
     def log_rewards(self, rewards_dict):
         self.reward_logs.add_step(rewards_dict)
 
+    def log_eval(self, eval_dict):
+        self.evaluation_logs.add_step(eval_dict)
+
     def finish_step(self, dones):
         self.reward_logs.finish_step(dones)
+        self.evaluation_logs.finish_step(dones)  # If applicable
         self.step_counter += 1
 
     def finish_iteration(self):
@@ -132,13 +139,16 @@ class Logger:
 
         averages = prepend_to_keys("rewards", self.reward_logs.get_average_rewards())
 
+        eval_averages = prepend_to_keys("evaluations", self.evaluation_logs.get_average_rewards())
+
+
         category_logs = {
             f"{category}/{key}": val
             for category in self.iteration_logs.logs.keys()
             for key, val in self.iteration_logs.get_all_logs(category).items()
         }
 
-        wandb.log({**averages, **category_logs})
+        wandb.log({**averages, **eval_averages, **category_logs})
 
     def tic(self, category="default"):
         self.timer.tic(category)

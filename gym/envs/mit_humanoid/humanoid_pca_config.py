@@ -4,17 +4,26 @@ with potential-based rewards implemented
 """
 
 import torch
+import numpy as np
 from gym.envs.base.legged_robot_config import (
     LeggedRobotCfg,
     LeggedRobotRunnerCfg,
 )
 
 
-class HumanoidRunningCfg(LeggedRobotCfg):
+class HumanoidPCACfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_actuators = 18
         episode_length_s = 5  # 100
+
+    class pca:
+        mode = "all"
+        torques = False
+        eigenvectors = torch.from_numpy(np.load("/home/aileen/QGym/scripts/humanoid_pcas.npy")).to("cuda").T
+        haa_flip_indexes = [3,9]
+        symmetry_eigvec_ref_index = [ 0,1, 3]
+        num_pcs = 6
 
     class terrain(LeggedRobotCfg.terrain):
         curriculum = False
@@ -177,6 +186,9 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         # (0: none, 1: pos tgt, 2: vel target, 3: effort)
         default_dof_drive_mode = 3
 
+    class scaling(LeggedRobotCfg.scaling):
+        pca_scalings = 0.5
+
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9
         soft_dof_vel_limit = 0.9
@@ -197,7 +209,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         dof_pos_target = dof_pos
 
 
-class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
+class HumanoidPCARunnerCfg(LeggedRobotRunnerCfg):
     do_wandb = True
     seed = -1
 
@@ -223,7 +235,7 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
 
         critic_obs = actor_obs
 
-        actions = ["dof_pos_target_legs"]
+        actions = ["pca_scalings"]
 
         add_noise = True
         noise_level = 1.0  # scales other values
@@ -251,7 +263,7 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
 
                 # * Shaping rewards * #
                 base_height = 0.1
-                orientation = 1.0
+                orientation = 2.0
                 hip_yaw_zero = 2.0
                 hip_abad_symmetry = 0.2
 
@@ -278,8 +290,8 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
         algorithm_class_name = "PPO"
         num_steps_per_env = 24
         max_iterations = 2000
-        run_name = "ICRA2023"
-        experiment_name = "HumanoidLocomotion"
+        run_name = ""
+        experiment_name = "Humanoid"
         save_interval = 50
         plot_input_gradients = False
         plot_parameter_gradients = False
