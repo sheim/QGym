@@ -32,11 +32,11 @@ SAVE_LOCALLY = False
 
 # choose critics to include in comparison
 critic_names = [
-    # "OuterProduct",
+    "OuterProduct",
     # "OuterProductLatent",
     # "PDCholeskyInput",
-    # "CholeskyInput",
-    # "CholeskyLatent",
+    "CholeskyInput",
+    "CholeskyLatent",
     "DenseSpectralLatent",
 ]
 
@@ -233,4 +233,5 @@ plot_critic_3d_interactive(
     },
     W_latent=graphing_data["W_latent"],
     b_latent=graphing_data["b_latent"],
+    dmax=0.2,
 )

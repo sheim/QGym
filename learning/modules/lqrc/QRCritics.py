@@ -355,6 +355,34 @@ class OuterProductLatent(OuterProduct):
         else:
             return value
 
+    def loss_fn(self, obs, target, **kwargs):
+        fn = eval(f"F.{self.loss}")
+        output = self.forward(obs, return_all=True)
+        value = output["value"]
+        if self.loss_type == "standard":
+            return fn(value, target, reduction="mean")
+        elif self.loss_type == "sobol":
+            if not {"batch_grad", "W_latent", "b_latent"}.issubset(set(kwargs.keys())):
+                raise ValueError("Sobol loss called with missing kwargs.")
+            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+        elif self.loss_type == "shape":
+            if not {"batch_grad", "W_latent", "b_latent"}.issubset(set(kwargs.keys())):
+                raise ValueError("Shape loss called with missing kwargs.")
+            return shape_loss(
+                fn,
+                obs,
+                output["x_offsets"],
+                output["A"],
+                target,
+                kwargs["batch_grad"],
+                torch.zeros_like(output["x_offsets"]),
+                W_latent=kwargs["W_latent"],
+                b_latent=kwargs["b_latent"],
+            )
+        else:
+            raise ValueError("Loss type unspecified")
+
 
 class CholeskyInput(nn.Module):
     def __init__(

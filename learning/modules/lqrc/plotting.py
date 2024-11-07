@@ -1282,6 +1282,7 @@ def plot_critic_3d_interactive(
     display_names,
     W_latent=None,
     b_latent=None,
+    dmax=None,
     ground_truth="Unicycle",
 ):
     num_critics = len(A.keys())
@@ -1340,6 +1341,16 @@ def plot_critic_3d_interactive(
         y_range = np.linspace(min(np_x[:, 1]), max(np_x[:, 1]), 50)
         X, Y = np.meshgrid(x_range, y_range)
 
+        # Check if dmax is specified and limit the plot range
+        if xy_eval is not None and dmax is not None:
+            distances = np.sqrt((X - np_xy_eval[0]) ** 2 + (Y - np_xy_eval[1]) ** 2)
+            mask = distances <= dmax  # Mask for points within dmax radius
+        else:
+            mask = np.ones_like(X, dtype=bool)  # No restriction if dmax is None
+
+        zero_padding = [
+            0 for _ in range(x_offsets[critic_name].shape[0] - 2)
+        ]  # pad non-xy parts of state with 0s for grid
         if np_W_latent is not None and np_b_latent is not None:
             np_W_latent = np_W_latent.detach().cpu().numpy()
             np_b_latent = np_b_latent.detach().cpu().numpy()
@@ -1348,17 +1359,21 @@ def plot_critic_3d_interactive(
                 [
                     [
                         (
-                            (np.array([xi, yi]) - np_x_offset) @ np_W_latent.T
+                            (np.array([xi, yi, *zero_padding]) - np_x_offset)
+                            @ np_W_latent.T
                             + np_b_latent
                         )
                         @ np_A
                         @ (
-                            (np.array([xi, yi]) - np_x_offset) @ np_W_latent.T
+                            (np.array([xi, yi, *zero_padding]) - np_x_offset)
+                            @ np_W_latent.T
                             + np_b_latent
                         )
-                        for xi in x_range
+                        if mask[i, j]
+                        else np.nan
+                        for j, xi in enumerate(x_range)  # due to meshgrid "xy" indexing
                     ]
-                    for yi in y_range
+                    for i, yi in enumerate(y_range)
                 ]
             )
         else:
@@ -1366,12 +1381,14 @@ def plot_critic_3d_interactive(
             Z = np.array(
                 [
                     [
-                        (np.array([xi, yi]) - np_x_offset)
+                        (np.array([xi, yi, *zero_padding]) - np_x_offset)
                         @ np_A
-                        @ (np.array([xi, yi]) - np_x_offset)
-                        for xi in x_range
+                        @ (np.array([xi, yi, *zero_padding]) - np_x_offset)
+                        if mask[i, j]
+                        else np.nan
+                        for j, xi in enumerate(x_range)
                     ]
-                    for yi in y_range
+                    for i, yi in enumerate(y_range)
                 ]
             )
 
