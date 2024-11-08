@@ -35,9 +35,9 @@ critic_names = [
     "OuterProduct",
     # "OuterProductLatent",
     # "PDCholeskyInput",
-    "CholeskyInput",
-    "CholeskyLatent",
-    "DenseSpectralLatent",
+    # "CholeskyInput",
+    # "CholeskyLatent",
+    # "DenseSpectralLatent",
 ]
 
 # make dir for saving this run's results
@@ -52,16 +52,49 @@ latent_bias = None
 for critic_param in critic_params.values():
     critic_param["device"] = DEVICE
 
+# 2 DIM data
+# with open(
+#     f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/50_unicycle_soft_constraints_grad.pkl",
+#     "rb",
+# ) as f:
+#     data = pickle.load(f)
+# 4 DIM data
 
-print("Loading data")
+early_stopping = 0.8
 with open(
-    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/50_unicycle_soft_constraints_grad.pkl",
+    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/4d_data_125.pkl",
     "rb",
 ) as f:
     data = pickle.load(f)
-x0 = np.array(data["x0"])
-cost = np.array(data["cost"])
-grad = np.array(data["gradients"])
+    # ! hot fix to avoid regenerating data
+    data["gradients"] = data["cost_gradient"]
+    data.pop("cost_gradient")
+
+n_dim = data["x0"][0].shape[-1]
+if n_dim == 4:
+    x0_plot = np.vstack([x[0] for x in data["x0"] if abs(x[0, 3]) <= 0.2])
+    cost_plot = np.vstack(
+        [c[0] for x, c in zip(data["x0"], data["cost"]) if abs(x[0, 3]) <= 0.2]
+    )
+    # dVdx_plot = [dv[0, :] for x, dv in zip(X, dVdx) if abs(x[0, 3]) <= 0.2]
+
+x0 = (
+    np.array(data["x0"])
+    if not isinstance(data["x0"], list)
+    else np.vstack([x[: int(early_stopping * x.shape[0])] for x in data["x0"]])
+)
+cost = (
+    np.array(data["cost"])
+    if not isinstance(data["cost"], list)
+    else np.vstack(
+        [c[: int(early_stopping * c.shape[0])].reshape(-1, 1) for c in data["cost"]]
+    )
+)
+grad = (
+    np.array(data["gradients"])
+    if not isinstance(data["gradients"], list)
+    else np.vstack([g[: int(early_stopping * g.shape[0])] for g in data["gradients"]])
+)
 eval_ix = len(x0) // 3
 
 print(
@@ -96,7 +129,9 @@ print(
 x0 = torch.from_numpy(x0).float().to(DEVICE)
 cost = torch.from_numpy(cost).float().to(DEVICE)
 grad = torch.from_numpy(grad).float().to(DEVICE)
-
+# turn numpy arrays to torch to keep standard
+x0_plot = torch.from_numpy(x0_plot).float().to(DEVICE)
+cost_plot = torch.from_numpy(cost_plot).float().to(DEVICE)
 print(
     "cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std()
 )
@@ -216,22 +251,43 @@ for ix, name in enumerate(critic_names):
         graphing_data["b_latent"][name] = latent_bias if "Latent" in name else None
         graphing_data["cost_true"][name] = data[0, eval_ix]["cost"]
 
-plot_critic_3d_interactive(
-    x0,
-    cost,
-    graphing_data["A"],
-    graphing_data["xy_eval"],
-    graphing_data["cost_true"],
-    graphing_data["cost_eval"],
-    graphing_data["x_offsets"],
-    display_names={
-        "CholeskyInput": "Cholesky",
-        "OuterProduct": "Outer Product",
-        "CholeskyLatent": "Cholesky Latent",
-        "DenseSpectralLatent": "Spectral Latent",
-        "Critic": "Critic",
-    },
-    W_latent=graphing_data["W_latent"],
-    b_latent=graphing_data["b_latent"],
-    dmax=0.2,
-)
+if n_dim == 2:
+    plot_critic_3d_interactive(
+        x0,
+        cost,
+        graphing_data["A"],
+        graphing_data["xy_eval"],
+        graphing_data["cost_true"],
+        graphing_data["cost_eval"],
+        graphing_data["x_offsets"],
+        display_names={
+            "CholeskyInput": "Cholesky",
+            "OuterProduct": "Outer Product",
+            "CholeskyLatent": "Cholesky Latent",
+            "DenseSpectralLatent": "Spectral Latent",
+            "Critic": "Critic",
+        },
+        W_latent=graphing_data["W_latent"],
+        b_latent=graphing_data["b_latent"],
+        dmax=0.2,
+    )
+elif n_dim == 4:
+    plot_critic_3d_interactive(
+        x0_plot[:, :2],
+        cost_plot,
+        graphing_data["A"],
+        graphing_data["xy_eval"],
+        graphing_data["cost_true"],
+        graphing_data["cost_eval"],
+        graphing_data["x_offsets"],
+        display_names={
+            "CholeskyInput": "Cholesky",
+            "OuterProduct": "Outer Product",
+            "CholeskyLatent": "Cholesky Latent",
+            "DenseSpectralLatent": "Spectral Latent",
+            "Critic": "Critic",
+        },
+        W_latent=graphing_data["W_latent"],
+        b_latent=graphing_data["b_latent"],
+        dmax=0.2,
+    )
