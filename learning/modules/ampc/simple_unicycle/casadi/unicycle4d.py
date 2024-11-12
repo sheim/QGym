@@ -1,7 +1,8 @@
 import os
 from tqdm import tqdm
 from casadi import *
-from utils import plot_robot, plot_3d_costs, plot_3d_surface
+
+# from utils import plot_robot, plot_3d_costs, plot_3d_surface
 import numpy as np
 import tqdm
 import pickle

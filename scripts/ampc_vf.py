@@ -29,14 +29,15 @@ from learning.modules.lqrc.plotting import (
 from learning.modules.lqrc.utils import get_latent_matrix
 
 SAVE_LOCALLY = False
-
+LOAD_NORM = True
 # choose critics to include in comparison
 critic_names = [
+    "Diagonal",
     "OuterProduct",
-    # "OuterProductLatent",
-    # "PDCholeskyInput",
+    # # "OuterProductLatent",
+    # # "PDCholeskyInput",
     # "CholeskyInput",
-    # "CholeskyLatent",
+    "CholeskyLatent",
     # "DenseSpectralLatent",
 ]
 
@@ -45,6 +46,9 @@ time_str = time.strftime("%Y%m%d_%H%M%S")
 save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
 if SAVE_LOCALLY and not os.path.exists(save_path):
     os.makedirs(save_path)
+model_path = os.path.join(LEGGED_GYM_ROOT_DIR, "models")
+if not os.path.exists(model_path):
+    os.makedirs(model_path)
 
 latent_weight = None
 latent_bias = None
@@ -62,13 +66,13 @@ for critic_param in critic_params.values():
 
 early_stopping = 0.8
 with open(
-    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/4d_data_125.pkl",
+    f"{LEGGED_GYM_ROOT_DIR}/learning/modules/ampc/simple_unicycle/casadi/4d_data_9261.pkl",
     "rb",
 ) as f:
     data = pickle.load(f)
     # ! hot fix to avoid regenerating data
-    data["gradients"] = data["cost_gradient"]
-    data.pop("cost_gradient")
+    # data["gradients"] = data["cost_gradient"]
+    # data.pop("cost_gradient")
 
 n_dim = data["x0"][0].shape[-1]
 if n_dim == 4:
@@ -95,35 +99,60 @@ grad = (
     if not isinstance(data["gradients"], list)
     else np.vstack([g[: int(early_stopping * g.shape[0])] for g in data["gradients"]])
 )
-eval_ix = len(x0) // 3
 
 print(
     f"Raw data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
 )
 
-# remove top 10% of cost values and corresponding states
-num_to_remove = math.ceil(0.1 * len(cost))
-top_indices = np.argsort(cost)[-num_to_remove:]
+# remove states, gradients, and values where value > 20
+top_indices = (cost > 20).squeeze()
 mask = np.ones(len(cost), dtype=bool)
 mask[top_indices] = False
 x0 = x0[mask]
 cost = cost[mask]
 grad = grad[mask]
-# optimal_u = optimal_u[mask]
-n_samples = x0.shape[0]
 
-# min max normalization to put state and cost on [0, 1]
-x0_min = x0.min(axis=0)
-x0_max = x0.max(axis=0)
+# Normalization
+if LOAD_NORM and os.path.exists(f"{model_path}/normalization.pkl"):
+    with open(f"{model_path}/normalization.pkl", "rb") as f:
+        normalization_data = pickle.load(f)
+        x0_min, x0_max = normalization_data["x0_min"], normalization_data["x0_max"]
+        cost_min, cost_max = (
+            normalization_data["cost_min"],
+            normalization_data["cost_max"],
+        )
+else:
+    # min max normalization to put state on [-1, 1] and cost on [0, 1]
+    x0_min = x0.min(axis=0)
+    x0_max = x0.max(axis=0)
+    cost_min = cost.min()
+    cost_max = cost.max()
+    # Save normalization values if not provided
+    with open(f"{model_path}/normalization.pkl", "wb") as f:
+        pickle.dump(
+            {
+                "x0_min": x0_min,
+                "x0_max": x0_max,
+                "cost_min": cost_min,
+                "cost_max": cost_max,
+            },
+            f,
+        )
+
 x0 = 2 * (x0 - x0_min) / (x0_max - x0_min) - 1
-cost_min = cost.min()
-cost_max = cost.max()
+x0_plot = 2 * (x0_plot - x0_min) / (x0_max - x0_min) - 1
 cost = (cost - cost_min) / (cost_max - cost_min)
-grad = (x0_max - x0_min) / 2 * grad / (cost_max - cost_min)
-
+cost_plot = (cost_plot - cost_min) / (cost_max - cost_min)
+grad = ((x0_max - x0_min) / 2) * (grad / (cost_max - cost_min))
 print(
     f"Normalized data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
 )
+
+# ! make save fig show swap easy
+
+# hack to see data dist
+plt.hist(cost, bins=100)
+plt.savefig(os.path.join("NNdata_dist.png"), dpi=300)
 
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
@@ -132,13 +161,14 @@ grad = torch.from_numpy(grad).float().to(DEVICE)
 # turn numpy arrays to torch to keep standard
 x0_plot = torch.from_numpy(x0_plot).float().to(DEVICE)
 cost_plot = torch.from_numpy(cost_plot).float().to(DEVICE)
+eval_ix = len(x0) // 3 + 50 if n_dim == 2 else len(x0_plot) // 3 + 50
 print(
     "cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std()
 )
 
+
 # set up constants
 total_data = x0.shape[0]
-n_dims = x0.shape[1]
 graphing_data = {
     data_name: {name: {} for name in critic_names}
     for data_name in [
@@ -179,7 +209,7 @@ for ix, name in enumerate(critic_names):
     params = critic_params[name]
     if "critic_name" in params.keys():
         params.update(critic_params[params["critic_name"]])
-    params["num_obs"] = n_dims
+    params["num_obs"] = n_dim
 
     critic_class = globals()[name]
     critic = critic_class(**params).to(DEVICE)
@@ -242,14 +272,19 @@ for ix, name in enumerate(critic_names):
     print(f"{name} max error: ", actual_error.max().item())
 
     with torch.no_grad():
-        graphing_data["xy_eval"][name] = data[0, eval_ix]["critic_obs"]
-        prediction = critic.evaluate(data[0, eval_ix]["critic_obs"], return_all=True)
+        eval_pt = data[0, eval_ix]["critic_obs"] if n_dim == 2 else x0_plot[eval_ix]
+        graphing_data["xy_eval"][name] = eval_pt
+        prediction = critic.evaluate(eval_pt, return_all=True)
         graphing_data["cost_eval"][name] = prediction.get("value")
         graphing_data["A"][name] = prediction["A"]
         graphing_data["x_offsets"][name] = prediction["x_offsets"]
         graphing_data["W_latent"][name] = latent_weight if "Latent" in name else None
         graphing_data["b_latent"][name] = latent_bias if "Latent" in name else None
-        graphing_data["cost_true"][name] = data[0, eval_ix]["cost"]
+        graphing_data["cost_true"][name] = (
+            data[0, eval_ix]["cost"] if n_dim == 2 else cost_plot[eval_ix]
+        )
+
+    torch.save(critic.state_dict(), f"{model_path}/{type(critic).__name__}.pth")
 
 if n_dim == 2:
     plot_critic_3d_interactive(
@@ -281,6 +316,7 @@ elif n_dim == 4:
         graphing_data["cost_eval"],
         graphing_data["x_offsets"],
         display_names={
+            "Diagonal": "Diagonal",
             "CholeskyInput": "Cholesky",
             "OuterProduct": "Outer Product",
             "CholeskyLatent": "Cholesky Latent",
@@ -289,5 +325,5 @@ elif n_dim == 4:
         },
         W_latent=graphing_data["W_latent"],
         b_latent=graphing_data["b_latent"],
-        dmax=0.2,
+        # dmax=0.2,
     )

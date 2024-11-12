@@ -82,6 +82,18 @@ critic_params = {
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
+    "Diagonal": {
+        "num_obs": 10,
+        "hidden_dims": [256, 128],
+        "activation": "tanh",
+        "normalize_obs": True,
+        # "latent_dim": 8,  # 16,
+        "minimize": True,
+        "offset_hidden_dims": [64],
+        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_type": "shape",  # [standard, sobol, shape]
+        "c_offset": False,
+    },
     "OuterProduct": {
         "num_obs": 10,
         "hidden_dims": [256, 128],

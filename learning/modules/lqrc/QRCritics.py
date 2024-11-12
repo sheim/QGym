@@ -212,6 +212,92 @@ class Critic(nn.Module):
         return nn.functional.mse_loss(self.forward(obs), target, reduction="mean")
 
 
+class Diagonal(nn.Module):
+    def __init__(
+        self,
+        num_obs,
+        hidden_dims,
+        latent_dim=None,
+        activation="elu",
+        dropouts=None,
+        normalize_obs=False,
+        c_offset=False,
+        minimize=False,
+        offset_hidden_dims=None,
+        loss="mse_loss",
+        loss_type="standard",
+        device="cuda",
+        **kwargs,
+    ):
+        super().__init__()
+        self.device = device
+        if latent_dim is None:
+            latent_dim = num_obs
+        self.latent_dim = latent_dim
+        self.minimize = minimize
+        if minimize:
+            self.sign = torch.ones(1, device=device)
+        else:
+            self.sign = -torch.ones(1, device=device)
+        self.value_offset = (
+            nn.Parameter(torch.zeros(1, device=device))
+            if c_offset
+            else torch.zeros(1, device=device)
+        )
+        self.loss = loss
+        self.loss_type = loss_type
+
+        self._normalize_obs = normalize_obs
+        if self._normalize_obs:
+            self.obs_rms = RunningMeanStd(num_obs)
+
+        self.NN = create_MLP(num_obs, latent_dim, hidden_dims, activation, dropouts)
+        self.offset_NN = (
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
+            if offset_hidden_dims
+            else lambda x: torch.zeros_like(x)
+        )
+
+    def forward(self, x, return_all=False):
+        z = self.NN(x)
+        A = torch.vmap(torch.diag)(torch.atleast_2d(z))
+        x_offsets = self.offset_NN(x)
+        value = self.sign * quadratify_xAx(x - x_offsets, A)
+
+        if return_all:
+            return {"value": value, "A": A, "x_offsets": x_offsets}
+        return value
+
+    def evaluate(self, obs, return_all=False):
+        return self.forward(obs, return_all)
+
+    def loss_fn(self, obs, target, **kwargs):
+        fn = eval(f"F.{self.loss}")
+        output = self.forward(obs, return_all=True)
+        value = output["value"]
+        if self.loss_type == "standard":
+            return fn(value, target, reduction="mean")
+        elif self.loss_type == "sobol":
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Sobol loss called with missing kwargs.")
+            pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
+            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+        elif self.loss_type == "shape":
+            if "batch_grad" not in kwargs.keys():
+                raise ValueError("Shape loss called with missing kwargs.")
+            return shape_loss(
+                fn,
+                obs,
+                output["x_offsets"],
+                output["A"],
+                target,
+                kwargs["batch_grad"],
+                torch.zeros_like(output["x_offsets"]),
+            )
+        else:
+            raise ValueError("Loss type unspecified")
+
+
 class OuterProduct(nn.Module):
     def __init__(
         self,
