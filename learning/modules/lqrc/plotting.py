@@ -104,7 +104,7 @@ def plot_variable_lr(data, fn, title="Scheduled Learning Rate", extension="png")
     fig, axes = plt.subplots(
         nrows=len(list(data.keys())),
         ncols=1,
-        figsize=(10, 5 + 5 * len(list(data.keys()))),
+        figsize=(5 + 4 * len(list(data.keys())), 10),
     )
     for ix, name in enumerate(data.keys()):
         ax = axes[ix] if isinstance(axes, np.ndarray) else axes
@@ -1510,10 +1510,11 @@ def plot_robot(
     ax_xy.plot(X_traj[:, 0], X_traj[:, 1], label="Trajectory")
     ax_xy.set_xlabel("x")
     ax_xy.set_ylabel("y")
-    ax_xy.set_xlim([-0.5, 0.5])
-    ax_xy.set_ylim([-0.5, 0.5])
+    ax_xy.set_xlim([-0.6, 0.6])
+    ax_xy.set_ylim([-0.6, 0.6])
     ax_xy.set_aspect("equal")  # Ensure equal scaling of axes
     ax_xy.grid()
+    ax_xy.set_title(plt_name.split("/")[-1])
 
     # Plot obstacles as gray circles
     if obst_pos is not None and obst_rad is not None:

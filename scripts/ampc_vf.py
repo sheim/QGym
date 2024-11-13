@@ -160,7 +160,6 @@ grad = torch.from_numpy(grad).float().to(DEVICE)
 # turn numpy arrays to torch to keep standard
 x0_plot = torch.from_numpy(x0_plot).float().to(DEVICE)
 cost_plot = torch.from_numpy(cost_plot).float().to(DEVICE)
-eval_ix = len(x0) // 4 + 50 if n_dim == 2 else len(x0_plot) // 4 + 40
 print(
     "cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std()
 )
@@ -203,6 +202,7 @@ data = TensorDict(
     batch_size=(1, total_data),
     device=DEVICE,
 )
+trained_critics = {}
 
 standard_offset = 0
 for ix, name in enumerate(critic_names):
@@ -275,20 +275,7 @@ for ix, name in enumerate(critic_names):
 
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
-
-    with torch.no_grad():
-        eval_pt = data[0, eval_ix]["critic_obs"] if n_dim == 2 else x0_plot[eval_ix]
-        graphing_data["xy_eval"][name] = eval_pt
-        prediction = critic.evaluate(eval_pt, return_all=True)
-        graphing_data["cost_eval"][name] = prediction.get("value")
-        graphing_data["A"][name] = prediction["A"]
-        graphing_data["x_offsets"][name] = prediction["x_offsets"]
-        graphing_data["W_latent"][name] = latent_weight if "Latent" in name else None
-        graphing_data["b_latent"][name] = latent_bias if "Latent" in name else None
-        graphing_data["cost_true"][name] = (
-            data[0, eval_ix]["cost"] if n_dim == 2 else cost_plot[eval_ix]
-        )
-
+    trained_critics[name] = critic
     torch.save(critic.state_dict(), f"{model_path}/{type(critic).__name__}.pth")
 
 if SAVE_LOCALLY:
@@ -312,68 +299,93 @@ if SAVE_LOCALLY:
         y_label2="Change in Average Value Loss",
     )
 
-if n_dim == 2:
-    plot_critic_3d_interactive(
-        x0,
-        cost,
-        graphing_data["A"],
-        graphing_data["xy_eval"],
-        graphing_data["cost_true"],
-        graphing_data["cost_eval"],
-        graphing_data["x_offsets"],
-        display_names={
-            "Diagonal": "Diagonal",
-            "CholeskyInput": "Cholesky",
-            "OuterProduct": "Outer Product",
-            "CholeskyLatent": "Cholesky Latent",
-            "DenseSpectralLatent": "Spectral Latent",
-            "Critic": "Critic",
-        },
-        W_latent=graphing_data["W_latent"],
-        b_latent=graphing_data["b_latent"],
-        dmax=0.2,
-    )
-elif n_dim == 4:
-    for name, val in graphing_data["A"].items():
-        print(f"{name}: min A", val.min(), "max A", val.max(), "mean A", val.mean())
-    for name, val in graphing_data["W_latent"].items():
-        if val is not None:
-            print(
-                f"{name}: min W_latent",
-                val.min(),
-                "max W_latent",
-                val.max(),
-                "mean W_latent",
-                val.mean(),
+for eval_ix in [150, 210, 221, 238, 329, 431, 84, 103, 165, 298, 374, 402]:
+    for name in critic_names:
+        critic = trained_critics[name]
+        with torch.no_grad():
+            eval_pt = data[0, eval_ix]["critic_obs"] if n_dim == 2 else x0_plot[eval_ix]
+            graphing_data["xy_eval"][name] = eval_pt
+            prediction = critic.evaluate(eval_pt, return_all=True)
+            graphing_data["cost_eval"][name] = prediction.get("value")
+            graphing_data["A"][name] = prediction["A"]
+            graphing_data["x_offsets"][name] = prediction["x_offsets"]
+            graphing_data["W_latent"][name] = (
+                latent_weight if "Latent" in name else None
             )
-    for name, val in graphing_data["b_latent"].items():
-        if val is not None:
-            print(
-                f"{name}: min b_latent",
-                val.min(),
-                "max b_latent",
-                val.max(),
-                "mean b_latent",
-                val.mean(),
+            graphing_data["b_latent"][name] = latent_bias if "Latent" in name else None
+            graphing_data["cost_true"][name] = (
+                data[0, eval_ix]["cost"] if n_dim == 2 else cost_plot[eval_ix]
             )
 
-    plot_critic_3d_interactive(
-        x0_plot[:, :2],
-        cost_plot,
-        graphing_data["A"],
-        graphing_data["xy_eval"],
-        graphing_data["cost_true"],
-        graphing_data["cost_eval"],
-        graphing_data["x_offsets"],
-        display_names={
-            "Diagonal": "Diagonal",
-            "CholeskyInput": "Cholesky",
-            "OuterProduct": "Outer Product",
-            "CholeskyLatent": "Cholesky Latent",
-            "DenseSpectralLatent": "Spectral Latent",
-            "Critic": "Critic",
-        },
-        W_latent=graphing_data["W_latent"],
-        b_latent=graphing_data["b_latent"],
-        dmax=0.2,
-    )
+    if n_dim == 2:
+        plot_critic_3d_interactive(
+            x0,
+            cost,
+            graphing_data["A"],
+            graphing_data["xy_eval"],
+            graphing_data["cost_true"],
+            graphing_data["cost_eval"],
+            graphing_data["x_offsets"],
+            display_names={
+                "Diagonal": "Diagonal",
+                "CholeskyInput": "Cholesky",
+                "OuterProduct": "Outer Product",
+                "CholeskyLatent": "Cholesky Latent",
+                "DenseSpectralLatent": "Spectral Latent",
+                "Critic": "Critic",
+            },
+            W_latent=graphing_data["W_latent"],
+            b_latent=graphing_data["b_latent"],
+            dmax=0.2,
+        )
+    elif n_dim == 4:
+        # for name, val in graphing_data["A"].items():
+        #     print(
+        #         f"{name}: min A",
+        #         val.min(),
+        #         "max A",
+        #         val.max(),
+        #         "mean A",
+        #         val.mean(),
+        #     )
+        # for name, val in graphing_data["W_latent"].items():
+        #     if val is not None:
+        #         print(
+        #             f"{name}: min W_latent",
+        #             val.min(),
+        #             "max W_latent",
+        #             val.max(),
+        #             "mean W_latent",
+        #             val.mean(),
+        #         )
+        # for name, val in graphing_data["b_latent"].items():
+        #     if val is not None:
+        #         print(
+        #             f"{name}: min b_latent",
+        #             val.min(),
+        #             "max b_latent",
+        #             val.max(),
+        #             "mean b_latent",
+        #             val.mean(),
+        #         )
+
+        plot_critic_3d_interactive(
+            x0_plot[:, :2],
+            cost_plot,
+            graphing_data["A"],
+            graphing_data["xy_eval"],
+            graphing_data["cost_true"],
+            graphing_data["cost_eval"],
+            graphing_data["x_offsets"],
+            display_names={
+                "Diagonal": "Diagonal",
+                "CholeskyInput": "Cholesky",
+                "OuterProduct": "Outer Product",
+                "CholeskyLatent": "Cholesky Latent",
+                "DenseSpectralLatent": "Spectral Latent",
+                "Critic": "Critic",
+            },
+            W_latent=graphing_data["W_latent"],
+            b_latent=graphing_data["b_latent"],
+            dmax=0.2,
+        )

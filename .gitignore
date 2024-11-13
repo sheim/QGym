@@ -26,6 +26,7 @@ plots/*
 scripts/plots/*
 learning/modules/ampc/acados_unicycle/*
 learning/modules/ampc/simple_unicycle/acados/c_generated_code/*
+*.pdf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

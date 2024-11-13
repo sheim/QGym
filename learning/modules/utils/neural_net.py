@@ -4,7 +4,13 @@ import copy
 
 
 def create_MLP(
-    num_inputs, num_outputs, hidden_dims, activations, dropouts=None, just_list=False, bias_in_linear_layers=True,
+    num_inputs,
+    num_outputs,
+    hidden_dims,
+    activations,
+    dropouts=None,
+    just_list=False,
+    bias_in_linear_layers=True,
 ):
     if not isinstance(activations, list):
         activations = [activations] * len(hidden_dims)
@@ -15,7 +21,14 @@ def create_MLP(
     layers = []
     # first layer
     if len(hidden_dims) > 0:
-        add_layer(layers, num_inputs, hidden_dims[0], activations[0], dropouts[0], bias_in_linear_layers=bias_in_linear_layers)
+        add_layer(
+            layers,
+            num_inputs,
+            hidden_dims[0],
+            activations[0],
+            dropouts[0],
+            bias_in_linear_layers=bias_in_linear_layers,
+        )
         for i in range(len(hidden_dims) - 1):
             add_layer(
                 layers,
@@ -23,12 +36,19 @@ def create_MLP(
                 hidden_dims[i + 1],
                 activations[i + 1],
                 dropouts[i + 1],
-                bias_in_linear_layers=bias_in_linear_layers
+                bias_in_linear_layers=bias_in_linear_layers,
             )
         else:
-            add_layer(layers, hidden_dims[-1], num_outputs, bias_in_linear_layers=bias_in_linear_layers)
+            add_layer(
+                layers,
+                hidden_dims[-1],
+                num_outputs,
+                bias_in_linear_layers=bias_in_linear_layers,
+            )
     else:  # handle no hidden dims, just linear layer
-        add_layer(layers, num_inputs, num_outputs, bias_in_linear_layers=bias_in_linear_layers)
+        add_layer(
+            layers, num_inputs, num_outputs, bias_in_linear_layers=bias_in_linear_layers
+        )
 
     if just_list:
         return layers
@@ -36,8 +56,17 @@ def create_MLP(
         return torch.nn.Sequential(*layers)
 
 
-def add_layer(layer_list, num_inputs, num_outputs, activation=None, dropout=0, bias_in_linear_layers=True):
-    layer_list.append(torch.nn.Linear(num_inputs, num_outputs, bias=bias_in_linear_layers))
+def add_layer(
+    layer_list,
+    num_inputs,
+    num_outputs,
+    activation=None,
+    dropout=0,
+    bias_in_linear_layers=True,
+):
+    layer_list.append(
+        torch.nn.Linear(num_inputs, num_outputs, bias=bias_in_linear_layers)
+    )
     if dropout > 0:
         layer_list.append(torch.nn.Dropout(p=dropout))
     if activation is not None:
@@ -90,7 +119,7 @@ def export_network(network, network_name, path, num_inputs):
     path_TS = os.path.join(path, network_name + ".pt")  # TorchScript path
     path_onnx = os.path.join(path, network_name + ".onnx")  # ONNX path
     model = copy.deepcopy(network).to("cpu")
-    model.device = "cpu" # force all tensors created as intermediate steps to CPU
+    model.device = "cpu"  # force all tensors created as intermediate steps to CPU
     # To trace model, must be evaluated once with arbitrary input
     model.eval()
     dummy_input = torch.rand((2, num_inputs))
