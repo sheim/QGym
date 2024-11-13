@@ -1,7 +1,7 @@
 import os
 from tqdm import tqdm
 from casadi import *
-from utils import plot_robot, plot_3d_costs, plot_3d_surface
+from utils import plot_robot, plot_3d_costs
 import numpy as np
 import tqdm
 import pickle
@@ -200,7 +200,7 @@ def make_run_fcn(
     return run
 
 
-def evaluate_grid(Ngrid=20, filename=None):
+def evaluate_grid(Ngrid=50, filename=None):
     filename = f"{filename}_{Ngrid**2}"
     # Ngrid = 20
     x_values = np.linspace(-0.52, 0.52, Ngrid)
@@ -212,14 +212,9 @@ def evaluate_grid(Ngrid=20, filename=None):
     with tqdm.tqdm(total=Ngrid * Ngrid) as pbar:
         for i in range(Ngrid):
             for j in range(Ngrid):
-                x0 = [X[i, j], Y[i, j]]
-                Utraj, Xtraj, cost, dcost_dx0 = solve_open_loop(
-                    x0,
-                    soft_constraint_scale=1e2,
-                    soft_state_constr=True,
-                    silent=True,
-                    plt_show=False,
-                )
+                x0 = [X[i, j], Y[i, j],0,0]
+                run_fcn = make_run_fcn(x0,silent=True, plt_show=False, plt_save=False)
+                Utraj, Xtraj, cost, dcost_dx0  = run_fcn(x0)
                 if cost is not None:
                     x0s.append(x0)
                     Utrajs.append(Utraj)
@@ -248,6 +243,7 @@ def evaluate_grid_closed_loop(Ngrid=5, filename=None):
     theta_values = np.linspace(-np.pi, np.pi, Ngrid)
 
     x0s, Utrajs, Xtrajs, costs, cost_gradients = [], [], [], [], []
+    
 
     X, Y, theta = np.meshgrid(x_values, y_values, theta_values)
     with tqdm.tqdm(total=Ngrid**3) as pbar:

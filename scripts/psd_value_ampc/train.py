@@ -218,14 +218,14 @@ def process_data(filename, load_norm=False, plt_show=False):
 
     # Filter and prepare data for plotting
     if type(X[0]) is not list:
-        X_plot = [x[0, :] for x in X if abs(x[0, 3]) <= 0.2]
-        V_plot = [v[0] for x, v in zip(X, V) if abs(x[0, 3]) <= 0.2]
+        X_plot    = [ x[0, :] for x     in X            if abs(x[0, 3]) <= 0.2]
+        V_plot    = [ v[0   ] for x, v  in zip(X, V)    if abs(x[0, 3]) <= 0.2]
         dVdx_plot = [dv[0, :] for x, dv in zip(X, dVdx) if abs(x[0, 3]) <= 0.2]
         
         early_stopping = 0.8
-        X_earlystop = [x[:int(early_stopping * x.shape[0]), :] for x in X]
-        V_earlystop = [v[:int(early_stopping * v.shape[0])] for v in V]
-        dVdx_earlystop = [dv[:int(early_stopping * dv.shape[0]), :] for dv in dVdx]
+        X_earlystop =    [  x[:int(early_stopping * x.shape[0]),  :] for x in X]
+        V_earlystop =    [  v[:int(early_stopping * v.shape[0])    ] for v in V]
+        dVdx_earlystop = [ dv[:int(early_stopping * dv.shape[0]), :] for dv in dVdx]
 
         X = np.concatenate(X_earlystop, axis=0)
         V = np.concatenate(V_earlystop, axis=0)

@@ -134,189 +134,147 @@ def plot_3d_costs(
     plt_show=True, 
     plt_name=None,
     zlim=20,
-    cost_gradient=None,  # New parameter for cost gradient
-    dmax=None
+    cost_gradient=None,
+    dmax=None,
+    latexify=True
 ):
-    # Check if the input is nested or flattened
-    is_nested = isinstance(xy_coords[0][0], list)  # Assumes that nested lists indicate a list of lists
-
+    if latexify:
+        # LaTeX-style settings
+        plt.rcParams.update({
+            "text.usetex": True,                  # Use LaTeX for all text
+            "font.family": "serif",               # Set font to serif (like LaTeX default)
+            "font.size": 8,                      # Set base font size
+            "axes.labelsize": 8,                 # Axis label font size
+            "axes.titlesize": 8,                 # Title font size
+            "xtick.labelsize": 8,                # Tick label font size
+            "ytick.labelsize": 8,
+            "legend.fontsize": 8,
+            "lines.linewidth": 1,                 # Line width for plot lines
+            "axes.linewidth": 0.75,               # Axis line width
+        })
     # Create a 3D plot
-    fig = plt.figure()
+    fig = plt.figure(figsize=(5, 3))
     ax = fig.add_subplot(111, projection='3d')
+    ax.view_init(elev=40, azim=155)
 
-    if is_nested:
-        # Use a colormap to assign colors to each set of points
-        colors = cm.viridis(np.linspace(0, 1, len(xy_coords)))
-
-        # Loop through each set of points in the nested lists
-        for idx, (outer_x0_set, cost_set, color) in enumerate(zip(xy_coords, costs, colors)):
-            x_values = [coord[0] for coord in outer_x0_set]
-            y_values = [coord[1] for coord in outer_x0_set]
-
-            # Scatter plot for each set of points
-            ax.scatter(
-                x_values, y_values, cost_set, c=[color]*len(cost_set), marker='o', label=f'Set {idx}'
-            )
-            # Mark the outer_x0 with a larger star
-            ax.scatter(
-                x_values[0], y_values[0], cost_set[0], color=color, marker='*', s=150, edgecolor='k'
-            )
-
-    else:
-        # Flattened data, retain original functionality
-        x_values = [coord[0] for coord in xy_coords]
-        y_values = [coord[1] for coord in xy_coords]
-        ax.scatter(x_values, y_values, costs, c=costs, cmap='viridis', marker='o')
-
-    # Plot cost_true and cost_eval as bold blue and red crosses at xy_eval
-    if xy_eval is not None and cost_true is not None:
-        ax.scatter(
-            xy_eval[0], xy_eval[1], cost_true, color='blue', marker='X', s=100, label='Cost True'
-        )
-    if xy_eval is not None and cost_eval is not None:
-        ax.scatter(
-            xy_eval[0], xy_eval[1], cost_eval, color='red', marker='X', s=100, label='Cost Eval'
-        )
-
-    # Add a legend if cost_true or cost_eval are plotted
-    if cost_true is not None or cost_eval is not None:
-        ax.legend()
-
-    # Plot the surface if P is provided
-    if P is not None:
-        x_range = np.linspace(min(x_values), max(x_values), 50)
-        y_range = np.linspace(min(y_values), max(y_values), 50)
-        X, Y = np.meshgrid(x_range, y_range)
-
-        # Check if dmax is specified and limit the plot range
-        if xy_eval is not None and dmax is not None:
-            distances = np.sqrt((X - xy_eval[0])**2 + (Y - xy_eval[1])**2)
-            mask = distances <= dmax  # Mask for points within dmax radius
-        else:
-            mask = np.ones_like(X, dtype=bool)  # No restriction if dmax is None
-
-        # Compute Z based on the quadratic surface equation
-        zero_padding = [0 for _ in range(offset.shape[0]-2)]
-        if linLatW is not None and linLatb is not None:
-            Z = np.array([
-                [((np.array([xi, yi,*zero_padding]) - offset)@linLatW.T + linLatb) @ P @ ((np.array([xi, yi, *zero_padding]) - offset)@linLatW.T + linLatb) 
-                 if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
-                for i, yi in enumerate(y_range)
-            ])
-        else:
-            Z = np.array([
-                [(np.array([xi, yi, *zero_padding]) - offset) @ P @ (np.array([xi, yi, *zero_padding]) - offset) 
-                 if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
-                for i, yi in enumerate(y_range)
-            ])
-
-        # Plot the surface, masking values outside the dmax radius
-        ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.5, edgecolor='none')
-
+    # Flattened data and scatter plot
+    x_values = [coord[0] for coord in xy_coords]
+    y_values = [coord[1] for coord in xy_coords]
+    ax.scatter(x_values, y_values, costs, c=costs, cmap='Blues_r', vmin=0, vmax=40, s=1, alpha=0.1, zorder=-1e5, label='Optimal MPC cost')
 
     # Plot cost gradients as arrows if provided
     if cost_gradient is not None:
         # Adjust gradient arrows based on data structure (flattened or nested)
-        if is_nested:
-            for x0_set, costs_, cost_gradient_, color in zip(xy_coords, costs, cost_gradient, colors):
-                gradient_x, gradient_y, gradient_z = zip(*[
-                    (-grad[0] / np.linalg.norm(grad), -grad[1] / np.linalg.norm(grad), -np.linalg.norm(grad))
-                    for grad in cost_gradient_
-                ])
-                ax.quiver(
-                    [coord[0] for coord in x0_set],
-                    [coord[1] for coord in x0_set],
-                    costs_,
-                    gradient_x,
-                    gradient_y,
-                    gradient_z,
-                    length=0.02,
-                    color=color,
-                    pivot='middle',
-                    arrow_length_ratio=0,
-                    alpha=0.5,
-                )
-        else:
-            gradient_x, gradient_y, gradient_z = zip(*[
-                (-grad[0] / np.linalg.norm(grad), -grad[1] / np.linalg.norm(grad), -np.linalg.norm(grad))
-                for grad in cost_gradient
-            ])
-            ax.quiver(
-                x_values,
-                y_values,
-                costs,
-                gradient_x,
-                gradient_y,
-                gradient_z,
-                length=0.02,
-                color='blue',
-                pivot='middle',
-                arrow_length_ratio=0,
-                alpha=0.5,
-            )
+        gradient_x, gradient_y, gradient_z = zip(*[
+            (-grad[0] / np.linalg.norm(grad), -grad[1] / np.linalg.norm(grad), -np.linalg.norm(grad))
+            for grad in cost_gradient
+        ])
+        ax.quiver(
+            x_values,
+            y_values,
+            costs,
+            gradient_x,
+            gradient_y,
+            gradient_z,
+            length=0.02,
+            color='blue',
+            pivot='middle',
+            arrow_length_ratio=0,
+            alpha=0.5,
+            label='Cost gradient'
+        )
+
+    # Plot multiple surfaces if P, offset are lists
+    x_range = np.linspace(min(x_values), max(x_values), 50)
+    y_range = np.linspace(min(y_values), max(y_values), 50)
+    if isinstance(P, list) and isinstance(offset, list):
+        for i, (P_matrix, offset_vec, xyev) in enumerate(zip(P, offset,xy_eval)):
+            label=None
+            if i==0:
+                label="Learned PSD approx."
+            plot_surface(ax, x_range, y_range, P_matrix, offset_vec, linLatW, linLatb, xyev, dmax, label=label)
+    elif P is not None:
+        plot_surface(ax, x_range, y_range, P, offset, linLatW, linLatb, xy_eval, dmax)
+        
+    # Plot cost_true and cost_eval as bold blue and red crosses at xy_eval
+    if (isinstance(xy_eval[0], list) or isinstance(xy_eval[0], np.ndarray)) and isinstance(cost_true, list):
+        ax.plot(
+            [point[0] for point in xy_eval], [point[1] for point in xy_eval], cost_true, color='blue', marker='x', markersize=5, zorder=1e5, label=r'True cost'
+        )
+    elif xy_eval is not None and cost_true is not None:
+        ax.scatter(
+            xy_eval[0], xy_eval[1], cost_true, color='blue', marker='X', s=100, label='True cost'
+        )
+    if (isinstance(xy_eval[0], list) or isinstance(xy_eval[0], np.ndarray)) and isinstance(cost_eval, list):
+        ax.plot(
+            [point[0] for point in xy_eval], [point[1] for point in xy_eval], cost_eval, color='darkred', marker='x', markersize=5, zorder=1e5, label=r'Predicted cost'
+        )
+    elif xy_eval and cost_eval is not None:
+        ax.scatter(
+            xy_eval[0], xy_eval[1], cost_eval, color='red', marker='X', s=100, label='Predicted cost'
+        )
 
     # Set axis labels and limits
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Cost')
+    from mpl_toolkits.mplot3d import Axes3D, proj3d
+    f = lambda x,y,z: proj3d.proj_transform(x,y,z, ax.get_proj())[:2]
+    leg = ax.legend(bbox_to_anchor=[0.8,0.7], loc='lower left')
+    # leg.get_frame().set_facecolor("white")
+    for lh in leg.legend_handles: 
+        lh.set_alpha(1)
+    leg.legend_handles[1].set_color(cm.summer(0.8))
+    leg.get_texts()[2].set_text("Closed-loop path")
+    ax.set_xlabel(r'State $p_\mathrm{x}$', labelpad=-15)
+    ax.set_ylabel(r'State $p_\mathrm{y}$', labelpad=-15)
+    ax.set_zlabel('Cost $V$', labelpad=-15)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
     ax.set_box_aspect([1, 1, 0.75])  # x, y, z aspect ratio
     ax.set_zlim(0, zlim)
 
     # Save or show the plot
     if plt_name:
-        plt.savefig(f"{plt_name}")
+        # plt.savefig(f"{plt_name}")
+        # plt.tight_layout()
+        plt.savefig(f"{plt_name}", dpi=600)
     if plt_show:
         plt.show()
 
     plt.close()
     
-def plot_3d_surface(xy_coords, costs, zlim=(0, 20), plt_show=True, plt_name=None):
-    # Unpack x and y coordinates
-    x_values = [coord[0] for coord in xy_coords]
-    y_values = [coord[1] for coord in xy_coords]
+def plot_surface(ax, x_range, y_range, P, offset, linLatW, linLatb, xy_eval, dmax, label=None):
+    # Set up grid for plotting the surface
+    X, Y = np.meshgrid(x_range, y_range)
 
-    # Convert to numpy arrays for easier reshaping
-    x_values = np.array(x_values)
-    y_values = np.array(y_values)
-    costs = np.array(costs)
+    # Check if dmax is specified and limit the plot range
+    if xy_eval is not None and dmax is not None:
+        distances = np.sqrt((X - xy_eval[0])**2 + (Y - xy_eval[1])**2)
+        mask = distances <= dmax  # Mask for points within dmax radius
+    else:
+        mask = np.ones_like(X, dtype=bool)  # No restriction if dmax is None
 
-    # Reshape the data assuming it's a grid (N x N)
-    N = int(np.sqrt(len(xy_coords)))  # Assuming a perfect square number of points
-    X = x_values.reshape(N, N)
-    Y = y_values.reshape(N, N)
-    Z = costs.reshape(N, N)
+    # Compute Z based on the quadratic surface equation
+    zero_padding = [0 for _ in range(offset.shape[0] - 2)]
+    if linLatW is not None and linLatb is not None:
+        Z = np.array([
+            [((np.array([xi, yi, *zero_padding]) - offset) @ linLatW.T + linLatb) @ P @ ((np.array([xi, yi, *zero_padding]) - offset) @ linLatW.T + linLatb) 
+             if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
+            for i, yi in enumerate(y_range)
+        ])
+    else:
+        Z = np.array([
+            [(np.array([xi, yi, *zero_padding]) - offset).T @ P @ (np.array([xi, yi, *zero_padding]) - offset) 
+             if mask[i, j] else np.nan for j, xi in enumerate(x_range)]
+            for i, yi in enumerate(y_range)
+        ])
 
-    # Create a 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Create a surface plot
-    # ax_clip becomes available in matplotlib 3.10
-    # surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', axlim_clip=True)
-    surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none')
-
-    # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Cost')
-
-    # Set aspect ratio of the x and y axes to be equal
-    ax.set_box_aspect([1, 1, 0.75])  # x, y, z aspect ratio
-
-    # Set limits for the z-axis (cost)
-    ax.set_zlim(zlim)
-
-    # Add a color bar which maps values to colors
-    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-
-    if plt_name:
-        plt.savefig(f"{plt_name}")
-        
-    if plt_show:
-        plt.show()
-        
-    plt.close()
+    # Plot the surface, masking values outside the dmax radius
+    if label:
+        ax.plot_surface(X, Y, Z, cmap='summer', vmin=0, vmax=20, alpha=0.7, zorder= 1e3, edgecolor='none', label=label)
+    else:
+        ax.plot_surface(X, Y, Z, cmap='summer', vmin=0, vmax=20, alpha=0.7, zorder= 1e3, edgecolor='none')
     
+
 def plot_costs_histogram(costs, plt_show=True, plt_name=None):
     # Check if costs is 1D or 2D
     if costs.ndim == 1:
