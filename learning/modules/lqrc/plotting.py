@@ -104,6 +104,7 @@ def plot_variable_lr(data, fn, title="Scheduled Learning Rate", extension="png")
     fig, axes = plt.subplots(
         nrows=len(list(data.keys())),
         ncols=1,
+        figsize=(10, 5 + 5 * len(list(data.keys()))),
     )
     for ix, name in enumerate(data.keys()):
         ax = axes[ix] if isinstance(axes, np.ndarray) else axes
@@ -1235,7 +1236,13 @@ def moving_average(data, window_size):
 
 
 def plot_learning_progress(
-    test_error, title, fn="test_error", smoothing_window=30, extension="png"
+    test_error,
+    title,
+    fn="test_error",
+    smoothing_window=30,
+    extension="png",
+    y_label1="Average Test Error",
+    y_label2="Change in Average Test Error",
 ):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
@@ -1257,10 +1264,10 @@ def plot_learning_progress(
         # plot change in error
         ax2.plot(error_change, label=name)
 
-    ax1.set_ylabel("Average Test Error")
+    ax1.set_ylabel(y_label1)
     ax1.set_yscale("log")
     # ax1.set_ylim(bottom=2.08e10, top=2.11e10)
-    ax2.set_ylabel("Change in Average Test Error")
+    ax2.set_ylabel(y_label2)
     ax2.set_xlabel("Iteration")
     ax2.set_yscale("log")
     ax1.legend()

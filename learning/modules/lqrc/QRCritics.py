@@ -260,7 +260,7 @@ class Diagonal(nn.Module):
 
     def forward(self, x, return_all=False):
         z = self.NN(x)
-        A = torch.vmap(torch.diag)(torch.atleast_2d(z))
+        A = torch.vmap(torch.diag)(torch.atleast_2d(z)).squeeze()
         x_offsets = self.offset_NN(x)
         value = self.sign * quadratify_xAx(x - x_offsets, A)
 

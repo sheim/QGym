@@ -24,28 +24,26 @@ from tensordict import TensorDict
 
 from learning.modules.lqrc.plotting import (
     plot_critic_3d_interactive,
+    plot_learning_progress,
+    plot_variable_lr,
 )
 
 from learning.modules.lqrc.utils import get_latent_matrix
 
-SAVE_LOCALLY = False
-LOAD_NORM = True
+SAVE_LOCALLY = True
+LOAD_NORM = False
 # choose critics to include in comparison
 critic_names = [
     "Diagonal",
     "OuterProduct",
     # # "OuterProductLatent",
     # # "PDCholeskyInput",
-    # "CholeskyInput",
+    "CholeskyInput",
     "CholeskyLatent",
-    # "DenseSpectralLatent",
+    "DenseSpectralLatent",
 ]
 
 # make dir for saving this run's results
-time_str = time.strftime("%Y%m%d_%H%M%S")
-save_path = os.path.join(LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str)
-if SAVE_LOCALLY and not os.path.exists(save_path):
-    os.makedirs(save_path)
 model_path = os.path.join(LEGGED_GYM_ROOT_DIR, "models")
 if not os.path.exists(model_path):
     os.makedirs(model_path)
@@ -112,6 +110,11 @@ x0 = x0[mask]
 cost = cost[mask]
 grad = grad[mask]
 
+# hack to see data dist
+plt.hist(cost, bins=100)
+# plt.show()
+# plt.savefig(os.path.join("NNdata_dist.png"), dpi=300)
+
 # Normalization
 if LOAD_NORM and os.path.exists(f"{model_path}/normalization.pkl"):
     with open(f"{model_path}/normalization.pkl", "rb") as f:
@@ -150,10 +153,6 @@ print(
 
 # ! make save fig show swap easy
 
-# hack to see data dist
-plt.hist(cost, bins=100)
-plt.savefig(os.path.join("NNdata_dist.png"), dpi=300)
-
 # turn numpy arrays to torch before training
 x0 = torch.from_numpy(x0).float().to(DEVICE)
 cost = torch.from_numpy(cost).float().to(DEVICE)
@@ -161,7 +160,7 @@ grad = torch.from_numpy(grad).float().to(DEVICE)
 # turn numpy arrays to torch to keep standard
 x0_plot = torch.from_numpy(x0_plot).float().to(DEVICE)
 cost_plot = torch.from_numpy(cost_plot).float().to(DEVICE)
-eval_ix = len(x0) // 3 + 50 if n_dim == 2 else len(x0_plot) // 3 + 50
+eval_ix = len(x0) // 4 + 50 if n_dim == 2 else len(x0_plot) // 4 + 40
 print(
     "cost mean", cost.mean(), "cost median", cost.median(), "cost std dev", cost.std()
 )
@@ -183,6 +182,7 @@ graphing_data = {
 }
 test_error = {name: [] for name in critic_names}
 lr_history = {name: [] for name in critic_names}
+loss_history = {name: [] for name in critic_names}
 
 # set up training
 max_gradient_steps = 500
@@ -213,9 +213,13 @@ for ix, name in enumerate(critic_names):
 
     critic_class = globals()[name]
     critic = critic_class(**params).to(DEVICE)
-    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3, weight_decay=0.01)
+    # critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3, weight_decay=0.01)
+    # lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #     critic_optimizer, mode="min", factor=0.5, patience=100, threshold=1e-5
+    # )
+    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-2)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        critic_optimizer, mode="min", factor=0.5, patience=100, threshold=1e-5
+        critic_optimizer, mode="min", factor=0.5, patience=20
     )
 
     # train new critic
@@ -267,6 +271,7 @@ for ix, name in enumerate(critic_names):
             ).to("cpu")
         test_error[name].append(actual_error.detach().mean().numpy())
         lr_history[name].append(lr_scheduler.get_last_lr()[0])
+        loss_history[name].append(value_loss.cpu().detach().mean().numpy())
 
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
@@ -286,6 +291,27 @@ for ix, name in enumerate(critic_names):
 
     torch.save(critic.state_dict(), f"{model_path}/{type(critic).__name__}.pth")
 
+if SAVE_LOCALLY:
+    time_str = time.strftime("%Y%m%d_%H%M%S")
+    save_path = os.path.join(
+        LEGGED_GYM_ROOT_DIR, "logs", "offline_critics_graph", time_str
+    )
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    plot_learning_progress(
+        test_error,
+        "Pointwise Error on Test Set \n (Comparison of Normed Vals Used in Supervised Training)",
+        fn=f"{save_path}/test_error",
+    )
+    plot_variable_lr(lr_history, f"{save_path}/lr_history")
+    plot_learning_progress(
+        loss_history,
+        "Loss History over Training Epochs",
+        fn=f"{save_path}/loss_history",
+        y_label1="Average Value Loss",
+        y_label2="Change in Average Value Loss",
+    )
+
 if n_dim == 2:
     plot_critic_3d_interactive(
         x0,
@@ -296,6 +322,7 @@ if n_dim == 2:
         graphing_data["cost_eval"],
         graphing_data["x_offsets"],
         display_names={
+            "Diagonal": "Diagonal",
             "CholeskyInput": "Cholesky",
             "OuterProduct": "Outer Product",
             "CholeskyLatent": "Cholesky Latent",
@@ -307,6 +334,29 @@ if n_dim == 2:
         dmax=0.2,
     )
 elif n_dim == 4:
+    for name, val in graphing_data["A"].items():
+        print(f"{name}: min A", val.min(), "max A", val.max(), "mean A", val.mean())
+    for name, val in graphing_data["W_latent"].items():
+        if val is not None:
+            print(
+                f"{name}: min W_latent",
+                val.min(),
+                "max W_latent",
+                val.max(),
+                "mean W_latent",
+                val.mean(),
+            )
+    for name, val in graphing_data["b_latent"].items():
+        if val is not None:
+            print(
+                f"{name}: min b_latent",
+                val.min(),
+                "max b_latent",
+                val.max(),
+                "mean b_latent",
+                val.mean(),
+            )
+
     plot_critic_3d_interactive(
         x0_plot[:, :2],
         cost_plot,
@@ -325,5 +375,5 @@ elif n_dim == 4:
         },
         W_latent=graphing_data["W_latent"],
         b_latent=graphing_data["b_latent"],
-        # dmax=0.2,
+        dmax=0.2,
     )

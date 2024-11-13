@@ -8,7 +8,7 @@ critic_params = {
         # "latent_dim": 8,  # 16,
         "minimize": True,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -20,7 +20,7 @@ critic_params = {
         "latent_dim": None,
         "minimize": True,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -34,7 +34,7 @@ critic_params = {
         "latent_hidden_dims": [64, 64],
         "latent_activation": None,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -48,7 +48,7 @@ critic_params = {
         "latent_hidden_dims": [64, 64],
         "latent_activation": None,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -63,7 +63,7 @@ critic_params = {
         "latent_hidden_dims": [64, 64],
         "latent_activation": None,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -78,7 +78,7 @@ critic_params = {
         "latent_hidden_dims": [32, 32],
         "latent_activation": None,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -90,7 +90,7 @@ critic_params = {
         # "latent_dim": 8,  # 16,
         "minimize": True,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -101,7 +101,7 @@ critic_params = {
         "activation": "tanh",
         "normalize_obs": False,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
@@ -115,7 +115,7 @@ critic_params = {
         "latent_hidden_dims": [32, 32],
         "latent_activation": None,
         "offset_hidden_dims": [64],
-        "loss_fn": "mse_loss",  # [mse_loss, l1_loss]
+        "loss_fn": "l1_loss",  # [mse_loss, l1_loss]
         "loss_type": "shape",  # [standard, sobol, shape]
         "c_offset": False,
     },
