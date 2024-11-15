@@ -104,7 +104,7 @@ def plot_variable_lr(data, fn, title="Scheduled Learning Rate", extension="png")
     fig, axes = plt.subplots(
         nrows=len(list(data.keys())),
         ncols=1,
-        figsize=(5 + 4 * len(list(data.keys())), 10),
+        figsize=(5 + 3 * len(list(data.keys())), 6),
     )
     for ix, name in enumerate(data.keys()):
         ax = axes[ix] if isinstance(axes, np.ndarray) else axes
@@ -1243,6 +1243,7 @@ def plot_learning_progress(
     extension="png",
     y_label1="Average Test Error",
     y_label2="Change in Average Test Error",
+    log_scale=True,
 ):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
@@ -1265,8 +1266,10 @@ def plot_learning_progress(
         ax2.plot(error_change, label=name)
 
     ax1.set_ylabel(y_label1)
-    ax1.set_yscale("log")
+    if log_scale:
+        ax1.set_yscale("log")
     # ax1.set_ylim(bottom=2.08e10, top=2.11e10)
+    ax1.set_ylim(bottom=0.0, top=0.6)
     ax2.set_ylabel(y_label2)
     ax2.set_xlabel("Iteration")
     ax2.set_yscale("log")
@@ -1532,3 +1535,15 @@ def plot_robot(
         plt.show()
 
     plt.close()
+
+
+def plot_grad_histogram(data, title, show_fig=True, fn=None):
+    fig, axes = plt.subplots(1, 4, figsize=(10, 4))
+    for ix, ax in enumerate(axes):
+        ax.hist(data[:, ix], bins=50)
+        ax.set_title(f"Grad Dim {ix}")
+    fig.suptitle(title)
+    if show_fig:
+        plt.show()
+    if fn:
+        plt.savefig(fn)

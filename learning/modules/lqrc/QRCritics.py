@@ -101,7 +101,6 @@ def shape_loss(
     scaling = scaling_function(
         torch.norm(diff_i, dim=-1), dmax
     )  # Shape: [batch_size, batch_size]
-    # ! TODO: add latent here
     if W_latent is not None and b_latent is not None:
         x_bar = (
             x_batch_exp.transpose(0, 1) - x_offsets_exp
@@ -129,12 +128,17 @@ def shape_loss(
         diff_j, A
     )  # Shape: [batch_size, batch_size]
 
-    V_losses = loss_fn(
-        pred_values, target.unsqueeze(0).expand(batch_size, batch_size)
+    V_losses = loss_fn(  #! check that functional is same as torch.nn.L1Loss, may need two sep obj, make sure no reduction!
+        pred_values,
+        target.unsqueeze(0).expand(
+            batch_size, batch_size
+        ),  # ! check if dataloaer output is the same with henrik's
+        reduction="none",
     )  # Shape: [batch_size, batch_size]
     dV_losses = loss_fn(
         pred_values_grad,
         batch_grad.unsqueeze(0).expand(batch_size, batch_size, feature_dim),
+        reduction="none",
     ).mean(dim=-1)  # Shape: [batch_size, batch_size, feature_dim]
     scaled_losses = scaling * (
         V_losses + dV_scaling * dV_losses
@@ -148,7 +152,11 @@ def shape_loss(
     )  # Shape: [batch_size]
 
     # extra loss penalizing x0offset when close to origin:
-    offset_losses = loss_fn(x_offsets, x_setpoint)
+    offset_losses = loss_fn(
+        x_offsets,
+        x_setpoint,
+        reduction="none",
+    )
     # Compute the distance between x_batch and x_setpoint
     distances = torch.norm(
         obs - x_setpoint, dim=1, keepdim=True
@@ -276,12 +284,20 @@ class Diagonal(nn.Module):
         output = self.forward(obs, return_all=True)
         value = output["value"]
         if self.loss_type == "standard":
-            return fn(value, target, reduction="mean")
+            return fn(value, target, reduction="none")
         elif self.loss_type == "sobol":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Sobol loss called with missing kwargs.")
             pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
-            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+            return fn(
+                value,
+                target,
+                reduction="none",
+            ) + fn(
+                pred_grad,
+                kwargs["batch_grad"],
+                reduction="none",
+            )
         elif self.loss_type == "shape":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Shape loss called with missing kwargs.")
@@ -363,12 +379,20 @@ class OuterProduct(nn.Module):
         output = self.forward(obs, return_all=True)
         value = output["value"]
         if self.loss_type == "standard":
-            return fn(value, target, reduction="mean")
+            return fn(value, target, reduction="none")
         elif self.loss_type == "sobol":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Sobol loss called with missing kwargs.")
             pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
-            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+            return fn(
+                value,
+                target,
+                reduction="none",
+            ) + fn(
+                pred_grad,
+                kwargs["batch_grad"],
+                reduction="none",
+            )
         elif self.loss_type == "shape":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Shape loss called with missing kwargs.")
@@ -446,12 +470,20 @@ class OuterProductLatent(OuterProduct):
         output = self.forward(obs, return_all=True)
         value = output["value"]
         if self.loss_type == "standard":
-            return fn(value, target, reduction="mean")
+            return fn(value, target, reduction="none")
         elif self.loss_type == "sobol":
             if not {"batch_grad", "W_latent", "b_latent"}.issubset(set(kwargs.keys())):
                 raise ValueError("Sobol loss called with missing kwargs.")
             pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
-            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+            return fn(
+                value,
+                target,
+                reduction="none",
+            ) + fn(
+                pred_grad,
+                kwargs["batch_grad"],
+                reduction="none",
+            )
         elif self.loss_type == "shape":
             if not {"batch_grad", "W_latent", "b_latent"}.issubset(set(kwargs.keys())):
                 raise ValueError("Shape loss called with missing kwargs.")
@@ -515,7 +547,7 @@ class CholeskyInput(nn.Module):
             num_obs, num_lower_diag_elements, hidden_dims, activation, dropouts
         )
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "lrelu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -545,12 +577,20 @@ class CholeskyInput(nn.Module):
         output = self.forward(obs, return_all=True)
         value = output["value"]
         if self.loss_type == "standard":
-            return fn(value, target, reduction="mean")
+            return fn(value, target, reduction="none")
         elif self.loss_type == "sobol":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Sobol loss called with missing kwargs.")
             pred_grad = gradient_xAx(obs - output["x_offsets"], output["A"])
-            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+            return fn(
+                value,
+                target,
+                reduction="none",
+            ) + fn(
+                pred_grad,
+                kwargs["batch_grad"],
+                reduction="none",
+            )
         elif self.loss_type == "shape":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Shape loss called with missing kwargs.")
@@ -638,7 +678,7 @@ class CholeskyLatent(CholeskyInput):
         output = self.forward(obs, return_all=True)
         value = output["value"]
         if self.loss_type == "standard":
-            return fn(value, target, reduction="mean")
+            return fn(value, target, reduction="none")
         elif self.loss_type == "sobol":
             if not {"batch_grad", "W_latent", "b_latent"}.issubset(kwargs.keys()):
                 raise ValueError("Sobol loss called with missing kwargs.")
@@ -648,7 +688,15 @@ class CholeskyLatent(CholeskyInput):
                 kwargs["W_latent"],
                 kwargs["b_latent"],
             )
-            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+            return fn(
+                value,
+                target,
+                reduction="none",
+            ) + fn(
+                pred_grad,
+                kwargs["batch_grad"],
+                reduction="none",
+            )
         elif self.loss_type == "shape":
             if not {"batch_grad", "W_latent", "b_latent"}.issubset(set(kwargs.keys())):
                 raise ValueError("Shape loss called with missing kwargs.")
@@ -814,7 +862,7 @@ class SpectralLatent(nn.Module):
         output = self.forward(obs, return_all=True)
         value = output["value"]
         if self.loss_type == "standard":
-            return fn(value, target, reduction="mean")
+            return fn(value, target, reduction="none")
         elif self.loss_type == "sobol":
             if not {"batch_grad", "W_latent", "b_latent"}.issubset(kwargs.keys()):
                 raise ValueError("Sobol loss called with missing kwargs.")
@@ -824,7 +872,15 @@ class SpectralLatent(nn.Module):
                 kwargs["W_latent"],
                 kwargs["b_latent"],
             )
-            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+            return fn(
+                value,
+                target,
+                reduction="none",
+            ) + fn(
+                pred_grad,
+                kwargs["batch_grad"],
+                reduction="none",
+            )
         elif self.loss_type == "shape":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Shape loss called with missing kwargs.")
@@ -968,7 +1024,7 @@ class DenseSpectralLatent(nn.Module):
         output = self.forward(obs, return_all=True)
         value = output["value"]
         if self.loss_type == "standard":
-            return fn(value, target, reduction="mean")
+            return fn(value, target, reduction="none")
         elif self.loss_type == "sobol":
             if not {"batch_grad", "W_latent", "b_latent"}.issubset(kwargs.keys()):
                 raise ValueError("Sobol loss called with missing kwargs.")
@@ -978,7 +1034,15 @@ class DenseSpectralLatent(nn.Module):
                 kwargs["W_latent"],
                 kwargs["b_latent"],
             )
-            return fn(value, target) + fn(pred_grad, kwargs["batch_grad"])
+            return fn(
+                value,
+                target,
+                reduction="none",
+            ) + fn(
+                pred_grad,
+                kwargs["batch_grad"],
+                reduction="none",
+            )
         elif self.loss_type == "shape":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Shape loss called with missing kwargs.")

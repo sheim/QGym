@@ -8,7 +8,6 @@ from gym import LEGGED_GYM_ROOT_DIR
 import torch
 from torch import nn  # noqa F401
 import numpy as np
-from scipy.spatial import KDTree
 import matplotlib.pyplot as plt
 
 from learning.modules.critic import Critic  # noqa F401
@@ -26,6 +25,7 @@ from learning.modules.lqrc.plotting import (
     plot_critic_3d_interactive,
     plot_learning_progress,
     plot_variable_lr,
+    plot_grad_histogram,
 )
 
 from learning.modules.lqrc.utils import get_latent_matrix
@@ -98,6 +98,8 @@ grad = (
     else np.vstack([g[: int(early_stopping * g.shape[0])] for g in data["gradients"]])
 )
 
+plot_grad_histogram(grad, "Gradient Histogram - Raw Data")
+
 print(
     f"Raw data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
 )
@@ -114,6 +116,8 @@ grad = grad[mask]
 plt.hist(cost, bins=100)
 # plt.show()
 # plt.savefig(os.path.join("NNdata_dist.png"), dpi=300)
+
+plot_grad_histogram(grad, "Gradient Histogram - Clipped Data")
 
 # Normalization
 if LOAD_NORM and os.path.exists(f"{model_path}/normalization.pkl"):
@@ -150,7 +154,7 @@ grad = ((x0_max - x0_min) / 2) * (grad / (cost_max - cost_min))
 print(
     f"Normalized data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
 )
-
+plot_grad_histogram(grad, "Gradient Histogram - Clipped + Normalized Data")
 # ! make save fig show swap easy
 
 # turn numpy arrays to torch before training
@@ -185,7 +189,7 @@ loss_history = {name: [] for name in critic_names}
 
 # set up training
 max_gradient_steps = 500
-batch_size = 512
+batch_size = 1024
 n_training_data = int(0.6 * total_data)
 n_validation_data = total_data - n_training_data
 print(f"training data: {n_training_data}, validation data: {n_validation_data}")
@@ -226,7 +230,7 @@ for ix, name in enumerate(critic_names):
     mean_value_loss = 0
     counter = 0
 
-    generator = create_uniform_generator(
+    generator = create_uniform_generator(  #! check this works
         data[:1, train_idx],
         batch_size,
         max_gradient_steps=max_gradient_steps,
@@ -259,7 +263,7 @@ for ix, name in enumerate(critic_names):
         critic_optimizer.zero_grad()
         value_loss.backward()
         critic_optimizer.step()
-        lr_scheduler.step(value_loss)
+        lr_scheduler.step(value_loss)  #! scale on validation loss
         counter += 1
         # pointwise prediction test error
         with torch.no_grad():
@@ -289,6 +293,7 @@ if SAVE_LOCALLY:
         test_error,
         "Pointwise Error on Test Set \n (Comparison of Normed Vals Used in Supervised Training)",
         fn=f"{save_path}/test_error",
+        log_scale=False,
     )
     plot_variable_lr(lr_history, f"{save_path}/lr_history")
     plot_learning_progress(
@@ -297,6 +302,7 @@ if SAVE_LOCALLY:
         fn=f"{save_path}/loss_history",
         y_label1="Average Value Loss",
         y_label2="Change in Average Value Loss",
+        log_scale=False,
     )
 
 for eval_ix in [150, 210, 221, 238, 329, 431, 84, 103, 165, 298, 374, 402]:
