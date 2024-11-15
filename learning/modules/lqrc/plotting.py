@@ -1269,7 +1269,7 @@ def plot_learning_progress(
     if log_scale:
         ax1.set_yscale("log")
     # ax1.set_ylim(bottom=2.08e10, top=2.11e10)
-    ax1.set_ylim(bottom=0.0, top=0.6)
+    # ax1.set_ylim(bottom=0.0, top=0.6)
     ax2.set_ylabel(y_label2)
     ax2.set_xlabel("Iteration")
     ax2.set_yscale("log")

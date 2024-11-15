@@ -1,10 +1,8 @@
 import pickle
-import math
-import random
 import os
 import time
 from gym import LEGGED_GYM_ROOT_DIR
-
+import tqdm
 import torch
 from torch import nn  # noqa F401
 import numpy as np
@@ -12,9 +10,6 @@ import matplotlib.pyplot as plt
 
 from learning.modules.critic import Critic  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
-from learning.utils import (
-    create_uniform_generator,
-)
 from utils import (
     DEVICE,
 )
@@ -30,17 +25,33 @@ from learning.modules.lqrc.plotting import (
 
 from learning.modules.lqrc.utils import get_latent_matrix
 
+
+class AmpcValueDataset(torch.utils.data.Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        x = self.data["critic_obs"][idx]
+        v = self.data["cost"][idx]
+        dv = self.data["grad"][idx]
+        # x, v, dv = self.data[idx]
+        return x, v, dv
+
+
 SAVE_LOCALLY = True
 LOAD_NORM = False
 # choose critics to include in comparison
 critic_names = [
-    "Diagonal",
-    "OuterProduct",
+    # "Diagonal",
+    # "OuterProduct",
     # # "OuterProductLatent",
     # # "PDCholeskyInput",
     "CholeskyInput",
-    "CholeskyLatent",
-    "DenseSpectralLatent",
+    # "CholeskyLatent",
+    # "DenseSpectralLatent",
 ]
 
 # make dir for saving this run's results
@@ -98,7 +109,7 @@ grad = (
     else np.vstack([g[: int(early_stopping * g.shape[0])] for g in data["gradients"]])
 )
 
-plot_grad_histogram(grad, "Gradient Histogram - Raw Data")
+# plot_grad_histogram(grad, "Gradient Histogram - Raw Data")
 
 print(
     f"Raw data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
@@ -113,11 +124,11 @@ cost = cost[mask]
 grad = grad[mask]
 
 # hack to see data dist
-plt.hist(cost, bins=100)
+# plt.hist(cost, bins=100)
 # plt.show()
 # plt.savefig(os.path.join("NNdata_dist.png"), dpi=300)
 
-plot_grad_histogram(grad, "Gradient Histogram - Clipped Data")
+# plot_grad_histogram(grad, "Gradient Histogram - Clipped Data")
 
 # Normalization
 if LOAD_NORM and os.path.exists(f"{model_path}/normalization.pkl"):
@@ -154,7 +165,7 @@ grad = ((x0_max - x0_min) / 2) * (grad / (cost_max - cost_min))
 print(
     f"Normalized data mean {x0.mean(axis=0)} \n median {np.median(x0, axis=0)} \n max {x0.max(axis=0)} \n min {x0.min(axis=0)}"
 )
-plot_grad_histogram(grad, "Gradient Histogram - Clipped + Normalized Data")
+# plot_grad_histogram(grad, "Gradient Histogram - Clipped + Normalized Data")
 # ! make save fig show swap easy
 
 # turn numpy arrays to torch before training
@@ -188,9 +199,9 @@ lr_history = {name: [] for name in critic_names}
 loss_history = {name: [] for name in critic_names}
 
 # set up training
-max_gradient_steps = 500
+max_gradient_steps = 250  # 500
 batch_size = 1024
-n_training_data = int(0.6 * total_data)
+n_training_data = int(0.8 * total_data)
 n_validation_data = total_data - n_training_data
 print(f"training data: {n_training_data}, validation data: {n_validation_data}")
 rand_perm = torch.randperm(total_data)
@@ -206,6 +217,7 @@ data = TensorDict(
     batch_size=(1, total_data),
     device=DEVICE,
 )
+
 trained_critics = {}
 
 standard_offset = 0
@@ -217,10 +229,6 @@ for ix, name in enumerate(critic_names):
 
     critic_class = globals()[name]
     critic = critic_class(**params).to(DEVICE)
-    # critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3, weight_decay=0.01)
-    # lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    #     critic_optimizer, mode="min", factor=0.5, patience=100, threshold=1e-5
-    # )
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-2)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         critic_optimizer, mode="min", factor=0.5, patience=20
@@ -228,44 +236,45 @@ for ix, name in enumerate(critic_names):
 
     # train new critic
     mean_value_loss = 0
-    counter = 0
-
-    generator = create_uniform_generator(  #! check this works
-        data[:1, train_idx],
-        batch_size,
-        max_gradient_steps=max_gradient_steps,
+    train_loader = torch.utils.data.DataLoader(
+        AmpcValueDataset(
+            data[0, train_idx],
+        ),
+        batch_size=batch_size,
+        shuffle=True,
     )
+    test_loader = torch.utils.data.DataLoader(
+        AmpcValueDataset(
+            data[0, test_idx],
+        ),
+        batch_size=batch_size,
+        shuffle=False,
+    )
+    for epoch in tqdm.tqdm(range(max_gradient_steps)):
+        critic.train()
+        train_loss = 0.0
+        for obs_batch, cost_batch, grad_batch in train_loader:
+            if "Latent" in name and epoch == 0:
+                latent_weight, latent_bias = get_latent_matrix(
+                    obs_batch.shape, critic.latent_NN, device=DEVICE
+                )
 
-    for batch in generator:
-        # print offset to check it's working as intended
-        if counter == 0:
-            if ix == 0:
-                standard_offset = batch["cost"].mean()
-            print(f"{name} value offset before mean assigning", critic.value_offset)
-            if params["c_offset"]:
-                with torch.no_grad():
-                    critic.value_offset.copy_(standard_offset)
-                print(f"{name} value offset after mean assigning", critic.value_offset)
-
-        if "Latent" in name:
-            latent_weight, latent_bias = get_latent_matrix(
-                batch["critic_obs"].shape, critic.latent_NN, device=DEVICE
+            # calculate loss and optimize
+            value_loss = critic.loss_fn(
+                obs_batch.squeeze(),
+                cost_batch.squeeze(),
+                batch_grad=grad_batch.squeeze(),
+                W_latent=latent_weight,
+                b_latent=latent_bias,
             )
+            critic_optimizer.zero_grad()
+            value_loss.backward()
+            critic_optimizer.step()
+            train_loss = value_loss.item()
 
-        # calculate loss and optimize
-        value_loss = critic.loss_fn(
-            batch["critic_obs"].squeeze(),
-            batch["cost"].squeeze(),
-            batch_grad=batch["grad"].squeeze(),
-            W_latent=latent_weight,
-            b_latent=latent_bias,
-        )
-        critic_optimizer.zero_grad()
-        value_loss.backward()
-        critic_optimizer.step()
-        lr_scheduler.step(value_loss)  #! scale on validation loss
-        counter += 1
         # pointwise prediction test error
+        critic.eval()
+        test_loss = 0.0
         with torch.no_grad():
             actual_error = (
                 (
@@ -273,9 +282,23 @@ for ix, name in enumerate(critic_names):
                     - critic.evaluate(data["critic_obs"][0, test_idx])
                 ).pow(2)
             ).to("cpu")
+            for obs_batch, cost_batch, grad_batch in test_loader:
+                value_loss = critic.loss_fn(
+                    obs_batch.squeeze(),
+                    cost_batch.squeeze(),
+                    batch_grad=grad_batch.squeeze(),
+                    W_latent=latent_weight,
+                    b_latent=latent_bias,
+                )
+                test_loss += value_loss.item()
+        # scale by dataset size
+        train_loss /= len(train_loader)
+        test_loss /= len(test_loader)
+        # update graphing trakcers
         test_error[name].append(actual_error.detach().mean().numpy())
         lr_history[name].append(lr_scheduler.get_last_lr()[0])
-        loss_history[name].append(value_loss.cpu().detach().mean().numpy())
+        loss_history[name].append(train_loss)
+        lr_scheduler.step(test_loss)
 
     print(f"{name} average error: ", actual_error.mean().item())
     print(f"{name} max error: ", actual_error.max().item())
@@ -345,36 +368,6 @@ for eval_ix in [150, 210, 221, 238, 329, 431, 84, 103, 165, 298, 374, 402]:
             dmax=0.2,
         )
     elif n_dim == 4:
-        # for name, val in graphing_data["A"].items():
-        #     print(
-        #         f"{name}: min A",
-        #         val.min(),
-        #         "max A",
-        #         val.max(),
-        #         "mean A",
-        #         val.mean(),
-        #     )
-        # for name, val in graphing_data["W_latent"].items():
-        #     if val is not None:
-        #         print(
-        #             f"{name}: min W_latent",
-        #             val.min(),
-        #             "max W_latent",
-        #             val.max(),
-        #             "mean W_latent",
-        #             val.mean(),
-        #         )
-        # for name, val in graphing_data["b_latent"].items():
-        #     if val is not None:
-        #         print(
-        #             f"{name}: min b_latent",
-        #             val.min(),
-        #             "max b_latent",
-        #             val.max(),
-        #             "mean b_latent",
-        #             val.mean(),
-        #         )
-
         plot_critic_3d_interactive(
             x0_plot[:, :2],
             cost_plot,
