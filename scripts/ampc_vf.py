@@ -83,14 +83,6 @@ with open(
     # data["gradients"] = data["cost_gradient"]
     # data.pop("cost_gradient")
 
-n_dim = data["x0"][0].shape[-1]
-if n_dim == 4:
-    x0_plot = np.vstack([x[0] for x in data["x0"] if abs(x[0, 3]) <= 0.2])
-    cost_plot = np.vstack(
-        [c[0] for x, c in zip(data["x0"], data["cost"]) if abs(x[0, 3]) <= 0.2]
-    )
-    # dVdx_plot = [dv[0, :] for x, dv in zip(X, dVdx) if abs(x[0, 3]) <= 0.2]
-
 x0 = (
     np.array(data["x0"])
     if not isinstance(data["x0"], list)
@@ -109,6 +101,14 @@ grad = (
     else np.vstack([g[: int(early_stopping * g.shape[0])] for g in data["gradients"]])
 )
 
+n_dim = data["x0"][0].shape[-1]
+if n_dim == 4:
+    x0_plot = np.vstack([x[0] for x in data["x0"] if abs(x[0, 3]) <= 0.2])
+    cost_plot = np.vstack(
+        [c[0] for x, c in zip(data["x0"], data["cost"]) if abs(x[0, 3]) <= 0.2]
+    )
+    # dVdx_plot = [dv[0, :] for x, dv in zip(X, dVdx) if abs(x[0, 3]) <= 0.2]
+
 # plot_grad_histogram(grad, "Gradient Histogram - Raw Data")
 
 print(
@@ -122,6 +122,12 @@ mask[top_indices] = False
 x0 = x0[mask]
 cost = cost[mask]
 grad = grad[mask]
+# repeat for plotting points
+top_indices_plot = (cost_plot > 20).squeeze()
+mask_plot = np.ones(len(cost_plot), dtype=bool)
+mask_plot[top_indices_plot] = False
+x0_plot = x0_plot[mask_plot]
+cost_plot = cost_plot[mask_plot]
 
 # hack to see data dist
 # plt.hist(cost, bins=100)
@@ -196,7 +202,11 @@ graphing_data = {
 }
 test_error = {name: [] for name in critic_names}
 lr_history = {name: [] for name in critic_names}
-loss_history = {name: [] for name in critic_names}
+loss_history = {
+    name: []
+    for name in [f"{critic}_train_loss" for critic in critic_names]
+    + [f"{critic}_test_loss" for critic in critic_names]
+}
 
 # set up training
 max_gradient_steps = 250  # 500
@@ -270,7 +280,7 @@ for ix, name in enumerate(critic_names):
             critic_optimizer.zero_grad()
             value_loss.backward()
             critic_optimizer.step()
-            train_loss = value_loss.item()
+            train_loss += value_loss.item()
 
         # pointwise prediction test error
         critic.eval()
@@ -297,7 +307,8 @@ for ix, name in enumerate(critic_names):
         # update graphing trakcers
         test_error[name].append(actual_error.detach().mean().numpy())
         lr_history[name].append(lr_scheduler.get_last_lr()[0])
-        loss_history[name].append(train_loss)
+        loss_history[f"{name}_train_loss"].append(train_loss)
+        loss_history[f"{name}_test_loss"].append(test_loss)
         lr_scheduler.step(test_loss)
 
     print(f"{name} average error: ", actual_error.mean().item())
