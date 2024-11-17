@@ -38,9 +38,32 @@ def quadratify_xAx(x, A):
         return res.squeeze(0)
     return res.squeeze()
 
-def gradient_xAx(x,A):
-    res = 2*torch.einsum("...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A).squeeze(1)
+
+def gradient_xAx(x, A):
+    res = 2 * torch.einsum(
+        "...ij, ...jk -> ...ik", x.unsqueeze(-1).transpose(-2, -1), A
+    ).squeeze(1)
     return res
+
+
+def gradient_zAz(x, A, W_latent, b_latent):
+    batch_size, feature_dim = x.shape
+    z = torch.einsum(
+        "...ij, ...jk -> ...ik",
+        x.unsqueeze(1),
+        W_latent.T.unsqueeze(0).repeat(batch_size, 1, 1),
+    ) + b_latent.unsqueeze(0).repeat(batch_size, 1, 1)
+    Pz = torch.einsum("...ij, ...jk -> ...ik", A, z.transpose(-2, -1))
+    res = (
+        2
+        * torch.einsum(
+            "...ij, ...jk -> ...ik",
+            Pz.transpose(-2, -1),
+            W_latent.repeat(batch_size, 1, 1),
+        ).squeeze()
+    )
+    return res
+
 
 def init_weights(m):
     if isinstance(m, nn.Linear):

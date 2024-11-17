@@ -14,6 +14,7 @@ from learning.modules.lqrc.QRCritics import (
     compose_cholesky,
     quadratify_xAx,
     gradient_xAx,
+    gradient_zAz,
 )
 
 import torch
@@ -32,6 +33,27 @@ import torch.nn.functional as F
 #     torch.backends.cudnn.benchmark = False
 #     random.seed(42)
 #     np.random.seed(42)
+
+
+def get_latent_matrix(input_size, model, device):
+    dummy_input = torch.randn(*input_size, device=device)
+    # Use torch.jit.trace to create a traced version of the model
+    traced_model = torch.jit.trace(model, dummy_input)
+    final_weight = traced_model.get_parameter("0.weight")
+    for i in range(1, len(list(model.children()))):
+        final_weight = traced_model.get_parameter(f"{i}.weight") @ final_weight
+
+    try:
+        final_bias = traced_model.get_parameter("0.bias")
+        for i in range(1, len(list(model.children()))):
+            final_bias = traced_model.get_parameter(
+                f"{i}.weight"
+            ) @ final_bias + traced_model.get_parameter(f"{i}.bias")
+        return final_weight, final_bias
+    except:
+        print("No bias found.")
+
+    return final_weight
 
 
 class AmpcValueDataset(torch.utils.data.Dataset):
@@ -150,20 +172,48 @@ class PDCholesky(torch.nn.Module):
         return value, A, x_off
 
 
-class PDCholeskyLatent(PDCholesky):
+class PDCholeskyLatent(torch.nn.Module):
     def __init__(self, input_dim, latent_dim):
-        super(PDCholesky, self).__init__(input_dim)
+        super(PDCholeskyLatent, self).__init__()
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        num_lower_diag_elements = sum(range(latent_dim + 1))
+        self.lower_diag_NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, num_lower_diag_elements),
+        )
+
+        self.cone_center_offset_NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, input_dim),
+        )
         self.latent_NN = torch.nn.Sequential(
             torch.nn.Linear(input_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, input_dim),
         )
 
     def forward(self, x):
         x_off = self.cone_center_offset_NN(x)
         z = self.latent_NN(x - x_off)
         output = self.lower_diag_NN(x)
-        L = create_PD_lower_diagonal(output, self.input_dim, "cpu")
+        L = create_PD_lower_diagonal(output, self.latent_dim, "cpu")
         A = compose_cholesky(L)
         value = quadratify_xAx(z, A)
         return value, A, x_off
@@ -171,7 +221,7 @@ class PDCholeskyLatent(PDCholesky):
 
 class DenseSpectralLatent(torch.nn.Module):
     def __init__(self, input_dim, latent_dim, relative_dim):
-        super(DenseSpectralLatent, self).__init__(input_dim)
+        super(DenseSpectralLatent, self).__init__()
         self.input_dim = input_dim
         self.relative_dim = relative_dim
         self.latent_dim = latent_dim
@@ -193,8 +243,6 @@ class DenseSpectralLatent(torch.nn.Module):
         )
         self.latent_NN = torch.nn.Sequential(
             torch.nn.Linear(input_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, input_dim),
         )
         self.cone_center_offset_NN = torch.nn.Sequential(
             torch.nn.Linear(input_dim, 64),
@@ -310,7 +358,16 @@ class LocalShapeLoss(torch.nn.Module):
         self.x_setpoint = torch.zeros(4)
         self.x_threshold = 0.2
 
-    def forward(self, x_batch, psd_matrices, x_offsets, v_batch, dV_batch):
+    def forward(
+        self,
+        x_batch,
+        psd_matrices,
+        x_offsets,
+        v_batch,
+        dV_batch,
+        W_latent=None,
+        b_latent=None,
+    ):
         batch_size, feature_dim = x_batch.size()
 
         x_batch_exp = x_batch.unsqueeze(1).expand(
@@ -327,14 +384,30 @@ class LocalShapeLoss(torch.nn.Module):
             torch.norm(diff_i, dim=-1), self.dmax
         )  # Shape: [batch_size, batch_size]
 
-        diff_j = (
-            x_batch_exp.transpose(0, 1) - x_offsets_exp
-        )  # Shape: [batch_size, batch_size, feature_dim]
+        if W_latent is not None and b_latent is not None:
+            x_bar = (
+                x_batch_exp.transpose(0, 1) - x_offsets_exp
+            )  # Shape: [batch_size, batch_size, feature_dim]
+            pred_values_grad = torch.vmap(gradient_zAz)(
+                x_bar,
+                psd_matrices,
+                W_latent.unsqueeze(0).expand(batch_size, -1, -1),
+                b_latent.unsqueeze(0).expand(batch_size, -1),
+            )  # Shape: [batch_size, batch_size]
+            diff_j = torch.einsum(
+                "...ij, ...jk -> ...ik",
+                x_bar,
+                W_latent.T.unsqueeze(0).expand(batch_size, -1, -1),
+            ) + b_latent.unsqueeze(0).expand(batch_size, -1)
+        else:
+            diff_j = (
+                x_batch_exp.transpose(0, 1) - x_offsets_exp
+            )  # Shape: [batch_size, batch_size, feature_dim]
+            pred_values_grad = torch.vmap(gradient_xAx)(
+                diff_j, psd_matrices
+            )  # Shape: [batch_size, batch_size]
 
         pred_values = torch.vmap(quadratify_xAx)(
-            diff_j, psd_matrices
-        )  # Shape: [batch_size, batch_size]
-        pred_values_grad = torch.vmap(gradient_xAx)(
             diff_j, psd_matrices
         )  # Shape: [batch_size, batch_size]
 
@@ -508,6 +581,9 @@ def train(model, filename, plt_show=False):
         dVdx_scaled_plot,
     ) = process_data(filename, plt_show=plt_show)
     model_name = type(model).__name__
+    latent_model = True if "Latent" in model_name else False
+    latent_weight = None
+    latent_bias = None
     loss_history = {
         name: [] for name in [f"{model_name}_test_loss", f"{model_name}_train_loss"]
     }
@@ -553,22 +629,31 @@ def train(model, filename, plt_show=False):
 
     epochs = 250
     for epoch in tqdm.tqdm(range(epochs)):
+        # Training
         model.train()
         train_loss = 0.0
         for x_batch, v_batch, dV_batch in train_loader:
             optimizer.zero_grad()
 
-            # if type(model) in (PsdChol, PsdCholLatentLin):
-            #     predictions, _ = model(x_batch)
-            #     loss = criterion(predictions.squeeze(), v_batch)
-            if type(model) is PDCholesky or type(model) is Diagonal:
-                predictions, psd_matrices, x_offset = model(x_batch)
-                if type(criterion) is LocalShapeLoss:
-                    loss = criterion(x_batch, psd_matrices, x_offset, v_batch, dV_batch)
-                else:
-                    loss = criterion(predictions.squeeze(), v_batch) + 10 * criterion(
-                        x_offset.squeeze(), torch.zeros_like(x_offset.squeeze())
+            predictions, psd_matrices, x_offset = model(x_batch)
+            if type(criterion) is LocalShapeLoss:
+                if latent_model:
+                    latent_weight, latent_bias = get_latent_matrix(
+                        x_batch.shape, model.latent_NN, device="cpu"
                     )
+                loss = criterion(
+                    x_batch,
+                    psd_matrices,
+                    x_offset,
+                    v_batch,
+                    dV_batch,
+                    W_latent=latent_weight,
+                    b_latent=latent_bias,
+                )
+            else:  #! assuming this isn't happening rn
+                loss = criterion(predictions.squeeze(), v_batch) + 10 * criterion(
+                    x_offset.squeeze(), torch.zeros_like(x_offset.squeeze())
+                )
 
             loss.backward()
             optimizer.step()
@@ -579,21 +664,25 @@ def train(model, filename, plt_show=False):
         val_loss = 0.0
         with torch.no_grad():
             for x_batch, v_batch, dV_batch in val_loader:
-                # if type(model) in (PsdChol, PsdCholLatentLin):
-                #     predictions, psd_matrices = model(x_batch)
-                #     loss = criterion(predictions.squeeze(), v_batch)
-                if type(model) is PDCholesky or type(model) is Diagonal:
-                    predictions, psd_matrices, x_offsets = model(x_batch)
-                    if type(criterion) is LocalShapeLoss:
-                        loss = criterion(
-                            x_batch, psd_matrices, x_offsets, v_batch, dV_batch
+                predictions, psd_matrices, x_offset = model(x_batch)
+                if type(criterion) is LocalShapeLoss:
+                    if latent_model:
+                        latent_weight, latent_bias = get_latent_matrix(
+                            x_batch.shape, model.latent_NN, device="cpu"
                         )
-                    else:
-                        loss = criterion(
-                            predictions.squeeze(), v_batch
-                        ) + 10 * criterion(
-                            x_offset.squeeze(), torch.zeros_like(x_offset.squeeze())
-                        )
+                    loss = criterion(
+                        x_batch,
+                        psd_matrices,
+                        x_offset,
+                        v_batch,
+                        dV_batch,
+                        W_latent=latent_weight,
+                        b_latent=latent_bias,
+                    )
+                else:  #! assuming this isn't happening rn
+                    loss = criterion(predictions.squeeze(), v_batch) + 10 * criterion(
+                        x_offset.squeeze(), torch.zeros_like(x_offset.squeeze())
+                    )
 
                 val_loss += loss.item()
 
@@ -696,15 +785,24 @@ if __name__ == "__main__":
     model_names = [
         "PDCholesky",
         "Diagonal",
-        "OuterProduct",
         "PDCholeskyLatent",
         "DenseSpectralLatent",
+        "OuterProduct",
     ]
 
     input_dim = 4
+    latent_dim = 8
+    relative_dim = 6
 
-    for model in model_names:
-        model = eval(f"{model}(input_dim=input_dim)")
+    for name in model_names:
+        if name == "PDCholeskyLatent":
+            model = eval(f"{name}(input_dim=input_dim, latent_dim=latent_dim)")
+        elif name == "DenseSpectralLatent":
+            model = eval(
+                f"{name}(input_dim=input_dim, latent_dim=latent_dim, relative_dim=relative_dim)"
+            )
+        else:
+            model = eval(f"{name}(input_dim=input_dim)")
         train(model, filename=filename)
     # for model in model_names:
     #     model = eval(f"{model}(input_dim=input_dim)")
