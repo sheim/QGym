@@ -322,13 +322,13 @@ class OuterProduct(torch.nn.Module):
             torch.nn.Linear(64, input_dim),
         )
 
-        def forward(self, x, return_all=False):
-            z = self.NN(x)
-            A = z.unsqueeze(-1) @ z.unsqueeze(-2)
-            x_offsets = self.offset_NN(x)
-            value = quadratify_xAx(x - x_offsets, A)
+    def forward(self, x, return_all=False):
+        z = self.NN(x)
+        A = z.unsqueeze(-1) @ z.unsqueeze(-2)
+        x_offsets = self.cone_center_offset_NN(x)
+        value = quadratify_xAx(x - x_offsets, A)
 
-            return value, A, x_offsets
+        return value, A, x_offsets
 
 
 def scaling_function(d, dmax):
@@ -795,6 +795,8 @@ if __name__ == "__main__":
     relative_dim = 6
 
     for name in model_names:
+        print("")
+        print("Currently training", name)
         if name == "PDCholeskyLatent":
             model = eval(f"{name}(input_dim=input_dim, latent_dim=latent_dim)")
         elif name == "DenseSpectralLatent":
