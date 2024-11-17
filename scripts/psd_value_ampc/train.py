@@ -7,6 +7,7 @@ from gym import LEGGED_GYM_ROOT_DIR
 from learning.modules.ampc.simple_unicycle.casadi.utils import (
     plot_costs_histogram,
     plot_3d_costs,
+    plot_learning_progress,
 )
 from learning.modules.lqrc.QRCritics import (
     create_PD_lower_diagonal,
@@ -22,15 +23,15 @@ import torch
 # import torch.optim as optim
 import numpy as np
 import random
+import torch.nn.functional as F
 
-
-def set_deterministic():
-    torch.manual_seed(42)
-    torch.cuda.manual_seed_all(42)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    random.seed(42)
-    np.random.seed(42)
+# def set_deterministic():
+#     torch.manual_seed(42)
+#     torch.cuda.manual_seed_all(42)
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
+#     random.seed(42)
+#     np.random.seed(42)
 
 
 class AmpcValueDataset(torch.utils.data.Dataset):
@@ -149,8 +150,137 @@ class PDCholesky(torch.nn.Module):
         return value, A, x_off
 
 
-# cholesky latent
-# spectral latent
+class PDCholeskyLatent(PDCholesky):
+    def __init__(self, input_dim, latent_dim):
+        super(PDCholesky, self).__init__(input_dim)
+        self.latent_NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, latent_dim),
+            torch.nn.Linear(latent_dim, latent_dim),
+            torch.nn.Linear(latent_dim, input_dim),
+        )
+
+    def forward(self, x):
+        x_off = self.cone_center_offset_NN(x)
+        z = self.latent_NN(x - x_off)
+        output = self.lower_diag_NN(x)
+        L = create_PD_lower_diagonal(output, self.input_dim, "cpu")
+        A = compose_cholesky(L)
+        value = quadratify_xAx(z, A)
+        return value, A, x_off
+
+
+class DenseSpectralLatent(torch.nn.Module):
+    def __init__(self, input_dim, latent_dim, relative_dim):
+        super(DenseSpectralLatent, self).__init__(input_dim)
+        self.input_dim = input_dim
+        self.relative_dim = relative_dim
+        self.latent_dim = latent_dim
+        n_zeros = sum(range(relative_dim))
+        n_outputs = relative_dim + relative_dim * latent_dim - n_zeros
+        self.rel_fill = n_zeros
+        self.spectral_NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, n_outputs),
+        )
+        self.latent_NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, latent_dim),
+            torch.nn.Linear(latent_dim, latent_dim),
+            torch.nn.Linear(latent_dim, input_dim),
+        )
+        self.cone_center_offset_NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, input_dim),
+        )
+
+    def forward(self, x, return_all=False):
+        x_offsets = self.cone_center_offset_NN(x)
+        z = self.latent_NN(x - x_offsets)
+        y = self.spectral_NN(x)
+        A_diag = torch.diag_embed(F.softplus(y[..., : self.relative_dim]))
+        tril_indices = torch.tril_indices(self.relative_dim, self.latent_dim)
+        L = torch.zeros(
+            (*x.shape[:-1], self.relative_dim, self.latent_dim), device="cpu"
+        )
+        L[..., tril_indices[0], tril_indices[1]] = y[
+            ..., self.relative_dim : self.relative_dim + tril_indices.shape[1]
+        ]
+        L[..., :, self.relative_dim :] = y[
+            ..., self.relative_dim + tril_indices.shape[1] :
+        ].view(L[..., :, self.relative_dim :].shape)
+
+        # Compute (L^T A_diag) L
+        A = torch.einsum(
+            "...ij,...jk->...ik",
+            torch.einsum("...ik,...kj->...ij", L.transpose(-1, -2), A_diag),
+            L,
+        )
+        # assert (torch.linalg.eigvals(A).real >= -1e-6).all()
+        # ! This fails, but so far with just -e-10, so really really small...
+        value = quadratify_xAx(z, A)
+
+        return value, A, x_offsets
+
+
+class OuterProduct(torch.nn.Module):
+    def __init__(
+        self,
+        input_dim,
+    ):
+        super(OuterProduct, self).__init__()
+        self.input_dim = input_dim
+        self.NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, input_dim),
+        )
+
+        self.cone_center_offset_NN = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, input_dim),
+        )
+
+        def forward(self, x, return_all=False):
+            z = self.NN(x)
+            A = z.unsqueeze(-1) @ z.unsqueeze(-2)
+            x_offsets = self.offset_NN(x)
+            value = quadratify_xAx(x - x_offsets, A)
+
+            return value, A, x_offsets
 
 
 def scaling_function(d, dmax):
@@ -172,7 +302,6 @@ class LocalShapeLoss(torch.nn.Module):
     ):
         super(LocalShapeLoss, self).__init__()
         self.dmax = dmax
-        # self.l1_loss = torch.nn.MSELoss(reduction='none')
         self.V_loss = V_loss
         self.dV_loss = dV_loss
         self.dV_scaling = dV_scaling
@@ -378,6 +507,10 @@ def train(model, filename, plt_show=False):
         V_scaled_plot,
         dVdx_scaled_plot,
     ) = process_data(filename, plt_show=plt_show)
+    model_name = type(model).__name__
+    loss_history = {
+        name: [] for name in [f"{model_name}_test_loss", f"{model_name}_train_loss"]
+    }
 
     # Prepare data for training and validation
     train_ratio = 0.8
@@ -418,7 +551,7 @@ def train(model, filename, plt_show=False):
         optimizer, mode="min", factor=0.5, patience=20, verbose=True
     )
 
-    epochs = 2  # 250
+    epochs = 250
     for epoch in tqdm.tqdm(range(epochs)):
         model.train()
         train_loss = 0.0
@@ -449,7 +582,7 @@ def train(model, filename, plt_show=False):
                 # if type(model) in (PsdChol, PsdCholLatentLin):
                 #     predictions, psd_matrices = model(x_batch)
                 #     loss = criterion(predictions.squeeze(), v_batch)
-                if type(model) is PDCholesky:
+                if type(model) is PDCholesky or type(model) is Diagonal:
                     predictions, psd_matrices, x_offsets = model(x_batch)
                     if type(criterion) is LocalShapeLoss:
                         loss = criterion(
@@ -466,6 +599,8 @@ def train(model, filename, plt_show=False):
 
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
+        loss_history[f"{model_name}_train_loss"].append(train_loss)
+        loss_history[f"{model_name}_test_loss"].append(val_loss)
         scheduler.step(val_loss)
 
         current_lr = optimizer.param_groups[0]["lr"]
@@ -481,6 +616,12 @@ def train(model, filename, plt_show=False):
         f"{LEGGED_GYM_ROOT_DIR}/models/{filename}_{type(model).__name__}.pkl", "wb"
     ) as f:
         pickle.dump({"V_max": V_max, "V_min": V_min, "X_max": X_max, "X_min": X_min}, f)
+
+    plot_learning_progress(
+        loss_history,
+        f"{model_name} Loss History",
+        fn=f"{LEGGED_GYM_ROOT_DIR}/plots/loss_history_{model_name}",
+    )
 
     # model.eval()
     # with torch.no_grad():
@@ -552,16 +693,12 @@ if __name__ == "__main__":
     #     "train": train
     # })
     filename = "4d_data_9261"
-    # model = PDCholesky(input_dim=len(X_min))
-    # model = Diagonal(input_dim=len(X_min))
     model_names = [
-        "Diagonal",
-        # "OuterProduct",
-        # # "OuterProductLatent",
         "PDCholesky",
-        # "CholeskyInput",
-        # "CholeskyLatent",
-        # "DenseSpectralLatent",
+        "Diagonal",
+        "OuterProduct",
+        "PDCholeskyLatent",
+        "DenseSpectralLatent",
     ]
 
     input_dim = 4
