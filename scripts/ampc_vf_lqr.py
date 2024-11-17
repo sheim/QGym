@@ -189,9 +189,10 @@ if __name__ == "__main__":
         [-0.5, -0.5, 0, 0],
     ]
     model_names = [
-        "Diagonal",
-        "OuterProduct",
-        "CholeskyInput",
+        # "Diagonal",
+        # "OuterProduct",
+        # "CholeskyInput",
+        "PDCholeskyInput"
         # "CholeskyLatent",
         # "DenseSpectralLatent", # ! TODO: deal with latent denorm
     ]

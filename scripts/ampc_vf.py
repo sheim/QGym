@@ -10,9 +10,10 @@ import matplotlib.pyplot as plt
 
 from learning.modules.critic import Critic  # noqa F401
 from learning.modules.lqrc import *  # noqa F401
-from utils import (
-    DEVICE,
-)
+
+# from utils import (
+#     DEVICE,
+# )
 from critic_params_ampc import critic_params
 from tensordict import TensorDict
 
@@ -24,6 +25,21 @@ from learning.modules.lqrc.plotting import (
 )
 
 from learning.modules.lqrc.utils import get_latent_matrix
+import random
+
+DEVICE = "cpu"
+
+
+def set_deterministic():
+    torch.manual_seed(42)
+    torch.cuda.manual_seed_all(42)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    random.seed(42)
+    np.random.seed(42)
+
+
+set_deterministic()
 
 
 class AmpcValueDataset(torch.utils.data.Dataset):
@@ -48,8 +64,8 @@ critic_names = [
     # "Diagonal",
     # "OuterProduct",
     # # "OuterProductLatent",
-    # # "PDCholeskyInput",
-    "CholeskyInput",
+    "PDCholeskyInput",
+    # "CholeskyInput",
     # "CholeskyLatent",
     # "DenseSpectralLatent",
 ]
@@ -208,24 +224,39 @@ loss_history = {
     + [f"{critic}_test_loss" for critic in critic_names]
 }
 
+
 # set up training
 max_gradient_steps = 250  # 500
 batch_size = 1024
 n_training_data = int(0.8 * total_data)
 n_validation_data = total_data - n_training_data
 print(f"training data: {n_training_data}, validation data: {n_validation_data}")
-rand_perm = torch.randperm(total_data)
-train_idx = rand_perm[0:n_training_data]
-test_idx = rand_perm[n_training_data:]
+# rand_perm = torch.randperm(total_data)
+# train_idx = rand_perm[0:n_training_data]
+# test_idx = rand_perm[n_training_data:]
 
-data = TensorDict(
-    {
-        "critic_obs": x0.unsqueeze(dim=0),
-        "cost": cost.unsqueeze(dim=0),
-        "grad": grad.unsqueeze(dim=0),
-    },
-    batch_size=(1, total_data),
-    device=DEVICE,
+# data = TensorDict(
+#     {
+#         "critic_obs": x0.unsqueeze(dim=0),
+#         "cost": cost.unsqueeze(dim=0),
+#         "grad": grad.unsqueeze(dim=0),
+#     },
+#     batch_size=(1, total_data),
+#     device=DEVICE,
+# )
+
+train_data, val_data = torch.utils.data.random_split(
+    list(zip(x0, cost, grad)), [n_training_data, n_validation_data]
+)
+train_loader = torch.utils.data.DataLoader(
+    train_data,
+    batch_size=batch_size,
+    shuffle=True,
+)
+test_loader = torch.utils.data.DataLoader(
+    val_data,
+    batch_size=batch_size,
+    shuffle=False,
 )
 
 trained_critics = {}
@@ -245,25 +276,11 @@ for ix, name in enumerate(critic_names):
     )
 
     # train new critic
-    mean_value_loss = 0
-    train_loader = torch.utils.data.DataLoader(
-        AmpcValueDataset(
-            data[0, train_idx],
-        ),
-        batch_size=batch_size,
-        shuffle=True,
-    )
-    test_loader = torch.utils.data.DataLoader(
-        AmpcValueDataset(
-            data[0, test_idx],
-        ),
-        batch_size=batch_size,
-        shuffle=False,
-    )
     for epoch in tqdm.tqdm(range(max_gradient_steps)):
         critic.train()
         train_loss = 0.0
         for obs_batch, cost_batch, grad_batch in train_loader:
+            critic_optimizer.zero_grad()
             if "Latent" in name and epoch == 0:
                 latent_weight, latent_bias = get_latent_matrix(
                     obs_batch.shape, critic.latent_NN, device=DEVICE
@@ -277,7 +294,6 @@ for ix, name in enumerate(critic_names):
                 W_latent=latent_weight,
                 b_latent=latent_bias,
             )
-            critic_optimizer.zero_grad()
             value_loss.backward()
             critic_optimizer.step()
             train_loss += value_loss.item()
@@ -286,12 +302,12 @@ for ix, name in enumerate(critic_names):
         critic.eval()
         test_loss = 0.0
         with torch.no_grad():
-            actual_error = (
-                (
-                    data["cost"][0, test_idx].squeeze()
-                    - critic.evaluate(data["critic_obs"][0, test_idx])
-                ).pow(2)
-            ).to("cpu")
+            # actual_error = (
+            #     (
+            #         data["cost"][0, test_idx].squeeze()
+            #         - critic.evaluate(data["critic_obs"][0, test_idx])
+            #     ).pow(2)
+            # ).to("cpu")
             for obs_batch, cost_batch, grad_batch in test_loader:
                 value_loss = critic.loss_fn(
                     obs_batch.squeeze(),
@@ -304,15 +320,19 @@ for ix, name in enumerate(critic_names):
         # scale by dataset size
         train_loss /= len(train_loader)
         test_loss /= len(test_loader)
+        current_lr = critic_optimizer.param_groups[0]["lr"]
+        print(
+            f"Epoch {epoch+1}/{max_gradient_steps}, Train Loss: {train_loss:.4f}, Val Loss: {test_loss:.4f}, LR: {current_lr:.6f}"
+        )
         # update graphing trakcers
-        test_error[name].append(actual_error.detach().mean().numpy())
+        # test_error[name].append(actual_error.detach().mean().numpy())
         lr_history[name].append(lr_scheduler.get_last_lr()[0])
         loss_history[f"{name}_train_loss"].append(train_loss)
         loss_history[f"{name}_test_loss"].append(test_loss)
         lr_scheduler.step(test_loss)
 
-    print(f"{name} average error: ", actual_error.mean().item())
-    print(f"{name} max error: ", actual_error.max().item())
+    # print(f"{name} average error: ", actual_error.mean().item())
+    # print(f"{name} max error: ", actual_error.max().item())
     trained_critics[name] = critic
     torch.save(critic.state_dict(), f"{model_path}/{type(critic).__name__}.pth")
 
@@ -323,12 +343,12 @@ if SAVE_LOCALLY:
     )
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    plot_learning_progress(
-        test_error,
-        "Pointwise Error on Test Set \n (Comparison of Normed Vals Used in Supervised Training)",
-        fn=f"{save_path}/test_error",
-        log_scale=False,
-    )
+    # plot_learning_progress(
+    #     test_error,
+    #     "Pointwise Error on Test Set \n (Comparison of Normed Vals Used in Supervised Training)",
+    #     fn=f"{save_path}/test_error",
+    #     log_scale=False,
+    # )
     plot_variable_lr(lr_history, f"{save_path}/lr_history")
     plot_learning_progress(
         loss_history,
@@ -339,7 +359,7 @@ if SAVE_LOCALLY:
         log_scale=False,
     )
 
-for eval_ix in [150, 210, 221, 238, 329, 431, 84, 103, 165, 298, 374, 402]:
+for eval_ix in [150, 210, 221, 238, 329, 84, 103, 165, 298]:
     for name in critic_names:
         critic = trained_critics[name]
         with torch.no_grad():
@@ -369,6 +389,7 @@ for eval_ix in [150, 210, 221, 238, 329, 431, 84, 103, 165, 298, 374, 402]:
             display_names={
                 "Diagonal": "Diagonal",
                 "CholeskyInput": "Cholesky",
+                "PDCholeskyInput": "PD Cholesky",
                 "OuterProduct": "Outer Product",
                 "CholeskyLatent": "Cholesky Latent",
                 "DenseSpectralLatent": "Spectral Latent",
@@ -390,6 +411,7 @@ for eval_ix in [150, 210, 221, 238, 329, 431, 84, 103, 165, 298, 374, 402]:
             display_names={
                 "Diagonal": "Diagonal",
                 "CholeskyInput": "Cholesky",
+                "PDCholeskyInput": "PD Cholesky",
                 "OuterProduct": "Outer Product",
                 "CholeskyLatent": "Cholesky Latent",
                 "DenseSpectralLatent": "Spectral Latent",

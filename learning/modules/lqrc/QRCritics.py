@@ -80,6 +80,9 @@ def shape_loss(
     target,
     batch_grad,
     x_setpoint,
+    cost_loss,
+    grad_loss,
+    offset_loss,
     dV_scaling=0.2,
     x_threshold=0.2,
     dmax=0.2,
@@ -128,17 +131,23 @@ def shape_loss(
         diff_j, A
     )  # Shape: [batch_size, batch_size]
 
-    V_losses = loss_fn(  #! check that functional is same as torch.nn.L1Loss, may need two sep obj, make sure no reduction!
+    # V_losses = loss_fn(
+    #     pred_values,
+    #     target.unsqueeze(0).expand(batch_size, batch_size),
+    #     reduction="none",
+    # )  # Shape: [batch_size, batch_size]
+    # dV_losses = loss_fn(
+    #     pred_values_grad,
+    #     batch_grad.unsqueeze(0).expand(batch_size, batch_size, feature_dim),
+    #     reduction="none",
+    # ).mean(dim=-1)  # Shape: [batch_size, batch_size, feature_dim]
+    V_losses = cost_loss(
         pred_values,
-        target.unsqueeze(0).expand(
-            batch_size, batch_size
-        ),  # ! check if dataloaer output is the same with henrik's
-        reduction="none",
+        target.unsqueeze(0).expand(batch_size, batch_size),
     )  # Shape: [batch_size, batch_size]
-    dV_losses = loss_fn(
+    dV_losses = cost_loss(
         pred_values_grad,
         batch_grad.unsqueeze(0).expand(batch_size, batch_size, feature_dim),
-        reduction="none",
     ).mean(dim=-1)  # Shape: [batch_size, batch_size, feature_dim]
     scaled_losses = scaling * (
         V_losses + dV_scaling * dV_losses
@@ -152,10 +161,9 @@ def shape_loss(
     )  # Shape: [batch_size]
 
     # extra loss penalizing x0offset when close to origin:
-    offset_losses = loss_fn(
+    offset_losses = offset_loss(
         x_offsets,
         x_setpoint,
-        reduction="none",
     )
     # Compute the distance between x_batch and x_setpoint
     distances = torch.norm(
@@ -261,7 +269,7 @@ class Diagonal(nn.Module):
 
         self.NN = create_MLP(num_obs, latent_dim, hidden_dims, activation, dropouts)
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "lrelu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -355,7 +363,7 @@ class OuterProduct(nn.Module):
 
         self.NN = create_MLP(num_obs, latent_dim, hidden_dims, activation, dropouts)
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "lrelu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -552,6 +560,9 @@ class CholeskyInput(nn.Module):
             else lambda x: torch.zeros_like(x)
         )
         # self.lower_diag_NN.apply(init_weights)
+        self.cost_loss = torch.nn.L1Loss(reduction="none")
+        self.grad_loss = torch.nn.L1Loss(reduction="none")
+        self.offset_loss = torch.nn.L1Loss(reduction="none")
 
     def forward(self, x, return_all=False):
         output = self.lower_diag_NN(x)
@@ -594,6 +605,17 @@ class CholeskyInput(nn.Module):
         elif self.loss_type == "shape":
             if "batch_grad" not in kwargs.keys():
                 raise ValueError("Shape loss called with missing kwargs.")
+            # test_x = torch.tensor(
+            #     [[0.01, 0.02, 0.03, 0.04], [0.05, 0.06, 0.07, 0.08]],
+            #     dtype=torch.float32,
+            # )
+            # test_o = torch.tensor([[3, 4, 5, 6], [7, 8, 9, 10]], dtype=torch.float32)
+            # test_c = torch.tensor([[1], [2]], dtype=torch.float32).squeeze()
+            # test_g = torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.float32)
+            # test_A = 3.0 * torch.eye(4).unsqueeze(0).repeat(2, 1, 1)
+            # shape_loss(
+            #     fn, test_x, test_o, test_A, test_c, test_g, torch.zeros_like(test_o)
+            # )
             return shape_loss(
                 fn,
                 obs,
@@ -601,7 +623,10 @@ class CholeskyInput(nn.Module):
                 output["A"],
                 target,
                 kwargs["batch_grad"],
-                torch.zeros_like(output["x_offsets"]),
+                torch.zeros_like(output["x_offsets"][0]),
+                self.cost_loss,
+                self.grad_loss,
+                self.offset_loss,
             )
         else:
             raise ValueError("Loss type unspecified")
@@ -814,7 +839,7 @@ class SpectralLatent(nn.Module):
             # bias_in_linear_layers=False,
         )
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "lrelu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
@@ -964,7 +989,7 @@ class DenseSpectralLatent(nn.Module):
             # bias_in_linear_layers=False,
         )
         self.offset_NN = (
-            create_MLP(num_obs, num_obs, offset_hidden_dims, "relu")
+            create_MLP(num_obs, num_obs, offset_hidden_dims, "lrelu")
             if offset_hidden_dims
             else lambda x: torch.zeros_like(x)
         )
