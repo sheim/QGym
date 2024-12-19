@@ -254,6 +254,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         run_name = "Standing"
         experiment_name = "Humanoid"
         save_interval = 50
+
         class evaluation:
             class weights:
                 tracking_ang_vel = 0.5

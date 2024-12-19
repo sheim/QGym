@@ -16,10 +16,12 @@ class MiniCheetahPca(MiniCheetah):
 
     def _init_buffers(self):
         super()._init_buffers()
-        self.pca_scalings = torch.zeros(self.num_envs, self.cfg.pca.num_pcs, device=self.device)
+        self.pca_scalings = torch.zeros(
+            self.num_envs, self.cfg.pca.num_pcs, device=self.device
+        )
         self.eigenvectors = torch.zeros(
-                self.cfg.pca.num_pcs, self.dof_pos_target.shape[1], device=self.device
-            )
+            self.cfg.pca.num_pcs, self.dof_pos_target.shape[1], device=self.device
+        )
         self.oscillators = torch.zeros(self.num_envs, 4, device=self.device)
         self.oscillator_obs = torch.zeros(self.num_envs, 8, device=self.device)
 
@@ -36,7 +38,7 @@ class MiniCheetahPca(MiniCheetah):
         )
         self.pca_scalings_history = torch.zeros(
             self.num_envs,
-            self.cfg.pca.num_pcs*3,
+            self.cfg.pca.num_pcs * 3,
             dtype=torch.float,
             device=self.device,
         )
@@ -111,6 +113,7 @@ class MiniCheetahPca(MiniCheetah):
         if not self.cfg.osc.randomize_osc_params:
             self.compute_osc_slope()
         self.compute_pca()
+
     def compute_osc_slope(self):
         cmd_x = torch.abs(self.commands[:, 0:1]) - self.cfg.osc.stop_threshold
         stop = cmd_x < 0
@@ -272,66 +275,108 @@ class MiniCheetahPca(MiniCheetah):
 
     def compute_pca(self):
         if not self.cfg.pca.torques:
-            if self.cfg.pca.mode =="symmetries":
+            if self.cfg.pca.mode == "symmetries":
                 for i in range(len(self.cfg.pca.symmetry_eigvec_ref_index)):
-                    one_eigvec =  self.cfg.pca.eigenvectors[self.cfg.pca.symmetry_eigvec_ref_index[i]:self.cfg.pca.symmetry_eigvec_ref_index[i]+1,0:3]
+                    one_eigvec = self.cfg.pca.eigenvectors[
+                        self.cfg.pca.symmetry_eigvec_ref_index[
+                            i
+                        ] : self.cfg.pca.symmetry_eigvec_ref_index[i] + 1,
+                        0:3,
+                    ]
 
                     if self.cfg.pca.symmetry_eigvec_ref_index[i] == 5:
-                        self.eigenvectors[4*i,:] = torch.cat((one_eigvec,-one_eigvec,-one_eigvec, one_eigvec),1)
-                        #self.eigenvectors[1+4*i,:] = torch.cat((one_eigvec,one_eigvec,-one_eigvec,-one_eigvec),1)
+                        self.eigenvectors[4 * i, :] = torch.cat(
+                            (one_eigvec, -one_eigvec, -one_eigvec, one_eigvec), 1
+                        )
+                        # self.eigenvectors[1+4*i,:] = torch.cat((one_eigvec,one_eigvec,-one_eigvec,-one_eigvec),1)
                     else:
-                        self.eigenvectors[4*i,:]=torch.cat((one_eigvec,one_eigvec,one_eigvec,one_eigvec),1)
-                        self.eigenvectors[1+4*i,:] = torch.cat((one_eigvec,-one_eigvec,-one_eigvec, one_eigvec),1)
-                        self.eigenvectors[2+4*i,:] = torch.cat((one_eigvec,-one_eigvec,one_eigvec,-one_eigvec),1)
-                        self.eigenvectors[3+4*i,:] = torch.cat((one_eigvec,one_eigvec,-one_eigvec,-one_eigvec),1)
+                        self.eigenvectors[4 * i, :] = torch.cat(
+                            (one_eigvec, one_eigvec, one_eigvec, one_eigvec), 1
+                        )
+                        self.eigenvectors[1 + 4 * i, :] = torch.cat(
+                            (one_eigvec, -one_eigvec, -one_eigvec, one_eigvec), 1
+                        )
+                        self.eigenvectors[2 + 4 * i, :] = torch.cat(
+                            (one_eigvec, -one_eigvec, one_eigvec, -one_eigvec), 1
+                        )
+                        self.eigenvectors[3 + 4 * i, :] = torch.cat(
+                            (one_eigvec, one_eigvec, -one_eigvec, -one_eigvec), 1
+                        )
 
                 for i in range(len(self.cfg.pca.haa_flip_indexes)):
-                    self.eigenvectors[:,self.cfg.pca.haa_flip_indexes[i]:
-                                      self.cfg.pca.haa_flip_indexes[i]+1] *= -1
-                #np.save('symmetry_eigvec', self.eigenvectors.cpu().numpy())
-                #print(self.eigenvectors)
+                    self.eigenvectors[
+                        :,
+                        self.cfg.pca.haa_flip_indexes[
+                            i
+                        ] : self.cfg.pca.haa_flip_indexes[i] + 1,
+                    ] *= -1
+                # np.save('symmetry_eigvec', self.eigenvectors.cpu().numpy())
+                # print(self.eigenvectors)
             if self.cfg.pca.mode == "one_leg":
                 # 4th leg, all actuators
                 self.eigenvectors = self.cfg.pca.eigenvectors
-                self.eigenvectors = torch.hstack([self.eigenvectors[0:6,0:3],self.eigenvectors[0:6,0:3],
-                                                  self.eigenvectors[0:6,0:3],self.eigenvectors[0:6,0:3]])
-                #flipping sign/mirroring for opposing leg (excluding haa)
-                self.eigenvectors[:,4:6] *=-1
-                self.eigenvectors[:,7:9] *=-1
+                self.eigenvectors = torch.hstack(
+                    [
+                        self.eigenvectors[0:6, 0:3],
+                        self.eigenvectors[0:6, 0:3],
+                        self.eigenvectors[0:6, 0:3],
+                        self.eigenvectors[0:6, 0:3],
+                    ]
+                )
+                # flipping sign/mirroring for opposing leg (excluding haa)
+                self.eigenvectors[:, 4:6] *= -1
+                self.eigenvectors[:, 7:9] *= -1
 
-                #flipping abad
+                # flipping abad
                 for i in range(len(self.cfg.pca.haa_flip_indexes)):
-                    self.eigenvectors[:,self.cfg.pca.haa_flip_indexes[i]:
-                                      self.cfg.pca.haa_flip_indexes[i]+1] *= -1
+                    self.eigenvectors[
+                        :,
+                        self.cfg.pca.haa_flip_indexes[
+                            i
+                        ] : self.cfg.pca.haa_flip_indexes[i] + 1,
+                    ] *= -1
 
             elif self.cfg.pca.mode == "joint":
                 # 3rd actuator kfe, all legs
                 eigenvectors_og = torch.tensor(
                     [
-                        [0.30653829, -0.76561209, -0.26433388,0,0,0],
-                        [-0.5543308, -0.12128448, 0.65422278,0,0,0],
-                        [-0.40904421, 0.38943236, -0.65652515,0,0,0],
-                        [0.65683672, 0.49746421, 0.26663625,0,0,0],
+                        [0.30653829, -0.76561209, -0.26433388, 0, 0, 0],
+                        [-0.5543308, -0.12128448, 0.65422278, 0, 0, 0],
+                        [-0.40904421, 0.38943236, -0.65652515, 0, 0, 0],
+                        [0.65683672, 0.49746421, 0.26663625, 0, 0, 0],
                     ],
                     device=self.device,
                 ).T
                 for i in range(0, 4):
                     self.eigenvectors[:, i * 3] = eigenvectors_og[:, i]
-                #print(self.eigenvectors.shape)
+                # print(self.eigenvectors.shape)
             elif self.cfg.pca.mode == "all":
                 self.eigenvectors = self.cfg.pca.eigenvectors
             else:
                 Warning("PC MODE NOT RECOGNIZED in compute_torques")
-            
-            #print(self.pca_scalings[:,0])
-            self.dof_pos_target = torch.zeros(self.num_envs, self.dof_pos_target.shape[1], device=self.device)
-            for i in range(0, self.pca_scalings.shape[1]):  # todo sanity check this! unit test or something?
+
+            # print(self.pca_scalings[:,0])
+            self.dof_pos_target = torch.zeros(
+                self.num_envs, self.dof_pos_target.shape[1], device=self.device
+            )
+            for i in range(
+                0, self.pca_scalings.shape[1]
+            ):  # todo sanity check this! unit test or something?
                 self.dof_pos_target += torch.mul(
                     self.eigenvectors[i, :].repeat(self.num_envs, 1),
-                    self.pca_scalings[:, i:i+1],
+                    self.pca_scalings[:, i : i + 1],
                 )
         else:
-            self.dof_pos_target = (self.torques - self.tau_ff-self.d_gains*(self.dof_vel_target - self.dof_vel))/self.p_gains - self.default_dof_pos + self.dof_pos
+            self.dof_pos_target = (
+                (
+                    self.torques
+                    - self.tau_ff
+                    - self.d_gains * (self.dof_vel_target - self.dof_vel)
+                )
+                / self.p_gains
+                - self.default_dof_pos
+                + self.dof_pos
+            )
 
     def perturb_base_velocity(self, velocity_delta, env_ids=None):
         if env_ids is None:
@@ -401,7 +446,8 @@ class MiniCheetahPca(MiniCheetah):
         dt2 = (self.dt * self.cfg.control.decimation) ** 2
         error = (
             torch.square(
-                self.pca_scalings_history[:, :n] - self.pca_scalings_history[:, n : 2 * n]
+                self.pca_scalings_history[:, :n]
+                - self.pca_scalings_history[:, n : 2 * n]
             )
             / dt2
         )
@@ -420,7 +466,6 @@ class MiniCheetahPca(MiniCheetah):
             / dt2
         )
         return -torch.sum(error, dim=1)
-
 
     def _reward_coupled_grf(self):
         """
@@ -586,8 +631,9 @@ class MiniCheetahPca(MiniCheetah):
         similarity *= 1 - self._sqrdexp(angle, torch.pi)
         similarity *= 1 - self._sqrdexp((torch.pi - angle), torch.pi)
         return similarity
+
     def _reward_pca(self):
         """Tracking pca"""
         error = torch.square(self.pca_scalings)
-        error = torch.exp(-error /0.5)
+        error = torch.exp(-error / 0.5)
         return torch.sum(error, dim=1)

@@ -6,6 +6,7 @@ from .utils import export_network
 from .utils import RunningMeanStd
 import numpy as np
 
+
 class Actor(nn.Module):
     def __init__(
         self,
@@ -75,7 +76,7 @@ class Actor(nn.Module):
         return self.distribution.log_prob(actions).sum(dim=-1)
 
     def act_inference(self, observations):
-        #print(observations)
+        # print(observations)
         if self._normalize_obs:
             observations = self.normalize(observations)
         actions_mean = self.NN(observations)

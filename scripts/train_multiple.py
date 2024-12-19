@@ -5,20 +5,22 @@ from gym.utils.logging_and_saving import local_code_save_helper
 from torch.multiprocessing import Process
 from torch.multiprocessing import set_start_method
 
-def setup(size): #i,j):#
+
+def setup(size):  # i,j):#
     args = get_args()
     args.wandb_entity = "biomimetics"
     args.wandb_project = "sweep_ctrlfrequencies"
     args.experiment_name = "sweep_ctrlfrequencies"
     args.ctrl_frequency = size
-    args.run_name = "ref_pca_" + str(size) #+ str([size, size, int(size/2)])#str(size) "all_" + 
+    args.run_name = "ref_pca_" + str(
+        size
+    )  # + str([size, size, int(size/2)])#str(size) "all_" +
     wandb_helper = wandb_singleton.WandbSingleton()
     env_cfg, train_cfg = task_registry.create_cfgs(args)
-    
+
     # train_cfg.policy.actor_hidden_dims = [size, size, int(size/2)]
     # train_cfg.policy.critic_hidden_dims = [size, size, int(size/2)]
     env_cfg.control.ctrl_frequency = size
-
 
     # args.wandb_entity = "biomimetics"
     # args.wandb_project = "sweep_gait3_weights"
@@ -49,15 +51,22 @@ def train(train_cfg, policy_runner):
 
     wandb_helper.close_wandb()
 
-def worker(size) : #i,j): #size
-    train_cfg, policy_runner, env = setup(size) #i,j)#size)
+
+def worker(size):  # i,j): #size
+    train_cfg, policy_runner, env = setup(size)  # i,j)#size)
     train(train_cfg=train_cfg, policy_runner=policy_runner)
 
 
 if __name__ == "__main__":
-    networksizes = [15, 25, 50, 75, 100]#[256, 128, 64, 32, 16]#[60, 55, 50, 45, 40, 35] #[28, 24, 20] #
-    set_start_method('spawn')
-    for i,size in enumerate(networksizes):
+    networksizes = [
+        15,
+        25,
+        50,
+        75,
+        100,
+    ]  # [256, 128, 64, 32, 16]#[60, 55, 50, 45, 40, 35] #[28, 24, 20] #
+    set_start_method("spawn")
+    for i, size in enumerate(networksizes):
         print(i)
         p = Process(target=worker, args=(size,))
         p.start()

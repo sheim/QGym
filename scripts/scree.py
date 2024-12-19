@@ -5,7 +5,7 @@ from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 from sklearn.decomposition import PCA
 
-#full_data = (np.load("pca_scalings_training_myrunner.npz",allow_pickle=True)['pca_scalings'])
+# full_data = (np.load("pca_scalings_training_myrunner.npz",allow_pickle=True)['pca_scalings'])
 full_data = np.load("pca_components_ref_withpcascaling.npy")
 print(full_data)
 
@@ -21,5 +21,3 @@ print(full_data)
 #     plt.xlabel("Component Number", fontsize=20)
 #     plt.ylabel("Variance", fontsize=20)
 #     plt.show()
-
-

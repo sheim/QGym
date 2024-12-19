@@ -3,6 +3,7 @@ from gym.utils import get_args, task_registry, randomize_episode_counters
 from gym.utils.logging_and_saving import wandb_singleton
 from gym.utils.logging_and_saving import local_code_save_helper
 
+
 def setup():
     args = get_args()
     wandb_helper = wandb_singleton.WandbSingleton()

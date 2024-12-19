@@ -2,6 +2,7 @@ import torch
 
 from isaacgym.torch_utils import quat_rotate_inverse
 from gym.envs import LeggedRobot
+from scipy.special import iv
 
 
 class HumanoidRunning(LeggedRobot):
@@ -23,6 +24,7 @@ class HumanoidRunning(LeggedRobot):
                 body_dict.items(), key=lambda body_tuple: body_tuple[1]
             )
         ]
+        print(body_names)
         # * construct a list of id numbers corresponding to end_effectors
         self.end_effector_ids = []
         for end_effector_name in self.cfg.asset.end_effector_names:
@@ -292,3 +294,75 @@ class HumanoidRunning(LeggedRobot):
         error = self.dof_pos[:, 15] - self.default_dof_pos[:, 15]
         reward += self._sqrdexp(error / self.scales["dof_pos"][15])
         return reward / 2.0
+
+    def _reward_contact(self):
+        def f(phase, shift=0.0):
+            a = 10.0
+            return torch.sigmoid(a * torch.sin(phase + shift))
+
+        decimation_steps = self.cfg.control.decimation
+        phase_per_step = self.dt * self.omega
+        adjusted_phase = (self.phase - (decimation_steps - 1) * phase_per_step).fmod(
+            2 * torch.pi
+        )
+
+        right_foot_contact = self.contact_forces[:, 5, 2].gt(0.0)
+        left_foot_contact = self.contact_forces[:, 10, 2].gt(0.0)
+
+        double_contact_penalty = (right_foot_contact & left_foot_contact).float()
+        right_foot_reward = right_foot_contact.float() * f(adjusted_phase[:, 0])
+        left_foot_reward = left_foot_contact.float() * f(
+            adjusted_phase[:, 0], shift=torch.pi
+        )
+
+        return (right_foot_reward + left_foot_reward) - 0.5 * double_contact_penalty
+
+    def expected_indicator(self, phase, shift=0.0, kappa=5.0):
+        temp_phase = torch.linspace(
+            0.0, 2 * torch.pi, self.num_envs, device=self.device
+        )  # Shape: (num_envs,)
+        steps = 100
+        phases = temp_phase[:, None] + torch.linspace(
+            0.0, 2 * torch.pi, steps, device=self.device
+        )  # Shape: (num_envs, 100)
+        phases += phase
+        bessel = iv(0, kappa)
+
+        indicators = torch.exp(kappa * torch.cos(phases + shift)) / (
+            2 * torch.pi * bessel
+        )
+        return torch.mean(indicators, dim=1)  # Shape: (num_envs,)
+
+    def _reward_gait_contact(self):
+        def f(phase, shift=0.0):
+            a = 5.0
+            return torch.sigmoid(a * torch.sin(phase + shift))
+
+        I_left_force = f(self.phase).squeeze()
+        I_right_force = f(self.phase, shift=torch.pi).squeeze()
+
+        I_left_vel = f(self.phase, shift=torch.pi).squeeze()
+        I_right_vel = f(self.phase).squeeze()
+
+        # I_left_force = self.expected_indicator(self.phase)
+        # I_right_force = self.expected_indicator(self.phase, shift=torch.pi)
+
+        # I_left_vel = self.expected_indicator(self.phase, shift=torch.pi)
+        # I_right_vel = self.expected_indicator(self.phase)
+
+        left_vel = torch.norm(self.end_effector_lin_vel[:, 0, :], dim=1)
+        right_vel = torch.norm(self.end_effector_lin_vel[:, 1, :], dim=1)
+        left_force = torch.norm(self.contact_forces[:, 10, :3], dim=1)
+        right_force = torch.norm(self.contact_forces[:, 5, :3], dim=1)
+
+        penalty_left_force = 1 - I_left_force * torch.exp(-0.01 * left_force)
+        penalty_right_force = 1 - I_right_force * torch.exp(-0.01 * right_force)
+
+        penalty_left_vel = 1 - I_left_vel * torch.exp(-0.01 * left_vel)
+        penalty_right_vel = 1 - I_right_vel * torch.exp(-0.01 * right_vel)
+
+        total_penalty = (penalty_left_force + penalty_right_force) + (
+            penalty_left_vel + penalty_right_vel
+        )
+
+        return -total_penalty

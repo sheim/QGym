@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,4 +9,4 @@ pca_scalings = data["pca_scalings"]
 dof_pos_obs = data["dof_pos_obs"]
 
 
-print(dof_pos_obs[0,0])
+print(dof_pos_obs[0, 0])

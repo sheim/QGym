@@ -3,6 +3,7 @@ from gym.utils import get_args, task_registry
 from gym.utils import SliderInterface
 from gym.utils import VisualizationRecorder
 import numpy as np
+
 # torch needs to be imported after isaacgym imports in local source
 import torch
 
@@ -30,28 +31,28 @@ def setup(args):
     return env, runner, train_cfg
 
 
-
 def play(env, runner, train_cfg):
     if env.cfg.viewer.record:
         recorder = VisualizationRecorder(
             env, train_cfg.runner.experiment_name, train_cfg.runner.load_run
         )
     saveLogs = False
-    log = {'dof_pos_obs': [], 
-           'dof_vel': [], 
-           'torques': [],
-           'grf': [], 
-           'oscillators': [],
-           'base_lin_vel': [],
-           'base_ang_vel': [],
-           'commands': [],
-           'dof_pos_error': [],
-           'reward': [],
-            'dof_names': [],
-           }
+    log = {
+        "dof_pos_obs": [],
+        "dof_vel": [],
+        "torques": [],
+        "grf": [],
+        "oscillators": [],
+        "base_lin_vel": [],
+        "base_ang_vel": [],
+        "commands": [],
+        "dof_pos_error": [],
+        "reward": [],
+        "dof_names": [],
+    }
     RECORD_FRAMES = False
     print(env.dof_names)
- 
+
     # * set up interface: GamepadInterface(env) or KeyboardInterface(env)
     COMMANDS_INTERFACE = hasattr(env, "commands")
     if COMMANDS_INTERFACE:
@@ -59,13 +60,12 @@ def play(env, runner, train_cfg):
         interface = SliderInterface(env)
     img_idx = 0
 
-    for i in range(10*int(env.max_episode_length)):
-
+    for i in range(10 * int(env.max_episode_length)):
         if env.cfg.viewer.record:
             recorder.update(i)
-        if i ==1000 and saveLogs:
-            log['dof_names'] = env.dof_names
-            np.savez('new_logs', **log)
+        if i == 1000 and saveLogs:
+            log["dof_names"] = env.dof_names
+            np.savez("new_logs", **log)
 
         if COMMANDS_INTERFACE:
             interface.update(env)
@@ -73,8 +73,7 @@ def play(env, runner, train_cfg):
         env.check_exit()
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     EXPORT_POLICY = True
     args = get_args()
     with torch.no_grad():

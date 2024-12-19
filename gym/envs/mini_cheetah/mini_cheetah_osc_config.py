@@ -23,8 +23,8 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         # mesh_type = 'trimesh'  # none, plane, heightfield or trimesh
 
     class init_state(MiniCheetahCfg.init_state):
-        reset_mode = "reset_to_basic" #"reset_to_range" #
-        timeout_reset_ratio = 1.0 #0.75 #
+        reset_mode = "reset_to_basic"  # "reset_to_range" #
+        timeout_reset_ratio = 1.0  # 0.75 #
         # * default COM for basic initialization
         pos = [0.0, 0.0, 0.35]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
@@ -155,13 +155,14 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
     class scaling(MiniCheetahCfg.scaling):
         pass
 
+
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
 
     class policy(MiniCheetahRunnerCfg.policy):
         disable_actions = False
-        actor_hidden_dims = [256, 256, 128] #[60, 60, 30] 
-        critic_hidden_dims = [256, 256, 128] #[60, 60, 30] 
+        actor_hidden_dims = [256, 256, 128]  # [60, 60, 30]
+        critic_hidden_dims = [256, 256, 128]  # [60, 60, 30]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
 
@@ -188,7 +189,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_target",
         ]
 
-        #actions = ["pca_scalings"]
+        # actions = ["pca_scalings"]
         actions = ["dof_pos_target"]
 
         class noise:
@@ -198,27 +199,27 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             class weights:
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
-                lin_vel_z = 0.
-                ang_vel_xy = 0.
+                lin_vel_z = 0.0
+                ang_vel_xy = 0.0
                 orientation = 1.0
-                torques = 5.e-7
-                dof_vel = 0.
+                torques = 5.0e-7
+                dof_vel = 0.0
                 min_base_height = 1.5
                 collision = 0
                 action_rate = 0.01  # -0.01
                 action_rate2 = 0.001  # -0.001
-                stand_still = 0.
-                dof_pos_limits = 0.
-                feet_contact_forces = 0.
-                dof_near_home = 0.
-                swing_grf = 5.
-                stance_grf = 5.
-                swing_velocity = 0.
-                stance_velocity = 0.
-                coupled_grf = 0.  # 8.
-                enc_pace = 0.
+                stand_still = 0.0
+                dof_pos_limits = 0.0
+                feet_contact_forces = 0.0
+                dof_near_home = 0.0
+                swing_grf = 5.0
+                stance_grf = 5.0
+                swing_velocity = 0.0
+                stance_velocity = 0.0
+                coupled_grf = 0.0  # 8.
+                enc_pace = 0.0
                 cursorial = 0.25
-                standing_torques = 0.  # 1.e-5
+                standing_torques = 0.0  # 1.e-5
                 # tracking_lin_vel = 4.0
                 # tracking_ang_vel = 2.0
                 # lin_vel_z = 0.

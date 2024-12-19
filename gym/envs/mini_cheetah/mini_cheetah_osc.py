@@ -100,6 +100,7 @@ class MiniCheetahOsc(MiniCheetah):
         # self.grf = self._compute_grf()
         if not self.cfg.osc.randomize_osc_params:
             self.compute_osc_slope()
+
     def compute_osc_slope(self):
         cmd_x = torch.abs(self.commands[:, 0:1]) - self.cfg.osc.stop_threshold
         stop = cmd_x < 0

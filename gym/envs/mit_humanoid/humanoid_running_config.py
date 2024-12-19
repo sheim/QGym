@@ -22,7 +22,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         measure_heights = False
 
     class init_state(LeggedRobotCfg.init_state):
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_basic"
         pos = [0.0, 0.0, 0.75]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
@@ -44,28 +44,28 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.7, 0.72],  # z
-            [-torch.pi / 10, torch.pi / 10],  # roll
-            [-torch.pi / 10, torch.pi / 10],  # pitch
-            [-torch.pi / 10, torch.pi / 10],  # yaw
+            [0.75, 0.78],  # z
+            [-torch.pi / 20, torch.pi / 20],  # roll
+            [-torch.pi / 20, torch.pi / 20],  # pitch
+            [-torch.pi / 20, torch.pi / 20],  # yaw
         ]
 
         # ranges for [v_x, v_y, v_z, w_x, w_y, w_z]
         root_vel_range = [
-            [-0.5, 2.5],  # x
-            [-0.5, 0.5],  # y
-            [-0.5, 0.5],  # z
-            [-0.5, 0.5],  # roll
-            [-0.5, 0.5],  # pitch
-            [-0.5, 0.5],  # yaw
+            [-0, 0],  # x
+            [-0, 0],  # y
+            [-0, 0],  # z
+            [-0, 0],  # roll
+            [-0, 0],  # pitch
+            [-0, 0],  # yaw
         ]
 
         dof_pos_range = {
             "hip_yaw": [-0.1, 0.1],
-            "hip_abad": [-0.2, 0.2],
-            "hip_pitch": [-0.2, 0.2],
+            "hip_abad": [-0.1, 0.1],
+            "hip_pitch": [-0.1, 0.1],
             "knee": [0.6, 0.7],
-            "ankle": [-0.3, 0.3],
+            "ankle": [-0.05, 0.05],
             "shoulder_pitch": [0.0, 0.0],
             "shoulder_abad": [0.0, 0.0],
             "shoulder_yaw": [0.0, 0.0],
@@ -73,11 +73,11 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         }
 
         dof_vel_range = {
-            "hip_yaw": [-0.1, 0.1],
-            "hip_abad": [-0.1, 0.1],
-            "hip_pitch": [-0.1, 0.1],
-            "knee": [-0.1, 0.1],
-            "ankle": [-0.1, 0.1],
+            "hip_yaw": [-0.0, 0.0],
+            "hip_abad": [-0.0, 0.0],
+            "hip_pitch": [-0.0, 0.0],
+            "knee": [-0.0, 0.0],
+            "ankle": [-0.0, 0.0],
             "shoulder_pitch": [0.0, 0.0],
             "shoulder_abad": [0.0, 0.0],
             "shoulder_yaw": [0.0, 0.0],
@@ -109,16 +109,16 @@ class HumanoidRunningCfg(LeggedRobotCfg):
             "elbow": 1.0,
         }  # [N*m*s/rad]
         ctrl_frequency = 100
-        desired_sim_frequency = 800
+        desired_sim_frequency = 1000
 
     class commands(LeggedRobotCfg.commands):
-        resampling_time = 5.0
+        resampling_time = 2.0
 
         class ranges:
             # TRAINING COMMAND RANGES #
-            lin_vel_x = [0, 4.5]  # min max [m/s]
+            lin_vel_x = [0, 2.5]  # min max [m/s]
             lin_vel_y = 0.75  # min max [m/s]
-            yaw_vel = 4.0  # min max [rad/s]
+            yaw_vel = 2.0  # min max [rad/s]
             # # PLAY COMMAND RANGES #
             # lin_vel_x = [3., 3.]    # min max [m/s]
             # lin_vel_y = 0.    # min max [m/s]
@@ -145,7 +145,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
             + "mit_humanoid/urdf/humanoid_F_sf.urdf"
         )
         keypoints = ["base"]
-        end_effectors = ["left_foot", "right_foot"]
+        end_effector_names = ["left_foot", "right_foot"]
         # end_effector_names = ['left_toe', 'left_heel',
         #                       'right_toe', 'right_heel']
         foot_name = "foot"
@@ -251,9 +251,12 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
 
                 # * Shaping rewards * #
                 base_height = 0.1
-                orientation = 1.0
+                orientation = 2.0
                 hip_yaw_zero = 2.0
                 hip_abad_symmetry = 0.2
+
+                contact = 0.0
+                gait_contact = 2.0
 
             class termination_weight:
                 termination = 1
@@ -277,12 +280,13 @@ class HumanoidRunningRunnerCfg(LeggedRobotRunnerCfg):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO"
         num_steps_per_env = 24
-        max_iterations = 2000
+        max_iterations = 1000
         run_name = "ICRA2023"
         experiment_name = "HumanoidLocomotion"
         save_interval = 50
         plot_input_gradients = False
         plot_parameter_gradients = False
+
         class evaluation:
             class weights:
                 tracking_ang_vel = 0.5

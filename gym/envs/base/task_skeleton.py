@@ -81,6 +81,6 @@ class TaskSkeleton:
     def _parse_cfg(self, cfg=None):
         self.dt = self.cfg.control.ctrl_dt
         self.scales = class_to_dict(self.cfg.scaling, self.device)
-        #print(self.scales)
+        # print(self.scales)
         self.max_episode_length_s = self.cfg.env.episode_length_s
         self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)

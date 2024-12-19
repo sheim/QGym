@@ -4,6 +4,7 @@ from gym.envs.mini_cheetah.mini_cheetah_config import (
 )
 import torch
 import numpy as np
+
 BASE_HEIGHT_REF = 0.33
 
 
@@ -16,12 +17,18 @@ class MiniCheetahPcaCfg(MiniCheetahCfg):
     class pca:
         mode = "symmetries"
         torques = False
-        eigenvectors = torch.from_numpy(
-                            np.load("/home/aileen/QGym/scripts/pca_components_ref_withpcascaling.npy")).to("cuda").T
-        haa_flip_indexes = [3,9]
-        symmetry_eigvec_ref_index = [0,4,5]
-        num_pcs = 9#4*len(symmetry_eigvec_ref_index)
-
+        eigenvectors = (
+            torch.from_numpy(
+                np.load(
+                    "/home/aileen/QGym/scripts/pca_components_ref_withpcascaling.npy"
+                )
+            )
+            .to("cuda")
+            .T
+        )
+        haa_flip_indexes = [3, 9]
+        symmetry_eigvec_ref_index = [0, 4, 5]
+        num_pcs = 9  # 4*len(symmetry_eigvec_ref_index)
 
     class env(MiniCheetahCfg.env):
         num_envs = 4096
@@ -89,7 +96,7 @@ class MiniCheetahPcaCfg(MiniCheetahCfg):
         init_w_offset = True
         randomize_osc_params = False
         grf_threshold = 0.1
-        omega_range = [1,3]
+        omega_range = [1, 3]
         coupling_range = [0.0, 0.0]
         offset_range = [0.0, 0.0]
 
@@ -174,11 +181,11 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
 
     class policy(MiniCheetahRunnerCfg.policy):
         disable_actions = False
-        actor_hidden_dims = [32, 32, 16] #[256, 256, 128] #[16, 16]
-        critic_hidden_dims = [32, 32, 16] #[256, 256, 128] #[16, 16] 
+        actor_hidden_dims = [32, 32, 16]  # [256, 256, 128] #[16, 16]
+        critic_hidden_dims = [32, 32, 16]  # [256, 256, 128] #[16, 16]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        #normalize_obs = True
+        # normalize_obs = True
 
         actor_obs = [
             "base_ang_vel",
@@ -212,33 +219,33 @@ class MiniCheetahPcaRunnerCfg(MiniCheetahRunnerCfg):
 
         class reward:
             class weights:
-                #PCA Symmetries
-                tracking_lin_vel = 5.5 #5.5
-                tracking_ang_vel = 2.5 #2.0 #2.5
-                lin_vel_z = 0.
-                ang_vel_xy = 0.
-                orientation = 2.5 #2.3 #2.5
-                torques = 5.e-7
-                dof_vel = 0.
+                # PCA Symmetries
+                tracking_lin_vel = 5.5  # 5.5
+                tracking_ang_vel = 2.5  # 2.0 #2.5
+                lin_vel_z = 0.0
+                ang_vel_xy = 0.0
+                orientation = 2.5  # 2.3 #2.5
+                torques = 5.0e-7
+                dof_vel = 0.0
                 min_base_height = 1.5
                 collision = 0
                 action_rate = 0.01  # -0.01
                 action_rate2 = 0.001  # -0.001
-                stand_still = 0.
-                dof_pos_limits = 0.
-                feet_contact_forces = 0.
-                dof_near_home = 0.
-                swing_grf = 5.
-                stance_grf = 5.
-                swing_velocity = 0.
-                stance_velocity = 0.
-                coupled_grf = 0.  # 8.
-                enc_pace = 0.
+                stand_still = 0.0
+                dof_pos_limits = 0.0
+                feet_contact_forces = 0.0
+                dof_near_home = 0.0
+                swing_grf = 5.0
+                stance_grf = 5.0
+                swing_velocity = 0.0
+                stance_velocity = 0.0
+                coupled_grf = 0.0  # 8.
+                enc_pace = 0.0
                 cursorial = 0.25
-                standing_torques = 0.  # 1.e-5
+                standing_torques = 0.0  # 1.e-5
                 pca = 0.2
 
-                #PCA ALL
+                # PCA ALL
 
                 # tracking_lin_vel = 4.0
                 # tracking_ang_vel = 2.0

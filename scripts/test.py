@@ -45,13 +45,12 @@ import numpy as np
 # print(velocity_sweep)
 
 
-
 # Import module
 import os
- 
+
 # Assign directory
 directory = r"/home/aileen/QGym/logs/ctrl_freq_sweep"
- 
+
 # Iterate over files in directory
 for name in os.listdir(directory):
     print(name)

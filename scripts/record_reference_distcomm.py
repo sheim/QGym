@@ -5,7 +5,8 @@ from gym.utils import VisualizationRecorder
 import numpy as np
 import matplotlib.pyplot as plt
 from gym import LEGGED_GYM_ROOT_DIR
-import os 
+import os
+
 # torch needs to be imported after isaacgym imports in local source
 import torch
 
@@ -30,17 +31,18 @@ def setup(args):
     runner.switch_to_eval()
 
     if EXPORT_POLICY:
-        path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs',
-                            train_cfg.runner.experiment_name, 'exported')
+        path = os.path.join(
+            LEGGED_GYM_ROOT_DIR, "logs", train_cfg.runner.experiment_name, "exported"
+        )
         runner.export(path)
     return env, runner, train_cfg
 
 
 def play(env, runner, train_cfg):
     saveLogs = True
-    mode = 'straight'
+    mode = "straight"
 
-        # * set up recording
+    # * set up recording
     if env.cfg.viewer.record:
         recorder = VisualizationRecorder(
             env, train_cfg.runner.experiment_name, train_cfg.runner.load_run
@@ -57,79 +59,80 @@ def play(env, runner, train_cfg):
         "dof_pos_error": [],
         "reward": [],
         "dof_names": [],
-        "pca_scalings":[],
-        "phase":[],
+        "pca_scalings": [],
+        "phase": [],
     }
 
     # * set up interface: GamepadInterface(env) or KeyboardInterface(env)
 
-    pca_scalings_logged = torch.zeros((0,2)).to(device=env.device)
+    pca_scalings_logged = torch.zeros((0, 2)).to(device=env.device)
     noiseplots = False
-    count=False
+    count = False
     env.commands[:, :] = 0
     for i in range(10 * int(env.max_episode_length)):
-        #print(env.pca_scalings[0,:])
-        #env.pca_scalings = torch.randn(1,6).repeat(env.num_envs, 1)
-        #print(env.pca_scalings.shape)
-        #pca_scalings_logged = torch.vstack((pca_scalings_logged, env.pca_scalings[0,0:2]))
-        #print(i)
-        if saveLogs and i >=500:
+        # print(env.pca_scalings[0,:])
+        # env.pca_scalings = torch.randn(1,6).repeat(env.num_envs, 1)
+        # print(env.pca_scalings.shape)
+        # pca_scalings_logged = torch.vstack((pca_scalings_logged, env.pca_scalings[0,0:2]))
+        # print(i)
+        if saveLogs and i >= 500:
             log["dof_pos_obs"] += env.dof_pos_obs.tolist()
             log["dof_vel"] += env.dof_vel.tolist()
             log["torques"] += env.torques.tolist()
             log["phase"] += env.phase.tolist()
-            #log["grf"] += env.grf.tolist()
+            # log["grf"] += env.grf.tolist()
             # log["oscillators"] += env.oscillators.tolist()
             # log["base_lin_vel"] += env.base_lin_vel.tolist()
             # log["base_ang_vel"] += env.base_ang_vel.tolist()
             # log["commands"] += env.commands.tolist()
             # log["dof_pos_error"] += (env.default_dof_pos - env.dof_pos).tolist()
             # log["pca_scalings"] += (env.pca_scalings.tolist())
-            #reward_weights = runner.policy_cfg["reward"]["weights"]
-            #log["reward"] += runner.get_rewards(reward_weights).tolist()
+            # reward_weights = runner.policy_cfg["reward"]["weights"]
+            # log["reward"] += runner.get_rewards(reward_weights).tolist()
 
             if i == 1500:
                 log["dof_names"] = env.dof_names
                 np.savez(f"data_source_{mode}_v3_a0", **log)
-                print('done')
+                print("done")
                 if noiseplots:
-                    plt.plot(pca_scalings_logged[:,1].cpu(),pca_scalings_logged[:,0].cpu())
+                    plt.plot(
+                        pca_scalings_logged[:, 1].cpu(), pca_scalings_logged[:, 0].cpu()
+                    )
                     plt.xlabel("PCA scaling 1", fontsize=20)
                     plt.ylabel("PCA scaling 2", fontsize=20)
                     plt.show()
-        if 'turn' in mode:
+        if "turn" in mode:
             env.commands[:, 0] = torch.clamp(
-                        env.commands[:, 0] + 0.5,
-                        max=1.0,
-                        )
-            if mode == 'turn_left':
+                env.commands[:, 0] + 0.5,
+                max=1.0,
+            )
+            if mode == "turn_left":
                 env.commands[:, 2] = torch.clamp(
-                        env.commands[:, 2] + 0.5,
-                        max=2.0,
-                    )
+                    env.commands[:, 2] + 0.5,
+                    max=2.0,
+                )
             else:
                 env.commands[:, 2] = torch.clamp(
-                        env.commands[:, 2] - 0.5,
-                        min=-2.0,
-                    )
+                    env.commands[:, 2] - 0.5,
+                    min=-2.0,
+                )
         else:
             env.commands[:, 0] = torch.clamp(
-                        env.commands[:, 0] + 0.5,
-                        max=3.0,
-                        )
+                env.commands[:, 0] + 0.5,
+                max=3.0,
+            )
 
         if env.cfg.viewer.record:
             recorder.update(i)
         runner.set_actions(
             runner.policy_cfg["actions"],
-            #torch.randn(1,6).repeat(env.num_envs, 1).to(device = env.device),
+            # torch.randn(1,6).repeat(env.num_envs, 1).to(device = env.device),
             runner.get_inference_actions(),
             runner.policy_cfg["disable_actions"],
         )
 
-
         if i == 500 and count:
-                        # * get the body_name to body_index dict
+            # * get the body_name to body_index dict
             body_dict = env.gym.get_actor_rigid_body_dict(
                 env.envs[0], env.actor_handles[0]
             )
@@ -141,24 +144,28 @@ def play(env, runner, train_cfg):
                 )
             ]
 
-            body_id = [body_names.index(body_name)
-                        for body_name in body_names
-                        if "base" in body_name]
-
-            body_pos = torch.zeros(16,1,3)
-            body_pos =  env._rigid_body_lin_vel[
-            :, body_id
+            body_id = [
+                body_names.index(body_name)
+                for body_name in body_names
+                if "base" in body_name
             ]
+
+            body_pos = torch.zeros(16, 1, 3)
+            body_pos = env._rigid_body_lin_vel[:, body_id]
             print(body_pos)
-            success = abs(body_pos)[:,:,0] >= 0.5*torch.ones_like(body_pos)[:,:,0]
+            success = abs(body_pos)[:, :, 0] >= 0.5 * torch.ones_like(body_pos)[:, :, 0]
             success2 = torch.zeros_like(success)
             success3 = torch.zeros_like(success)
 
-            success2=abs(body_pos)[:,:,1] <= 0.5*torch.ones_like(body_pos)[:,:,1]
-            success3=abs(body_pos)[:,:,2] <= 0.5*torch.ones_like(body_pos)[:,:,2]
+            success2 = (
+                abs(body_pos)[:, :, 1] <= 0.5 * torch.ones_like(body_pos)[:, :, 1]
+            )
+            success3 = (
+                abs(body_pos)[:, :, 2] <= 0.5 * torch.ones_like(body_pos)[:, :, 2]
+            )
 
-            success = torch.logical_and(success,success2)
-            success = torch.logical_and(success,success3)
+            success = torch.logical_and(success, success2)
+            success = torch.logical_and(success, success3)
             print(sum(success))
         env.step()
         env.check_exit()

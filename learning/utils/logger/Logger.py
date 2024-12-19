@@ -16,6 +16,7 @@ class Logger:
 
         self.reward_logs = EpisodicLogs(num_envs, episode_dt, device=device)
         self.evaluation_logs = EpisodicLogs(num_envs, episode_dt, device=device)
+        self.action_logs = EpisodicLogs(num_envs, episode_dt, device=device)
         self.iteration_logs = PerIterationLogs()
 
         self.iteration_counter = 0
@@ -38,6 +39,9 @@ class Logger:
 
     def log_rewards(self, rewards_dict):
         self.reward_logs.add_step(rewards_dict)
+
+    def log_actions(self, actions_dict):
+        self.action_logs.add_step(actions_dict)
 
     def log_eval(self, eval_dict):
         self.evaluation_logs.add_step(eval_dict)
@@ -139,8 +143,9 @@ class Logger:
 
         averages = prepend_to_keys("rewards", self.reward_logs.get_average_rewards())
 
-        eval_averages = prepend_to_keys("evaluations", self.evaluation_logs.get_average_rewards())
-
+        eval_averages = prepend_to_keys(
+            "evaluations", self.evaluation_logs.get_average_rewards()
+        )
 
         category_logs = {
             f"{category}/{key}": val

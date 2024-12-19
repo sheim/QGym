@@ -19,7 +19,7 @@ class OnPolicyRunner(BaseRunner):
         )
 
     def learn(self):
-        #log = {'pca_scalings':[]}
+        # log = {'pca_scalings':[]}
         self.set_up_logger()
 
         rewards_dict = {}
@@ -58,7 +58,17 @@ class OnPolicyRunner(BaseRunner):
                     terminated = self.get_terminated()
                     dones = timed_out | terminated
 
-                    #log['pca_scalings'] += [self.env.pca_scalings.tolist()[0]]
+                    action_dict = {
+                        f"action_{j}": actions[0, j].item()
+                        for j in range(actions.shape[1])
+                    }
+                    # action_dict = {
+                    #     f"action_{j}": self.env.pca_scalings[0, j].item()
+                    #     for j in range(self.env.pca_scalings.shape[1])
+                    # }
+                    # print(actions[0, 0].item())
+                    # print(self.env.pca_scalings[0, 0].item())
+                    logger.log_actions(action_dict)
 
                     self.update_rewards(rewards_dict, terminated)
                     total_rewards = torch.stack(tuple(rewards_dict.values())).sum(dim=0)
@@ -87,11 +97,15 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
-        #np.save("pca_scalings_training", log)
+        # np.save("pca_scalings_training", log)
         self.save()
 
     def update_rewards(self, rewards_dict, terminated):
-        rewards_dict.update(self.get_rewards(self.policy_cfg["reward"]["termination_weight"], mask=terminated))
+        rewards_dict.update(
+            self.get_rewards(
+                self.policy_cfg["reward"]["termination_weight"], mask=terminated
+            )
+        )
         rewards_dict.update(
             self.get_rewards(
                 self.policy_cfg["reward"]["weights"],
@@ -103,13 +117,16 @@ class OnPolicyRunner(BaseRunner):
     def update_evaluation(self, rewards_dict, terminated):
         rewards_dict.update(
             self.get_rewards(
-                self.cfg['evaluation']["weights"],
+                self.cfg["evaluation"]["weights"],
                 modifier=self.env.dt,
                 mask=~terminated,
             )
         )
 
     def set_up_logger(self):
+        num_actions = self.get_action_size(self.policy_cfg["actions"])
+        action_names = [f"action_{i}" for i in range(num_actions)]
+        logger.register_actions(action_names)
         logger.register_rewards(list(self.policy_cfg["reward"]["weights"].keys()))
         logger.register_rewards(
             list(self.policy_cfg["reward"]["termination_weight"].keys())
@@ -130,7 +147,6 @@ class OnPolicyRunner(BaseRunner):
         logger.attach_torch_obj_to_wandb(
             (self.alg.actor_critic.actor, self.alg.actor_critic.critic)
         )
-
 
     def save(self):
         os.makedirs(self.log_dir, exist_ok=True)

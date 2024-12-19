@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 from mpl_toolkits.mplot3d import proj3d
+
 # torch needs to be imported after isaacgym imports in local source
 import torch
 
@@ -50,7 +51,7 @@ def play(env, runner, train_cfg):
         "dof_pos_error": [],
         "reward": [],
         "dof_names": [],
-        "pca_scalings":[]
+        "pca_scalings": [],
     }
 
     # # * set up interface: GamepadInterface(env) or KeyboardInterface(env)
@@ -58,15 +59,15 @@ def play(env, runner, train_cfg):
     # if COMMANDS_INTERFACE:
     #     # interface = GamepadInterface(env)
     #     interface = KeyboardInterface(env)
-    pca_scalings_logged = torch.zeros((0,3)).to(device=env.device)
-    dist=torch.zeros((0,3)).to(device=env.device)
+    pca_scalings_logged = torch.zeros((0, 3)).to(device=env.device)
+    dist = torch.zeros((0, 3)).to(device=env.device)
     plt.figure()
-    ax = plt.axes(projection='3d')
+    ax = plt.axes(projection="3d")
     noiseplots = True
     for i in range(10 * int(env.max_episode_length)):
-        #print(env.pca_scalings.shape)
-        #env.pca_scalings = torch.randn(1,6).repeat(env.num_envs, 1)
-        #print(env.pca_scalings.shape)
+        # print(env.pca_scalings.shape)
+        # env.pca_scalings = torch.randn(1,6).repeat(env.num_envs, 1)
+        # print(env.pca_scalings.shape)
         print(i)
         if saveLogs:
             log["dof_pos_obs"] += env.dof_pos_obs.tolist()
@@ -78,9 +79,9 @@ def play(env, runner, train_cfg):
             log["base_ang_vel"] += env.base_ang_vel.tolist()
             log["commands"] += env.commands.tolist()
             log["dof_pos_error"] += (env.default_dof_pos - env.dof_pos).tolist()
-            log["pca_scalings"] += (env.pca_scalings.tolist())
-            #reward_weights = runner.policy_cfg["reward"]["weights"]
-            #log["reward"] += runner.get_rewards(reward_weights).tolist()
+            log["pca_scalings"] += env.pca_scalings.tolist()
+            # reward_weights = runner.policy_cfg["reward"]["weights"]
+            # log["reward"] += runner.get_rewards(reward_weights).tolist()
 
             if i == 1000:
                 log["dof_names"] = env.dof_names
@@ -92,8 +93,19 @@ def play(env, runner, train_cfg):
             # min,_ = torch.min(obsdist,dim=0)
             # dist*=(m-min)
             pca_scalings_logged = pca_scalings_logged.cpu().numpy()
-            ax.plot3D(pca_scalings_logged[:,0],pca_scalings_logged[:,1],pca_scalings_logged[:,2])
-            ax.scatter3D(dist[:,0].cpu(),dist[:,1].cpu(), dist[:,2].cpu(), c='r',marker='.',s=5)
+            ax.plot3D(
+                pca_scalings_logged[:, 0],
+                pca_scalings_logged[:, 1],
+                pca_scalings_logged[:, 2],
+            )
+            ax.scatter3D(
+                dist[:, 0].cpu(),
+                dist[:, 1].cpu(),
+                dist[:, 2].cpu(),
+                c="r",
+                marker=".",
+                s=5,
+            )
             ax.set_xlabel("x", fontsize=10)
             ax.set_ylabel("y", fontsize=10)
             ax.set_zlabel("z", fontsize=10)
@@ -101,9 +113,9 @@ def play(env, runner, train_cfg):
             plt.show()
 
         env.commands[:, 0] = torch.clamp(
-                    env.commands[:, 0] + 0.5,
-                    max=4.0,
-                    )
+            env.commands[:, 0] + 0.5,
+            max=4.0,
+        )
         # if COMMANDS_INTERFACE:
         #     interface.update(env)
         if env.cfg.viewer.record:
@@ -114,8 +126,10 @@ def play(env, runner, train_cfg):
             runner.policy_cfg["disable_actions"],
         )
 
-        if i<500:
-            pca_scalings_logged = torch.vstack((pca_scalings_logged, env._rigid_body_pos[0,4,:]))
+        if i < 500:
+            pca_scalings_logged = torch.vstack(
+                (pca_scalings_logged, env._rigid_body_pos[0, 4, :])
+            )
 
             if env.cfg.viewer.record:
                 recorder.update(i)
@@ -128,18 +142,24 @@ def play(env, runner, train_cfg):
             env.fix_base_link = True
             env.dof_pos_target = torch.randn_like(env.dof_pos_target)
 
-        #action_dist=action_dist[0,1:3]
+            # action_dist=action_dist[0,1:3]
 
             in_contact = torch.gt(
                 torch.norm(env.contact_forces[:, 4, :], dim=-1),
                 50.0,
             )[0]
-            #print(in_contact)
-            if((in_contact)):
-                ax.scatter3D(env._rigid_body_pos[0,4,0].cpu(),env._rigid_body_pos[0,4,1].cpu(), env._rigid_body_pos[0,4,2].cpu(), c='g',marker='o',s=8)
+            # print(in_contact)
+            if in_contact:
+                ax.scatter3D(
+                    env._rigid_body_pos[0, 4, 0].cpu(),
+                    env._rigid_body_pos[0, 4, 1].cpu(),
+                    env._rigid_body_pos[0, 4, 2].cpu(),
+                    c="g",
+                    marker="o",
+                    s=8,
+                )
             else:
-                dist = torch.vstack((dist,env._rigid_body_pos[0,4,:]))
-
+                dist = torch.vstack((dist, env._rigid_body_pos[0, 4, :]))
 
         env.step()
         env.check_exit()
