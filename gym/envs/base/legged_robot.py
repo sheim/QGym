@@ -517,8 +517,9 @@ class LeggedRobot(BaseTask):
             dtype=torch.float,
             device=self.device,
         )
+        # add height as the 4th command
         self.commands = torch.zeros(
-            self.num_envs, 3, dtype=torch.float, device=self.device
+            self.num_envs, 4, dtype=torch.float, device=self.device
         )
         self.base_lin_vel = quat_rotate_inverse(
             self.base_quat, self.root_states[:, 7:10]

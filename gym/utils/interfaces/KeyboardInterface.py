@@ -15,6 +15,10 @@ class KeyboardInterface:
         env.gym.subscribe_viewer_keyboard_event(
             env.viewer, gymapi.KEY_SPACE, "space_shoot"
         )
+        env.gym.subscribe_viewer_keyboard_event(env.viewer, gymapi.KEY_UP, "height_up")
+        env.gym.subscribe_viewer_keyboard_event(
+            env.viewer, gymapi.KEY_DOWN, "height_down"
+        )
         env.gym.subscribe_viewer_mouse_event(
             env.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_shoot"
         )
@@ -24,6 +28,7 @@ class KeyboardInterface:
         print("WASD: forward, strafe left, " "backward, strafe right")
         print("QE: yaw left/right")
         print("R: reset environments")
+        print("Arrow Up/Down: stand up/lay down")
         print("ESC: quit")
         print("______________________________________________________________")
 
@@ -38,6 +43,10 @@ class KeyboardInterface:
 
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
+
+        self.min_height = 0.1
+        self.max_height = 0.4
+        self.increment_height = 0.1
 
     def update(self, env):
         for evt in env.gym.query_viewer_action_events(env.viewer):
@@ -72,6 +81,16 @@ class KeyboardInterface:
                 env.commands[:, 2] = torch.clamp(
                     env.commands[:, 2] + self.increment_yaw,
                     max=self.max_vel_yaw,
+                )
+            elif evt.action == "height_up":
+                env.commands[:, 3] = torch.clamp(
+                    env.commands[:, 3] + self.increment_height,
+                    max=self.max_height,
+                )
+            elif evt.action == "height_down":
+                env.commands[:, 3] = torch.clamp(
+                    env.commands[:, 3] - self.increment_height,
+                    max=self.min_height,
                 )
             elif evt.action == "QUIT":
                 env.exit = True

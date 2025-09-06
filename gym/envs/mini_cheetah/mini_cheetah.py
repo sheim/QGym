@@ -1,5 +1,6 @@
 import torch
 
+from isaacgym.torch_utils import torch_rand_float
 from gym.envs.base.legged_robot import LeggedRobot
 
 
@@ -51,3 +52,20 @@ class MiniCheetah(LeggedRobot):
             ),
             dim=1,
         )
+
+    def _resample_commands(self, env_ids):
+        super()._resample_commands(env_ids)
+
+        # resample height
+        height_range = self.command_ranges["height"]
+        self.commands[env_ids, 3] = torch_rand_float(
+            height_range[0], height_range[1], (len(env_ids), 1), device=self.device
+        ).squeeze(1)
+
+    def _reward_tracking_height(self):
+        """Reward for base height."""
+        # error between current and commanded height
+        error = self.base_height.flatten() - self.commands[:, 3].flatten()
+        error /= self.scales["base_height"]
+
+        return self._sqrdexp(error)

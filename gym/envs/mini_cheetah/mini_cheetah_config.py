@@ -72,6 +72,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
             lin_vel_x = [-2.0, 3.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 3  # max [rad/s]
+            height = [0.15, 0.35]  # m
 
     class push_robots:
         toggle = True
@@ -119,7 +120,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
         dof_pos_obs = dof_pos
         dof_pos_target = 4 * [0.2, 0.3, 0.3]
         tau_ff = 4 * [18, 18, 28]
-        commands = [3, 1, 3]
+        commands = [3, 1, 3, 1]  # add height as a command
 
 
 class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
@@ -178,13 +179,14 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 orientation = 1.0
                 torques = 5.0e-7
                 dof_vel = 0.0
-                min_base_height = 1.5
+                # min_base_height = 1.5
                 action_rate = 0.01
                 action_rate2 = 0.001
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
+                tracking_height = 0.5
 
             class termination_weight:
                 termination = 0.01
