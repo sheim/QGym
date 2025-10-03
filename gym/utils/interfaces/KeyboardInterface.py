@@ -44,9 +44,9 @@ class KeyboardInterface:
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
 
-        self.min_height = 0.1
-        self.max_height = 0.4
-        self.increment_height = 0.1
+        self.min_height = 0.76  # laying down height
+        self.max_height = 1.70  # standing height
+        self.increment_height = 0.5
 
     def update(self, env):
         for evt in env.gym.query_viewer_action_events(env.viewer):
