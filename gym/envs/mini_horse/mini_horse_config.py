@@ -8,8 +8,9 @@ BASE_HEIGHT_REF = 1.7
 
 class MiniHorseCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
-        num_envs = 2**12
-        num_actuators = 12
+        # changed from 12 to 21 to match number of joints
+        num_envs = 2**21
+        num_actuators = 21
         episode_length_s = 4
 
     class terrain(LeggedRobotCfg.terrain):
@@ -17,9 +18,12 @@ class MiniHorseCfg(LeggedRobotCfg):
 
     class init_state(LeggedRobotCfg.init_state):
         default_joint_angles = {
+            "joint": 0.0,
             "haa": 0.0,
-            "hfe": -0.785398,
-            "kfe": 1.596976,
+            "ffe": 0.0,
+            "cfe": 0.0,
+            "pfe": 0.0,
+            "hfe": 0.0,
         }
 
         # * reset setup chooses how the initial conditions are chosen.
@@ -28,22 +32,40 @@ class MiniHorseCfg(LeggedRobotCfg):
         reset_mode = "reset_to_range"
 
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 0.35]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.7]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
 
         # * initialization for random range setup
         dof_pos_range = {
+            """maybe this range is too large and is crashing my computer
+            "joint": [0.0, 2.0],
+            "haa": [-0.2, 0.2],
+            "ffe": [-1.7, 1.7],
+            "cfe": [0.0, 3.0],
+            "pfe": [-1.2, 0.5],
+            "hfe": [-0.3, 1.2],
+            """
+            "joint": [0.0, 0.0],
             "haa": [-0.01, 0.01],
-            "hfe": [-0.785398, -0.785398],
-            "kfe": [1.596976, 1.596976],
+            "ffe": [0.0, 0.0],
+            "cfe": [0.0, 0.0],
+            "pfe": [0.0, 0.0],
+            "hfe": [0.0, 0.0],
         }
-        dof_vel_range = {"haa": [0.0, 0.0], "hfe": [0.0, 0.0], "kfe": [0.0, 0.0]}
+        dof_vel_range = {
+            "joint": [0.0, 0.0],
+            "haa": [0.0, 0.0],
+            "ffe": [0.0, 0.0],
+            "cfe": [0.0, 0.0],
+            "pfe": [0.0, 0.0],
+            "hfe": [0.0, 0.0],
+        }
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.35, 0.35],  # z
+            [1.7, 1.7],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
@@ -59,8 +81,22 @@ class MiniHorseCfg(LeggedRobotCfg):
 
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
-        stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
-        damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
+        stiffness = {
+            "joint": 20.0,
+            "haa": 20.0,
+            "ffe": 20.0,
+            "cfe": 20.0,
+            "pfe": 20.0,
+            "hfe": 20.0,
+        }
+        damping = {
+            "joint": 0.5,
+            "haa": 0.5,
+            "ffe": 0.5,
+            "cfe": 0.5,
+            "pfe": 20.0,
+            "hfe": 20.0,
+        }
         ctrl_frequency = 100
         desired_sim_frequency = 500
 
@@ -101,7 +137,7 @@ class MiniHorseCfg(LeggedRobotCfg):
         disable_gravity = False
         disable_motors = False
         joint_damping = 0.1
-        rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
+        rotor_inertia = [0.002268] * 21
 
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9
