@@ -52,23 +52,23 @@
   </joint>
 
   <!-- ===================== LEG TEMPLATE ========================== -->
-  <!-- Five links per leg: shoulder -> hip -> thigh -> shank -> hoof -->
+  <!-- Five links per leg: shoulder -> forearm -> cannon -> pastern -> hoof -->
   <!-- ===================== FRONT LEFT LEG ======================== -->
   <link name="FL_shoulder">
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="FL_hip">
+  <link name="FL_forearm">
     <visual><origin xyz="0.0 0.1 -0.25"/><geometry><cylinder length="0.46" radius="0.075"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.25"/><geometry><box size="0.15 0.15 0.4"/></geometry></collision>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="FL_thigh">
+  <link name="FL_cannon">
     <visual><origin xyz="0.04 0.1 -0.15"/><geometry><cylinder length="0.3" radius="0.04"/></geometry></visual>
     <collision><origin xyz="0.04 0.1 -0.15"/><geometry><box size="0.08 0.08 0.25"/></geometry></collision>
     <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
   </link>
-  <link name="FL_shank">
+  <link name="FL_pastern">
     <visual><origin xyz="0.0 0.1 -0.045"/><geometry><cylinder length="0.13" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.045"/><geometry><box size="0.06 0.06 0.1"/></geometry></collision>
     <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
@@ -79,28 +79,28 @@
     <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
   </link>
 
-  <joint name="2_fl_haa" type="revolute">
+  <joint name="FL_haa" type="revolute">
     <parent link="base_fh"/><child link="FL_shoulder"/>
     <origin xyz="0.35 0.225 -0.23" rpy="0 0 0"/><axis xyz="1 0 0"/>
     <limit effort="18" lower="-0.2" upper="0.2" velocity="41"/>
   </joint>
-  <joint name="FL_hip_joint" type="revolute">
-    <parent link="FL_shoulder"/><child link="FL_hip"/>
+  <joint name="FL_ffe" type="revolute">
+    <parent link="FL_shoulder"/><child link="FL_forearm"/>
     <origin xyz="0 0 0.025" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.7" upper="0.5" effort="50" velocity="2.0"/>
   </joint>
-  <joint name="FL_knee_joint" type="revolute">
-    <parent link="FL_hip"/><child link="FL_thigh"/>
+  <joint name="FL_cfe" type="revolute">
+    <parent link="FL_forearm"/><child link="FL_cannon"/>
     <origin xyz="-0.08 0 -0.48"/><axis xyz="0 1 0"/>
     <limit lower="0" upper="3.0" effort="40" velocity="2.0"/>
   </joint>
-  <joint name="FL_fetlock_joint" type="revolute">
-    <parent link="FL_thigh"/><child link="FL_shank"/>
+  <joint name="FL_pfe" type="revolute">
+    <parent link="FL_cannon"/><child link="FL_pastern"/>
     <origin xyz="0.04 0 -0.32"/><axis xyz="0 1 0"/>
     <limit lower="-1.2" upper="0.5" effort="30" velocity="2.0"/>
   </joint>
-  <joint name="FL_hoof_joint" type="revolute">
-    <parent link="FL_shank"/><child link="FL_hoof"/>
+  <joint name="FL_hfe" type="revolute">
+    <parent link="FL_pastern"/><child link="FL_hoof"/>
     <origin xyz="0 0 -0.1"/><axis xyz="0 1 0"/>
     <limit lower="-0.3" upper="1.2" effort="20" velocity="2.0"/>
   </joint>
@@ -110,17 +110,17 @@
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="FR_hip">
+  <link name="FR_forearm">
     <visual><origin xyz="0.0 0.1 -0.25"/><geometry><cylinder length="0.46" radius="0.075"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.25"/><geometry><box size="0.15 0.15 0.4"/></geometry></collision>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="FR_thigh">
+  <link name="FR_cannon">
     <visual><origin xyz="0.04 0.1 -0.15"/><geometry><cylinder length="0.3" radius="0.04"/></geometry></visual>
     <collision><origin xyz="0.04 0.1 -0.15"/><geometry><box size="0.08 0.08 0.25"/></geometry></collision>
     <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
   </link>
-  <link name="FR_shank">
+  <link name="FR_pastern">
     <visual><origin xyz="0.0 0.1 -0.045"/><geometry><cylinder length="0.13" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.045"/><geometry><box size="0.06 0.06 0.1"/></geometry></collision>
     <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
@@ -131,28 +131,28 @@
     <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
   </link>
 
-  <joint name="2_fr_haa" type="revolute">
+  <joint name="FR_haa" type="revolute">
     <parent link="base_fh"/><child link="FR_shoulder"/>
     <origin xyz="0.35 -0.225 -0.23" rpy="0 0 0"/><axis xyz="1 0 0"/>
     <limit effort="18" lower="-0.2" upper="0.2" velocity="41"/>
   </joint>
-  <joint name="FR_hip_joint" type="revolute">
-    <parent link="FR_shoulder"/><child link="FR_hip"/>
+  <joint name="FR_ffe" type="revolute">
+    <parent link="FR_shoulder"/><child link="FR_forearm"/>
     <origin xyz="0 -0.2 0.025" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-1.7" upper="0.5" effort="50" velocity="2.0"/>
   </joint>
-  <joint name="FR_knee_joint" type="revolute">
-    <parent link="FR_hip"/><child link="FR_thigh"/>
+  <joint name="FR_cfe" type="revolute">
+    <parent link="FR_forearm"/><child link="FR_cannon"/>
     <origin xyz="-0.08 0 -0.48"/><axis xyz="0 1 0"/>
     <limit lower="0" upper="3.0" effort="40" velocity="2.0"/>
   </joint>
-  <joint name="FR_fetlock_joint" type="revolute">
-    <parent link="FR_thigh"/><child link="FR_shank"/>
+  <joint name="FR_pfe" type="revolute">
+    <parent link="FR_cannon"/><child link="FR_pastern"/>
     <origin xyz="0.04 0 -0.32"/><axis xyz="0 1 0"/>
     <limit lower="-1.2" upper="0.5" effort="30" velocity="2.0"/>
   </joint>
-  <joint name="FR_hoof_joint" type="revolute">
-    <parent link="FR_shank"/><child link="FR_hoof"/>
+  <joint name="FR_hfe" type="revolute">
+    <parent link="FR_pastern"/><child link="FR_hoof"/>
     <origin xyz="0 0 -0.1"/><axis xyz="0 1 0"/>
     <limit lower="-0.3" upper="1.2" effort="20" velocity="2.0"/>
   </joint>
@@ -162,17 +162,17 @@
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="RL_hip">
+  <link name="RL_forearm">
     <visual><origin xyz="0.0 0.0 -0.17"/><geometry><cylinder length="0.46" radius="0.09"/></geometry></visual>
     <collision><origin xyz="0.0 0.0 -0.17"/><geometry><box size="0.175 0.175 0.4"/></geometry></collision>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="RL_thigh">
+  <link name="RL_cannon">
     <visual><origin xyz="-0.05 0 -0.185"/><geometry><cylinder length="0.36" radius="0.05"/></geometry></visual>
     <collision><origin xyz="-0.05 0 -0.185"/><geometry><box size="0.1 0.1 0.3"/></geometry></collision>
     <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
   </link>
-  <link name="RL_shank">
+  <link name="RL_pastern">
     <visual><origin xyz="0 0 -0.09"/><geometry><cylinder length="0.15" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0 0 -0.09"/><geometry><box size="0.06 0.06 0.12"/></geometry></collision>
     <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
@@ -182,28 +182,28 @@
     <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
   </link>
 
-  <joint name="2_rf_haa" type="revolute">
+  <joint name="RL_haa" type="revolute">
     <parent link="base_bh"/><child link="RL_shoulder"/>
     <origin xyz="-0.3 0.225 -0.43" rpy="0 0 0"/><axis xyz="1 0 0"/>
     <limit effort="18" lower="-0.2" upper="0.2" velocity="41"/>
   </joint>
-  <joint name="RL_hip_joint" type="revolute">
-    <parent link="RL_shoulder"/><child link="RL_hip"/>
+  <joint name="RL_ffe" type="revolute">
+    <parent link="RL_shoulder"/><child link="RL_forearm"/>
     <origin xyz="0 0.12 -0.05" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-0.5" upper="1.5" effort="50" velocity="2.0"/>
   </joint>
-  <joint name="RL_knee_joint" type="revolute">
-    <parent link="RL_hip"/><child link="RL_thigh"/>
+  <joint name="RL_cfe" type="revolute">
+    <parent link="RL_forearm"/><child link="RL_cannon"/>
     <origin xyz="0.09 0 -0.4"/><axis xyz="0 1 0"/>
     <limit lower="-3.0" upper="0.0" effort="40" velocity="2.0"/>
   </joint>
-  <joint name="RL_fetlock_joint" type="revolute">
-    <parent link="RL_thigh"/><child link="RL_shank"/>
+  <joint name="RL_pfe" type="revolute">
+    <parent link="RL_cannon"/><child link="RL_pastern"/>
     <origin xyz="-0.04 0 -0.35"/><axis xyz="0 1 0"/>
     <limit lower="-1.0" upper="0.0" effort="30" velocity="2.0"/>
   </joint>
-  <joint name="RL_hoof_joint" type="revolute">
-    <parent link="RL_shank"/><child link="RL_hoof"/>
+  <joint name="RL_hfe" type="revolute">
+    <parent link="RL_pastern"/><child link="RL_hoof"/>
     <origin xyz="0 0 -0.16"/><axis xyz="0 1 0"/>
     <limit lower="-0.3" upper="1.5" effort="20" velocity="2.0"/>
   </joint>
@@ -213,17 +213,17 @@
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="RR_hip">
+  <link name="RR_forearm">
     <visual><origin xyz="0.0 0.0 -0.17"/><geometry><cylinder length="0.46" radius="0.09"/></geometry></visual>
     <collision><origin xyz="0.0 0.0 -0.17"/><geometry><box size="0.175 0.175 0.4"/></geometry></collision>
     <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
   </link>
-  <link name="RR_thigh">
+  <link name="RR_cannon">
     <visual><origin xyz="-0.05 0 -0.185"/><geometry><cylinder length="0.36" radius="0.05"/></geometry></visual>
     <collision><origin xyz="-0.05 0 -0.185"/><geometry><box size="0.1 0.1 0.3"/></geometry></collision>
     <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
   </link>
-  <link name="RR_shank">
+  <link name="RR_pastern">
     <visual><origin xyz="0 0 -0.09"/><geometry><cylinder length="0.15" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0 0 -0.09"/><geometry><box size="0.06 0.06 0.12"/></geometry></collision>
     <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
@@ -233,28 +233,28 @@
     <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
   </link>
 
-  <joint name="2_rr_haa" type="revolute">
+  <joint name="RR_haa" type="revolute">
     <parent link="base_bh"/><child link="RR_shoulder"/>
     <origin xyz="-0.3 -0.225 -0.43" rpy="0 0 0"/><axis xyz="1 0 0"/>
     <limit effort="18" lower="-0.2" upper="0.2" velocity="41"/>
   </joint>
-  <joint name="RR_hip_joint" type="revolute">
-    <parent link="RR_shoulder"/><child link="RR_hip"/>
+  <joint name="RR_ffe" type="revolute">
+    <parent link="RR_shoulder"/><child link="RR_forearm"/>
     <origin xyz="0 -0.12 -0.05" rpy="0 0 0"/><axis xyz="0 1 0"/>
     <limit lower="-0.5" upper="1.5" effort="50" velocity="2.0"/>
   </joint>
-  <joint name="RR_knee_joint" type="revolute">
-    <parent link="RR_hip"/><child link="RR_thigh"/>
+  <joint name="RR_cfe" type="revolute">
+    <parent link="RR_forearm"/><child link="RR_cannon"/>
     <origin xyz="0.09 0 -0.4"/><axis xyz="0 1 0"/>
     <limit lower="-3.0" upper="0.0" effort="40" velocity="2.0"/>
   </joint>
-  <joint name="RR_fetlock_joint" type="revolute">
-    <parent link="RR_thigh"/><child link="RR_shank"/>
+  <joint name="RR_pfe" type="revolute">
+    <parent link="RR_cannon"/><child link="RR_pastern"/>
     <origin xyz="-0.04 0 -0.35"/><axis xyz="0 1 0"/>
     <limit lower="-1.0" upper="0.0" effort="30" velocity="2.0"/>
   </joint>
-  <joint name="RR_hoof_joint" type="revolute">
-    <parent link="RR_shank"/><child link="RR_hoof"/>
+  <joint name="RR_hfe" type="revolute">
+    <parent link="RR_pastern"/><child link="RR_hoof"/>
     <origin xyz="0 0 -0.16"/><axis xyz="0 1 0"/>
     <limit lower="-0.3" upper="1.5" effort="20" velocity="2.0"/>
   </joint>
