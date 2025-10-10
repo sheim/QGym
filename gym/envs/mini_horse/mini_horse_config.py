@@ -9,7 +9,7 @@ BASE_HEIGHT_REF = 1.7
 class MiniHorseCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         # changed from 12 to 21 to match number of joints
-        num_envs = 2**21
+        num_envs = 2**6  # simultaneous simulation environments
         num_actuators = 21
         episode_length_s = 4
 
@@ -94,8 +94,8 @@ class MiniHorseCfg(LeggedRobotCfg):
             "haa": 0.5,
             "ffe": 0.5,
             "cfe": 0.5,
-            "pfe": 20.0,
-            "hfe": 20.0,
+            "pfe": 0.5,
+            "hfe": 0.5,
         }
         ctrl_frequency = 100
         desired_sim_frequency = 500
@@ -150,12 +150,12 @@ class MiniHorseCfg(LeggedRobotCfg):
     class scaling(LeggedRobotCfg.scaling):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
-        dof_vel = 4 * [2.0, 2.0, 4.0]
+        dof_vel = 21 * [2.0]
         base_height = 1.7
-        dof_pos = 4 * [0.2, 0.3, 0.3]
+        dof_pos = 21 * [0.2]
         dof_pos_obs = dof_pos
-        dof_pos_target = 4 * [0.2, 0.3, 0.3]
-        tau_ff = 4 * [18, 18, 28]
+        dof_pos_target = 21 * [0.2]
+        tau_ff = 21 * [18]
         commands = [3, 1, 3, 1]  # add height as a command
 
 

@@ -18,8 +18,8 @@
       </geometry>
     </collision>
     <inertial>
-      <mass value="345.0"/>
-      <inertia ixx="1.0" iyy="1.0" izz="1.0" ixy="0" ixz="0" iyz="0"/>
+      <mass value="20.0"/>
+      <inertia ixx="6.0" iyy="6.0" izz="4.0" ixy="1.0" ixz="1.0" iyz="1.0"/>
     </inertial>
   </link>
 
@@ -40,8 +40,8 @@
       </geometry>
     </collision>
     <inertial>
-      <mass value="145.0"/>
-      <inertia ixx="1.0" iyy="1.0" izz="1.0" ixy="0" ixz="0" iyz="0"/>
+      <mass value="20.0"/>
+      <inertia ixx="6.0" iyy="6.0" izz="4.0" ixy="1.0" ixz="1.0" iyz="1.0"/>
     </inertial>
   </link>
 
@@ -56,27 +56,27 @@
   <!-- ===================== FRONT LEFT LEG ======================== -->
   <link name="FL_shoulder">
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FL_forearm">
     <visual><origin xyz="0.0 0.1 -0.25"/><geometry><cylinder length="0.46" radius="0.075"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.25"/><geometry><box size="0.15 0.15 0.4"/></geometry></collision>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FL_cannon">
     <visual><origin xyz="0.04 0.1 -0.15"/><geometry><cylinder length="0.3" radius="0.04"/></geometry></visual>
     <collision><origin xyz="0.04 0.1 -0.15"/><geometry><box size="0.08 0.08 0.25"/></geometry></collision>
-    <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
+    <inertial><mass value="3.0"/><inertia ixx="0.03" ixy="0" ixz="0" iyy="0.03" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FL_pastern">
     <visual><origin xyz="0.0 0.1 -0.045"/><geometry><cylinder length="0.13" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.045"/><geometry><box size="0.06 0.06 0.1"/></geometry></collision>
-    <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.5"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FL_hoof">
     <visual><origin xyz="0.0 0.1 -0.05"/><geometry><cylinder length="0.08" radius="0.05"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.055"/><geometry><box size="0.1 0.1 0.07"/></geometry></collision>
-    <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
+    <inertial><mass value="1.0"/><inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/></inertial>
   </link>
 
   <joint name="FL_haa" type="revolute">
@@ -108,27 +108,27 @@
   <!-- ===================== FRONT RIGHT LEG ===================== -->
   <link name="FR_shoulder">
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FR_forearm">
     <visual><origin xyz="0.0 0.1 -0.25"/><geometry><cylinder length="0.46" radius="0.075"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.25"/><geometry><box size="0.15 0.15 0.4"/></geometry></collision>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FR_cannon">
     <visual><origin xyz="0.04 0.1 -0.15"/><geometry><cylinder length="0.3" radius="0.04"/></geometry></visual>
     <collision><origin xyz="0.04 0.1 -0.15"/><geometry><box size="0.08 0.08 0.25"/></geometry></collision>
-    <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
+    <inertial><mass value="3.0"/><inertia ixx="0.03" ixy="0" ixz="0" iyy="0.03" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FR_pastern">
     <visual><origin xyz="0.0 0.1 -0.045"/><geometry><cylinder length="0.13" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.045"/><geometry><box size="0.06 0.06 0.1"/></geometry></collision>
-    <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.5"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="FR_hoof">
     <visual><origin xyz="0.0 0.1 -0.05"/><geometry><cylinder length="0.08" radius="0.05"/></geometry></visual>
     <collision><origin xyz="0.0 0.1 -0.055"/><geometry><box size="0.1 0.1 0.07"/></geometry></collision>
-    <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
+    <inertial><mass value="1.0"/><inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/></inertial>
   </link>
 
   <joint name="FR_haa" type="revolute">
@@ -160,26 +160,26 @@
   <!-- ===================== REAR LEFT LEG ===================== -->
   <link name="RL_shoulder">
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RL_forearm">
     <visual><origin xyz="0.0 0.0 -0.17"/><geometry><cylinder length="0.46" radius="0.09"/></geometry></visual>
     <collision><origin xyz="0.0 0.0 -0.17"/><geometry><box size="0.175 0.175 0.4"/></geometry></collision>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RL_cannon">
     <visual><origin xyz="-0.05 0 -0.185"/><geometry><cylinder length="0.36" radius="0.05"/></geometry></visual>
     <collision><origin xyz="-0.05 0 -0.185"/><geometry><box size="0.1 0.1 0.3"/></geometry></collision>
-    <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
+    <inertial><mass value="3.0"/><inertia ixx="0.03" ixy="0" ixz="0" iyy="0.03" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RL_pastern">
     <visual><origin xyz="0 0 -0.09"/><geometry><cylinder length="0.15" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0 0 -0.09"/><geometry><box size="0.06 0.06 0.12"/></geometry></collision>
-    <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.5"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RL_hoof"><visual><origin xyz="0 0 -0.05"/><geometry><cylinder length="0.1" radius="0.05"/></geometry></visual>
     <collision><origin xyz="0 0 -0.055"/><geometry><box size="0.1 0.1 0.09"/></geometry></collision>
-    <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
+    <inertial><mass value="1.0"/><inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/></inertial>
   </link>
 
   <joint name="RL_haa" type="revolute">
@@ -211,26 +211,26 @@
   <!-- ===================== REAR RIGHT LEG ===================== -->
   <link name="RR_shoulder">
     <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RR_forearm">
     <visual><origin xyz="0.0 0.0 -0.17"/><geometry><cylinder length="0.46" radius="0.09"/></geometry></visual>
     <collision><origin xyz="0.0 0.0 -0.17"/><geometry><box size="0.175 0.175 0.4"/></geometry></collision>
-    <inertial><mass value="2.0"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.0"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RR_cannon">
     <visual><origin xyz="-0.05 0 -0.185"/><geometry><cylinder length="0.36" radius="0.05"/></geometry></visual>
     <collision><origin xyz="-0.05 0 -0.185"/><geometry><box size="0.1 0.1 0.3"/></geometry></collision>
-    <inertial><mass value="3.0"/><inertia ixx="0.03" iyy="0.03" izz="0.01"/></inertial>
+    <inertial><mass value="3.0"/><inertia ixx="0.03" ixy="0" ixz="0" iyy="0.03" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RR_pastern">
     <visual><origin xyz="0 0 -0.09"/><geometry><cylinder length="0.15" radius="0.03"/></geometry></visual>
     <collision><origin xyz="0 0 -0.09"/><geometry><box size="0.06 0.06 0.12"/></geometry></collision>
-    <inertial><mass value="2.5"/><inertia ixx="0.02" iyy="0.02" izz="0.01"/></inertial>
+    <inertial><mass value="2.5"/><inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.01"/></inertial>
   </link>
   <link name="RR_hoof"><visual><origin xyz="0 0 -0.05"/><geometry><cylinder length="0.1" radius="0.05"/></geometry></visual>
     <collision><origin xyz="0 0 -0.055"/><geometry><box size="0.1 0.1 0.09"/></geometry></collision>
-    <inertial><mass value="1.0"/><inertia ixx="0.01" iyy="0.01" izz="0.01"/></inertial>
+    <inertial><mass value="1.0"/><inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/></inertial>
   </link>
 
   <joint name="RR_haa" type="revolute">
