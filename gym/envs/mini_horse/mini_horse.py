@@ -7,6 +7,7 @@ from gym.envs.base.legged_robot import LeggedRobot
 class MiniHorse(LeggedRobot):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+        print("DOF names:", self.dof_names)
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""
@@ -65,6 +66,7 @@ class MiniHorse(LeggedRobot):
     def _reward_tracking_height(self):
         """Reward for base height."""
         # error between current and commanded height
+        # print("Height:", self.base_height.flatten())
         error = self.base_height.flatten() - self.commands[:, 3].flatten()
         error /= self.scales["base_height"]
 

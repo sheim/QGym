@@ -3,7 +3,7 @@ from gym.envs.base.legged_robot_config import (
     LeggedRobotRunnerCfg,
 )
 
-BASE_HEIGHT_REF = 1.7
+BASE_HEIGHT_REF = 1.3
 
 
 class MiniHorseCfg(LeggedRobotCfg):
@@ -19,11 +19,16 @@ class MiniHorseCfg(LeggedRobotCfg):
     class init_state(LeggedRobotCfg.init_state):
         default_joint_angles = {
             "joint": 0.0,
-            "haa": 0.0,
-            "ffe": 0.0,
-            "cfe": 0.0,
-            "pfe": 0.0,
-            "hfe": 0.0,
+            "F_haa": 0.0,
+            "R_haa": 0.0,
+            "F_ffe": 0.0,
+            "R_ffe": 0.0,
+            "F_cfe": 0.0,
+            "R_cfe": 0.0,
+            "F_pfe": 0.0,
+            "R_pfe": 0.0,
+            "F_hfe": 0.0,
+            "R_hfe": 0.0,
         }
 
         # * reset setup chooses how the initial conditions are chosen.
@@ -32,40 +37,44 @@ class MiniHorseCfg(LeggedRobotCfg):
         reset_mode = "reset_to_range"
 
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 1.7]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.3]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
 
         # * initialization for random range setup
         dof_pos_range = {
-            """maybe this range is too large and is crashing my computer
+            # keep init range narrower than joint limit range
+            # avoid init collisions, keep height consistent
             "joint": [0.0, 2.0],
-            "haa": [-0.2, 0.2],
-            "ffe": [-1.7, 1.7],
-            "cfe": [0.0, 3.0],
-            "pfe": [-1.2, 0.5],
-            "hfe": [-0.3, 1.2],
-            """
-            "joint": [0.0, 0.0],
-            "haa": [-0.01, 0.01],
-            "ffe": [0.0, 0.0],
-            "cfe": [0.0, 0.0],
-            "pfe": [0.0, 0.0],
-            "hfe": [0.0, 0.0],
+            "F_haa": [-0.2, 0.2],
+            "R_haa": [-0.2, 0.2],
+            "F_ffe": [-0.5, 0.5],
+            "R_ffe": [-0.5, 0.5],
+            "F_cfe": [0.0, 0.5],
+            "R_cfe": [-0.5, 0.0],
+            "F_pfe": [-0.5, 0.5],
+            "R_pfe": [-0.5, 0.0],
+            "F_hfe": [-0.3, 1.2],
+            "R_hfe": [-0.3, 1.5],
         }
         dof_vel_range = {
             "joint": [0.0, 0.0],
-            "haa": [0.0, 0.0],
-            "ffe": [0.0, 0.0],
-            "cfe": [0.0, 0.0],
-            "pfe": [0.0, 0.0],
-            "hfe": [0.0, 0.0],
+            "F_haa": [0.0, 0.0],
+            "R_haa": [0.0, 0.0],
+            "F_ffe": [0.0, 0.0],
+            "R_ffe": [0.0, 0.0],
+            "F_cfe": [0.0, 0.0],
+            "R_cfe": [0.0, 0.0],
+            "F_pfe": [0.0, 0.0],
+            "R_pfe": [0.0, 0.0],
+            "F_hfe": [0.0, 0.0],
+            "R_hfe": [0.0, 0.0],
         }
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [1.7, 1.7],  # z
+            [1.3, 1.3],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
@@ -82,20 +91,30 @@ class MiniHorseCfg(LeggedRobotCfg):
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
         stiffness = {
-            "joint": 20.0,
-            "haa": 20.0,
-            "ffe": 20.0,
-            "cfe": 20.0,
-            "pfe": 20.0,
-            "hfe": 20.0,
+            "joint": 50.0,
+            "F_haa": 50.0,
+            "R_haa": 50.0,
+            "F_ffe": 50.0,
+            "R_ffe": 50.0,
+            "F_cfe": 50.0,
+            "R_cfe": 50.0,
+            "F_pfe": 50.0,
+            "R_pfe": 50.0,
+            "F_hfe": 50.0,
+            "R_hfe": 50.0,
         }
         damping = {
-            "joint": 0.5,
-            "haa": 0.5,
-            "ffe": 0.5,
-            "cfe": 0.5,
-            "pfe": 0.5,
-            "hfe": 0.5,
+            "joint": 10,
+            "F_haa": 1,
+            "R_haa": 1,
+            "F_ffe": 1,
+            "R_ffe": 1,
+            "F_cfe": 1,
+            "R_cfe": 1,
+            "F_pfe": 1,
+            "R_pfe": 1,
+            "F_hfe": 1,
+            "R_hfe": 1,
         }
         ctrl_frequency = 100
         desired_sim_frequency = 500
@@ -108,7 +127,7 @@ class MiniHorseCfg(LeggedRobotCfg):
             lin_vel_x = [-2.0, 3.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 3  # max [rad/s]
-            height = [0.76, 1.70]  # m
+            height = [0.76, 1.30]  # m
 
     class push_robots:
         toggle = True
@@ -127,13 +146,16 @@ class MiniHorseCfg(LeggedRobotCfg):
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
             + "mini_horse/urdf/mini_horse_simple.urdf"
         )
-        foot_name = "foot"
-        penalize_contacts_on = ["shank"]
+        foot_name = "hoof"
+        penalize_contacts_on = ["pastern"]
         terminate_after_contacts_on = ["base"]
-        end_effector_names = ["foot"]
+        end_effector_names = ["hoof"]
         collapse_fixed_joints = False
         self_collisions = 1
         flip_visual_attachments = False
+        # * fix the base of the robot
+        fix_base_link = False
+        # disable gravity
         disable_gravity = False
         disable_motors = False
         joint_damping = 0.1
@@ -151,7 +173,7 @@ class MiniHorseCfg(LeggedRobotCfg):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
         dof_vel = 21 * [2.0]
-        base_height = 1.7
+        base_height = 1.3
         dof_pos = 21 * [0.2]
         dof_pos_obs = dof_pos
         dof_pos_target = 21 * [0.2]
@@ -178,10 +200,11 @@ class MiniHorseRunnerCfg(LeggedRobotRunnerCfg):
         normalize_obs = True
         actions = ["dof_pos_target"]
         add_noise = True
-        disable_actions = False
+        # not apply actions
+        disable_actions = True
 
         class noise:
-            scale = 1.0
+            scale = 0.0
             dof_pos_obs = 0.01
             base_ang_vel = 0.01
             dof_pos = 0.005
@@ -215,7 +238,7 @@ class MiniHorseRunnerCfg(LeggedRobotRunnerCfg):
                 orientation = 1.0
                 torques = 5.0e-7
                 dof_vel = 0.0
-                # min_base_height = 1.5
+                # min_base_height = 1.3
                 action_rate = 0.01
                 action_rate2 = 0.001
                 stand_still = 0.0
