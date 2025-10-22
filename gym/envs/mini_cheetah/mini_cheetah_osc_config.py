@@ -15,7 +15,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
     class env(MiniCheetahCfg.env):
         num_envs = 4096
         num_actuators = 12
-        episode_length_s = 4.0
+        episode_length_s = 5.0
         env_spacing = 3.0
 
     class terrain(MiniCheetahCfg.terrain):
@@ -174,7 +174,6 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "commands",
             "dof_pos_obs",
             "dof_vel",
-            "oscillator_obs",
             "dof_pos_target",
         ]
         normalize_obs = False
@@ -238,6 +237,70 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
 
             class termination_weight:
                 termination = 0.15
+
+    # class policy:
+    #     hidden_dims = [256, 256, 128]
+    #     critic_hidden_dims = [256, 256, 128]
+    #     # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+    #     activation = "elu"
+    #     smooth_exploration = False
+
+    #     obs = [
+    #         "base_ang_vel",
+    #         "projected_gravity",
+    #         "commands",
+    #         "dof_pos_obs",
+    #         "dof_vel",
+    #         "oscillator_obs",
+    #         "dof_pos_target",
+    #     ]
+
+    #     critic_obs = [
+    #         "base_height",
+    #         "base_lin_vel",
+    #         "base_ang_vel",
+    #         "projected_gravity",
+    #         "commands",
+    #         "dof_pos_obs",
+    #         "dof_vel",
+    #         "oscillator_obs",
+    #         "oscillators_vel",
+    #         "dof_pos_target",
+    #     ]
+
+    #     actions = ["dof_pos_target"]
+
+    #     class noise:
+    #         pass
+
+    #     class reward:
+    #         class weights:
+    #             tracking_lin_vel = 4.0
+    #             tracking_ang_vel = 2.0
+    #             lin_vel_z = 0.0
+    #             ang_vel_xy = 0.01
+    #             orientation = 1.0
+    #             torques = 5.0e-7
+    #             dof_vel = 0.0
+    #             min_base_height = 1.5
+    #             collision = 0
+    #             action_rate = 0.01  # -0.01
+    #             action_rate2 = 0.001  # -0.001
+    #             stand_still = 0.0
+    #             dof_pos_limits = 0.0
+    #             feet_contact_forces = 0.0
+    #             dof_near_home = 0.0
+    #             swing_grf = 5.0
+    #             stance_grf = 5.0
+    #             swing_velocity = 0.0
+    #             stance_velocity = 0.0
+    #             coupled_grf = 0.0  # 8.
+    #             enc_pace = 0.0
+    #             cursorial = 0.25
+    #             standing_torques = 0.0  # 1.e-5
+
+    #         class termination_weight:
+    #             termination = 15.0 / 100.0
 
     class algorithm(MiniCheetahRunnerCfg.algorithm):
         # both
