@@ -59,8 +59,8 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
-        stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
-        damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
+        stiffness = {"haa": 182.0, "hfe": 192.0, "kfe": 600.0}
+        damping = {"haa": 1.51, "hfe": 1.55, "kfe": 2.74}
         ctrl_frequency = 100
         desired_sim_frequency = 500
 
