@@ -5,8 +5,7 @@
     <inertial>
         <mass value="490"/>
         <origin xyz="0.0 0.0 0.0"/>
-        <!-- scaled by 490 / 3.3 = 148.484848 -->
-        <inertia ixx="1.670900" ixy="0" ixz="0" iyy="53.755970" iyz="0" izz="6.336294"/>
+        <inertia ixx="46.853123" ixy="0" ixz="0" iyy="1507.352382" iyz="0" izz="177.673807"/>
     </inertial>
     <visual>
         <geometry><mesh filename="meshes/mini_vision_body.dae"/></geometry>
@@ -25,15 +24,14 @@
     <origin rpy="0 0 0" xyz="0.14775 -0.049 0.0"/>
     <parent link="base"/>
     <child link="rf_hip"/>
-    <limit effort="164" lower="-1.5" upper="1.5" velocity="41"/>
+    <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
 
 <link name="rf_hip">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.055 -0.036 0."/>
-        <!-- scaled by 4.558 / 0.54 = 8.440741 -->
-        <inertia ixx="0.003215922" ixy="0.000489563" ixz="0.000003798" iyy="0.004726815" iyz="0.000008019" izz="0.003747689"/>
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
     </inertial>
     <visual>
         <geometry>
@@ -49,15 +47,14 @@
     <origin rpy="0.0 0.0 0.0" xyz="0.055 -0.019 0.00"/>
     <parent link="rf_hip"/>
     <child link="rf_thigh"/>
-    <limit effort="172" lower="-2.6" upper="2.6" velocity="41"/>
+    <limit effort="250" lower="-2.6" upper="2.6" velocity="41"/>
 </joint>
 
 <link name="rf_thigh">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.0 -0.016 -0.02"/>
-        <!-- scaled by 4.558 / 0.634 = 7.189274 -->
-        <inertia ixx="0.01425633" ixy="0.001761372" ixz="0.000093461" iyy="0.01511904" iyz="0.000010784" izz="0.002933224"/>
+        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
     </inertial>
     <visual>
         <geometry>
@@ -79,15 +76,14 @@
     <origin rpy="0.0 0 0.0" xyz="0.0 -0.049 -0.2085"/>
     <parent link="rf_thigh"/>
     <child link="rf_shank"/>
-    <limit effort="840" lower="-2.7" upper="2.7" velocity="26.8"/>
+    <limit effort="2793" lower="-2.7" upper="2.7" velocity="26.8"/>
 </joint>
 
 <link name="rf_shank">
     <inertial>
         <mass value="2.02"/>
         <origin xyz="0.0 0.0 -0.061"/>
-        <!-- scaled by 2.02 / 0.064 = 31.5625 -->
-        <inertia ixx="0.007732813" ixy="0" ixz="0" iyy="0.007827500" iyz="0" izz="0.000189375"/>
+        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
     </inertial>
     <visual>
         <geometry>
@@ -118,8 +114,7 @@
     <inertial>
         <origin rpy="0 0 0" xyz="0 0 0.0"/>
         <mass value="0.20"/>
-        <!-- original foot inertia was zero; remains zero (scaled from 0) -->
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
     </inertial>
 </link>
 
@@ -130,15 +125,14 @@
     <origin rpy="0 0 0" xyz="0.14775 0.049 0.0"/>
     <parent link="base"/>
     <child link="lf_hip"/>
-    <limit effort="164" lower="-1.5" upper="1.5" velocity="41"/>
+    <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
 
 <link name="lf_hip">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.055 0.036 0."/>
-        <!-- same scaling as rf_hip -->
-        <inertia ixx="0.003215922" ixy="0.000489563" ixz="0.000003798" iyy="0.004726815" iyz="0.000008019" izz="0.003747689"/>
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
     </inertial>
     <visual>
         <geometry><mesh filename="meshes/mini_vision_abd.dae"/></geometry>
@@ -152,15 +146,14 @@
     <origin rpy="0.0 0.0 0.0" xyz="0.055 0.019 0.00"/>
     <parent link="lf_hip"/>
     <child link="lf_thigh"/>
-    <limit effort="172" lower="-2.6" upper="2.6" velocity="41"/>
+    <limit effort="250" lower="-2.6" upper="2.6" velocity="41"/>
 </joint>
 
 <link name="lf_thigh">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.0 0.016 -0.02"/>
-        <!-- same scaling as rf_thigh -->
-        <inertia ixx="0.01425633" ixy="0.001761372" ixz="0.000093461" iyy="0.01511904" iyz="0.000010784" izz="0.002933224"/>
+        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
     </inertial>
     <visual>
         <geometry>
@@ -168,10 +161,6 @@
         </geometry>
         <origin rpy="0.0 0 3.141592" xyz="0.0 0.0 0.0"/>
     </visual>
-    <collision>
-        <geometry><cylinder length ="0.17" radius = "0.015"/></geometry>
-        <origin rpy="0 0 0" xyz="0 0.05 -0.092"/>
-    </collision>
 </link>
 
 <!-- LF Shank and KFE -->
@@ -180,15 +169,14 @@
     <origin rpy="0.0 0 0.0" xyz="0.0 0.049 -0.2085"/>
     <parent link="lf_thigh"/>
     <child link="lf_shank"/>
-    <limit effort="840" lower="-2.7" upper="2.7" velocity="26.8"/>
+    <limit effort="2793" lower="-2.7" upper="2.7" velocity="26.8"/>
 </joint>
 
 <link name="lf_shank">
     <inertial>
         <mass value="2.02"/>
         <origin xyz="0.0 0.0 -0.061"/>
-        <!-- same scaling as rf_shank -->
-        <inertia ixx="0.007732813" ixy="0" ixz="0" iyy="0.007827500" iyz="0" izz="0.000189375"/>
+        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
     </inertial>
     <visual>
         <geometry>
@@ -196,12 +184,6 @@
         </geometry>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     </visual>
-    <collision>
-        <geometry>
-            <cylinder length ="0.1" radius = "0.01"/>
-        </geometry>
-        <origin rpy="0 0 0" xyz="0 0 -0.1"/>
-    </collision>
 </link>
 
 <!-- LF FOOT -->
@@ -219,7 +201,7 @@
     <inertial>
         <origin rpy="0 0 0" xyz="0 0 0.0"/>
         <mass value="0.20"/>
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
     </inertial>
 </link>
 
@@ -230,15 +212,14 @@
     <origin rpy="0 3.141592 0" xyz="-0.14775 -0.049 0.0"/>
     <parent link="base"/>
     <child link="rh_hip"/>
-    <limit effort="164" lower="-1.5" upper="1.5" velocity="41"/>
+    <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
 
 <link name="rh_hip">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.055 -0.036 0."/>
-        <!-- same scaling as rf_hip -->
-        <inertia ixx="0.003215922" ixy="0.000489563" ixz="0.000003798" iyy="0.004726815" iyz="0.000008019" izz="0.003747689"/>
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
     </inertial>
     <visual>
         <geometry>
@@ -254,15 +235,14 @@
     <origin rpy="0.0 3.141592 0.0" xyz="0.055 -0.019 0.00"/>
     <parent link="rh_hip"/>
     <child link="rh_thigh"/>
-    <limit effort="172" lower="-2.6" upper="2.6" velocity="41"/>
+    <limit effort="250" lower="-2.6" upper="2.6" velocity="41"/>
 </joint>
 
 <link name="rh_thigh">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.0 -0.016 -0.02"/>
-        <!-- same scaling as rf_thigh -->
-        <inertia ixx="0.01425633" ixy="0.001761372" ixz="0.000093461" iyy="0.01511904" iyz="0.000010784" izz="0.002933224"/>
+        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
     </inertial>
     <visual>
         <geometry>
@@ -270,12 +250,6 @@
         </geometry>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     </visual>
-    <collision>
-        <geometry>
-            <cylinder length ="0.17" radius = "0.015"/>
-        </geometry>
-        <origin rpy="0 0 0" xyz="0 -0.05 -0.092"/>
-    </collision>
 </link>
 
 <!-- RH Shank and KFE -->
@@ -284,15 +258,14 @@
     <origin rpy="0.0 0 0.0" xyz="0.0 -0.049 -0.2085"/>
     <parent link="rh_thigh"/>
     <child link="rh_shank"/>
-    <limit effort="840" lower="-2.7" upper="2.7" velocity="26.8"/>
+    <limit effort="2793" lower="-2.7" upper="2.7" velocity="26.8"/>
 </joint>
 
 <link name="rh_shank">
     <inertial>
         <mass value="2.02"/>
         <origin xyz="0.0 0.0 -0.061"/>
-        <!-- same scaling as rf_shank -->
-        <inertia ixx="0.007732813" ixy="0" ixz="0" iyy="0.007827500" iyz="0" izz="0.000189375"/>
+        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
     </inertial>
     <visual>
         <geometry>
@@ -300,12 +273,6 @@
         </geometry>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     </visual>
-    <collision>
-        <geometry>
-            <cylinder length ="0.1" radius = "0.01"/>
-        </geometry>
-        <origin rpy="0 0 0" xyz="0 0 -0.1"/>
-    </collision>
 </link>
 
 <!-- RH FOOT -->
@@ -323,7 +290,7 @@
     <inertial>
         <origin rpy="0 0 0" xyz="0 0 -0.0"/>
         <mass value="0.20"/>
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
     </inertial>
 </link>
 
@@ -334,15 +301,14 @@
     <origin rpy="0 3.141592 0" xyz="-0.14775 0.049 0.0"/>
     <parent link="base"/>
     <child link="lh_hip"/>
-    <limit effort="164" lower="-1.5" upper="1.5" velocity="41"/>
+    <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
 
 <link name="lh_hip">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.055 0.036 0."/>
-        <!-- same scaling as rf_hip -->
-        <inertia ixx="0.003215922" ixy="0.000489563" ixz="0.000003798" iyy="0.004726815" iyz="0.000008019" izz="0.003747689"/>
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
     </inertial>
     <visual>
         <geometry> <mesh filename="meshes/mini_vision_abd.dae"/> </geometry>
@@ -356,15 +322,14 @@
     <origin rpy="0.0 3.141592 0.0" xyz="0.055 0.019 0.00"/>
     <parent link="lh_hip"/>
     <child link="lh_thigh"/>
-    <limit effort="172" lower="-2.6" upper="2.6" velocity="41"/>
+    <limit effort="250" lower="-2.6" upper="2.6" velocity="41"/>
 </joint>
 
 <link name="lh_thigh">
     <inertial>
         <mass value="4.558"/>
         <origin xyz="0.0 0.016 -0.02"/>
-        <!-- same scaling as rf_thigh -->
-        <inertia ixx="0.01425633" ixy="0.001761372" ixz="0.000093461" iyy="0.01511904" iyz="0.000010784" izz="0.002933224"/>
+        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
     </inertial>
     <visual>
         <geometry>
@@ -372,12 +337,6 @@
         </geometry>
         <origin rpy="0.0 0 3.141592" xyz="0.0 0.0 0.0"/>
     </visual>
-    <collision>
-        <geometry>
-            <cylinder length ="0.17" radius = "0.015"/>
-        </geometry>
-        <origin rpy="0 0 0" xyz="0 0.05 -0.092"/>
-    </collision>
 </link>
 
 <!-- LH Shank and KFE -->
@@ -386,15 +345,14 @@
     <origin rpy="0.0 0 0.0" xyz="0.0 0.049 -0.2085"/>
     <parent link="lh_thigh"/>
     <child link="lh_shank"/>
-    <limit effort="840" lower="-2.7" upper="2.7" velocity="26.8"/>
+    <limit effort="2793" lower="-2.7" upper="2.7" velocity="26.8"/>
 </joint>
 
 <link name="lh_shank">
     <inertial>
         <mass value="2.02"/>
         <origin xyz="0.0 0.0 -0.061"/>
-        <!-- same scaling as rf_shank -->
-        <inertia ixx="0.007732813" ixy="0" ixz="0" iyy="0.007827500" iyz="0" izz="0.000189375"/>
+        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
     </inertial>
     <visual>
         <geometry>
@@ -402,12 +360,6 @@
         </geometry>
         <origin rpy="0.0 0.0 3.141592" xyz="0.0 0.0 0.0"/>
     </visual>
-    <collision>
-        <geometry>
-            <cylinder length ="0.1" radius = "0.01"/>
-        </geometry>
-        <origin rpy="0 0 0" xyz="0 0 -0.1"/>
-    </collision>
 </link>
 
 <!-- LH FOOT -->
@@ -425,7 +377,7 @@
     <inertial>
         <origin rpy="0 0 0" xyz="0 0 0.0"/>
         <mass value="0.20"/>
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
     </inertial>
 </link>
 
