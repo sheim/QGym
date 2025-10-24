@@ -40,6 +40,13 @@ class MiniCheetah(LeggedRobot):
         error = torch.sum(torch.square(error), dim=1)
         return torch.exp(-error / self.cfg.reward_settings.tracking_sigma)
 
+    def _reward_tracking_ang_vel(self):
+        """Tracking of angular velocity commands (yaw)"""
+        ang_vel_error = torch.square(
+            (self.commands[:, 2] - self.base_ang_vel[:, 2]) / 5.0
+        )
+        return self._sqrdexp(ang_vel_error)
+
     def _reward_dof_vel(self):
         """Penalize dof velocities"""
         return torch.sum(self._sqrdexp(self.dof_vel / self.scales["dof_vel"]), dim=1)

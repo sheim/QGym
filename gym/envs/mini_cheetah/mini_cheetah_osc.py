@@ -6,7 +6,7 @@ from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
 
 from isaacgym import gymtorch
 
-MINI_CHEETAH_MASS = 8.292 * 9.81  # Weight of mini cheetah in Newtons
+MINI_CHEETAH_WEIGHT = 8.292 * 9.81  # Weight of mini cheetah in Newtons
 
 
 class MiniCheetahOsc(MiniCheetah):
@@ -209,6 +209,21 @@ class MiniCheetahOsc(MiniCheetah):
                 0, len(possible_commands), (len(env_ids), 1), device=self.device
             )
         ]
+        # add some gaussian noise to the commands
+        self.commands[env_ids, 0:1] += (
+            torch.randn((len(env_ids), 1), device=self.device) * self.cfg.commands.var
+        )
+
+        # possible_commands = torch.tensor(self.command_ranges["lin_vel_y"],
+        #                                  device=self.device)
+        # self.commands[env_ids, 1:2] = possible_commands[torch.randint(
+        #     0, len(possible_commands), (len(env_ids), 1),
+        #     device=self.device)]
+        # possible_commands = torch.tensor(self.command_ranges["yaw_vel"],
+        #                                  device=self.device)
+        # self.commands[env_ids, 0:1] = possible_commands[torch.randint(
+        #     0, len(possible_commands), (len(env_ids), 1),
+        #     device=self.device)]
 
         if 0 in self.cfg.commands.ranges.lin_vel_x:
             # * with 20% chance, reset to 0 commands except for forward
@@ -262,7 +277,7 @@ class MiniCheetahOsc(MiniCheetah):
     def _compute_grf(self, grf_norm=True):
         grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
         if grf_norm:
-            return torch.clamp_max(grf / MINI_CHEETAH_MASS, 1.0)
+            return torch.clamp_max(grf / MINI_CHEETAH_WEIGHT, 1.0)
         else:
             return grf
 
@@ -323,38 +338,6 @@ class MiniCheetahOsc(MiniCheetah):
         combined_rew = self._sqrdexp(swing_rew * 2) + stance_rew
         prod = torch.prod(torch.clip(combined_rew, 0, 1), dim=1)
         return prod - torch.ones_like(prod)
-
-    def _reward_swing_velocity(self):
-        """Reward non-zero end effector velocity during swing (0 to pi)"""
-        # velocity = torch.tanh(torch.norm(self.end_effector_lin_vel, dim=-1))
-        velocity = torch.zeros_like(
-            self.oscillators
-        )  # TODO: Grab velocity from AJ V2 code
-        phase_bool = torch.lt(self.oscillators, torch.pi).int()
-        phase_sin = torch.maximum(
-            torch.zeros_like(self.oscillators), torch.sin(self.oscillators)
-        )
-        if self.cfg.osc.osc_bool:
-            rew = phase_bool * velocity
-        else:
-            rew = phase_sin * velocity
-        return torch.mean(rew, dim=1)
-
-    def _reward_stance_velocity(self):
-        """Reward zero end effector velocity during swing (pi to 2pi)"""
-        # velocity = torch.tanh(torch.norm(self.end_effector_lin_vel, dim=-1))
-        velocity = torch.zeros_like(
-            self.oscillators
-        )  # TODO: Grab velocity from AJ V2 code
-        ph_bool = torch.gt(self.oscillators, torch.pi).int()
-        ph_sin = torch.maximum(
-            torch.zeros_like(self.oscillators), -torch.sin(self.oscillators)
-        )
-        if self.cfg.osc.osc_bool:
-            rew = ph_bool * velocity
-        else:
-            rew = ph_sin * velocity
-        return -torch.mean(rew, dim=1)
 
     def _reward_dof_vel(self):
         return super()._reward_dof_vel() * self._switch()
