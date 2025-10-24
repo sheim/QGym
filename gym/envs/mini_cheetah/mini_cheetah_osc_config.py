@@ -25,7 +25,6 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
     class init_state(MiniCheetahCfg.init_state):
         timeout_reset_ratio = 0.75
         reset_mode = "reset_to_range"
-        timeout_reset_ratio = 0.75
         # * default COM for basic initialization
         pos = [0.0, 0.0, 0.35]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
@@ -266,7 +265,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     class algorithm:
         # training params
         value_loss_coef = 1.0
-        use_clipped_value_loss = False
+        use_clipped_value_loss = True
         clip_param = 0.2
         entropy_coef = 0.01
         num_learning_epochs = 4

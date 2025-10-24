@@ -88,10 +88,8 @@ class PPO2:
                 ).clamp(-self.clip_param, self.clip_param)
                 value_losses_clipped = (value_clipped - batch["returns"]).pow(2)
                 value_losses = (
-                    (self.critic.evaluate(batch["critic_obs"]) - batch["returns"])
-                    .pow(2)
-                    .mean()
-                )
+                    self.critic.evaluate(batch["critic_obs"]) - batch["returns"]
+                ).pow(2)
                 value_loss = torch.max(value_losses, value_losses_clipped).mean()
             else:
                 value_loss = self.critic.loss_fn(batch["critic_obs"], batch["returns"])
