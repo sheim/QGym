@@ -10,7 +10,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 12
-        episode_length_s = 4
+        episode_length_s = 10
 
     class terrain(LeggedRobotCfg.terrain):
         mesh_type = "plane"
@@ -74,9 +74,9 @@ class MiniCheetahCfg(LeggedRobotCfg):
             yaw_vel = 3  # max [rad/s]
 
     class push_robots:
-        toggle = True
-        interval_s = 15
-        max_push_vel_xy = 0.05
+        toggle = False
+        interval_s = 1
+        max_push_vel_xy = 0.5
         push_box_dims = [0.3, 0.1, 0.1]  # x,y,z [m]
 
     class domain_rand:

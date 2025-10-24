@@ -11,7 +11,7 @@ def setup(args):
     env_cfg, train_cfg = task_registry.create_cfgs(args)
     env_cfg.env.num_envs = 32
     if hasattr(env_cfg, "push_robots"):
-        env_cfg.push_robots.toggle = False
+        env_cfg.push_robots.toggle = True
     if hasattr(env_cfg, "commands"):
         env_cfg.commands.resampling_time = 9999
     env_cfg.env.episode_length_s = 50
@@ -22,6 +22,7 @@ def setup(args):
     train_cfg.runner.resume = True
     train_cfg.logging.enable_local_saving = False
     runner = task_registry.make_alg_runner(env, train_cfg)
+    # runner.actor_cfg["disable_actions"] = True
 
     # * switch to evaluation mode (dropout for example)
     runner.switch_to_eval()
