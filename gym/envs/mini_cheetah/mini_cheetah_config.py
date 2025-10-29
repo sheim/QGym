@@ -10,7 +10,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 12
-        episode_length_s = 4
+        episode_length_s = 6
 
     class terrain(LeggedRobotCfg.terrain):
         mesh_type = "plane"
@@ -59,8 +59,8 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
-        stiffness = {"haa": 182.0, "hfe": 192.0, "kfe": 600.0}
-        damping = {"haa": 1.51, "hfe": 1.55, "kfe": 2.74}
+        stiffness = {"haa": 379.193, "hfe": 406.701, "kfe": 1864.340}
+        damping = {"haa": 9.48, "hfe": 10.168, "kfe": 46.608}
         ctrl_frequency = 100
         desired_sim_frequency = 500
 
@@ -100,7 +100,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
         flip_visual_attachments = False
         disable_gravity = False
         disable_motors = False
-        joint_damping = 0.1
+        joint_damping = 0.3
         rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
 
     class reward_settings(LeggedRobotCfg.reward_settings):
