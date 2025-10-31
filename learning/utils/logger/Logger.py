@@ -90,8 +90,7 @@ class Logger:
             dashes_each_side = (width - subtitle_length) // 2
             log_string += "\n"
             log_string += (
-                f"{marker * dashes_each_side} {subtitle} "
-                f"{marker * dashes_each_side}\n"
+                f"{marker * dashes_each_side} {subtitle} {marker * dashes_each_side}\n"
             )
 
         separator(f"Iteration {self.iteration_counter}/{self.tot_iter}", "#")
@@ -114,7 +113,7 @@ class Logger:
         tot_t = self.timer.get_time("iteration")
         col_time = self.timer.get_time("collection")
         learn_time = self.timer.get_time("learning")
-        time_string = f"(sim: {col_time:.2f}" f", learn:{learn_time:.2f})"
+        time_string = f"(sim: {col_time:.2f}, learn:{learn_time:.2f})"
         format_log_entry("total time", tot_t, time_string)
 
         format_log_entry(

@@ -11,7 +11,7 @@ class GamepadInterface:
         print("__________________________________________________________")
         if pygame.joystick.get_count() == 1:
             print("Using gamepad interface, " + "overriding default comand settings")
-            print("left joystick: forward, strafe left, " "backward, strafe right")
+            print("left joystick: forward, strafe left, backward, strafe right")
             print("right joystick (left/right): yaw left/right")
             print("back button: reset environments")
             print("start button: quit")
@@ -26,8 +26,7 @@ class GamepadInterface:
 
         elif pygame.joystick.get_count() > 1:
             print(
-                "WARNING: you have more than one gamepad plugged in."
-                "Please unplug one."
+                "WARNING: you have more than one gamepad plugged in.Please unplug one."
             )
         else:
             print("WARNING: failed to initialize gamepad.")
