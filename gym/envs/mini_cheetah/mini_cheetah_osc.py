@@ -288,6 +288,11 @@ class MiniCheetahOsc(MiniCheetah):
             / self.cfg.reward_settings.switch_scale
         )
 
+    def _reward_ang_vel_xy(self):
+        """Penalize xy axes base angular velocity"""
+        error = self._sqrdexp(self.base_ang_vel[:, :2] / self.scales["base_ang_vel"][0])
+        return torch.sum(error, dim=1)
+
     def _reward_cursorial(self):
         # penalize the abad joints being away from 0
         return -torch.mean(
