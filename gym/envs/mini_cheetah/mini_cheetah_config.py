@@ -9,7 +9,7 @@ BASE_HEIGHT_REF = 0.3
 class MiniCheetahCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
-        num_actuators = 12
+        num_actuators = 13
         episode_length_s = 6
 
     class terrain(LeggedRobotCfg.terrain):
@@ -20,6 +20,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
             "haa": 0.0,
             "hfe": -0.785398,
             "kfe": 1.596976,
+            "base_joint": 0.0,
         }
 
         # * reset setup chooses how the initial conditions are chosen.
@@ -38,8 +39,15 @@ class MiniCheetahCfg(LeggedRobotCfg):
             "haa": [-0.01, 0.01],
             "hfe": [-0.785398, -0.785398],
             "kfe": [1.596976, 1.596976],
+            "base_joint": [-0.01, 0.01],
         }
-        dof_vel_range = {"haa": [0.0, 0.0], "hfe": [0.0, 0.0], "kfe": [0.0, 0.0]}
+        dof_vel_range = {
+            "haa": [0.0, 0.0],
+            "hfe": [0.0, 0.0],
+            "kfe": [0.0, 0.0],
+            "base_joint": [0.0, 0.0],
+        }
+
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
@@ -59,8 +67,8 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
-        stiffness = {"haa": 379.193, "hfe": 406.701, "kfe": 1864.340}
-        damping = {"haa": 9.48, "hfe": 10.168, "kfe": 46.608}
+        stiffness = {"haa": 379.193, "hfe": 406.701, "kfe": 1864.340, "base_joint": 500}
+        damping = {"haa": 9.48, "hfe": 10.168, "kfe": 46.608, "base_joint": 9.48}
         ctrl_frequency = 100
         desired_sim_frequency = 500
 
@@ -101,7 +109,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
         disable_gravity = False
         disable_motors = False
         joint_damping = 0.3
-        rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
+        rotor_inertia = [0.002268] + ([0.002268, 0.002268, 0.005484] * 4)
 
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9
@@ -114,12 +122,12 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class scaling(LeggedRobotCfg.scaling):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
-        dof_vel = 4 * [2.0, 2.0, 4.0]
+        dof_vel = [2.0] + (4 * [2.0, 2.0, 4.0])
         base_height = 0.3
-        dof_pos = 4 * [0.2, 0.3, 0.3]
+        dof_pos = [0.2] + (4 * [0.2, 0.3, 0.3])
         dof_pos_obs = dof_pos
-        dof_pos_target = 4 * [0.2, 0.3, 0.3]
-        tau_ff = 4 * [18, 18, 28]
+        dof_pos_target = [0.2] + (4 * [0.2, 0.3, 0.3])
+        tau_ff = [18] + (4 * [18, 18, 28])
         commands = [3, 1, 3, 1]  # add height as a command
 
 

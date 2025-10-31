@@ -1,28 +1,49 @@
 <?xml version="1.1" ?>
 <robot name="mini_cheetah">
 <!-- Base -->
-<link name="base">
+<link name="front_base">
     <inertial>
-        <mass value="490"/>
+        <mass value="345"/>
         <origin xyz="0.0 0.0 0.0"/>
         <inertia ixx="46.853123" ixy="0" ixz="0" iyy="1507.352382" iyz="0" izz="177.673807"/>
     </inertial>
     <visual>
-        <geometry><mesh filename="meshes/mini_vision_body.dae"/></geometry>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+        <geometry><box size="0.20 0.20 0.10"/></geometry>
+        <origin rpy="0 0 0" xyz="0 0 0.01"/>
     </visual>
     <collision>
-        <geometry><box size="0.30 0.20 0.10"/></geometry>
+        <geometry><box size="0.20 0.20 0.10"/></geometry>
         <origin rpy="0 0 0" xyz="0 0 0.01"/>
     </collision>
 </link>
+<link name="back_base">
+    <inertial>
+        <mass value="145"/>
+        <origin xyz="0.0 0.0 0.0"/>
+        <inertia ixx="46.853123" ixy="0" ixz="0" iyy="1507.352382" iyz="0" izz="177.673807"/>
+    </inertial>
+    <visual>
+        <geometry><box size="0.10 0.20 0.10"/></geometry>
+        <origin rpy="0 0 0" xyz="-0.1 0 -0.04"/>
+    </visual>
+    <collision>
+        <geometry><box size="0.10 0.20 0.10"/></geometry>
+        <origin rpy="0 0 0" xyz="-0.1 0 -0.04"/>
+    </collision>
+</link>
+
+  <joint name="base_joint" type="revolute">
+    <parent link="front_base"/><child link="back_base"/>
+    <origin xyz="-0.10 0 0.05" rpy="0 0 0"/><axis xyz="0 1 0"/>
+    <limit effort="18" lower="-0.2" upper="0.2" velocity="41"/>
+  </joint>
 
 <!-- RF Leg -->
 <!-- RF Hip and HAA -->
 <joint name="1_rf_haa" type="revolute">
     <axis xyz="1 0 0"/>
     <origin rpy="0 0 0" xyz="0.14775 -0.049 0.0"/>
-    <parent link="base"/>
+    <parent link="front_base"/>
     <child link="rf_hip"/>
     <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
@@ -123,7 +144,7 @@
 <joint name="2_lf_haa" type="revolute">
     <axis xyz="1 0 0"/>
     <origin rpy="0 0 0" xyz="0.14775 0.049 0.0"/>
-    <parent link="base"/>
+    <parent link="front_base"/>
     <child link="lf_hip"/>
     <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
@@ -209,8 +230,8 @@
 <!-- RH Hip and HAA -->
 <joint name="3_rh_haa" type="revolute">
     <axis xyz="-1 0 0"/>
-    <origin rpy="0 3.141592 0" xyz="-0.14775 -0.049 0.0"/>
-    <parent link="base"/>
+    <origin rpy="0 3.141592 0" xyz="-0.14775 -0.049 -0.05"/>
+    <parent link="back_base"/>
     <child link="rh_hip"/>
     <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
@@ -298,8 +319,8 @@
 <!-- LH Hip and HAA -->
 <joint name="4_lh_haa" type="revolute">
     <axis xyz="-1 0 0"/>
-    <origin rpy="0 3.141592 0" xyz="-0.14775 0.049 0.0"/>
-    <parent link="base"/>
+    <origin rpy="0 3.141592 0" xyz="-0.14775 0.049 -0.05"/>
+    <parent link="back_base"/>
     <child link="lh_hip"/>
     <limit effort="309" lower="-1.5" upper="1.5" velocity="41"/>
 </joint>
