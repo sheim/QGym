@@ -79,7 +79,7 @@ class FixedRobot(BaseTask):
                     self.num_envs, device=self.device
                 )
         self.gym.set_dof_actuation_force_tensor(
-            self.sim, gymtorch.unwrap_tensor(self.torques)
+            self.sim, gymtorch.unwrap_tensor(torques_to_gym_tensor)
         )
         self.gym.simulate(self.sim)
         if self.device == "cpu":
