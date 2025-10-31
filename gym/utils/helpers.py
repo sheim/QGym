@@ -242,8 +242,7 @@ def get_args(custom_parameters=None):
             "name": "--rl_device",
             "type": str,
             "default": "cuda:0",
-            "help": "Device used by the RL algorithm, "
-            "(cpu, gpu, cuda:0, cuda:1 etc..)",
+            "help": "Device used by the RL algorithm, (cpu, gpu, cuda:0, cuda:1 etc..)",
         },
         {
             "name": "--num_envs",

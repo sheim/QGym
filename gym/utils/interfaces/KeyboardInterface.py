@@ -21,7 +21,7 @@ class KeyboardInterface:
         print("______________________________________________________________")
         print("Using keyboard interface, overriding default comand settings")
         print("commands are in 1/5 increments of max.")
-        print("WASD: forward, strafe left, " "backward, strafe right")
+        print("WASD: forward, strafe left, backward, strafe right")
         print("QE: yaw left/right")
         print("R: reset environments")
         print("ESC: quit")

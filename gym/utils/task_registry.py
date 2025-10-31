@@ -174,7 +174,7 @@ class TaskRegistry:
         if env_cfg.sim_dt != 1.0 / env_cfg.control.desired_sim_frequency:
             print(
                 f"****** Simulation dt adjusted from "
-                f"{1.0/env_cfg.control.desired_sim_frequency}"
+                f"{1.0 / env_cfg.control.desired_sim_frequency}"
                 f" to {env_cfg.sim_dt}."
             )
 
