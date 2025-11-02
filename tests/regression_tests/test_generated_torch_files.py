@@ -1,15 +1,32 @@
+import subprocess
+import sys
+from pathlib import Path
+
 import torch
 
-
-def compare_tensors(file1, file2):
-    tensor1 = torch.load(file1, weights_only=True)
-    tensor2 = torch.load(file2, weights_only=True)
-    assert torch.all(
-        torch.eq(tensor1, tensor2)
-    ), f"Tensors in {file1} and {file2} are not equal."
+REFERENCE_FILE = Path(__file__).with_name("main_output.pt")
+RUN_SCRIPT = Path(__file__).with_name("run_n_iterations.py")
 
 
-def test_tensor_comparison():
-    file1 = "main_output.pt"
-    file2 = "pr_output.pt"
-    compare_tensors(file1, file2)
+def _generate_candidate_tensor(output_path: Path) -> None:
+    cmd = [
+        sys.executable,
+        str(RUN_SCRIPT),
+        "--output_tensor_file",
+        str(output_path),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def _load_tensor(path: Path):
+    return torch.load(path, weights_only=True)
+
+
+def test_generated_tensor_matches_reference(tmp_path):
+    candidate_path = tmp_path / "generated_output.pt"
+    _generate_candidate_tensor(candidate_path)
+    reference = _load_tensor(REFERENCE_FILE)
+    candidate = _load_tensor(candidate_path)
+    assert torch.equal(
+        reference, candidate
+    ), f"Tensors in {REFERENCE_FILE} and {candidate_path} differ."

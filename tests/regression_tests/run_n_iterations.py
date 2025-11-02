@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from gym.envs import __init__  # noqa: F401
 from gym.utils import get_args, task_registry
 import torch
@@ -12,6 +14,10 @@ def setup():
         }
     ]
     args = get_args(custom_parameter)
+    if not args.output_tensor_file:
+        args.output_tensor_file = Path(__file__).with_name("main_output.pt")
+    else:
+        args.output_tensor_file = Path(args.output_tensor_file)
     args.task = "mini_cheetah"
     args.seed = 0
     args.headless = True
@@ -29,6 +35,8 @@ def setup():
 
 
 def _run_training_test(output_tensor_file, env, runner):
+    output_tensor_file = Path(output_tensor_file)
+    output_tensor_file.parent.mkdir(parents=True, exist_ok=True)
     # * take a full iteration step
     runner.learn()
 

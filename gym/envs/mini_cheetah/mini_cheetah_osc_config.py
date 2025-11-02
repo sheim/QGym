@@ -15,7 +15,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
     class env(MiniCheetahCfg.env):
         num_envs = 4096
         num_actuators = 12
-        episode_length_s = 4.0
+        episode_length_s = 10.0
         env_spacing = 3.0
 
     class terrain(MiniCheetahCfg.terrain):
@@ -23,8 +23,8 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         # mesh_type = 'trimesh'  # none, plane, heightfield or trimesh
 
     class init_state(MiniCheetahCfg.init_state):
-        reset_mode = "reset_to_range"
         timeout_reset_ratio = 0.75
+        reset_mode = "reset_to_range"
         # * default COM for basic initialization
         pos = [0.0, 0.0, 0.35]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
@@ -38,7 +38,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
         # * initialization for random range setup
         dof_pos_range = {
-            "haa": [-0.01, 0.01],
+            "haa": [0.0, 0.01],
             "hfe": [-0.785398, -0.785398],
             "kfe": [1.596976, 1.596976],
         }
@@ -46,7 +46,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.35, 0.35],  # z
+            [0.375, 0.375],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
@@ -54,7 +54,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         root_vel_range = [
             [-0.5, 2.0],  # x
             [0.0, 0.0],  # y
-            [-0.05, 0.05],  # z
+            [0.0, 0.0],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
@@ -69,18 +69,15 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
     class osc:
         process_noise_std = 0.25
-        # oscillator parameters
-        omega = 3  # 0.5 #3.5  # in Hz
-        coupling = 1  # 0.02
-        osc_bool = False
-        grf_bool = False
-        randomize_osc_params = False
         grf_threshold = 0.1  # 20. # Normalized to body weight
+        # oscillator parameters
+        omega = 3  # gets overwritten
+        coupling = 1  # gets overwritten
+        osc_bool = False  # not used in paper
+        grf_bool = False  # not used in paper
+        randomize_osc_params = False
         omega_range = [1.0, 4.0]  # [0.0, 10.]
-        coupling_range = [
-            0.0,
-            1.0,
-        ]  # with normalized grf, can have omega/coupling on same scale
+        coupling_range = [0.0, 1.0]
         offset_range = [0.0, 0.0]
         stop_threshold = 0.5
         omega_stop = 1.0
@@ -100,12 +97,12 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         init_to = "random"
         init_w_offset = True
 
-    class commands(MiniCheetahCfg.commands):
+    class commands:
         resampling_time = 3.0  # time before command are changed[s]
         var = 1.0
 
-        class ranges(MiniCheetahCfg.commands.ranges):
-            lin_vel_x = [-3.0, -1.0, 0.0, 1.0, 3.0]  # min max [m/s]
+        class ranges:
+            lin_vel_x = [-1.0, 0.0, 1.0, 3.0]  # min max [m/s]
             lin_vel_y = 1.0  # [-1., 0, 1.]  # max [m/s]
             yaw_vel = 3.0  # [-6., -3., 0., 3., 6.]    # max [rad/s]
 
@@ -155,21 +152,42 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         switch_scale = 0.5
 
     class scaling(MiniCheetahCfg.scaling):
-        pass
+        base_ang_vel = [0.3, 0.3, 0.1]
+        base_lin_vel = BASE_HEIGHT_REF
+        # dof_vel = 100.
+        # dof_vel = 4*[41, 41, 27]  # ought to be roughly max expected speed.
+        dof_vel = 4 * [2.0, 2.0, 4.0]
+        base_height = 0.3
+        dof_pos = 4 * [0.2, 0.3, 0.3]  # hip-abad, hip-pitch, knee
+        dof_pos_obs = dof_pos
+        dof_pos_target = 4 * [0.2, 0.3, 0.3]
+        tau_ff = 4 * [18, 18, 28]  # hip-abad, hip-pitch, knee
+        # commands = [base_lin_vel, base_lin_vel, base_ang_vel]
+        commands = [3, 1, 3]  # [base_lin_vel, base_lin_vel, base_ang_vel]
 
 
 class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
-    class policy:
+    class actor(MiniCheetahRunnerCfg.actor):
         hidden_dims = [256, 256, 128]
-        critic_hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        smooth_exploration = False
-
+        # obs = [
+        #     "base_height",
+        #     "base_lin_vel",
+        #     "base_ang_vel",
+        #     "projected_gravity",
+        #     "commands",
+        #     "dof_pos_obs",
+        #     "dof_vel",
+        #     "oscillator_obs",
+        #     "dof_pos_target",
+        # ]
         obs = [
+            "base_height",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -177,9 +195,31 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "oscillator_obs",
             "dof_pos_target",
+            #  "osc_omega",
+            #  "osc_coupling"
+            #  "oscillators_vel",
+            #  "grf",
         ]
+        normalize_obs = True
+        actions = ["dof_pos_target"]
+        add_noise = True
+        disable_actions = False
 
-        critic_obs = [
+        class noise:
+            scale = 1.0
+            dof_pos_obs = 0.01
+            base_ang_vel = 0.01
+            dof_pos = 0.005
+            dof_vel = 0.005
+            lin_vel = 0.05
+            ang_vel = [0.3, 0.15, 0.4]
+            gravity_vec = 0.1
+
+    class critic(MiniCheetahRunnerCfg.critic):
+        hidden_dims = [256, 256, 128]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        obs = [
             "base_height",
             "base_lin_vel",
             "base_ang_vel",
@@ -191,22 +231,18 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "oscillators_vel",
             "dof_pos_target",
         ]
-
-        actions = ["dof_pos_target"]
-
-        class noise:
-            pass
+        normalize_obs = True
 
         class reward:
             class weights:
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
-                ang_vel_xy = 0.01
+                ang_vel_xy = 0.0
                 orientation = 1.0
                 torques = 5.0e-7
                 dof_vel = 0.0
-                min_base_height = 1.5
+                min_base_height = 1.0
                 collision = 0
                 action_rate = 0.01  # -0.01
                 action_rate2 = 0.001  # -0.001
@@ -214,8 +250,8 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                swing_grf = 5.0
-                stance_grf = 5.0
+                swing_grf = 1.0
+                stance_grf = 1.0
                 swing_velocity = 0.0
                 stance_velocity = 0.0
                 coupled_grf = 0.0  # 8.
@@ -226,21 +262,24 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             class termination_weight:
                 termination = 15.0 / 100.0
 
-    class algorithm(MiniCheetahRunnerCfg.algorithm):
+    class algorithm:
         # training params
         value_loss_coef = 1.0
         use_clipped_value_loss = True
         clip_param = 0.2
-        entropy_coef = 0.02
+        entropy_coef = 0.01
         num_learning_epochs = 4
         # mini batch size = num_envs*nsteps/nminibatches
         num_mini_batches = 8
-        learning_rate = 1.0e-5
+        max_gradient_steps = 32
+        learning_rate = 1.0e-4
         schedule = "adaptive"  # can be adaptive, fixed
         discount_horizon = 1.0
         GAE_bootstrap_horizon = 2.0
         desired_kl = 0.01
         max_grad_norm = 1.0
+        lr_range = [1e-5, 5e-3]
+        lr_ratio = 1.5
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

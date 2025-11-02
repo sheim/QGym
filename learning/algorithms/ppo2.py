@@ -81,7 +81,19 @@ class PPO2:
             max_gradient_steps=self.max_gradient_steps,
         )
         for batch in generator:
-            value_loss = self.critic.loss_fn(batch["critic_obs"], batch["returns"])
+            # todo validate and check this
+            if self.use_clipped_value_loss:
+                value_clipped = batch["values"] + (
+                    self.critic.evaluate(batch["critic_obs"]) - batch["values"]
+                ).clamp(-self.clip_param, self.clip_param)
+                value_losses_clipped = (value_clipped - batch["returns"]).pow(2)
+                value_losses = (
+                    self.critic.evaluate(batch["critic_obs"]) - batch["returns"]
+                ).pow(2)
+                value_loss = torch.max(value_losses, value_losses_clipped).mean()
+            else:
+                value_loss = self.critic.loss_fn(batch["critic_obs"], batch["returns"])
+
             self.critic_optimizer.zero_grad()
             value_loss.backward()
             nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
