@@ -1,442 +1,442 @@
-<?xml version="1.1" ?>
+<?xml version='1.2' encoding='utf-8'?>
 <robot name="mini_cheetah">
-<!-- Base -->
+
 <link name="front_base">
     <inertial>
-        <mass value="345"/>
-        <origin xyz="0.0 0.0 0.0"/>
-        <inertia ixx="46.853123" ixy="0" ixz="0" iyy="1507.352382" iyz="0" izz="177.673807"/>
+        <mass value="345" />
+        <origin xyz="0 0 0.05" rpy="0 0 0" />
+        <inertia ixx="11.629375" ixy="0" ixz="0" iyy="37.389375" iyz="0" izz="34.063" />
     </inertial>
-    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
+    <visual><origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <box size="1.02 0.38 0.61"/>
+        <box size="1.02 0.38 0.61" />
       </geometry>
       <material name="brown">
-        <color rgba="0.5 0.3 0.2 0.5"/>
+        <color rgba="0.5 0.3 0.2 0.5" />
       </material>
     </visual>
     <collision>
-      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <origin xyz="0 0 0.05" rpy="0 0 0" />
       <geometry>
-        <box size="1.02 0.38 0.51"/>
+        <box size="1.02 0.38 0.51" />
       </geometry>
     </collision>
 </link>
 <link name="back_base">
     <inertial>
-        <mass value="145"/>
-        <origin xyz="0.0 0.0 0.0"/>
-        <inertia ixx="46.853123" ixy="0" ixz="0" iyy="1507.352382" iyz="0" izz="177.673807"/>
+        <mass value="145" />
+        <origin xyz="-0.32 0 -0.25" rpy="0 0 0" />
+        <inertia ixx="4.88770833" ixy="0" ixz="0" iyy="5.17408333" iyz="0" izz="3.77604167" />
     </inertial>
     <visual>
-      <origin xyz="-0.27 0 -0.3" rpy="0 0 0"/>
+      <origin xyz="-0.27 0 -0.3" rpy="0 0 0" />
       <geometry>
-        <box size="0.51 0.38 0.61"/>
+        <box size="0.51 0.38 0.61" />
       </geometry>
       <material name="brown">
-        <color rgba="0.5 0.3 0.2 0.5"/>
+        <color rgba="0.5 0.3 0.2 0.5" />
       </material>
     </visual>
     <collision>
-      <origin xyz="-0.32 0 -0.25" rpy="0 0 0"/>
+      <origin xyz="-0.32 0 -0.25" rpy="0 0 0" />
       <geometry>
-        <box size="0.41 0.38 0.51"/>
+        <box size="0.41 0.38 0.51" />
       </geometry>
     </collision>
 </link>
 
   <joint name="base_joint" type="revolute">
-    <parent link="front_base"/><child link="back_base"/>
-    <origin xyz="-0.5 0 0.3" rpy="0 0 0"/><axis xyz="0 1 0"/>
-    <limit effort="1100" lower="-0.2" upper="0.2" velocity="41"/>
+    <parent link="front_base" /><child link="back_base" />
+    <origin xyz="-0.5 0 0.3" rpy="0 0 0" /><axis xyz="0 1 0" />
+    <limit effort="1100" lower="-0.2" upper="0.2" velocity="41" />
   </joint>
 
 <!-- RF Leg -->
 <!-- RF Hip and HAA -->
 <joint name="1_rf_haa" type="revolute">
-    <axis xyz="1 0 0"/>
-    <origin xyz="0.35 -0.225 -0.23" rpy="0 0 0"/><axis xyz="1 0 0"/>
-    <parent link="front_base"/>
-    <child link="rf_hip"/>
-    <limit effort="309" llower="-0.2" upper="0.2" velocity="41"/>
+    <axis xyz="1 0 0" />
+    <origin xyz="0.35 -0.225 -0.23" rpy="0 0 0" /><axis xyz="1 0 0" />
+    <parent link="front_base" />
+    <child link="rf_hip" />
+    <limit effort="309" llower="-0.2" upper="0.2" velocity="41" />
 </joint>
 
 <link name="rf_hip">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.055 -0.036 0."/>
-        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
+        <mass value="4.558" />
+        <origin xyz="0.055 -0.036 0." />
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
+    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0" /><geometry><cylinder length="0.05" radius="0.075" /></geometry></visual>
 </link>
 
 <!-- RF Thigh and HFE -->
 <joint name="rf_hfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 -0.12 -0.05"/>
-    <parent link="rf_hip"/>
-    <child link="rf_thigh"/>
-    <limit effort="250" lower="-0.5" upper="1.7" velocity="41"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 -0.12 -0.05" />
+    <parent link="rf_hip" />
+    <child link="rf_thigh" />
+    <limit effort="250" lower="-0.5" upper="1.7" velocity="41" />
 </joint>
 
 <link name="rf_thigh">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.0 -0.016 -0.02"/>
-        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
+        <mass value="4.558" />
+        <origin xyz="0 0 -0.2" rpy="0 0 0" />
+        <inertia ixx="0.0693195833" ixy="0" ixz="0" iyy="0.0693195833" iyz="0" izz="0.0170925" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 -0.2"/><geometry><cylinder length="0.46" radius="0.075"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.2"/><geometry><box size="0.15 0.15 0.4"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.2" /><geometry><cylinder length="0.46" radius="0.075" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.2" /><geometry><box size="0.15 0.15 0.4" /></geometry></collision>
 </link>
 
 <!-- RF Shank and KFE -->
 <joint name="rf_kfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="-0.07 0.0 -0.43"/>
-    <parent link="rf_thigh"/>
-    <child link="rf_shank"/>
-    <limit effort="2793" lower="-3.0" upper="0.0" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="-0.07 0.0 -0.43" />
+    <parent link="rf_thigh" />
+    <child link="rf_shank" />
+    <limit effort="2793" lower="-3.0" upper="0.0" velocity="26.8" />
 </joint>
 
 <link name="rf_shank">
     <inertial>
-        <mass value="2.02"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
+        <mass value="2.02" />
+        <origin xyz="0.05 0 -0.15" rpy="0 0 0" />
+        <inertia ixx="0.0115981667" ixy="0" ixz="0" iyy="0.0115981667" iyz="0" izz="0.00215466667" />
     </inertial>
-    <visual><geometry><cylinder length="0.3" radius="0.04"/></geometry><origin xyz="0.05 0.0 -0.15"/></visual>
-    <collision><geometry><box size="0.08 0.08 0.25"/></geometry><origin xyz="0.05 0.0 -0.15"/></collision>
+    <visual><geometry><cylinder length="0.3" radius="0.04" /></geometry><origin xyz="0.05 0.0 -0.15" /></visual>
+    <collision><geometry><box size="0.08 0.08 0.25" /></geometry><origin xyz="0.05 0.0 -0.15" /></collision>
 </link>
 
 <!-- RF Pastern and PFE -->
 <joint name="rf_pfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="0.05 0.0 -0.3"/>
-    <parent link="rf_shank"/>
-    <child link="rf_pastern"/>
-    <limit effort="2793" lower="-1.2" upper="0.5" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="0.05 0.0 -0.3" />
+    <parent link="rf_shank" />
+    <child link="rf_pastern" />
+    <limit effort="2793" lower="-1.2" upper="0.5" velocity="26.8" />
 </joint>
 
 <link name="rf_pastern">
-    <visual><origin xyz="0.0 0.0 -0.07"/><geometry><cylinder length="0.13" radius="0.03"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.075"/><geometry><box size="0.06 0.06 0.08"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.07" /><geometry><cylinder length="0.13" radius="0.03" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.075" /><geometry><box size="0.06 0.06 0.08" /></geometry></collision>
     <inertial>
-        <mass value="0.875"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.122692" ixy="0" ixz="0" iyy="0.124194" iyz="0" izz="0.003005"/>
+        <mass value="0.875" />
+        <origin xyz="0 0 -0.075" rpy="0 0 0" />
+        <inertia ixx="0.000729166667" ixy="0" ixz="0" iyy="0.000729166667" iyz="0" izz="0.000525" />
     </inertial>
 </link>
 
 <!-- RF FOOT -->
 <joint name="rf_pastern_to_foot" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <parent link="rf_pastern"/>
-    <child link="rf_foot"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.15"/>
-    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0"/>
+    <axis xyz="0 -1 0" />
+    <parent link="rf_pastern" />
+    <child link="rf_foot" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.15" />
+    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0" />
 </joint>
 
 <link name="rf_foot">
-    <visual><origin xyz="0.0 0.0 -0.03"/><geometry><cylinder length="0.08" radius="0.05"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.045"/><geometry><box size="0.1 0.1 0.05"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.03" /><geometry><cylinder length="0.08" radius="0.05" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.045" /><geometry><box size="0.1 0.1 0.05" /></geometry></collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0.0"/>
-        <mass value="0.20"/>
-        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 -0.045" />
+        <mass value="0.20" />
+        <inertia ixx="0.000208333333" ixy="0" ixz="0" iyy="0.000208333333" iyz="0" izz="0.000333333333" />
     </inertial>
 </link>
 
 <!-- LF Leg -->
 <!-- LF Hip and HAA -->
 <joint name="2_lf_haa" type="revolute">
-    <axis xyz="1 0 0"/>
-    <origin xyz="0.35 0.225 -0.23" rpy="0 0 0"/><axis xyz="1 0 0"/>
-    <parent link="front_base"/>
-    <child link="lf_hip"/>
-    <limit effort="309" lower="-0.2" upper="0.2" velocity="41"/>
+    <axis xyz="1 0 0" />
+    <origin xyz="0.35 0.225 -0.23" rpy="0 0 0" /><axis xyz="1 0 0" />
+    <parent link="front_base" />
+    <child link="lf_hip" />
+    <limit effort="309" lower="-0.2" upper="0.2" velocity="41" />
 </joint>
 
 <link name="lf_hip">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.055 0.036 0."/>
-        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
+        <mass value="4.558" />
+        <origin xyz="0.055 0.036 0." />
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
+    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0" /><geometry><cylinder length="0.05" radius="0.075" /></geometry></visual>
 </link>
 
 <!-- LF Thigh and HFE -->
 <joint name="lf_hfe" type="revolute">
-    <axis xyz="0 1 0"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.12 -0.05"/>
-    <parent link="lf_hip"/>
-    <child link="lf_thigh"/>
-    <limit effort="250" lower="-1.5" upper="0.5" velocity="41"/>
+    <axis xyz="0 1 0" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.12 -0.05" />
+    <parent link="lf_hip" />
+    <child link="lf_thigh" />
+    <limit effort="250" lower="-1.5" upper="0.5" velocity="41" />
 </joint>
 
 <link name="lf_thigh">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.0 0.016 -0.02"/>
-        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
+        <mass value="4.558" />
+        <origin xyz="0 0 -0.2" rpy="0 0 0" />
+        <inertia ixx="0.0693195833" ixy="0" ixz="0" iyy="0.0693195833" iyz="0" izz="0.0170925" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 -0.2"/><geometry><cylinder length="0.46" radius="0.075"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.2"/><geometry><box size="0.15 0.15 0.4"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.2" /><geometry><cylinder length="0.46" radius="0.075" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.2" /><geometry><box size="0.15 0.15 0.4" /></geometry></collision>
 </link>
 
 <!-- LF Shank and KFE -->
 <joint name="lf_kfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="0.0 0.049 -0.45"/>
-    <parent link="lf_thigh"/>
-    <child link="lf_shank"/>
-    <limit effort="2793" lower="-2.7" upper="2.7" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="0.0 0.049 -0.45" />
+    <parent link="lf_thigh" />
+    <child link="lf_shank" />
+    <limit effort="2793" lower="-2.7" upper="2.7" velocity="26.8" />
 </joint>
 
 <!-- LF Shank and KFE -->
 <joint name="lf_kfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="-0.07 0.0 -0.43"/>
-    <parent link="lf_thigh"/>
-    <child link="lf_shank"/>
-    <limit effort="2793" lower="-3.0" upper="0.0" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="-0.07 0.0 -0.43" />
+    <parent link="lf_thigh" />
+    <child link="lf_shank" />
+    <limit effort="2793" lower="-3.0" upper="0.0" velocity="26.8" />
 </joint>
 
 <link name="lf_shank">
     <inertial>
-        <mass value="2.02"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
+        <mass value="2.02" />
+        <origin xyz="0.05 0 -0.15" rpy="0 0 0" />
+        <inertia ixx="0.0115981667" ixy="0" ixz="0" iyy="0.0115981667" iyz="0" izz="0.00215466667" />
     </inertial>
-    <visual><geometry><cylinder length="0.3" radius="0.04"/></geometry><origin xyz="0.05 0.0 -0.15"/></visual>
-    <collision><geometry><box size="0.08 0.08 0.25"/></geometry><origin xyz="0.05 0.0 -0.15"/></collision>
+    <visual><geometry><cylinder length="0.3" radius="0.04" /></geometry><origin xyz="0.05 0.0 -0.15" /></visual>
+    <collision><geometry><box size="0.08 0.08 0.25" /></geometry><origin xyz="0.05 0.0 -0.15" /></collision>
 </link>
 
 <!-- LF Pastern and PFE -->
 <joint name="lf_pfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="0.05 0.0 -0.3"/>
-    <parent link="lf_shank"/>
-    <child link="lf_pastern"/>
-    <limit effort="2793" lower="-1.2" upper="0.5" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="0.05 0.0 -0.3" />
+    <parent link="lf_shank" />
+    <child link="lf_pastern" />
+    <limit effort="2793" lower="-1.2" upper="0.5" velocity="26.8" />
 </joint>
 
 <link name="lf_pastern">
-    <visual><origin xyz="0.0 0.0 -0.07"/><geometry><cylinder length="0.13" radius="0.03"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.075"/><geometry><box size="0.06 0.06 0.08"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.07" /><geometry><cylinder length="0.13" radius="0.03" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.075" /><geometry><box size="0.06 0.06 0.08" /></geometry></collision>
     <inertial>
-        <mass value="0.875"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.122692" ixy="0" ixz="0" iyy="0.124194" iyz="0" izz="0.003005"/>
+        <mass value="0.875" />
+        <origin xyz="0 0 -0.075" rpy="0 0 0" />
+        <inertia ixx="0.000729166667" ixy="0" ixz="0" iyy="0.000729166667" iyz="0" izz="0.000525" />
     </inertial>
 </link>
 
 <!-- LF FOOT -->
 <joint name="lf_pastern_to_foot" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <parent link="lf_pastern"/>
-    <child link="lf_foot"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.15"/>
-    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0"/>
+    <axis xyz="0 -1 0" />
+    <parent link="lf_pastern" />
+    <child link="lf_foot" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.15" />
+    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0" />
 </joint>
 
 <link name="lf_foot">
-    <visual><origin xyz="0.0 0.0 -0.03"/><geometry><cylinder length="0.08" radius="0.05"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.045"/><geometry><box size="0.1 0.1 0.05"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.03" /><geometry><cylinder length="0.08" radius="0.05" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.045" /><geometry><box size="0.1 0.1 0.05" /></geometry></collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0.0"/>
-        <mass value="0.20"/>
-        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 -0.045" />
+        <mass value="0.20" />
+        <inertia ixx="0.000208333333" ixy="0" ixz="0" iyy="0.000208333333" iyz="0" izz="0.000333333333" />
     </inertial>
 </link>
 
 <!-- RH Leg -->
 <!-- RH Hip and HAA -->
 <joint name="3_rh_haa" type="revolute">
-    <axis xyz="-1 0 0"/>
-    <origin rpy="0 3.141592 0" xyz="-0.3 -0.225 -0.43"/>
-    <parent link="back_base"/>
-    <child link="rh_hip"/>
-    <limit effort="309" lower="-0.2" upper="0.2" velocity="41"/>
+    <axis xyz="-1 0 0" />
+    <origin rpy="0 3.141592 0" xyz="-0.3 -0.225 -0.43" />
+    <parent link="back_base" />
+    <child link="rh_hip" />
+    <limit effort="309" lower="-0.2" upper="0.2" velocity="41" />
 </joint>
 
 <link name="rh_hip">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.055 -0.036 0."/>
-        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
+        <mass value="4.558" />
+        <origin xyz="0.055 -0.036 0." />
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
+    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0" /><geometry><cylinder length="0.05" radius="0.075" /></geometry></visual>
 </link>
 
 <!-- RH Thigh and HFE -->
 <joint name="rh_hfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 3.141592 0.0" xyz="0.0 -0.12 -0.05"/>
-    <parent link="rh_hip"/>
-    <child link="rh_thigh"/>
-    <limit effort="250" lower="-1.5" upper="0.5" velocity="41"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 3.141592 0.0" xyz="0.0 -0.12 -0.05" />
+    <parent link="rh_hip" />
+    <child link="rh_thigh" />
+    <limit effort="250" lower="-1.5" upper="0.5" velocity="41" />
 </joint>
 
 <link name="rh_thigh">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.0 -0.016 -0.02"/>
-        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
+        <mass value="4.558" />
+        <origin xyz="0 0 -0.3" rpy="0 0 0" />
+        <inertia ixx="0.0724057292" ixy="0" ixz="0" iyy="0.0724057292" iyz="0" izz="0.0232647917" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 -0.3"/><geometry><cylinder length="0.46" radius="0.09"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.3"/><geometry><box size="0.175 0.175 0.4"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.3" /><geometry><cylinder length="0.46" radius="0.09" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.3" /><geometry><box size="0.175 0.175 0.4" /></geometry></collision>
 </link>
 
 <!-- RH Shank and KFE -->
 <joint name="rh_kfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="0.09 0.0 -0.51"/>
-    <parent link="rh_thigh"/>
-    <child link="rh_shank"/>
-    <limit effort="2793" lower="0.0" upper="3.0" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="0.09 0.0 -0.51" />
+    <parent link="rh_thigh" />
+    <child link="rh_shank" />
+    <limit effort="2793" lower="0.0" upper="3.0" velocity="26.8" />
 </joint>
 
 <link name="rh_shank">
     <inertial>
-        <mass value="2.02"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
+        <mass value="2.02" />
+        <origin xyz="0.0 0.0 -0.061" />
+        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891" />
     </inertial>
-    <visual><geometry><cylinder length="0.36" radius="0.05"/></geometry><origin xyz="-0.05 0.0 -0.2"/></visual>
-    <collision><geometry><box size="0.1 0.1 0.3"/></geometry><origin xyz="-0.05 0.0 -0.2"/></collision>
+    <visual><geometry><cylinder length="0.36" radius="0.05" /></geometry><origin xyz="-0.05 0.0 -0.2" /></visual>
+    <collision><geometry><box size="0.1 0.1 0.3" /></geometry><origin xyz="-0.05 0.0 -0.2" /></collision>
 </link>
 
 <!-- RH Pastern and PFE -->
 <joint name="rh_pfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="-0.045 0.0 -0.39"/>
-    <parent link="rh_shank"/>
-    <child link="rh_pastern"/>
-    <limit effort="2793" lower="-1.0" upper="0.0" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="-0.045 0.0 -0.39" />
+    <parent link="rh_shank" />
+    <child link="rh_pastern" />
+    <limit effort="2793" lower="-1.0" upper="0.0" velocity="26.8" />
 </joint>
 
 <link name="rh_pastern">
-    <visual><origin xyz="0.0 0.0 -0.07"/><geometry><cylinder length="0.15" radius="0.03"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.075"/><geometry><box size="0.06 0.06 0.12"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.07" /><geometry><cylinder length="0.15" radius="0.03" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.075" /><geometry><box size="0.06 0.06 0.12" /></geometry></collision>
     <inertial>
-        <mass value="0.875"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.122692" ixy="0" ixz="0" iyy="0.124194" iyz="0" izz="0.003005"/>
+        <mass value="0.875" />
+        <origin xyz="0 0 -0.075" rpy="0 0 0" />
+        <inertia ixx="0.0013125" ixy="0" ixz="0" iyy="0.0013125" iyz="0" izz="0.000525" />
     </inertial>
 </link>
 
 <!-- RH FOOT -->
 <joint name="rh_pastern_to_foot" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <parent link="rh_pastern"/>
-    <child link="rh_foot"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.16"/>
-    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0"/>
+    <axis xyz="0 -1 0" />
+    <parent link="rh_pastern" />
+    <child link="rh_foot" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.16" />
+    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0" />
 </joint>
 
 <link name="rh_foot">
-    <visual><origin xyz="0.0 0.0 -0.03"/><geometry><cylinder length="0.08" radius="0.05"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.045"/><geometry><box size="0.1 0.1 0.05"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.03" /><geometry><cylinder length="0.08" radius="0.05" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.045" /><geometry><box size="0.1 0.1 0.05" /></geometry></collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0.0"/>
-        <mass value="0.20"/>
-        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 -0.045" />
+        <mass value="0.20" />
+        <inertia ixx="0.000208333333" ixy="0" ixz="0" iyy="0.000208333333" iyz="0" izz="0.000333333333" />
     </inertial>
 </link>
 
 <!-- LH Leg -->
 <!-- LH Hip and HAA -->
 <joint name="4_lh_haa" type="revolute">
-    <axis xyz="-1 0 0"/>
-    <origin rpy="0 3.141592 0" xyz="-0.3 0.225 -0.43"/>
-    <parent link="back_base"/>
-    <child link="lh_hip"/>
-    <limit effort="309" lower="-0.2" upper="0.2" velocity="41"/>
+    <axis xyz="-1 0 0" />
+    <origin rpy="0 3.141592 0" xyz="-0.3 0.225 -0.43" />
+    <parent link="back_base" />
+    <child link="lh_hip" />
+    <limit effort="309" lower="-0.2" upper="0.2" velocity="41" />
 </joint>
 
 <link name="lh_hip">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.055 0.036 0."/>
-        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
+        <mass value="4.558" />
+        <origin xyz="0.055 0.036 0." />
+        <inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/><geometry><cylinder length="0.05" radius="0.075"/></geometry></visual>
+    <visual><origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0" /><geometry><cylinder length="0.05" radius="0.075" /></geometry></visual>
 </link>
 
 <!-- LH Thigh and HFE -->
 <joint name="lh_hfe" type="revolute">
-    <axis xyz="0 1 0"/>
-    <origin rpy="0.0 3.141592 0.0" xyz="0.0 0.12 -0.05"/>
-    <parent link="lh_hip"/>
-    <child link="lh_thigh"/>
-    <limit effort="250" lower="-0.5" upper="1.5" velocity="41"/>
+    <axis xyz="0 1 0" />
+    <origin rpy="0.0 3.141592 0.0" xyz="0.0 0.12 -0.05" />
+    <parent link="lh_hip" />
+    <child link="lh_thigh" />
+    <limit effort="250" lower="-0.5" upper="1.5" velocity="41" />
 </joint>
 
 <link name="lh_thigh">
     <inertial>
-        <mass value="4.558"/>
-        <origin xyz="0.0 0.016 -0.02"/>
-        <inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
+        <mass value="4.558" />
+        <origin xyz="0 0 -0.3" rpy="0 0 0" />
+        <inertia ixx="0.0724057292" ixy="0" ixz="0" iyy="0.0724057292" iyz="0" izz="0.0232647917" />
     </inertial>
-    <visual><origin xyz="0.0 0.0 -0.3"/><geometry><cylinder length="0.46" radius="0.09"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.3"/><geometry><box size="0.175 0.175 0.4"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.3" /><geometry><cylinder length="0.46" radius="0.09" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.3" /><geometry><box size="0.175 0.175 0.4" /></geometry></collision>
 </link>
 
 <!-- LH Shank and KFE -->
 <joint name="lh_kfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="0.09 0.0 -0.51"/>
-    <parent link="lh_thigh"/>
-    <child link="lh_shank"/>
-    <limit effort="2793" lower="0.0" upper="3.0" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="0.09 0.0 -0.51" />
+    <parent link="lh_thigh" />
+    <child link="lh_shank" />
+    <limit effort="2793" lower="0.0" upper="3.0" velocity="26.8" />
 </joint>
 
 <link name="lh_shank">
     <inertial>
-        <mass value="2.02"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891"/>
+        <mass value="2.02" />
+        <origin xyz="0.0 0.0 -0.061" />
+        <inertia ixx="0.077229" ixy="0" ixz="0" iyy="0.078175" iyz="0" izz="0.001891" />
     </inertial>
-    <visual><geometry><cylinder length="0.36" radius="0.05"/></geometry><origin xyz="-0.05 0.0 -0.2"/></visual>
-    <collision><geometry><box size="0.1 0.1 0.3"/></geometry><origin xyz="-0.05 0.0 -0.2"/></collision>
+    <visual><geometry><cylinder length="0.36" radius="0.05" /></geometry><origin xyz="-0.05 0.0 -0.2" /></visual>
+    <collision><geometry><box size="0.1 0.1 0.3" /></geometry><origin xyz="-0.05 0.0 -0.2" /></collision>
 </link>
 
 <!-- LH Pastern and PFE -->
 <joint name="lh_pfe" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <origin rpy="0.0 0 0.0" xyz="-0.045 0.0 -0.39"/>
-    <parent link="lh_shank"/>
-    <child link="lh_pastern"/>
-    <limit effort="2793" lower="-1.0" upper="0.0" velocity="26.8"/>
+    <axis xyz="0 -1 0" />
+    <origin rpy="0.0 0 0.0" xyz="-0.045 0.0 -0.39" />
+    <parent link="lh_shank" />
+    <child link="lh_pastern" />
+    <limit effort="2793" lower="-1.0" upper="0.0" velocity="26.8" />
 </joint>
 
 <link name="lh_pastern">
-    <visual><origin xyz="0.0 0.0 -0.07"/><geometry><cylinder length="0.15" radius="0.03"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.075"/><geometry><box size="0.06 0.06 0.12"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.07" /><geometry><cylinder length="0.15" radius="0.03" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.075" /><geometry><box size="0.06 0.06 0.12" /></geometry></collision>
     <inertial>
-        <mass value="0.875"/>
-        <origin xyz="0.0 0.0 -0.061"/>
-        <inertia ixx="0.122692" ixy="0" ixz="0" iyy="0.124194" iyz="0" izz="0.003005"/>
+        <mass value="0.875" />
+        <origin xyz="0 0 -0.075" rpy="0 0 0" />
+        <inertia ixx="0.0013125" ixy="0" ixz="0" iyy="0.0013125" iyz="0" izz="0.000525" />
     </inertial>
 </link>
 
 <!-- LH FOOT -->
 <joint name="lh_pastern_to_foot" type="revolute">
-    <axis xyz="0 -1 0"/>
-    <parent link="lh_pastern"/>
-    <child link="lh_foot"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.16"/>
-    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0"/>
+    <axis xyz="0 -1 0" />
+    <parent link="lh_pastern" />
+    <child link="lh_foot" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.16" />
+    <limit lower="-1.0" upper="0.3" effort="20" velocity="2.0" />
 </joint>
 
 <link name="lh_foot">
-    <visual><origin xyz="0.0 0.0 -0.03"/><geometry><cylinder length="0.08" radius="0.05"/></geometry></visual>
-    <collision><origin xyz="0.0 0.0 -0.045"/><geometry><box size="0.1 0.1 0.05"/></geometry></collision>
+    <visual><origin xyz="0.0 0.0 -0.03" /><geometry><cylinder length="0.08" radius="0.05" /></geometry></visual>
+    <collision><origin xyz="0.0 0.0 -0.045" /><geometry><box size="0.1 0.1 0.05" /></geometry></collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0.0"/>
-        <mass value="0.20"/>
-        <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 -0.045" />
+        <mass value="0.20" />
+        <inertia ixx="0.000208333333" ixy="0" ixz="0" iyy="0.000208333333" iyz="0" izz="0.000333333333" />
     </inertial>
 </link>
 
