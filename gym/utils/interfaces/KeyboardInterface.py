@@ -44,8 +44,8 @@ class KeyboardInterface:
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
 
-        self.min_height = 0.1
-        self.max_height = 0.4
+        self.min_height = 0.6
+        self.max_height = 1.6
         self.increment_height = 0.1
 
     def update(self, env):
