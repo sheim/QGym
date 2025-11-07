@@ -3,14 +3,14 @@ from gym.envs.base.legged_robot_config import (
     LeggedRobotRunnerCfg,
 )
 
-BASE_HEIGHT_REF = 1.6
+BASE_HEIGHT_REF = 1.3
 
 
 class MiniCheetahCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
-        num_actuators = 21
-        episode_length_s = 12
+        num_actuators = 1 + 4 * 5
+        episode_length_s = 20
 
     class terrain(LeggedRobotCfg.terrain):
         mesh_type = "plane"
@@ -18,8 +18,8 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class init_state(LeggedRobotCfg.init_state):
         default_joint_angles = {
             "haa": 0.0,
-            "hfe": -0.785398,
-            "kfe": 1.596976,
+            "hfe": 0.0,
+            "kfe": 0.0,
             "pfe": 0.0,
             "pastern_to_foot": 0.0,
             "base_joint": 0.0,
@@ -31,33 +31,33 @@ class MiniCheetahCfg(LeggedRobotCfg):
         reset_mode = "reset_to_range"
 
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 1.6]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.3]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
 
         # * initialization for random range setup
         dof_pos_range = {
-            "haa": [-0.01, 0.01],
-            "hfe": [-0.785398, -0.785398],
-            "kfe": [1.596976, 1.596976],
+            "haa": [-0.2, 0.2],
+            "hfe": [-0.5, 0.5],
+            "kfe": [0.0, 0.0],
             "pfe": [0.0, 0.0],
-            "pastern_to_foot": [0.0, 0.00],
-            "base_joint": [-0.01, 0.01],
+            "pastern_to_foot": [0.0, 0.0],
+            "base_joint": [0.0, 0.0],
         }
         dof_vel_range = {
             "haa": [0.0, 0.0],
             "hfe": [0.0, 0.0],
             "kfe": [0.0, 0.0],
             "pfe": [0.0, 0.0],
-            "pastern_to_foot": [0.0, 0.00],
+            "pastern_to_foot": [0.0, 0.0],
             "base_joint": [0.0, 0.0],
         }
 
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [1.6, 1.6],  # z
+            [1.3, 1.3],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
@@ -74,22 +74,22 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
         stiffness = {
-            "haa": 379.193,
-            "hfe": 406.701,
-            "kfe": 1864.340,
-            "pfe": 1864.340,
-            "pastern_to_foot": 1864.340,
+            "haa": 800,
+            "hfe": 800,
+            "kfe": 4000,
+            "pfe": 4000,
+            "pastern_to_foot": 4000,
             "base_joint": 2500,
         }
         damping = {
             "haa": 9.48,
-            "hfe": 10.168,
-            "kfe": 46.608,
-            "pfe": 1864.340,
-            "pastern_to_foot": 1864.340,
+            "hfe": 50,
+            "kfe": 250,
+            "pfe": 3000,
+            "pastern_to_foot": 1000,
             "base_joint": 9.48,
         }
-        ctrl_frequency = 100
+        ctrl_frequency = 250
         desired_sim_frequency = 500
 
     class commands:
@@ -100,7 +100,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
             lin_vel_x = [-2.0, 3.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 3  # max [rad/s]
-            height = [0.61, 1.60]  # m
+            height = [0.61, 1.30]  # m
 
     class push_robots:
         toggle = False
@@ -110,7 +110,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class domain_rand:
         randomize_friction = True
-        friction_range = [0.5, 1.0]
+        friction_range = [0.5, 5.0]
         randomize_base_mass = False
         added_mass_range = [-1.0, 1.0]
 
@@ -129,8 +129,9 @@ class MiniCheetahCfg(LeggedRobotCfg):
         disable_gravity = False
         disable_motors = False
         joint_damping = 0.3
-        rotor_inertia = [0.002268] + (
-            [0.002268, 0.002268, 0.005484, 0.005484, 0.005484] * 4
+        fix_base_link = False
+        rotor_inertia = [0.002268] + 4 * (
+            [0.002268, 0.002268, 0.005484, 0.005484, 0.005484]
         )
 
     class reward_settings(LeggedRobotCfg.reward_settings):
@@ -144,12 +145,12 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class scaling(LeggedRobotCfg.scaling):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
-        dof_vel = [2.0] + (4 * [2.0, 2.0, 4.0, 4.0, 4.0])
+        dof_vel = [2.0] + (4 * [0.5, 0.5, 0.5, 0.5, 0.5])
         base_height = 0.3
         dof_pos = [0.2] + (4 * [0.2, 0.3, 0.3, 0.3, 0.3])
         dof_pos_obs = dof_pos
-        dof_pos_target = [0.2] + (4 * [0.2, 0.3, 0.3, 0.3, 0.3])
-        tau_ff = [18] + (4 * [18, 18, 28, 28, 28])
+        dof_pos_target = [0.2] + (4 * [0.2, 0.3, 0.2, 0.2, 0.2])
+        tau_ff = [3600] + (4 * [3600, 3600, 400000, 400000, 5800])
         commands = [3, 1, 3, 1]  # add height as a command
 
 
@@ -216,7 +217,7 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                tracking_height = 1.0
+                tracking_height = 1.5
 
             class termination_weight:
                 termination = 0.01
