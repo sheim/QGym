@@ -74,23 +74,23 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
         stiffness = {
-            "haa": 800,
-            "hfe": 800,
+            "haa": 4000,
+            "hfe": 4000,
             "kfe": 4000,
             "pfe": 4000,
             "pastern_to_foot": 4000,
-            "base_joint": 2500,
+            "base_joint": 50,
         }
         damping = {
-            "haa": 9.48,
-            "hfe": 50,
+            "haa": 250,
+            "hfe": 250,
             "kfe": 250,
-            "pfe": 3000,
-            "pastern_to_foot": 1000,
-            "base_joint": 9.48,
+            "pfe": 250,
+            "pastern_to_foot": 250,
+            "base_joint": 10,
         }
-        ctrl_frequency = 250
-        desired_sim_frequency = 500
+        ctrl_frequency = 500  # how often the PDF controller/action updates run
+        desired_sim_frequency = 1000  # how often the physics is calculated
 
     class commands:
         # * time before command are changed[s]
@@ -146,11 +146,13 @@ class MiniCheetahCfg(LeggedRobotCfg):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
         dof_vel = [2.0] + (4 * [0.5, 0.5, 0.5, 0.5, 0.5])
-        base_height = 0.3
-        dof_pos = [0.2] + (4 * [0.2, 0.3, 0.3, 0.3, 0.3])
+        base_height = BASE_HEIGHT_REF
+        dof_pos = [0.2] + (
+            4 * [1.0, 1.0, 1.0, 1.0, 1.0]
+        )  # i think these values were too small?
         dof_pos_obs = dof_pos
-        dof_pos_target = [0.2] + (4 * [0.2, 0.3, 0.2, 0.2, 0.2])
-        tau_ff = [3600] + (4 * [3600, 3600, 400000, 400000, 5800])
+        dof_pos_target = [0.2] + (4 * [0.1, 0.1, 0.1, 0.1, 0.1])  # target joint angles
+        tau_ff = [3600] + (4 * [3600, 3600, 400000, 400000, 5800])  # not being used
         commands = [3, 1, 3, 1]  # add height as a command
 
 
