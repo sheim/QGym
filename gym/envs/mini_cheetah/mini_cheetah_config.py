@@ -210,11 +210,11 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
                 orientation = 1.0
-                torques = 5.0e-7
+                torques = 5.0e-6
                 dof_vel = 0.0
-                # min_base_height = 1.5
-                action_rate = 0.01
-                action_rate2 = 0.001
+                min_base_height = 1.5
+                action_rate = 0.1
+                action_rate2 = 0.01
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
