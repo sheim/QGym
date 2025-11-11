@@ -58,7 +58,7 @@
     <origin xyz="0.35 -0.225 -0.23" rpy="0 0 0"/><axis xyz="1 0 0"/>
     <parent link="front_base"/>
     <child link="rf_hip"/>
-    <limit effort="35500" lower="-0.2" upper="0.2" velocity="41"/>
+    <limit effort="1000" lower="-0.2" upper="0.2" velocity="41"/>
 </joint>
 
 <link name="rf_hip">
@@ -76,7 +76,7 @@
     <origin rpy="0.0 0.0 0.0" xyz="0.0 -0.12 -0.05"/>
     <parent link="rf_hip"/>
     <child link="rf_thigh"/>
-    <limit effort="400000" lower="-0.5" upper="1.7" velocity="41"/>
+    <limit effort="700" lower="-0.5" upper="1.7" velocity="41"/>
 </joint>
 
 <link name="rf_thigh">
@@ -95,7 +95,7 @@
     <origin rpy="0.0 0 0.0" xyz="-0.07 0.0 -0.43"/>
     <parent link="rf_thigh"/>
     <child link="rf_shank"/>
-    <limit effort="400000" lower="-3.0" upper="0.0" velocity="26.8"/>
+    <limit effort="1000" lower="-3.0" upper="0.0" velocity="26.8"/>
 </joint>
 
 <link name="rf_shank">
@@ -114,7 +114,7 @@
     <origin rpy="0.0 0 0.0" xyz="0.05 0.0 -0.3"/>
     <parent link="rf_shank"/>
     <child link="rf_pastern"/>
-    <limit effort="4000" lower="-1.2" upper="0.5" velocity="26.8"/>
+    <limit effort="500" lower="-1.2" upper="0.5" velocity="26.8"/>
 </joint>
 
 <link name="rf_pastern">
@@ -133,7 +133,7 @@
     <parent link="rf_pastern"/>
     <child link="rf_foot"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.15"/>
-    <limit lower="-1.0" upper="0.3" effort="2793" velocity="2.0"/>
+    <limit lower="-1.0" upper="0.3" effort="300" velocity="2.0"/>
 </joint>
 
 <link name="rf_foot">
@@ -153,7 +153,7 @@
     <origin xyz="0.35 0.225 -0.23" rpy="0 0 0"/><axis xyz="1 0 0"/>
     <parent link="front_base"/>
     <child link="lf_hip"/>
-    <limit effort="35500" lower="-0.2" upper="0.2" velocity="41"/>
+    <limit effort="1000" lower="-0.2" upper="0.2" velocity="41"/>
 </joint>
 
 <link name="lf_hip">
@@ -171,7 +171,7 @@
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.12 -0.05"/>
     <parent link="lf_hip"/>
     <child link="lf_thigh"/>
-    <limit effort="400000" lower="-1.5" upper="0.5" velocity="41"/>
+    <limit effort="700" lower="-1.5" upper="0.5" velocity="41"/>
 </joint>
 
 <link name="lf_thigh">
@@ -190,7 +190,7 @@
     <origin rpy="0.0 0 0.0" xyz="-0.07 0.0 -0.43"/>
     <parent link="lf_thigh"/>
     <child link="lf_shank"/>
-    <limit effort="400000" lower="-3.0" upper="0.0" velocity="26.8"/>
+    <limit effort="1000" lower="-3.0" upper="0.0" velocity="26.8"/>
 </joint>
 
 <link name="lf_shank">
@@ -209,7 +209,7 @@
     <origin rpy="0.0 0 0.0" xyz="0.05 0.0 -0.3"/>
     <parent link="lf_shank"/>
     <child link="lf_pastern"/>
-    <limit effort="4000" lower="-1.2" upper="0.5" velocity="26.8"/>
+    <limit effort="500" lower="-1.2" upper="0.5" velocity="26.8"/>
 </joint>
 
 <link name="lf_pastern">
@@ -228,7 +228,7 @@
     <parent link="lf_pastern"/>
     <child link="lf_foot"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.15"/>
-    <limit lower="-1.0" upper="0.3" effort="2793" velocity="2.0"/>
+    <limit lower="-1.0" upper="0.3" effort="300" velocity="2.0"/>
 </joint>
 
 <link name="lf_foot">
@@ -248,7 +248,7 @@
     <origin rpy="0 3.141592 0" xyz="-0.3 -0.225 -0.43"/>
     <parent link="back_base"/>
     <child link="rh_hip"/>
-    <limit effort="35500" lower="-0.2" upper="0.2" velocity="41"/>
+    <limit effort="1000" lower="-0.2" upper="0.2" velocity="41"/>
 </joint>
 
 <link name="rh_hip">
@@ -266,7 +266,7 @@
     <origin rpy="0.0 3.141592 0.0" xyz="0.0 -0.12 -0.05"/>
     <parent link="rh_hip"/>
     <child link="rh_thigh"/>
-    <limit effort="400000" lower="-1.5" upper="0.5" velocity="41"/>
+    <limit effort="700" lower="-1.5" upper="0.5" velocity="41"/>
 </joint>
 
 <link name="rh_thigh">
@@ -285,7 +285,7 @@
     <origin rpy="0.0 0 0.0" xyz="0.09 0.0 -0.51"/>
     <parent link="rh_thigh"/>
     <child link="rh_shank"/>
-    <limit effort="400000" lower="0.0" upper="3.0" velocity="26.8"/>
+    <limit effort="1000" lower="0.0" upper="3.0" velocity="26.8"/>
 </joint>
 
 <link name="rh_shank">
@@ -304,7 +304,7 @@
     <origin rpy="0.0 0 0.0" xyz="-0.045 0.0 -0.39"/>
     <parent link="rh_shank"/>
     <child link="rh_pastern"/>
-    <limit effort="4000" lower="-1.0" upper="0.0" velocity="26.8"/>
+    <limit effort="500" lower="-1.0" upper="0.0" velocity="26.8"/>
 </joint>
 
 <link name="rh_pastern">
@@ -323,7 +323,7 @@
     <parent link="rh_pastern"/>
     <child link="rh_foot"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.16"/>
-    <limit lower="-1.0" upper="0.3" effort="2793" velocity="2.0"/>
+    <limit lower="-1.0" upper="0.3" effort="300" velocity="2.0"/>
 </joint>
 
 <link name="rh_foot">
@@ -343,7 +343,7 @@
     <origin rpy="0 3.141592 0" xyz="-0.3 0.225 -0.43"/>
     <parent link="back_base"/>
     <child link="lh_hip"/>
-    <limit effort="35500" lower="-0.2" upper="0.2" velocity="41"/>
+    <limit effort="1000" lower="-0.2" upper="0.2" velocity="41"/>
 </joint>
 
 <link name="lh_hip">
@@ -361,7 +361,7 @@
     <origin rpy="0.0 3.141592 0.0" xyz="0.0 0.12 -0.05"/>
     <parent link="lh_hip"/>
     <child link="lh_thigh"/>
-    <limit effort="400000" lower="-0.5" upper="1.5" velocity="41"/>
+    <limit effort="700" lower="-0.5" upper="1.5" velocity="41"/>
 </joint>
 
 <link name="lh_thigh">
@@ -380,7 +380,7 @@
     <origin rpy="0.0 0 0.0" xyz="0.09 0.0 -0.51"/>
     <parent link="lh_thigh"/>
     <child link="lh_shank"/>
-    <limit effort="400000" lower="0.0" upper="3.0" velocity="26.8"/>
+    <limit effort="1000" lower="0.0" upper="3.0" velocity="26.8"/>
 </joint>
 
 <link name="lh_shank">
@@ -399,7 +399,7 @@
     <origin rpy="0.0 0 0.0" xyz="-0.045 0.0 -0.39"/>
     <parent link="lh_shank"/>
     <child link="lh_pastern"/>
-    <limit effort="4000" lower="-1.0" upper="0.0" velocity="26.8"/>
+    <limit effort="500" lower="-1.0" upper="0.0" velocity="26.8"/>
 </joint>
 
 <link name="lh_pastern">
@@ -418,7 +418,7 @@
     <parent link="lh_pastern"/>
     <child link="lh_foot"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.16"/>
-    <limit lower="-1.0" upper="0.3" effort="2793" velocity="2.0"/>
+    <limit lower="-1.0" upper="0.3" effort="300" velocity="2.0"/>
 </joint>
 
 <link name="lh_foot">
