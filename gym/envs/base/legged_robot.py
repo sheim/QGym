@@ -9,8 +9,6 @@ from isaacgym.torch_utils import (
     quat_from_euler_xyz,
 )
 from isaacgym import gymtorch, gymapi
-import matplotlib.pyplot as plt
-import wandb
 
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.base_task import BaseTask
@@ -41,12 +39,6 @@ class LeggedRobot(BaseTask):
         self.device = sim_device  # todo CRIME: remove this from __init__ then
         self._parse_cfg(self.cfg)
         super().__init__(gym, sim, self.cfg, sim_params, sim_device, headless)
-        self.joint_log_table = wandb.Table(
-            columns=["step", "joint_name", "target_pos", "actual_pos", "torque"]
-        )
-        self.com_table = wandb.Table(
-            columns=["step", "env_id", "COM_x", "COM_y", "COM_z"]
-        )
 
         if not self.headless:
             self._set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -60,33 +52,12 @@ class LeggedRobot(BaseTask):
     def step(self):
         self._reset_buffers()
         self._pre_decimation_step()
-        self.com_traj = []
         # * step physics and render each frame
         self._render()
         for _ in range(self.cfg.control.decimation):
             self._pre_compute_torques()
             self.torques = self._compute_torques()
             self._post_compute_torques()
-
-            # logging for wandb
-            if self.common_step_counter % 100 == 0:  # log every 100th step
-                env_id = 0
-                joint_data = {}
-                for j in range(self.dof_pos.shape[1]):
-                    joint_data[f"joint_{j}/target_pos"] = float(
-                        self.dof_pos_target[env_id, j]
-                    )
-                    joint_data[f"joint_{j}/actual_pos"] = float(self.dof_pos[env_id, j])
-                    joint_data[f"joint_{j}/torque"] = float(self.torques[env_id, j])
-
-                # Append current COM position
-                com_pos = self.root_states[env_id, :3].cpu().numpy()
-                self.com_traj.append(com_pos)
-
-                if wandb.run is not None:
-                    wandb.log(joint_data)
-                    # wandb.log({"COM_point_cloud": wandb.Object3D(com_point_cloud)})
-
             self._step_physx_sim()
             self._post_physx_step()
 
@@ -95,28 +66,6 @@ class LeggedRobot(BaseTask):
 
         env_ids = self.to_be_reset.nonzero(as_tuple=False).flatten()
         self._reset_idx(env_ids)
-
-        # If episode ended, plot COM trajectory in 3D and log to W&B
-        if (
-            hasattr(self, "episode_done")
-            and self.episode_done
-            and len(self.com_traj) > 0
-        ):
-            com_array = np.array(self.com_traj)
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection="3d")
-            ax.scatter(
-                com_array[:, 0], com_array[:, 1], com_array[:, 2], c="blue", marker="o"
-            )
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.set_zlabel("Z")
-            ax.set_title("COM Trajectory")
-            wandb.log({"COM_trajectory_plot": wandb.Image(fig)})
-            plt.close(fig)
-
-            # Reset trajectory for next episode
-            self.com_traj = []
 
     def _pre_decimation_step(self):
         return None
