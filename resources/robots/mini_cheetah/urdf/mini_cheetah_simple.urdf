@@ -9,7 +9,7 @@
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0"/>
 			<geometry>
-				<box size="1.02 0.38 0.61"/>
+				<box size="0.8 0.38 0.61"/>
 			</geometry>
 			<material name="brown">
 				<color rgba="0.5 0.3 0.2 0.5"/>
@@ -18,7 +18,7 @@
 		<collision>
 			<origin xyz="0 0 0.05" rpy="0 0 0"/>
 			<geometry>
-				<box size="1.02 0.38 0.51"/>
+				<box size=".8 0.38 0.51"/>
 			</geometry>
 		</collision>
 	</link>
@@ -54,7 +54,7 @@
 	<!-- RF Leg -->
 	<!-- RF Hip and HAA -->
 	<joint name="1_fr_haa" type="revolute">
-		<axis xyz="1 0 0"/>
+		<axis xyz="-1 0 0"/>
 		<origin xyz="0.35 -0.225 -0.23" rpy="0 0 0"/>
 		<axis xyz="1 0 0"/>
 		<parent link="front_base"/>
@@ -64,7 +64,7 @@
 	<link name="fr_hip">
 		<inertial>
 			<mass value="4.558"/>
-			<origin xyz="0.055 -0.036 0."/>
+			<origin xyz="0.055 0.036 0."/>
 			<inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
 		</inertial>
 		<visual>
@@ -73,47 +73,41 @@
 				<cylinder length="0.05" radius="0.075"/>
 			</geometry>
 		</visual>
-        <collision>
-            <origin xyz="0.0 0.0 0.0" rpy="1.5708 0 0"/>
-			<geometry>
-				<cylinder length="0.05" radius="0.075"/>
-			</geometry>
-        </collision>
 	</link>
-	<!-- RF Thigh and HFE -->
+	<!-- LF Thigh and HFE -->
 	<joint name="fr_hfe" type="revolute">
-		<axis xyz="0 -1 0"/>
-		<origin rpy="0.0 0.0 0.0" xyz="0.0 -0.12 -0.05"/>
+		<axis xyz="0 1 0"/>
+		<origin rpy="0.0 0.6 0.0" xyz="0.0 0.12 -0.05"/>
 		<parent link="fr_hip"/>
 		<child link="fr_thigh"/>
-		<limit effort="700" lower="-0.5" upper="1.7" velocity="41"/>
+		<limit effort="700" lower="-0.7" upper="0.6" velocity="41"/>
 	</joint>
 	<link name="fr_thigh">
 		<inertial>
 			<mass value="4.558"/>
-			<origin xyz="0.0 -0.016 -0.02"/>
+			<origin xyz="0.0 0.016 -0.02"/>
 			<inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
 		</inertial>
 		<visual>
-			<origin xyz="0.0 0.0 -0.1"/>
+			<origin xyz="0.0 0.0 -0.2"/>
 			<geometry>
-				<cylinder length="0.46" radius="0.075"/>
+				<cylinder length="0.25" radius="0.075"/>
 			</geometry>
 		</visual>
 		<collision>
-			<origin xyz="0.0 0.0 -0.1"/>
+			<origin xyz="0.0 0.0 -0.2"/>
 			<geometry>
-				<cylinder length="0.46" radius="0.075"/>
+				<cylinder length="0.25" radius="0.075"/>
 			</geometry>
 		</collision>
 	</link>
-	<!-- RF Shank and KFE -->
+	<!-- LF Shank and KFE -->
 	<joint name="fr_kfe" type="revolute">
-		<axis xyz="0 -1 0"/>
-		<origin rpy="0.0 0 0.0" xyz="-0.07 0.0 -0.43"/>
+		<axis xyz="0 1 0"/>
+		<origin rpy="0.0 -0.6 0.0" xyz="0.0 0.0 -0.45"/>
 		<parent link="fr_thigh"/>
 		<child link="fr_shank"/>
-		<limit effort="1000" lower="-3.0" upper="2.0" velocity="26.8"/>
+		<limit effort="1000" lower="-1.3" upper="0.1" velocity="26.8"/>
 	</joint>
 	<link name="fr_shank">
 		<inertial>
@@ -129,57 +123,57 @@
 		</visual>
 		<collision>
 			<geometry>
-				<box size="0.08 0.08 0.25"/>
+				<cylinder length="0.3" radius="0.04"/>
 			</geometry>
 			<origin xyz="0.05 0.0 -0.15"/>
 		</collision>
 	</link>
-	<!-- RF Pastern and PFE-->
+	<!-- LF Pastern and PFE -->
 	<joint name="fr_pfe" type="revolute">
-		<axis xyz="0 -1 0"/>
-		<origin rpy="0.0 0 0.0" xyz="0.05 0.0 -0.3"/>
+		<axis xyz="0 1 0"/>
+		<origin rpy="0.05 0 0.0" xyz="0.0 0.0 -0.3"/>
 		<parent link="fr_shank"/>
 		<child link="fr_pastern"/>
-		<limit effort="500" lower="-1.2" upper="0.5" velocity="26.8"/>
+		<limit effort="500" lower="-0.3" upper="2.2" velocity="26.8"/>
 	</joint>
 	<link name="fr_pastern">
 		<visual>
-			<origin xyz="0.0 0.0 -0.07"/>
+			<origin xyz="0.02 0.0 -0.14"/>
 			<geometry>
-				<cylinder length="0.13" radius="0.03"/>
+				<cylinder length="0.2" radius="0.03"/>
 			</geometry>
 		</visual>
 		<collision>
-			<origin xyz="0.0 0.0 -0.075"/>
+			<origin xyz="0.02 0.0 -0.14"/>
 			<geometry>
-				<box size="0.06 0.06 0.08"/>
+				<cylinder length="0.2" radius="0.03"/>
 			</geometry>
 		</collision>
 		<inertial>
 			<mass value="0.875"/>
-			<origin xyz="0.0 0.0 -0.061"/>
+			<origin xyz="0.05 0.0 -0.061"/>
 			<inertia ixx="0.122692" ixy="0" ixz="0" iyy="0.124194" iyz="0" izz="0.003005"/>
 		</inertial>
 	</link>
-	<!-- RF FOOT -->
+	<!-- LF FOOT -->
 	<joint name="fr_pastern_to_foot" type="revolute">
-		<axis xyz="0 -1 0"/>
+		<axis xyz="0 1 0"/>
 		<parent link="fr_pastern"/>
 		<child link="fr_foot"/>
-		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.15"/>
-		<limit lower="-1.0" upper="0.3" effort="300" velocity="2.0"/>
+		<origin rpy="0.0 0.0 0.0" xyz="0.025 0.0 -0.3"/>
+		<limit lower="-0.3" upper="1.8" effort="300" velocity="2.0"/>
 	</joint>
 	<link name="fr_foot">
 		<visual>
-			<origin xyz="0.0 0.0 -0.03"/>
+			<origin xyz="0.0 0.0 -0.025"/>
 			<geometry>
-				<cylinder length="0.08" radius="0.05"/>
+				<cylinder length="0.04" radius="0.05"/>
 			</geometry>
 		</visual>
 		<collision>
-			<origin xyz="0.0 0.0 -0.045"/>
+			<origin xyz="0.0 0.0 -0.025"/>
 			<geometry>
-				<box size="0.1 0.1 0.05"/>
+				<cylinder length="0.04" radius="0.05"/>
 			</geometry>
 		</collision>
 		<inertial>
@@ -322,7 +316,7 @@
 	<!-- RH Leg -->
 	<!-- RH Hip and HAA -->
 	<joint name="3_hr_haa" type="revolute">
-		<axis xyz="-1 0 0"/>
+		<axis xyz="1 0 0"/>
 		<origin rpy="0 3.141592 0" xyz="-0.3 -0.225 -0.3"/>
 		<parent link="back_base"/>
 		<child link="hr_hip"/>
@@ -331,7 +325,7 @@
 	<link name="hr_hip">
 		<inertial>
 			<mass value="4.558"/>
-			<origin xyz="0.055 -0.036 0."/>
+			<origin xyz="0.055 0.036 0.0"/>
 			<inertia ixx="0.013332" ixy="0.002030" ixz="0.00001575" iyy="0.019595" iyz="0.000033" izz="0.015536"/>
 		</inertial>
 		<visual>
@@ -341,40 +335,40 @@
 			</geometry>
 		</visual>
 	</link>
-	<!-- RH Thigh and HFE -->
+	<!-- LH Thigh and HFE -->
 	<joint name="hr_hfe" type="revolute">
 		<axis xyz="0 1 0"/>
-		<origin rpy="0.0 3.141592 0.0" xyz="0.0 -0.12 -0.05"/>
+		<origin rpy="0.0 2.841592 0.0" xyz="0.0 0.12 -0.05"/>
 		<parent link="hr_hip"/>
 		<child link="hr_thigh"/>
-		<limit effort="700" lower="-0.5" upper="1.5" velocity="41"/>
+		<limit effort="700" lower="-0.7" upper="1.5" velocity="41"/>
 	</joint>
 	<link name="hr_thigh">
 		<inertial>
 			<mass value="4.558"/>
-			<origin xyz="0.0 -0.016 -0.02"/>
+			<origin xyz="0.0 0.016 -0.02"/>
 			<inertia ixx="0.053104" ixy="0.006561" ixz="0.000348" iyy="0.056318" iyz="0.000040" izz="0.010926"/>
 		</inertial>
 		<visual>
 			<origin xyz="0.0 0.0 -0.3"/>
 			<geometry>
-				<cylinder length="0.46" radius="0.09"/>
+				<cylinder length="0.2" radius="0.09"/>
 			</geometry>
 		</visual>
 		<collision>
 			<origin xyz="0.0 0.0 -0.3"/>
 			<geometry>
-				<box size="0.175 0.175 0.4"/>
+				<cylinder length="0.2" radius="0.09"/>
 			</geometry>
 		</collision>
 	</link>
-	<!-- RH Shank and KFE -->
+	<!-- LH Shank and KFE -->
 	<joint name="hr_kfe" type="revolute">
 		<axis xyz="0 1 0"/>
-		<origin rpy="0.0 0 0.0" xyz="0.09 0.0 -0.51"/>
+		<origin rpy="0.0 0.65 0.0" xyz="0.0 0.0 -0.5"/>
 		<parent link="hr_thigh"/>
 		<child link="hr_shank"/>
-		<limit effort="1000" lower="-0.2" upper="3.0" velocity="26.8"/>
+		<limit effort="1000" lower="-0.2" upper="0.8" velocity="26.8"/>
 	</joint>
 	<link name="hr_shank">
 		<inertial>
@@ -384,36 +378,36 @@
 		</inertial>
 		<visual>
 			<geometry>
-				<cylinder length="0.36" radius="0.05"/>
+				<cylinder length="0.25" radius="0.04"/>
 			</geometry>
-			<origin xyz="-0.05 0.0 -0.2"/>
+			<origin xyz="-0.05 0.0 -0.15"/>
 		</visual>
 		<collision>
 			<geometry>
-				<box size="0.1 0.1 0.3"/>
+				<cylinder length="0.25" radius="0.04"/>
 			</geometry>
-			<origin xyz="-0.05 0.0 -0.2"/>
+			<origin xyz="-0.05 0.0 -0.15"/>
 		</collision>
 	</link>
-	<!-- RH Pastern and PFE -->
+	<!-- LH Pastern and PFE  -->
 	<joint name="hr_pfe" type="revolute">
-		<axis xyz="0 -1 0"/>
-		<origin rpy="0.0 0 0.0" xyz="-0.045 0.0 -0.39"/>
+		<axis xyz="0 1 0"/>
+		<origin rpy="0.0 -0.35 0.0" xyz="-0.045 0.0 -0.35"/>
 		<parent link="hr_shank"/>
 		<child link="hr_pastern"/>
-		<limit effort="500" lower="-1.0" upper="2.0" velocity="26.8"/>
+		<limit effort="500" lower="-0.3" upper="2.5" velocity="26.8"/>
 	</joint>
 	<link name="hr_pastern">
 		<visual>
-			<origin xyz="0.0 0.0 -0.07"/>
+			<origin xyz="0.0 0.0 -0.15"/>
 			<geometry>
-				<cylinder length="0.15" radius="0.03"/>
+				<cylinder length="0.25" radius="0.03"/>
 			</geometry>
 		</visual>
 		<collision>
-			<origin xyz="0.0 0.0 -0.075"/>
+			<origin xyz="0.0 0.0 -0.15"/>
 			<geometry>
-				<box size="0.06 0.06 0.12"/>
+				<cylinder length="0.25" radius="0.03"/>
 			</geometry>
 		</collision>
 		<inertial>
@@ -422,25 +416,25 @@
 			<inertia ixx="0.122692" ixy="0" ixz="0" iyy="0.124194" iyz="0" izz="0.003005"/>
 		</inertial>
 	</link>
-	<!-- RH FOOT -->
+	<!-- LH FOOT  -->
 	<joint name="hr_pastern_to_foot" type="revolute">
-		<axis xyz="0 -1 0"/>
+		<axis xyz="0 1 0"/>
 		<parent link="hr_pastern"/>
 		<child link="hr_foot"/>
-		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.16"/>
-		<limit lower="-1.0" upper="0.3" effort="300" velocity="2.0"/>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.35"/>
+		<limit lower="-0.3" upper="1.8" effort="300" velocity="2.0"/>
 	</joint>
 	<link name="hr_foot">
 		<visual>
 			<origin xyz="0.0 0.0 -0.03"/>
 			<geometry>
-				<cylinder length="0.08" radius="0.05"/>
+				<cylinder length="0.04" radius="0.05"/>
 			</geometry>
 		</visual>
 		<collision>
-			<origin xyz="0.0 0.0 -0.045"/>
+			<origin xyz="0.0 0.0 -0.03"/>
 			<geometry>
-				<box size="0.1 0.1 0.05"/>
+				<cylinder length="0.04" radius="0.05"/>
 			</geometry>
 		</collision>
 		<inertial>
