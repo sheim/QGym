@@ -10,7 +10,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 1 + 4 * 5
-        episode_length_s = 20
+        episode_length_s = 10
 
     class terrain(LeggedRobotCfg.terrain):
         mesh_type = "plane"
@@ -31,7 +31,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
         reset_mode = "reset_to_range"
 
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 1.3]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.4]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -97,9 +97,9 @@ class MiniCheetahCfg(LeggedRobotCfg):
         resampling_time = 3.0
 
         class ranges:
-            lin_vel_x = [-2.0, 3.0]  # min max [m/s]
+            lin_vel_x = [-1.0, 8.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
-            yaw_vel = 3  # max [rad/s]
+            yaw_vel = 6  # max [rad/s]
             height = [0.61, 1.30]  # m
 
     class push_robots:
@@ -151,7 +151,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
             4 * [1.0, 1.0, 1.0, 1.0, 1.0]
         )  # i think these values were too small?
         dof_pos_obs = dof_pos
-        dof_pos_target = [0.2] + (4 * [0.1, 0.1, 0.1, 0.1, 0.1])  # target joint angles
+        dof_pos_target = [0.2] + (4 * [0.4, 0.4, 0.4, 0.2, 0.2])  # target joint angles
         tau_ff = [3600] + (4 * [3600, 3600, 400000, 400000, 5800])  # not being used
         commands = [3, 1, 3, 1]  # add height as a command
 
@@ -165,6 +165,8 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [
+            "base_height",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -210,11 +212,11 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
                 orientation = 1.0
-                torques = 5.0e-7
+                torques = 5.0e-6
                 dof_vel = 0.0
-                # min_base_height = 1.5
-                action_rate = 0.01
-                action_rate2 = 0.001
+                min_base_height = 1.5
+                action_rate = 0.1
+                action_rate2 = 0.01
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
@@ -225,7 +227,28 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 termination = 0.01
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        pass
+        class algorithm:
+            # both
+            gamma = 0.99
+            lam = 0.95
+            # shared
+            batch_size = 2**15
+            max_gradient_steps = 24
+            # new
+            storage_size = 2**17  # new
+            batch_size = 2**15  #  new
+
+            clip_param = 0.2
+            learning_rate = 1.0e-3
+            max_grad_norm = 1.0
+            # Critic
+            use_clipped_value_loss = True
+            # Actor
+            entropy_coef = 0.01
+            schedule = "adaptive"  # could be adaptive, fixed
+            desired_kl = 0.01
+            lr_range = [2e-4, 1e-2]
+            lr_ratio = 1.3
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""

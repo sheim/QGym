@@ -1010,11 +1010,11 @@ class LeggedRobot(BaseTask):
 
     def _reward_torques(self):
         """Penalize torques"""
-        return -torch.sum(torch.square(self.torques), dim=1)
+        return -torch.mean(torch.square(self.torques), dim=1)
 
     def _reward_dof_vel(self):
         """Penalize dof velocities"""
-        return -torch.sum(torch.square(self.dof_vel), dim=1)
+        return -torch.mean(torch.square(self.dof_vel), dim=1)
 
     def _reward_action_rate(self):
         """Penalize changes in actions"""
@@ -1026,7 +1026,7 @@ class LeggedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_action_rate2(self):
         """Penalize changes in actions"""
@@ -1040,7 +1040,7 @@ class LeggedRobot(BaseTask):
             )
             / dt2
         )
-        return -torch.sum(error, dim=1)
+        return -torch.mean(error, dim=1)
 
     def _reward_collision(self):
         """Penalize collisions on selected bodies"""
@@ -1065,20 +1065,20 @@ class LeggedRobot(BaseTask):
         # * lower limit
         out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)
-        return -torch.sum(out_of_limits, dim=1)
+        return -torch.mean(out_of_limits, dim=1)
 
     def _reward_dof_vel_limits(self):
         """Penalize dof velocities too close to the limit"""
         # * clip to max error = 1 rad/s per joint to avoid huge penalties
         limit = self.cfg.reward_settings.soft_dof_vel_limit
         error = self.dof_vel.abs() - self.dof_vel_limits * limit
-        return -torch.sum(error.clip(min=0.0, max=1.0), dim=1)
+        return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)
 
     def _reward_torque_limits(self):
         """penalize torques too close to the limit"""
         limit = self.cfg.reward_settings.soft_torque_limit
         error = self.torques.abs() - self.torque_limits * limit
-        return -torch.sum(error.clip(min=0.0, max=1.0), dim=1)
+        return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)
 
     def _reward_tracking_lin_vel(self):
         """Tracking of linear velocity commands (xy axes)"""
