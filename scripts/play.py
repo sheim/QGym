@@ -1,4 +1,5 @@
 from gym.envs import __init__  # noqa: F401
+from gym.envs.mini_cheetah.mini_cheetah_config import MiniCheetahCfg
 from gym.utils import get_args, task_registry
 from gym.utils import KeyboardInterface
 from gym.utils import VisualizationRecorder
@@ -6,7 +7,6 @@ from gym.utils import VisualizationRecorder
 # torch needs to be imported after isaacgym imports in local source
 import torch
 import numpy as np
-import os
 
 
 def setup(args):
@@ -31,10 +31,54 @@ def setup(args):
     return env, runner, train_cfg
 
 
+def create_obs_logging_dict(env, obs_vars, num_steps, scaling_cfg=None):
+    """
+    Create a dictionary to log raw and scaled observation data.
+
+    Returns:
+        obs_log: dict with keys:
+                 {var}_raw  -> [num_envs, num_steps, ...]
+                 {var}_scaled -> [num_envs, num_steps, ...]
+    """
+    num_envs = env.num_envs
+    obs_log = {}
+
+    for var in obs_vars:
+        val = getattr(env, var)
+        shape = (num_envs, num_steps) + val.shape[1:]  # preserve timestep array shape
+
+        # allocate tensors
+        obs_log[f"{var}_raw"] = torch.zeros(shape, device=val.device)
+        obs_log[f"{var}_scaled"] = torch.zeros_like(obs_log[f"{var}_raw"])
+
+    return obs_log
+
+
+def log_obs_step(env, obs_log, obs_vars, step_idx, scaling_cfg=None):
+    # log one timestep of observations
+
+    for var in obs_vars:
+        val = getattr(env, var)  # shape: [num_envs, N] or [num_envs, N, M]
+
+        # raw
+        obs_log[f"{var}_raw"][:, step_idx, ...] = val
+
+        # scaled
+        scale = None
+        if scaling_cfg is not None and hasattr(scaling_cfg, var):
+            scale = torch.tensor(getattr(scaling_cfg, var), device=val.device)
+        if scale is not None:
+            # scale to match val shape
+            while scale.ndim < val.ndim:
+                scale = scale.unsqueeze(0)
+            obs_log[f"{var}_scaled"][:, step_idx, ...] = val / scale
+        else:
+            # no scaling available -> just copy raw
+            obs_log[f"{var}_scaled"][:, step_idx, ...] = val
+
+
 def create_logging_dict(env, num_steps):
-    """
-    Creates a dictionary of tensors to store joint data for each timestep.
-    """
+    # creates a dictionary of tensors to store joint data for each timestep.
     num_envs = env.num_envs
     num_dofs = env.num_dof
 
@@ -59,6 +103,23 @@ def create_logging_dict(env, num_steps):
 def play(env, runner, train_cfg):
     num_steps = int(env.max_episode_length)
     log_data = create_logging_dict(env, num_steps)
+    scaling = MiniCheetahCfg.scaling  # NOTE: should change this to be an input
+
+    obs_vars = [
+        "base_height",
+        "base_lin_vel",
+        "base_ang_vel",
+        "projected_gravity",
+        "commands",
+        "dof_pos_obs",
+        "dof_vel",
+        "dof_pos_target",
+    ]
+
+    obs_log = create_obs_logging_dict(env, obs_vars, num_steps, scaling_cfg=scaling)
+
+    # track actual number of simulation steps
+    actual_steps = 0
 
     # * set up recording
     if env.cfg.viewer.record:
@@ -86,11 +147,18 @@ def play(env, runner, train_cfg):
             )
             env.step()
 
-            if i < num_steps:  # avoid overflow if loop is longer than episode
-                log_data["step"][i] = i
-                log_data["target_pos"][:, i, :] = env.dof_pos_target
-                log_data["actual_pos"][:, i, :] = env.dof_pos
-                log_data["torque"][:, i, :] = env.torques
+            # log only actual simulation steps
+            if actual_steps < num_steps:
+                # log joints
+                log_data["step"][actual_steps] = actual_steps
+                log_data["target_pos"][:, actual_steps, :] = env.dof_pos_target
+                log_data["actual_pos"][:, actual_steps, :] = env.dof_pos
+                log_data["torque"][:, actual_steps, :] = env.torques
+
+                # log observations
+                log_obs_step(env, obs_log, obs_vars, actual_steps, scaling_cfg=scaling)
+
+                actual_steps += 1
 
             env.check_exit()  # user exit or viewer closed
 
@@ -99,13 +167,26 @@ def play(env, runner, train_cfg):
     except SystemExit:
         print("\n[INFO] Viewer closed, saving logs...")
     finally:
-        save_path = os.path.join(os.getcwd(), "joint_logs.npz")
+        # slice to actual steps before saving
         log_data_cpu = {
             k: (v.detach().cpu().numpy() if torch.is_tensor(v) else v)
             for k, v in log_data.items()
         }
-        np.savez_compressed(save_path, **log_data_cpu)
-        print(f"\nSaved joint log to {save_path}")
+        for key in ["step", "target_pos", "actual_pos", "torque"]:
+            log_data_cpu[key] = log_data_cpu[key][:actual_steps]
+
+        np.savez_compressed("joint_logs.npz", **log_data_cpu)
+        print(f"\nSaved joint log to joint_logs.npz ({actual_steps} steps)")
+
+        obs_log_cpu = {
+            k: (v.detach().cpu().numpy() if torch.is_tensor(v) else v)
+            for k, v in obs_log.items()
+        }
+        for key in obs_log_cpu.keys():
+            obs_log_cpu[key] = obs_log_cpu[key][:, :actual_steps, ...]
+
+        np.savez_compressed("obs_logs.npz", **obs_log_cpu)
+        print(f"\nSaved obs log to obs_logs.npz ({actual_steps} steps)")
 
 
 if __name__ == "__main__":

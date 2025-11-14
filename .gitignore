@@ -17,6 +17,8 @@ gym/wandb
 user/wandb_config.json
 *trajectories/
 *.png
+obs_scaling_output/
+obs_scaling_comparison/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
