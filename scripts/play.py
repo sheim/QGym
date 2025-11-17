@@ -1,5 +1,4 @@
 from gym.envs import __init__  # noqa: F401
-from gym.envs.mini_cheetah.mini_cheetah_config import MiniCheetahCfg
 from gym.utils import get_args, task_registry
 from gym.utils import KeyboardInterface
 from gym.utils import VisualizationRecorder
@@ -31,7 +30,7 @@ def setup(args):
     return env, runner, train_cfg
 
 
-def create_obs_logging_dict(env, obs_vars, num_steps, scaling_cfg=None):
+def create_obs_logging_dict(env, obs_vars, num_steps):
     """
     Create a dictionary to log raw and scaled observation data.
 
@@ -54,27 +53,10 @@ def create_obs_logging_dict(env, obs_vars, num_steps, scaling_cfg=None):
     return obs_log
 
 
-def log_obs_step(env, obs_log, obs_vars, step_idx, scaling_cfg=None):
-    # log one timestep of observations
-
+def log_obs_step(env, obs_log, obs_vars, step_idx):
     for var in obs_vars:
-        val = getattr(env, var)  # shape: [num_envs, N] or [num_envs, N, M]
-
-        # raw
-        obs_log[f"{var}_raw"][:, step_idx, ...] = val
-
-        # scaled
-        scale = None
-        if scaling_cfg is not None and hasattr(scaling_cfg, var):
-            scale = torch.tensor(getattr(scaling_cfg, var), device=val.device)
-        if scale is not None:
-            # scale to match val shape
-            while scale.ndim < val.ndim:
-                scale = scale.unsqueeze(0)
-            obs_log[f"{var}_scaled"][:, step_idx, ...] = val / scale
-        else:
-            # no scaling available -> just copy raw
-            obs_log[f"{var}_scaled"][:, step_idx, ...] = val
+        obs_log[f"{var}_raw"][:, step_idx, ...] = getattr(env, var)
+        obs_log[f"{var}_scaled"][:, step_idx, ...] = env.get_state(var)
 
 
 def create_logging_dict(env, num_steps):
@@ -103,7 +85,6 @@ def create_logging_dict(env, num_steps):
 def play(env, runner, train_cfg):
     num_steps = int(env.max_episode_length)
     log_data = create_logging_dict(env, num_steps)
-    scaling = MiniCheetahCfg.scaling  # NOTE: should change this to be an input
 
     obs_vars = [
         "base_height",
@@ -116,7 +97,7 @@ def play(env, runner, train_cfg):
         "dof_pos_target",
     ]
 
-    obs_log = create_obs_logging_dict(env, obs_vars, num_steps, scaling_cfg=scaling)
+    obs_log = create_obs_logging_dict(env, obs_vars, num_steps)
 
     # track actual number of simulation steps
     actual_steps = 0
@@ -156,7 +137,7 @@ def play(env, runner, train_cfg):
                 log_data["torque"][:, actual_steps, :] = env.torques
 
                 # log observations
-                log_obs_step(env, obs_log, obs_vars, actual_steps, scaling_cfg=scaling)
+                log_obs_step(env, obs_log, obs_vars, actual_steps)
 
                 actual_steps += 1
 

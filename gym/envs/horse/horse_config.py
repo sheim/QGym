@@ -98,8 +98,8 @@ class HorseCfg(LeggedRobotCfg):
             "pastern_to_foot": 250,
             "base_joint": 10,
         }
-        ctrl_frequency = 500  # how often the PDF controller/action updates run
-        desired_sim_frequency = 1000  # how often the physics is calculated
+        ctrl_frequency = 250  # how often the PDF controller/action updates run
+        desired_sim_frequency = 500  # how often the physics is calculated
 
     class commands:
         # * time before command are changed[s]
@@ -216,11 +216,11 @@ class HorseRunnerCfg(LeggedRobotRunnerCfg):
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
                 orientation = 1.0
-                torques = 5.0e-6
+                torques = 5.0e-7
                 dof_vel = 0.0
                 min_base_height = 1.5
-                action_rate = 0.01
-                action_rate2 = 0.001
+                action_rate = 1e-4
+                action_rate2 = 1e-5
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
