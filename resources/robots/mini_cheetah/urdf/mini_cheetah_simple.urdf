@@ -80,7 +80,7 @@
 		<origin rpy="0.0 0.6 0.0" xyz="0.0 -0.12 -0.05"/>
 		<parent link="rf_hip"/>
 		<child link="rf_thigh"/>
-		<limit effort="700" lower="-0.7" upper="0.6" velocity="41"/>
+		<limit effort="1000" lower="-0.7" upper="0.6" velocity="41"/>
 	</joint>
 	<link name="rf_thigh">
 		<inertial>
@@ -211,7 +211,7 @@
 		<origin rpy="0.0 0.6 0.0" xyz="0.0 0.12 -0.05"/>
 		<parent link="lf_hip"/>
 		<child link="lf_thigh"/>
-		<limit effort="700" lower="-0.7" upper="0.6" velocity="41"/>
+		<limit effort="1000" lower="-0.7" upper="0.6" velocity="41"/>
 	</joint>
 	<link name="lf_thigh">
 		<inertial>
@@ -341,7 +341,7 @@
 		<origin rpy="0.0 2.841592 0.0" xyz="0.0 -0.12 -0.05"/>
 		<parent link="rh_hip"/>
 		<child link="rh_thigh"/>
-		<limit effort="700" lower="-0.7" upper="1.5" velocity="41"/>
+		<limit effort="1000" lower="-0.7" upper="1.5" velocity="41"/>
 	</joint>
 	<link name="rh_thigh">
 		<inertial>
@@ -471,7 +471,7 @@
 		<origin rpy="0.0 2.841592 0.0" xyz="0.0 0.12 -0.05"/>
 		<parent link="lh_hip"/>
 		<child link="lh_thigh"/>
-		<limit effort="700" lower="-0.7" upper="1.5" velocity="41"/>
+		<limit effort="1000" lower="-0.7" upper="1.5" velocity="41"/>
 	</joint>
 	<link name="lh_thigh">
 		<inertial>

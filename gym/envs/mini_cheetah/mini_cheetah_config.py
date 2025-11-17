@@ -37,33 +37,42 @@ class MiniCheetahCfg(LeggedRobotCfg):
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
 
         # * initialization for random range setup
+        # these are the physical limits in the URDF as of 17 Nov 2025
+        # dof_pos_range = {
+        #     "haa": [-0.2, 0.2],
+        #     "hfe": [-0.7, 0.6],
+        #     "kfe": [-1.3, 0.1],
+        #     "pfe": [-0.3, 2.2],
+        #     "pastern_to_foot": [-0.3, 1.8],
+        #     "base_joint": [-0.2, 0.2],
+        # }
         dof_pos_range = {
             "haa": [-0.2, 0.2],
-            "hfe": [-0.5, 0.5],
-            "kfe": [0.0, 0.0],
-            "pfe": [0.0, 0.0],
-            "pastern_to_foot": [0.0, 0.0],
-            "base_joint": [0.0, 0.0],
+            "hfe": [-0.7, 0.6],
+            "kfe": [-1.3, 0.1],
+            "pfe": [-0.3, 2.2],
+            "pastern_to_foot": [-0.3, 1.8],
+            "base_joint": [-0.2, 0.2],
         }
         dof_vel_range = {
-            "haa": [0.0, 0.0],
-            "hfe": [0.0, 0.0],
-            "kfe": [0.0, 0.0],
-            "pfe": [0.0, 0.0],
-            "pastern_to_foot": [0.0, 0.0],
-            "base_joint": [0.0, 0.0],
+            "haa": [-0.2, 0.2],
+            "hfe": [-0.2, 0.2],
+            "kfe": [-0.2, 0.2],
+            "pfe": [-0.2, 0.2],
+            "pastern_to_foot": [-0.2, 0.2],
+            "base_joint": [-0.2, 0.2],
         }
 
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
             [1.3, 1.3],  # z
-            [0.0, 0.0],  # roll
-            [0.0, 0.0],  # pitch
-            [0.0, 0.0],  # yaw
+            [-0.2, 0.2],  # roll
+            [-0.2, 0.2],  # pitch
+            [-0.2, 0.2],  # yaw
         ]
         root_vel_range = [
-            [-0.5, 2.0],  # x
+            [-0.5, 5.0],  # x
             [0.0, 0.0],  # y
             [-0.05, 0.05],  # z
             [0.0, 0.0],  # roll
@@ -147,12 +156,10 @@ class MiniCheetahCfg(LeggedRobotCfg):
         base_lin_vel = BASE_HEIGHT_REF
         dof_vel = [2.0] + (4 * [0.5, 0.5, 0.5, 0.5, 0.5])
         base_height = BASE_HEIGHT_REF
-        dof_pos = [0.2] + (
-            4 * [1.0, 1.0, 1.0, 1.0, 1.0]
-        )  # i think these values were too small?
+        dof_pos = [0.2] + (4 * [0.4, 1.3, 1.4, 2.5, 2.1])
         dof_pos_obs = dof_pos
-        dof_pos_target = [0.2] + (4 * [0.4, 0.4, 0.4, 0.2, 0.2])  # target joint angles
-        tau_ff = [3600] + (4 * [3600, 3600, 400000, 400000, 5800])  # not being used
+        dof_pos_target = [2.0 * x for x in dof_pos]  # target joint angles
+        tau_ff = [1100] + (4 * [1000, 1000, 1000, 500, 300])  # not being used
         commands = [3, 1, 3, 1]  # add height as a command
 
 
@@ -215,8 +222,8 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 torques = 5.0e-6
                 dof_vel = 0.0
                 min_base_height = 1.5
-                action_rate = 0.1
-                action_rate2 = 0.01
+                action_rate = 0.01
+                action_rate2 = 0.001
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
@@ -253,6 +260,6 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah"
-        max_iterations = 500
+        max_iterations = 1000
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
