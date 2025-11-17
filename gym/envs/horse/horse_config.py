@@ -3,13 +3,13 @@ from gym.envs.base.legged_robot_config import (
     LeggedRobotRunnerCfg,
 )
 
-BASE_HEIGHT_REF = 0.3
+BASE_HEIGHT_REF = 1.3
 
 
-class MiniCheetahCfg(LeggedRobotCfg):
+class HorseCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
-        num_actuators = 12
+        num_actuators = 1 + 4 * 5
         episode_length_s = 10
 
     class terrain(LeggedRobotCfg.terrain):
@@ -18,8 +18,11 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class init_state(LeggedRobotCfg.init_state):
         default_joint_angles = {
             "haa": 0.0,
-            "hfe": -0.785398,
-            "kfe": 1.596976,
+            "hfe": 0.0,
+            "kfe": 0.0,
+            "pfe": 0.0,
+            "pastern_to_foot": 0.0,
+            "base_joint": 0.0,
         }
 
         # * reset setup chooses how the initial conditions are chosen.
@@ -28,28 +31,48 @@ class MiniCheetahCfg(LeggedRobotCfg):
         reset_mode = "reset_to_range"
 
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 0.35]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.4]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
 
         # * initialization for random range setup
+        # these are the physical limits in the URDF as of 17 Nov 2025
+        # dof_pos_range = {
+        #     "haa": [-0.2, 0.2],
+        #     "hfe": [-0.7, 0.6],
+        #     "kfe": [-1.3, 0.1],
+        #     "pfe": [-0.3, 2.2],
+        #     "pastern_to_foot": [-0.3, 1.8],
+        #     "base_joint": [-0.2, 0.2],
+        # }
         dof_pos_range = {
-            "haa": [-0.01, 0.01],
-            "hfe": [-0.785398, -0.785398],
-            "kfe": [1.596976, 1.596976],
+            "haa": [-0.2, 0.2],
+            "hfe": [-0.7, 0.6],
+            "kfe": [-1.3, 0.1],
+            "pfe": [-0.3, 2.2],
+            "pastern_to_foot": [-0.3, 1.8],
+            "base_joint": [-0.2, 0.2],
         }
-        dof_vel_range = {"haa": [0.0, 0.0], "hfe": [0.0, 0.0], "kfe": [0.0, 0.0]}
+        dof_vel_range = {
+            "haa": [-0.2, 0.2],
+            "hfe": [-0.2, 0.2],
+            "kfe": [-0.2, 0.2],
+            "pfe": [-0.2, 0.2],
+            "pastern_to_foot": [-0.2, 0.2],
+            "base_joint": [-0.2, 0.2],
+        }
+
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.35, 0.35],  # z
-            [0.0, 0.0],  # roll
-            [0.0, 0.0],  # pitch
-            [0.0, 0.0],  # yaw
+            [1.3, 1.3],  # z
+            [-0.2, 0.2],  # roll
+            [-0.2, 0.2],  # pitch
+            [-0.2, 0.2],  # yaw
         ]
         root_vel_range = [
-            [-0.5, 2.0],  # x
+            [-0.5, 5.0],  # x
             [0.0, 0.0],  # y
             [-0.05, 0.05],  # z
             [0.0, 0.0],  # roll
@@ -59,19 +82,34 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
-        stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
-        damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
-        ctrl_frequency = 100
-        desired_sim_frequency = 500
+        stiffness = {
+            "haa": 4000,
+            "hfe": 4000,
+            "kfe": 4000,
+            "pfe": 4000,
+            "pastern_to_foot": 4000,
+            "base_joint": 50,
+        }
+        damping = {
+            "haa": 250,
+            "hfe": 250,
+            "kfe": 250,
+            "pfe": 250,
+            "pastern_to_foot": 250,
+            "base_joint": 10,
+        }
+        ctrl_frequency = 500  # how often the PDF controller/action updates run
+        desired_sim_frequency = 1000  # how often the physics is calculated
 
     class commands:
         # * time before command are changed[s]
         resampling_time = 3.0
 
         class ranges:
-            lin_vel_x = [-2.0, 3.0]  # min max [m/s]
+            lin_vel_x = [-1.0, 8.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
-            yaw_vel = 3  # max [rad/s]
+            yaw_vel = 6  # max [rad/s]
+            height = [0.61, 1.30]  # m
 
     class push_robots:
         toggle = False
@@ -81,15 +119,12 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class domain_rand:
         randomize_friction = True
-        friction_range = [0.5, 1.0]
+        friction_range = [0.5, 5.0]
         randomize_base_mass = False
         added_mass_range = [-1.0, 1.0]
 
     class asset(LeggedRobotCfg.asset):
-        file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
-            + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
-        )
+        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "horse/urdf/horse.urdf"
         foot_name = "foot"
         penalize_contacts_on = ["shank"]
         terminate_after_contacts_on = ["base"]
@@ -99,8 +134,11 @@ class MiniCheetahCfg(LeggedRobotCfg):
         flip_visual_attachments = False
         disable_gravity = False
         disable_motors = False
-        joint_damping = 0.1
-        rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
+        joint_damping = 0.3
+        fix_base_link = False
+        rotor_inertia = [0.002268] + 4 * (
+            [0.002268, 0.002268, 0.005484, 0.005484, 0.005484]
+        )
 
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9
@@ -113,16 +151,16 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class scaling(LeggedRobotCfg.scaling):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
-        dof_vel = 4 * [2.0, 2.0, 4.0]
-        base_height = 0.3
-        dof_pos = 4 * [0.2, 0.3, 0.3]
+        dof_vel = [2.0] + (4 * [0.5, 0.5, 0.5, 0.5, 0.5])
+        base_height = BASE_HEIGHT_REF
+        dof_pos = [0.2] + (4 * [0.4, 1.3, 1.4, 2.5, 2.1])
         dof_pos_obs = dof_pos
-        dof_pos_target = 4 * [0.2, 0.3, 0.3]
-        tau_ff = 4 * [18, 18, 28]
-        commands = [3, 1, 3, 1]
+        dof_pos_target = [2.0 * x for x in dof_pos]  # target joint angles
+        tau_ff = [1100] + (4 * [1000, 1000, 1000, 500, 300])  # not being used
+        commands = [3, 1, 3, 1]  # add height as a command
 
 
-class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
+class HorseRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
@@ -131,6 +169,8 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [
+            "base_height",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
@@ -179,22 +219,44 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
                 torques = 5.0e-6
                 dof_vel = 0.0
                 min_base_height = 1.5
-                action_rate = 0.1
-                action_rate2 = 0.01
+                action_rate = 0.01
+                action_rate2 = 0.001
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
+                tracking_height = 1.5
 
             class termination_weight:
                 termination = 0.01
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        pass
+        class algorithm:
+            # both
+            gamma = 0.99
+            lam = 0.95
+            # shared
+            batch_size = 2**15
+            max_gradient_steps = 24
+            # new
+            storage_size = 2**17  # new
+            batch_size = 2**15  #  new
+
+            clip_param = 0.2
+            learning_rate = 1.0e-3
+            max_grad_norm = 1.0
+            # Critic
+            use_clipped_value_loss = True
+            # Actor
+            entropy_coef = 0.01
+            schedule = "adaptive"  # could be adaptive, fixed
+            desired_kl = 0.01
+            lr_range = [2e-4, 1e-2]
+            lr_ratio = 1.3
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
-        experiment_name = "mini_cheetah"
-        max_iterations = 500
+        experiment_name = "horse"
+        max_iterations = 1000
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
