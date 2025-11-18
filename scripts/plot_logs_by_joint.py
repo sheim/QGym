@@ -11,6 +11,28 @@ SAVE_DIR = "plots_by_joint"
 # output folder
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+# joint limits
+JOINT_LIMITS = {
+    r".*haa": [-0.2, 0.2],
+    r".*f_hfe": [-0.7, 0.6],
+    r".*h_hfe": [-0.7, 1.5],
+    r".*f_kfe": [-1.3, 0.1],
+    r".*h_kfe": [-0.2, 0.8],
+    r".*f_pfe": [-0.3, 2.2],
+    r".*h_pfe": [-0.3, 2.5],
+    r".*f_pastern_to_foot": [-0.3, 1.8],
+    r".*h_pastern_to_foot": [-0.3, 1.8],
+    r".*base_joint": [-0.2, 0.2],
+}
+
+
+def find_joint_limits(joint_name: str):
+    for pattern, limits in JOINT_LIMITS.items():
+        if re.match(pattern, joint_name):
+            return limits
+    return None
+
+
 data = np.load(LOG_FILE, allow_pickle=True)
 steps = data["step"]
 target_pos = data["target_pos"]
@@ -60,41 +82,67 @@ def plot_joint_type(joint_type, leg_to_idx):
 
         # find last index with nonzero torque (or position)
         nonzero_idx = np.where(np.abs(actual_pos[ENV_ID, :, j]) > 1e-6)[0]
-        if len(nonzero_idx) > 0:
-            last_valid = nonzero_idx[-1] + 1
-        else:
-            last_valid = len(steps)
+        last_valid = nonzero_idx[-1] + 1 if len(nonzero_idx) > 0 else len(steps)
 
         # position plot
-        axs[pos_row, col].plot(
+        pos_ax = axs[pos_row, col]
+        pos_ax.plot(
             steps[:last_valid],
             target_pos[ENV_ID, :last_valid, j],
             linestyle="--",
             linewidth=1.3,
             label="Target Pos",
         )
-        axs[pos_row, col].plot(
+        pos_ax.plot(
             steps[:last_valid],
             actual_pos[ENV_ID, :last_valid, j],
             linewidth=1.3,
             label="Actual Pos",
         )
-        axs[pos_row, col].set_title(f"{leg.upper()} - {joint_type.upper()} Position")
-        axs[pos_row, col].set_ylabel("Position (rad)")
-        axs[pos_row, col].grid(True, linestyle="--", alpha=0.4)
-        axs[pos_row, col].legend(fontsize=7)
+
+        # add joint limit lines
+        limits = find_joint_limits(joint_names[j])
+        if limits is not None:
+            lo, hi = limits
+            pos_ax.axhline(
+                lo,
+                color="blue",
+                linestyle="--",
+                linewidth=1,
+                alpha=0.7,
+                label=f"Lower Limit ({lo:.2f})",
+            )
+            pos_ax.axhline(
+                hi,
+                color="red",
+                linestyle="--",
+                linewidth=1,
+                alpha=0.7,
+                label=f"Upper Limit ({hi:.2f})",
+            )
+
+            ymin, ymax = pos_ax.get_ylim()
+            ymin = min(ymin, lo - 0.05)
+            ymax = max(ymax, hi + 0.05)
+            pos_ax.set_ylim([ymin, ymax])
+
+        pos_ax.set_title(f"{leg.upper()} - {joint_type.upper()} Position")
+        pos_ax.set_ylabel("Position (rad)")
+        pos_ax.grid(True, linestyle="--", alpha=0.4)
+        pos_ax.legend(fontsize=7)
 
         # torque plot
-        axs[torque_row, col].plot(
+        torque_ax = axs[torque_row, col]
+        torque_ax.plot(
             steps[:last_valid],
             torques[ENV_ID, :last_valid, j],
             color="tab:red",
             linewidth=1.2,
         )
-        axs[torque_row, col].set_title(f"{leg.upper()} - {joint_type.upper()} Torque")
-        axs[torque_row, col].set_ylabel("Torque (Nm)")
-        axs[torque_row, col].set_xlabel("Step")
-        axs[torque_row, col].grid(True, linestyle="--", alpha=0.4)
+        torque_ax.set_title(f"{leg.upper()} - {joint_type.upper()} Torque")
+        torque_ax.set_ylabel("Torque (Nm)")
+        torque_ax.set_xlabel("Step")
+        torque_ax.grid(True, linestyle="--", alpha=0.4)
 
     plt.suptitle(f"{joint_type.upper()} Joints (All Legs)", fontsize=16)
     save_path = os.path.join(SAVE_DIR, f"{joint_type}.png")
@@ -121,10 +169,7 @@ def plot_base_joints(base_joints):
 
         # find last index with nonzero torque (or position)
         nonzero_idx = np.where(np.abs(actual_pos[ENV_ID, :, j]) > 1e-6)[0]
-        if len(nonzero_idx) > 0:
-            last_valid = nonzero_idx[-1] + 1
-        else:
-            last_valid = len(steps)
+        last_valid = nonzero_idx[-1] + 1 if len(nonzero_idx) > 0 else len(steps)
 
         # position
         pos_ax.plot(
@@ -140,6 +185,33 @@ def plot_base_joints(base_joints):
             linewidth=1.3,
             label="Actual Pos",
         )
+
+        # add joint limits
+        limits = find_joint_limits(name)
+        if limits is not None:
+            lo, hi = limits
+            pos_ax.axhline(
+                lo,
+                color="blue",
+                linestyle="--",
+                linewidth=1,
+                alpha=0.7,
+                label=f"Lower Limit ({lo:.2f})",
+            )
+            pos_ax.axhline(
+                hi,
+                color="red",
+                linestyle="--",
+                linewidth=1,
+                alpha=0.7,
+                label=f"Upper Limit ({hi:.2f})",
+            )
+
+            ymin, ymax = pos_ax.get_ylim()
+            ymin = min(ymin, lo - 0.05)
+            ymax = max(ymax, hi + 0.05)
+            pos_ax.set_ylim([ymin, ymax])
+
         pos_ax.set_title(f"{name} Position")
         pos_ax.set_ylabel("Position (rad)")
         pos_ax.legend(fontsize=7)
