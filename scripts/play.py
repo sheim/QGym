@@ -147,8 +147,9 @@ def play(env, runner, train_cfg):
         print("\n[INFO] Interrupted by user, saving logs...")
     except SystemExit:
         print("\n[INFO] Viewer closed, saving logs...")
+
+    # slice to actual steps before saving
     finally:
-        # slice to actual steps before saving
         log_data_cpu = {
             k: (v.detach().cpu().numpy() if torch.is_tensor(v) else v)
             for k, v in log_data.items()

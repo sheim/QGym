@@ -27,7 +27,7 @@
 		<origin xyz="-0.5 0 0.3" rpy="0 0 0"/>
 		<parent link="front_base"/>
 		<child link="back_base"/>
-		<limit effort="1100" lower="-0.2" upper="0.2" velocity="41"/>
+		<limit effort="10000" lower="-0.2" upper="0.2" velocity="41"/>
 	</joint>
 	<link name="back_base">
 		<inertial>

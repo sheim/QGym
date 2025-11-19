@@ -190,6 +190,9 @@ class HorseOsc(Horse):
         self.oscillator_obs = torch.cat(
             (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
         )
+        self.oscillator_obs = torch.cat(
+            (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
+        )
 
     def _resample_commands(self, env_ids):
         """Randommly select commands of some environments
