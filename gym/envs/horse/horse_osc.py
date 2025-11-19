@@ -524,3 +524,13 @@ class HorseOsc(Horse):
         error /= self.scales["base_height"]
 
         return self._sqrdexp(error)
+
+    # def _compute_torques(self):
+    #     torques = (
+    #         self.p_gains * (self.dof_pos_target + self.default_dof_pos - self.dof_pos)
+    #         + self.d_gains * (self.dof_vel_target - self.dof_vel)
+    #         + self.tau_ff
+    #     )
+
+    #     # disable torque limits
+    #     return torques
