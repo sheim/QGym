@@ -112,6 +112,7 @@ class HorseOscCfg(HorseCfg):
         coupling = 1  # gets overwritten
         osc_bool = False  # not used in paper
         grf_bool = False  # not used in paper
+        randomize_osc_params = False
         omega_range = [1.0, 4.0]  # [0.0, 10.]
         coupling_range = [0.0, 1.0]
         offset_range = [0.0, 0.0]
