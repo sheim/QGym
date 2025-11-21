@@ -112,7 +112,6 @@ class HorseOscCfg(HorseCfg):
         coupling = 1  # gets overwritten
         osc_bool = False  # not used in paper
         grf_bool = False  # not used in paper
-        randomize_osc_params = False
         omega_range = [1.0, 4.0]  # [0.0, 10.]
         coupling_range = [0.0, 1.0]
         offset_range = [0.0, 0.0]
@@ -121,7 +120,6 @@ class HorseOscCfg(HorseCfg):
         omega_step = 2.0
         omega_slope = 1.0
         omega_max = 4.0
-        omega_var = 0.25
         # coupling_step = 0.
         # coupling_stop = 0.
         coupling_stop = 4.0
@@ -129,10 +127,8 @@ class HorseOscCfg(HorseCfg):
         coupling_slope = 0.0
         coupling_max = 1.0
         offset = 1.0
-        coupling_var = 0.25
 
         init_to = "random"
-        init_w_offset = True
 
     class commands:
         resampling_time = 3.0  # * time before command are changed[s]
