@@ -7,16 +7,10 @@ BASE_HEIGHT_REF = 1.3
 
 
 class HorseOscCfg(HorseCfg):
-    class viewer:
-        ref_env = 0
-        pos = [-2.0, 3, 2]  # [m]
-        lookat = [0.0, 1.0, 0.5]  # [m]
-
     class env(HorseCfg.env):
         num_envs = 2**12
         num_actuators = 1 + 4 * 5
         episode_length_s = 10
-        env_spacing = 3.0
 
     class terrain(HorseCfg.terrain):
         mesh_type = "plane"
@@ -42,20 +36,24 @@ class HorseOscCfg(HorseCfg):
         # * initialization for random range setup
         # these are the physical limits in the URDF as of 17 Nov 2025
         # dof_pos_range = {
-        #     "haa": [-0.2, 0.2],
-        #     "hfe": [-0.7, 0.6],
-        #     "kfe": [-1.3, 0.1],
-        #     "pfe": [-0.3, 2.2],
-        #     "pastern_to_foot": [-0.3, 1.8],
-        #     "base_joint": [-0.2, 0.2],
+        #   haa": [-0.2, 0.2],
+        #   f_hfe": [-0.7, 0.6],
+        #   h_hfe": [-0.7, 1.5],
+        #   f_kfe": [-1.3, 0.1],
+        #   h_kfe": [-0.2, 0.8],
+        #   f_pfe": [-0.3, 2.2],
+        #   h_pfe": [-0.3, 2.5],
+        #   f_pastern_to_foot": [-0.3, 1.8],
+        #   h_pastern_to_foot": [-0.3, 1.8],
+        #   base_joint": [-0.2, 0.2],
         # }
         dof_pos_range = {
             "haa": [-0.2, 0.2],
             "hfe": [-0.7, 0.6],
-            "kfe": [-1.3, 0.1],
+            "kfe": [-0.2, 0.1],
             "pfe": [-0.3, 2.2],
             "pastern_to_foot": [-0.3, 1.8],
-            "base_joint": [-0.2, 0.2],
+            "base_joint": [-0.0, 0.0],
         }
         dof_vel_range = {
             "haa": [-0.2, 0.2],
@@ -69,15 +67,15 @@ class HorseOscCfg(HorseCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [1.3, 1.3],  # z
-            [-0.2, 0.2],  # roll
-            [-0.2, 0.2],  # pitch
+            [1.35, 1.35],  # z
+            [-0.0, 0.0],  # roll
+            [-0.0, 0.0],  # pitch
             [-0.2, 0.2],  # yaw
         ]
         root_vel_range = [
-            [-0.5, 5.0],  # x
+            [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [-0.05, 0.05],  # z
+            [0.0, 0.0],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
@@ -85,24 +83,25 @@ class HorseOscCfg(HorseCfg):
 
     class control(HorseCfg.control):
         # * PD Drive parameters:
+        # HorseOscCfg.control
         stiffness = {
-            "haa": 4000,
-            "hfe": 4000,
-            "kfe": 4000,
-            "pfe": 4000,
-            "pastern_to_foot": 4000,
-            "base_joint": 50,
+            "haa": 75,
+            "hfe": 40,
+            "kfe": 38,
+            "pfe": 10,
+            "pastern_to_foot": 5,
+            "base_joint": 50,  # still needs modifying
         }
         damping = {
-            "haa": 250,
-            "hfe": 250,
-            "kfe": 250,
-            "pfe": 250,
-            "pastern_to_foot": 250,
+            "haa": 0.0001,
+            "hfe": 0.0001,
+            "kfe": 0.0001,
+            "pfe": 0.5,
+            "pastern_to_foot": 0.5,
             "base_joint": 10,
         }
         ctrl_frequency = 250  # how often the PDF controller/action updates run
-        desired_sim_frequency = 500  # how often the physics is calculated
+        desired_sim_frequency = 1000  # how often the physics is calculated
 
     class osc:  # <-------------------most likely needs tuning
         process_noise_std = 0.25
@@ -136,7 +135,7 @@ class HorseOscCfg(HorseCfg):
         var = 1.0
 
         class ranges:
-            lin_vel_x = [-1.0, 0.0, 1.0, 3.0]  # min max [m/s]
+            lin_vel_x = [-1.0, 0.0, 1.0, 3.0, 6.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 6  # max [rad/s]
             height = [0.61, 1.30]  # m
@@ -163,7 +162,7 @@ class HorseOscCfg(HorseCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "horse/urdf/horse.urdf"
         foot_name = "foot"
         penalize_contacts_on = ["thigh", "shank", "pastern"]
-        terminate_after_contacts_on = ["base"]
+        terminate_after_contacts_on = ["base"]  # turn off for laying down
         collapse_fixed_joints = False
         fix_base_link = False
         self_collisions = 1
@@ -176,7 +175,7 @@ class HorseOscCfg(HorseCfg):
         soft_dof_pos_limit = 0.9
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
-        max_contact_force = 600.0
+        max_contact_force = 2000.0  # testing, this was too low for a horse weight
         base_height_target = BASE_HEIGHT_REF + 0.03
         tracking_sigma = 0.25
         switch_scale = 0.5
@@ -201,16 +200,6 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        # obs = [
-        #     "base_height",
-        #     "base_lin_vel",
-        #     "base_ang_vel",
-        #     "projected_gravity",
-        #     "commands",
-        #     "dof_pos_obs",
-        #     "dof_vel",
-        #     "dof_pos_target",
-        # ]
         obs = [
             "base_height",
             "base_lin_vel",
@@ -264,52 +253,56 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
-                ang_vel_xy = 0.0
+                ang_vel_xy = 0.01
                 orientation = 1.0
-                torques = 5.0e-6
+                torques = 5.0e-10
                 dof_vel = 0.0
-                min_base_height = 1.0
-                collision = 0
-                action_rate = 0.1  # -0.01
-                action_rate2 = 0.01  # -0.001
+                # min_base_height = 1.0
+                action_rate = 1e-5
+                action_rate2 = 1e-6
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                swing_grf = 1.0
-                stance_grf = 1.0
+                swing_grf = 5.0
+                stance_grf = 5.0
                 swing_velocity = 0.0
                 stance_velocity = 0.0
-                coupled_grf = 0.0  # 8.
+                coupled_grf = 1.0  # penalize for grf during swing, no grf during stance
                 enc_pace = 0.0
-                cursorial = 0.25
+                cursorial = 0.75  # enourage legs to stay under body, don't splay out
                 standing_torques = 0.0  # 1.e-5
+                tracking_height = 1.5
 
             class termination_weight:
                 termination = 15.0 / 100.0
 
     class algorithm:
-        # training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
+        # both
+        gamma = 0.99
+        lam = 0.95
+        # shared
+        batch_size = 2**15
+        max_gradient_steps = 24
+        # new
+        storage_size = 2**17  # new
+        batch_size = 2**15  #  new
+
         clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 4
-        # mini batch size = num_envs*nsteps/nminibatches
-        num_mini_batches = 8
-        max_gradient_steps = 32
-        learning_rate = 1.0e-4
-        schedule = "adaptive"  # can be adaptive, fixed
-        discount_horizon = 1.0
-        GAE_bootstrap_horizon = 2.0
-        desired_kl = 0.01
+        learning_rate = 1.0e-3
         max_grad_norm = 1.0
-        lr_range = [1e-5, 5e-3]
-        lr_ratio = 1.5
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [2e-4, 1e-2]
+        lr_ratio = 1.3
 
     class runner(HorseRunnerCfg.runner):
         run_name = ""
         experiment_name = "horse_osc"
-        max_iterations = 500
+        max_iterations = 1000
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
