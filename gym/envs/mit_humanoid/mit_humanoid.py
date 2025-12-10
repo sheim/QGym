@@ -1,7 +1,6 @@
 import torch
 
 from gym.envs.base.legged_robot import LeggedRobot
-from .jacobian import _apply_coupling
 
 
 class MIT_Humanoid(LeggedRobot):
@@ -10,25 +9,148 @@ class MIT_Humanoid(LeggedRobot):
 
     def _init_buffers(self):
         super()._init_buffers()
+        self._init_sampled_history_buffers()
 
+    def _init_sampled_history_buffers(self):
+        self.sampled_history_dof_pos_target = torch.zeros(
+            (self.num_envs, self.num_dof * self.cfg.env.sampled_history_length),
+            device=self.device,
+        )
+        self.sampled_history_dof_pos = torch.zeros(
+            self.num_envs,
+            self.num_dof * self.cfg.env.sampled_history_length,
+            device=self.device,
+        )
+        self.sampled_history_dof_vel = torch.zeros(
+            self.num_envs,
+            self.num_dof * self.cfg.env.sampled_history_length,
+            device=self.device,
+        )
+        self.sampled_history_counter = torch.zeros(
+            self.num_envs, dtype=int, device=self.device
+        )
+        self.sampled_history_threshold = int(
+            self.cfg.control.ctrl_frequency / self.cfg.env.sampled_history_frequency
+        )
+        self.J = torch.eye(self.num_dof).to(self.device)
+        self.J[4, 3] = 1
+        self.J[9, 8] = 1
+        self.J_inv_T = torch.inverse(self.J.T)
+
+    def _apply_coupling(self, q, qd, q_des, qd_des, kp, kd, tau_ff):
+        # Create a Jacobian matrix and move it to the same device as input tensors
+
+        # Perform transformations using Jacobian
+        q = torch.matmul(q, self.J.T)
+        qd = torch.matmul(qd, self.J.T)
+        q_des = torch.matmul(q_des, self.J.T)
+        qd_des = torch.matmul(qd_des, self.J.T)
+
+        # Compute feed-forward torques
+        tau_ff = torch.matmul(self.J_inv_T, tau_ff.T).T
+
+        # Compute kp and kd terms
+        kp = torch.diagonal(
+            torch.matmul(
+                torch.matmul(self.J_inv_T, torch.diag_embed(kp, dim1=-2, dim2=-1)),
+                self.J_inv_T.T,
+            ),
+            dim1=-2,
+            dim2=-1,
+        )
+
+        kd = torch.diagonal(
+            torch.matmul(
+                torch.matmul(self.J_inv_T, torch.diag_embed(kd, dim1=-2, dim2=-1)),
+                self.J_inv_T.T,
+            ),
+            dim1=-2,
+            dim2=-1,
+        )
+
+        # Compute torques
+        torques = kp * (q_des - q) + kd * (qd_des - qd) + tau_ff
+        torques = torch.matmul(torques, self.J)
+
+        return torques
+
+    def _reset_system(self, env_ids):
+        if len(env_ids) == 0:
+            return
+        super()._reset_system(env_ids)
+        self._reset_sampled_history_buffers(env_ids)
+        return
+
+    def _reset_sampled_history_buffers(self, ids):
+        n = self.cfg.env.sampled_history_length
+        self.sampled_history_dof_pos_target[ids] = self.dof_pos_target[ids].tile(n)
+        self.sampled_history_dof_pos[ids] = self.dof_pos_target[ids].tile(n)
+        self.sampled_history_dof_vel[ids] = self.dof_pos_target[ids].tile(n)
+
+    # compute_torques accounting for coupling, and filtering torques
     def _compute_torques(self):
-        self.desired_pos_target = self.dof_pos_target + self.default_dof_pos
-        q = self.dof_pos.clone()
-        qd = self.dof_vel.clone()
-        q_des = self.desired_pos_target.clone()
-        qd_des = self.dof_vel_target.clone()
-        tau_ff = self.tau_ff.clone()
-        kp = self.p_gains.clone()
-        kd = self.d_gains.clone()
+        torques = self._apply_coupling(
+            self.dof_pos,
+            self.dof_vel,
+            self.dof_pos_target + self.default_dof_pos,
+            self.dof_vel_target,
+            self.p_gains,
+            self.d_gains,
+            self.tau_ff,
+        )
+        return torques.clip(-self.torque_limits, self.torque_limits)
 
-        if self.cfg.asset.apply_humanoid_jacobian:
-            torques = _apply_coupling(q, qd, q_des, qd_des, kp, kd, tau_ff)
-        else:
-            torques = kp * (q_des - q) + kd * (qd_des - qd) + tau_ff
+    def _post_decimation_step(self):
+        super()._post_decimation_step()
+        self._update_sampled_history_buffers()
 
-        torques = torch.clip(torques, -self.torque_limits, self.torque_limits)
+    def _update_sampled_history_buffers(self):
+        self.sampled_history_counter += 1
 
-        return torques.view(self.torques.shape)
+        ids = torch.nonzero(
+            self.sampled_history_counter == self.sampled_history_threshold,
+            as_tuple=False,
+        ).flatten()
+
+        self.sampled_history_dof_pos_target[ids] = torch.roll(
+            self.sampled_history_dof_pos_target[ids], self.num_dof, dims=1
+        )  # check
+        self.sampled_history_dof_pos_target[ids, : self.num_dof] = self.dof_pos_target[
+            ids
+        ]
+        self.sampled_history_dof_pos[ids] = torch.roll(
+            self.sampled_history_dof_pos[ids], self.num_dof, dims=1
+        )  # check
+        self.sampled_history_dof_pos[ids, : self.num_dof] = self.dof_pos_target[ids]
+        self.sampled_history_dof_vel[ids] = torch.roll(
+            self.sampled_history_dof_vel[ids], self.num_dof, dims=1
+        )  # check
+        self.sampled_history_dof_vel[ids, : self.num_dof] = self.dof_pos_target[ids]
+
+        self.sampled_history_counter[ids] = 0
+
+    # --- rewards ---
+
+    def _switch(self, mode=None):
+        c_vel = torch.linalg.norm(self.commands, dim=1)
+        switch = torch.exp(
+            -torch.square(
+                torch.max(
+                    torch.zeros_like(c_vel),
+                    c_vel - self.cfg.reward_settings.switch_scale,
+                )
+            )
+            / self.cfg.reward_settings.switch_scale
+        )
+        if mode is None or mode == "stand":
+            return switch
+        elif mode == "move":
+            return 1 - switch
+
+    def _reward_lin_vel_xy(self):
+        return torch.exp(
+            -torch.linalg.norm(self.commands[:, :2] - self.base_lin_vel[:, :2], dim=1)
+        )
 
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity w. squared exp
@@ -56,12 +178,44 @@ class MIT_Humanoid(LeggedRobot):
 
     def _reward_dof_vel(self):
         # Penalize dof velocities
-        return torch.mean(self._sqrdexp(self.dof_vel / self.scales["dof_vel"]), dim=1)
+        return torch.mean(
+            self._sqrdexp(self.dof_vel / self.scales["dof_vel"]), dim=1
+        ) * self._switch("stand")
 
     def _reward_dof_near_home(self):
-        return torch.mean(
-            self._sqrdexp(
-                (self.dof_pos - self.default_dof_pos) / self.scales["dof_pos_obs"]
-            ),
-            dim=1,
+        return self._sqrdexp(
+            (self.dof_pos - self.default_dof_pos) / self.scales["dof_pos"]
+        ).mean(dim=1)
+
+    def _reward_stand_still(self):
+        """Penalize motion at zero commands"""
+        # * normalize angles so we care about being within 5 deg
+        rew_pos = torch.mean(
+            self._sqrdexp((self.dof_pos - self.default_dof_pos) / torch.pi * 36), dim=1
         )
+        rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
+        rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
+        rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
+        return rew_vel + rew_pos - rew_base_vel * self._switch("stand")
+
+    def _compute_grf(self, grf_norm=True):
+        grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
+        if grf_norm:
+            return torch.clamp_max(grf / self.cfg.asset.total_mass, 1.0)
+        else:
+            return grf
+
+    def smooth_sqr_wave(self, phase, sigma=0.2):  # sigma=0 is step function
+        return phase.sin() / (2 * torch.sqrt(phase.sin() ** 2.0 + sigma**2.0)) + 0.5
+
+    def _reward_hips_forward(self):
+        # reward hip motors for pointing forward
+        hip_yaw_abad = torch.cat((self.dof_pos[:, 0:2], self.dof_pos[:, 5:7]), dim=1)
+        hip_yaw_abad -= torch.cat(
+            (self.default_dof_pos[:, 0:2], self.default_dof_pos[:, 5:7]), dim=1
+        )
+        hip_yaw_abad /= torch.cat(
+            (self.scales["dof_pos"][0:2], self.scales["dof_pos"][5:7])
+        )
+        return (hip_yaw_abad).pow(2).mean(dim=1)
+        # return self._sqrdexp(hip_yaw_abad).sum(dim=1).mean(dim=1)

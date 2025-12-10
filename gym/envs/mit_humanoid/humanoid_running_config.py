@@ -142,7 +142,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         #         +'humanoid_fixed_arms_full.urdf')
         file = (
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
-            + "mit_humanoid/urdf/humanoid_F_sf.urdf"
+            + "mit_humanoid/urdf/humanoid_F_sf_learnt.urdf"
         )
         keypoints = ["base"]
         end_effectors = ["left_foot", "right_foot"]

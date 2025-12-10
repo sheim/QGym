@@ -17,6 +17,7 @@ class MiniCheetahRef(MiniCheetah):
 
     def _init_buffers(self):
         super()._init_buffers()
+        self._switch = torch.zeros(self.num_envs, 1, device=self.device)
         self.phase = torch.zeros(
             self.num_envs, 1, dtype=torch.float, device=self.device
         )
@@ -41,6 +42,7 @@ class MiniCheetahRef(MiniCheetah):
         self.phase_obs = torch.cat(
             (torch.sin(self.phase), torch.cos(self.phase)), dim=1
         )
+        self._update_cmd_switch()
 
     def _resample_commands(self, env_ids):
         super()._resample_commands(env_ids)
@@ -50,10 +52,20 @@ class MiniCheetahRef(MiniCheetah):
         ).squeeze(1)
         self.commands[env_ids, :3] *= (rand_ids < 0.9).unsqueeze(1)
 
-    def _switch(self):
+    def _check_terminations_and_timeouts(self):
+        """Check if environments need to be reset"""
+        contact_forces = self.contact_forces[:, self.termination_contact_indices, :]
+        self.terminated |= torch.any(torch.norm(contact_forces, dim=-1) > 1.0, dim=1)
+        self.timed_out = self.episode_length_buf >= self.max_episode_length
+        # self.to_be_reset = self.timed_out | self.terminated
+
+    # ---
+
+    def _update_cmd_switch(self):
         c_vel = torch.linalg.norm(self.commands, dim=1)
-        return torch.exp(
-            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1)) / 0.1
+        self._switch = torch.exp(
+            -torch.square(torch.max(torch.zeros_like(c_vel), c_vel - 0.1))
+            / self.cfg.reward_settings.switch_scale
         )
 
     def _reward_swing_grf(self):
@@ -64,7 +76,7 @@ class MiniCheetahRef(MiniCheetah):
         )
         ph_off = torch.lt(self.phase, torch.pi)
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
-        return -torch.sum(rew.float(), dim=1) * (1 - self._switch())
+        return -torch.sum(rew.float(), dim=1) * (1 - self._switch)
 
     def _reward_stance_grf(self):
         """Reward non-zero grf during stance (pi to 2pi)"""
@@ -75,7 +87,7 @@ class MiniCheetahRef(MiniCheetah):
         ph_off = torch.gt(self.phase, torch.pi)  # should this be in swing?
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
 
-        return torch.sum(rew.float(), dim=1) * (1 - self._switch())
+        return torch.sum(rew.float(), dim=1) * (1 - self._switch)
 
     def _reward_reference_traj(self):
         """REWARDS EACH LEG INDIVIDUALLY BASED ON ITS POSITION IN THE CYCLE"""
@@ -84,7 +96,7 @@ class MiniCheetahRef(MiniCheetah):
         error /= self.scales["dof_pos"]
         reward = (self._sqrdexp(error) - torch.abs(error) * 0.2).mean(dim=1)
         # * only when commanded velocity is higher
-        return reward * (1 - self._switch())
+        return reward * (1 - self._switch)
 
     def _get_ref(self):
         leg_frame = torch.zeros_like(self.torques)
@@ -112,10 +124,10 @@ class MiniCheetahRef(MiniCheetah):
         rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
         rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
         rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
-        return (rew_vel + rew_pos - rew_base_vel) * self._switch()
+        return (rew_vel + rew_pos - rew_base_vel) * self._switch
 
     def _reward_tracking_lin_vel(self):
         """Tracking linear velocity commands (xy axes)"""
         # just use lin_vel?
         reward = super()._reward_tracking_lin_vel()
-        return reward * (1 - self._switch())
+        return reward * (1 - self._switch)
