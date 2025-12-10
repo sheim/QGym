@@ -27,6 +27,6 @@ def test_generated_tensor_matches_reference(tmp_path):
     _generate_candidate_tensor(candidate_path)
     reference = _load_tensor(REFERENCE_FILE)
     candidate = _load_tensor(candidate_path)
-    assert torch.equal(
-        reference, candidate
-    ), f"Tensors in {REFERENCE_FILE} and {candidate_path} differ."
+    assert torch.equal(reference, candidate), (
+        f"Tensors in {REFERENCE_FILE} and {candidate_path} differ."
+    )

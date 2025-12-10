@@ -10,9 +10,9 @@ class MockObject:
 
 def all_rewards_registered(logger, reward_names):
     for key in reward_names:
-        assert (
-            key in logger.reward_logs.log_items.keys()
-        ), "key not registered in logger."
+        assert key in logger.reward_logs.log_items.keys(), (
+            "key not registered in logger."
+        )
 
 
 def only_rewards_registered(logger, reward_names):
@@ -27,13 +27,13 @@ def only_category_registered(logger, categories):
 
 def both_target_and_log_set_up(logger):
     for key in logger.iteration_logs.logs.keys():
-        assert (
-            key in logger.iteration_logs.targets.keys()
-        ), "target not registered in PerIteration."
+        assert key in logger.iteration_logs.targets.keys(), (
+            "target not registered in PerIteration."
+        )
     for key in logger.iteration_logs.targets.keys():
-        assert (
-            key in logger.iteration_logs.logs.keys()
-        ), "log not registered in PerIteration."
+        assert key in logger.iteration_logs.logs.keys(), (
+            "log not registered in PerIteration."
+        )
 
 
 def test_logger_setup():
@@ -71,16 +71,16 @@ def check_episode_count(logger, expected_count=1):
 
 def check_average_time(logger, expected_time):
     avg_time = logger.reward_logs.get_average_time()
-    assert (
-        abs(avg_time.item() - expected_time) < 1e-5
-    ), f"Average time {avg_time} is not close to {expected_time}"
+    assert abs(avg_time.item() - expected_time) < 1e-5, (
+        f"Average time {avg_time} is not close to {expected_time}"
+    )
 
 
 def check_average_reward(logger, reward_name, expected_average):
     avg_reward = logger.reward_logs.get_average_rewards()[reward_name]
-    assert (
-        abs(avg_reward.item() - expected_average) < 1e-5
-    ), f"Average reward {avg_reward} is not close to {expected_average}"
+    assert abs(avg_reward.item() - expected_average) < 1e-5, (
+        f"Average reward {avg_reward} is not close to {expected_average}"
+    )
 
 
 def test_logging_rewards():
@@ -173,8 +173,8 @@ def test_timer():
 
     ETA2 = logger.estimate_ETA(["first_step"], mode="total")
     expected_ETA2 = a * (1000 - 1)
-    assert (
-        abs(ETA2 - expected_ETA2) < 1e-5
-    ), f"ETA {ETA2} is not close to {expected_ETA2}"
+    assert abs(ETA2 - expected_ETA2) < 1e-5, (
+        f"ETA {ETA2} is not close to {expected_ETA2}"
+    )
 
     assert (a + b) >= 2 * trial_time, "Timer not working correctly."
