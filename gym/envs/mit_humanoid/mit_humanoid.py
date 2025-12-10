@@ -84,8 +84,8 @@ class MIT_Humanoid(LeggedRobot):
     def _reset_sampled_history_buffers(self, ids):
         n = self.cfg.env.sampled_history_length
         self.sampled_history_dof_pos_target[ids] = self.dof_pos_target[ids].tile(n)
-        self.sampled_history_dof_pos[ids] = self.dof_pos_target[ids].tile(n)
-        self.sampled_history_dof_vel[ids] = self.dof_pos_target[ids].tile(n)
+        self.sampled_history_dof_pos[ids] = self.dof_pos[ids].tile(n)
+        self.sampled_history_dof_vel[ids] = self.dof_vel[ids].tile(n)
 
     # compute_torques accounting for coupling, and filtering torques
     def _compute_torques(self):
@@ -121,11 +121,11 @@ class MIT_Humanoid(LeggedRobot):
         self.sampled_history_dof_pos[ids] = torch.roll(
             self.sampled_history_dof_pos[ids], self.num_dof, dims=1
         )  # check
-        self.sampled_history_dof_pos[ids, : self.num_dof] = self.dof_pos_target[ids]
+        self.sampled_history_dof_pos[ids, : self.num_dof] = self.dof_pos[ids]
         self.sampled_history_dof_vel[ids] = torch.roll(
             self.sampled_history_dof_vel[ids], self.num_dof, dims=1
         )  # check
-        self.sampled_history_dof_vel[ids, : self.num_dof] = self.dof_pos_target[ids]
+        self.sampled_history_dof_vel[ids, : self.num_dof] = self.dof_vel[ids]
 
         self.sampled_history_counter[ids] = 0
 
