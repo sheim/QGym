@@ -163,7 +163,7 @@ class LeggedRobotCfg(BaseConfig):
         file = ""
         # * name of the feet bodies,
         # * used to index body state and contact force tensors
-        foot_name = "None"
+        foot_name = "foot"
         penalize_contacts_on = []
         terminate_after_contacts_on = []
         end_effector_names = []
@@ -301,9 +301,6 @@ class LeggedRobotRunnerCfg(BaseConfig):
         batch_size = 2**15
         max_gradient_steps = 24
         # new
-        storage_size = 2**17  # new
-        batch_size = 2**15  #  new
-
         clip_param = 0.2
         learning_rate = 1.0e-3
         max_grad_norm = 1.0

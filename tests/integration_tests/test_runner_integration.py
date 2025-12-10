@@ -58,9 +58,9 @@ class TestDefaultIntegration:
         with torch.no_grad():
             actions = runner.get_inference_actions()
             deployed_actions = runner.env.get_states(runner.actor_cfg["actions"])
-        assert (
-            torch.equal(actions, torch.zeros_like(actions)) is False
-        ), "Policy returning all zeros"
+        assert torch.equal(actions, torch.zeros_like(actions)) is False, (
+            "Policy returning all zeros"
+        )
         assert (
             torch.equal(deployed_actions, torch.zeros_like(deployed_actions)) is False
         ), "Actions not written to environment"
@@ -78,9 +78,9 @@ class TestDefaultIntegration:
         model_7_path = os.path.join(runner.log_dir, "model_7.pt")
         model_8_path = os.path.join(runner.log_dir, "model_8.pt")
 
-        assert os.path.exists(
-            model_0_path
-        ), f"{model_0_path} (pre-iteration) was not saved"
+        assert os.path.exists(model_0_path), (
+            f"{model_0_path} (pre-iteration) was not saved"
+        )
         assert not os.path.exists(model_1_path), f"{model_1_path} was saved"
         assert not os.path.exists(model_2_path), f"{model_2_path} was saved"
         assert os.path.exists(model_3_path), f"{model_3_path} was not saved"
@@ -88,9 +88,9 @@ class TestDefaultIntegration:
         assert not os.path.exists(model_5_path), f"{model_5_path} was saved"
         assert os.path.exists(model_6_path), f"{model_6_path} was not saved"
         assert not os.path.exists(model_7_path), f"{model_7_path} was saved"
-        assert os.path.exists(
-            model_8_path
-        ), f"{model_5_path}(last iteration) was not saved"
+        assert os.path.exists(model_8_path), (
+            f"{model_5_path}(last iteration) was not saved"
+        )
 
         obs = torch.randn_like(runner.get_obs(runner.actor_cfg["obs"]))
         actions_first = runner.alg.actor.act_inference(obs).cpu().clone()

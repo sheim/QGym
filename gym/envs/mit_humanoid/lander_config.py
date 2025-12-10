@@ -6,11 +6,11 @@ from gym.envs.base.legged_robot_config import (
 BASE_HEIGHT_REF = 0.80
 
 
-class MITHumanoidCfg(LeggedRobotCfg):
+class LanderCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_actuators = 18
-        episode_length_s = 5  # episode length in seconds
+        episode_length_s = 10  # episode length in seconds
 
         sampled_history_length = 3  # n samples
         sampled_history_frequency = 10  # [Hz]
@@ -71,7 +71,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.64, 0.7],  # z
+            [0.64, 1.5],  # z
             [-0.1, 0.1],  # roll
             [-0.1, 0.1],  # pitch
             [-0.1, 0.1],
@@ -80,7 +80,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
         root_vel_range = [
             [-0.75, 2.75],  # x
             [-0.55, 0.55],  # y
-            [-0.35, 0.1],  # z
+            [-2.5, 0.25],  # z
             [-0.35, 0.35],  # roll
             [-0.35, 0.35],  # pitch
             [-0.35, 0.35],  # yaw
@@ -111,25 +111,23 @@ class MITHumanoidCfg(LeggedRobotCfg):
             "elbow": 1.0,
         }  # [N*m*s/rad]
 
-        ctrl_frequency = 100
+        ctrl_frequency = 500
         desired_sim_frequency = 500
 
-        filter_gain = 0.1586  # 1: no filtering, 0: wall
-
-    class oscillator:
-        base_frequency = 3.0  # [Hz]
+    # class oscillator:
+    #     base_frequency = 3.0  # [Hz]
 
     class commands:
         resampling_time = 10.0  # time before command are changed[s]
 
         class ranges:
-            lin_vel_x = [-0.0, 4.0]  # min max [m/s] [-0.75, 0.75]
-            lin_vel_y = 0.0  # max [m/s]
-            yaw_vel = 0.0  # max [rad/s]
+            lin_vel_x = [-2.0, 2.0]  # min max [m/s] [-0.75, 0.75]
+            lin_vel_y = 0.3  # max [m/s]
+            yaw_vel = 1.0  # max [rad/s]
 
     class push_robots:
         toggle = True
-        interval_s = 1
+        interval_s = 2
         max_push_vel_xy = 0.5
         push_box_dims = [0.1, 0.1, 0.3]  # x,y,z [m]
 
@@ -146,15 +144,11 @@ class MITHumanoidCfg(LeggedRobotCfg):
         )
         # foot_collisionbox_names = ["foot"]
         foot_name = "foot"
-        penalize_contacts_on = ["arm"]
+        penalize_contacts_on = ["arm", "hand", "shoulder"]
         terminate_after_contacts_on = ["base"]
-        end_effector_names = ["hand", "foot"]  # ??
         flip_visual_attachments = False
         self_collisions = 0  # 1 to disagble, 0 to enable...bitwise filter
         collapse_fixed_joints = False
-        # * see GymDofDriveModeFlags
-        # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
-        default_dof_drive_mode = 3
         fix_base_link = False
         disable_gravity = False
         disable_motors = False
@@ -222,17 +216,17 @@ class MITHumanoidCfg(LeggedRobotCfg):
         dof_pos_history = 3 * dof_pos
 
 
-class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
+class LanderRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
-    runner_class_name = "OnPolicyRunner"
+    runner_class_name = "MyRunner"
 
     class actor(LeggedRobotRunnerCfg.actor):
         frequency = 100
         init_noise_std = 1.0
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
-        activation = "elu"
-        layer_norm = [True, True, False]
+        activation = ["elu", "elu", "tanh"]
+        layer_norm = True
         smooth_exploration = False
 
         obs = [
@@ -243,7 +237,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
             "commands",
             "dof_pos_obs",
             "dof_vel",
-            # "dof_pos_history",
+            "dof_pos_history",
             "sampled_history_dof_pos",
             "sampled_history_dof_vel",
             "sampled_history_dof_pos_target",
@@ -265,15 +259,17 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         hidden_dims = [512, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        layer_norm = [True, True, False]
+        layer_norm = True
 
         obs = [
-            "base_height",
+            # "base_height",
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
+            "commands",
             "dof_pos_obs",
             "dof_vel",
+            "dof_pos_history",
             "sampled_history_dof_pos",
             "sampled_history_dof_vel",
             "sampled_history_dof_pos_target",
@@ -282,32 +278,34 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
 
         class reward:
             class weights:
-                tracking_lin_vel = 4.0
-                tracking_ang_vel = 0.5
-                # orientation = 1.0
-                torques = 5.0e-4
+                torques = 5.0e-5
+                power = 1e-6  # 1.0e-2
                 min_base_height = 1.5
-                action_rate = 1e-3
+                lin_vel_xy = 1.0
+                action_rate = 1e-2
                 action_rate2 = 1e-3
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
-                # dof_vel = 0.25
-                # stand_still = 0.25
+                dof_vel = 0.5
                 dof_pos_limits = 0.25
-                dof_near_home = 0.25
+                dof_near_home = 0.75
                 hips_forward = 0.0
-                walk_freq = 0.0  # 2.5
+                collision = 1.0
 
             class termination_weight:
-                termination = 15
+                termination = 1.0
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
         # both
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 4096
-        max_gradient_steps = 48
+        batch_size = 2**15
+        max_gradient_steps = 24
+        # new
+        storage_size = 2**17  # new
+        batch_size = 2**15  #  new
+
         clip_param = 0.2
         learning_rate = 1.0e-3
         max_grad_norm = 1.0
@@ -324,7 +322,7 @@ class MITHumanoidRunnerCfg(LeggedRobotRunnerCfg):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO2"
         num_steps_per_env = 24
-        max_iterations = 1000
-        run_name = "Standing"
+        max_iterations = 500
+        run_name = "lander"
         experiment_name = "Humanoid"
         save_interval = 50

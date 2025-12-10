@@ -6,9 +6,9 @@ class PerIterationLogs:
 
     def register_items(self, category, target, attribute_list):
         if category in self.targets.keys():
-            assert (
-                self.targets[category] == target
-            ), "Category already registered with different target"
+            assert self.targets[category] == target, (
+                "Category already registered with different target"
+            )
         else:
             self.targets[category] = target
             self.logs[category] = {}
