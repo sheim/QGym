@@ -1,7 +1,7 @@
 {
     "method": "random",
     "metric": {
-        "name": "Train/mean_reward",
+        "name": "rewards/total_rewards",
         "goal": "maximize"
     },
     "run_cap": 10,
