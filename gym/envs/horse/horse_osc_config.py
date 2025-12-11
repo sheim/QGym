@@ -34,24 +34,24 @@ class HorseOscCfg(HorseCfg):
         }
 
         # * initialization for random range setup
-        # these are the physical limits in the URDF as of 17 Nov 2025
+        # these are the physical limits in the URDF as of 11 Dec 2025
         # dof_pos_range = {
         #   haa": [-0.2, 0.2],
-        #   f_hfe": [-0.7, 0.6],
-        #   h_hfe": [-0.7, 1.5],
-        #   f_kfe": [-1.3, 0.1],
-        #   h_kfe": [-0.2, 0.8],
-        #   f_pfe": [-0.3, 2.2],
-        #   h_pfe": [-0.3, 2.5],
+        #   f_hfe": [-1.0, 0.6],
+        #   h_hfe": [-1.5, 0.5],
+        #   f_kfe": [-1.5, 0.1],
+        #   h_kfe": [-0.2, 1.0],
+        #   f_pfe": [-0.3, 3.0],
+        #   h_pfe": [-1.2, 2.5],
         #   f_pastern_to_foot": [-0.3, 1.8],
         #   h_pastern_to_foot": [-0.3, 1.8],
         #   base_joint": [-0.2, 0.2],
         # }
         dof_pos_range = {
             "haa": [-0.2, 0.2],
-            "hfe": [-0.7, 0.6],
+            "hfe": [-0.7, 0.5],
             "kfe": [-0.2, 0.1],
-            "pfe": [-0.3, 2.2],
+            "pfe": [-0.3, 1.0],
             "pastern_to_foot": [-0.3, 1.8],
             "base_joint": [-0.0, 0.0],
         }
