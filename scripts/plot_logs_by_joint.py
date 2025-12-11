@@ -14,12 +14,12 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 # joint limits
 JOINT_LIMITS = {
     r".*haa": [-0.2, 0.2],
-    r".*f_hfe": [-0.7, 0.6],
-    r".*h_hfe": [-0.7, 1.5],
-    r".*f_kfe": [-1.3, 0.1],
-    r".*h_kfe": [-0.2, 0.8],
-    r".*f_pfe": [-0.3, 2.2],
-    r".*h_pfe": [-0.3, 2.5],
+    r".*f_hfe": [-1.0, 0.6],
+    r".*h_hfe": [-1.5, 0.5],
+    r".*f_kfe": [-1.5, 0.1],
+    r".*h_kfe": [-0.2, 1.0],
+    r".*f_pfe": [-0.3, 3.0],
+    r".*h_pfe": [-1.2, 2.5],
     r".*f_pastern_to_foot": [-0.3, 1.8],
     r".*h_pastern_to_foot": [-0.3, 1.8],
     r".*base_joint": [-0.2, 0.2],
