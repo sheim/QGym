@@ -22,8 +22,7 @@ class MyRunner(OnPolicyRunner):
         num_actions = self.get_action_size(self.actor_cfg["actions"])
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])  # noqa: F841
         actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
-        critic_class_name = self.critic_cfg["critic_class_name"]
-        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
+        critic = Critic(num_critic_obs, **self.critic_cfg)
         alg_class = eval(self.cfg["algorithm_class_name"])
         self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
