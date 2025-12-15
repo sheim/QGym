@@ -21,6 +21,7 @@ class_dict = {
     "HumanoidRunning": ".mit_humanoid.humanoid_running",
     "Pendulum": ".pendulum.pendulum",
     "Lander": ".mit_humanoid.lander",
+    "HierarchOsc": ".mini_cheetah.hierarch_osc"
 }
 
 config_dict = {
@@ -87,7 +88,7 @@ task_dict = {
     "lander": ["Lander", "LanderCfg", "LanderRunnerCfg"],
     "psd_pendulum": ["Pendulum", "PendulumPSDCfg", "PendulumPSDRunnerCfg"],
     "hierarch": [
-        "MiniCheetahOsc",
+        "HierarchOsc",
         "HierarchicalOscCfg",
         "HierarchicalOscRunnerCfg",
     ],

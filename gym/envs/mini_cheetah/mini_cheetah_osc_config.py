@@ -196,10 +196,6 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "oscillator_obs",
             "dof_pos_target",
-            #  "osc_omega",
-            #  "osc_coupling"
-            #  "oscillators_vel",
-            #  "grf",
         ]
         normalize_obs = False
 

@@ -8,6 +8,7 @@ from learning.algorithms import PPO2  # noqa F401
 from learning.modules.actor import Actor
 from learning.modules.critic import Critic  # noqa F401
 from learning.modules.QRCritics import *  # noqa F401
+from gym.utils.helpers import get_load_path
 
 logger = Logger()
 storage = DictStorage()
@@ -17,6 +18,10 @@ class MyRunner(OnPolicyRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
 
+    def parse_train_cfg(self, train_cfg):
+        super().parse_train_cfg(train_cfg)
+        self.ll_cfg = train_cfg["low_level_actor"]
+
     def _set_up_alg(self):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
         num_actions = self.get_action_size(self.actor_cfg["actions"])
@@ -25,6 +30,25 @@ class MyRunner(OnPolicyRunner):
         critic = Critic(num_critic_obs, **self.critic_cfg)
         alg_class = eval(self.cfg["algorithm_class_name"])
         self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
+
+        num_actor_obs = self.get_obs_size(self.ll_cfg["obs"])
+        num_actions = self.get_action_size(self.ll_cfg["actions"])
+        self.ll_actor = Actor(num_actor_obs, num_actions, **self.ll_cfg).to(self.device)
+        resume_path = get_load_path(
+            name=self.ll_cfg["experiment_name"],
+            load_run=self.ll_cfg["load_run"],
+            checkpoint=self.ll_cfg["checkpoint"],
+        )
+        # path = self.ll_cfg["path"].format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+        loaded_dict = torch.load(resume_path, weights_only=True)
+        self.ll_actor.load_state_dict(loaded_dict["actor_state_dict"])
+        self.ll_actor.eval()
+
+    def step_env(self):
+        ll_actions = self.ll_actor.act(self.get_obs(self.ll_cfg["obs"]))
+        self.set_actions(self.ll_cfg["actions"], ll_actions)
+        self.env.step()
+        # put reward integration here
 
     def learn(self, states_to_log_dict=None):
         n_policy_steps = int((1 / self.env.dt) / self.actor_cfg["frequency"])
@@ -93,9 +117,8 @@ class MyRunner(OnPolicyRunner):
                         }
                     )
                     for step in range(n_policy_steps):
-                        self.env.step()
-                        # put reward integration here
-                        self.update_rewards_dict(rewards_dict, step)
+                        self.step_env()
+                        self.update_rewards_dict(rewards_dict, step)  # noqa: F405
                     else:
                         # catch and reset failed envs
                         to_be_reset = self.env.timed_out | self.env.terminated

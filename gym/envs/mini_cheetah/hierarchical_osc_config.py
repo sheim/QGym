@@ -170,22 +170,10 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
     seed = -1
     runner_class_name = "MyRunner"
 
-    class actor(MiniCheetahRunnerCfg.actor):
+    class low_level_actor:
         frequency = 100
         hidden_dims = [256, 256, 128]
-        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
-        # obs = [
-        #     "base_height",
-        #     "base_lin_vel",
-        #     "base_ang_vel",
-        #     "projected_gravity",
-        #     "commands",
-        #     "dof_pos_obs",
-        #     "dof_vel",
-        #     "oscillator_obs",
-        #     "dof_pos_target",
-        # ]
         obs = [
             "base_height",
             "base_lin_vel",
@@ -196,14 +184,38 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_vel",
             "oscillator_obs",
             "dof_pos_target",
-            #  "osc_omega",
-            #  "osc_coupling"
+        ]
+        normalize_obs = False
+        actions = ["dof_pos_target"]
+        path = "{LEGGED_GYM_ROOT_DIR}/logs/FullSend/Dec12_09-08-19_osc/model_500.pt "
+        experiment_name = "FullSend"
+        load_run = "Dec15_11-04-21_"
+        checkpoint = 500
+
+    class actor(MiniCheetahRunnerCfg.actor):
+        frequency = 50
+        hidden_dims = [256, 256, 128]
+        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        activation = "elu"
+        obs = [
+            "base_height",
+            "base_lin_vel",
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            # "dof_pos_obs",
+            # "dof_vel",
+            "oscillator_obs",
+            # "dof_pos_target",
+            "osc_omega",
+            "osc_coupling",
+            "osc_action",
             #  "oscillators_vel",
             #  "grf",
         ]
         normalize_obs = False
 
-        actions = ["dof_pos_target"]
+        actions = ["osc_action"]
         disable_actions = False
 
         class noise:
@@ -241,24 +253,26 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
                 orientation = 1.0
-                torques = 5.0e-6
+                # torques = 5.0e-8
                 dof_vel = 0.0
                 min_base_height = 1.0
                 collision = 0
-                action_rate = 10  # -0.01
-                action_rate2 = 1  # -0.001
+                # action_rate = 10  # -0.01
+                # action_rate2 = 1  # -0.001
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                swing_grf = 1.0
-                stance_grf = 1.0
+                swing_grf = 0.01
+                stance_grf = 0.01
                 swing_velocity = 0.0
                 stance_velocity = 0.0
                 coupled_grf = 0.0  # 8.
                 enc_pace = 0.0
-                cursorial = 0.25
+                cursorial = 0.0
                 standing_torques = 0.0  # 1.e-5
+                osc_action_sqrdexp = 1.0
+                osc_action_squared = 1e-5
 
             class termination_weight:
                 termination = 0.15
@@ -284,7 +298,7 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
-        experiment_name = "FullSend"
+        experiment_name = "Hierarch"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
