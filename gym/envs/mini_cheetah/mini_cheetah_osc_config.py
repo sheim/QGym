@@ -75,10 +75,10 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         coupling = 1  # gets overwritten
         osc_bool = False  # not used in paper
         grf_bool = False  # not used in paper
-        randomize_osc_params = False
-        omega_range = [1.0, 4.0]  # [0.0, 10.]
-        coupling_range = [0.0, 1.0]
-        offset_range = [0.0, 0.0]
+        randomize_osc_params = True
+        omega_range = [0.0, 4.0]  # [0.0, 10.]
+        coupling_range = [0.0, 0.0]
+        offset_range = [0.0, 0.5]
         stop_threshold = 0.5
         omega_stop = 1.0
         omega_step = 2.0
@@ -95,7 +95,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         coupling_var = 0.25
 
         init_to = "random"
-        init_w_offset = True
+        init_w_offset = False
 
     class commands:
         resampling_time = 3.0  # time before command are changed[s]
@@ -195,6 +195,7 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "oscillator_obs",
+            "oscillator_vel",
             "dof_pos_target",
         ]
         normalize_obs = False
@@ -225,15 +226,15 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "oscillator_obs",
-            "oscillators_vel",
+            "oscillator_vel",
             "dof_pos_target",
         ]
         normalize_obs = True
 
         class reward:
             class weights:
-                tracking_lin_vel = 4.0
-                tracking_ang_vel = 2.0
+                tracking_lin_vel = 5.0
+                tracking_ang_vel = 1.0
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
                 orientation = 1.0

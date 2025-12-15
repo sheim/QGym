@@ -1,28 +1,28 @@
-from gym.envs.mini_cheetah.mini_cheetah_config import (
-    MiniCheetahCfg,
-    MiniCheetahRunnerCfg,
+from gym.envs.mini_cheetah.mini_cheetah_osc_config import (
+    MiniCheetahOscCfg,
+    MiniCheetahOscRunnerCfg,
 )
 
 BASE_HEIGHT_REF = 0.33
 
 
-class HierarchicalOscCfg(MiniCheetahCfg):
+class HierarchicalOscCfg(MiniCheetahOscCfg):
     class viewer:
         ref_env = 0
         pos = [-2.0, 3, 2]  # [m]
         lookat = [0.0, 1.0, 0.5]  # [m]
 
-    class env(MiniCheetahCfg.env):
+    class env(MiniCheetahOscCfg.env):
         num_envs = 4096
         num_actuators = 12
         episode_length_s = 10.0
         env_spacing = 3.0
 
-    class terrain(MiniCheetahCfg.terrain):
+    class terrain(MiniCheetahOscCfg.terrain):
         mesh_type = "plane"
         # mesh_type = 'trimesh'  # none, plane, heightfield or trimesh
 
-    class init_state(MiniCheetahCfg.init_state):
+    class init_state(MiniCheetahOscCfg.init_state):
         timeout_reset_ratio = 0.75
         reset_mode = "reset_to_range"
         # * default COM for basic initialization
@@ -60,59 +60,37 @@ class HierarchicalOscCfg(MiniCheetahCfg):
             [0.0, 0.0],  # yaw
         ]
 
-    class control(MiniCheetahCfg.control):
+    class control(MiniCheetahOscCfg.control):
         # * PD Drive parameters:
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
         ctrl_frequency = 100
         desired_sim_frequency = 500
 
-    class osc:
-        process_noise_std = 0.25
-        grf_threshold = 0.1  # 20. # Normalized to body weight
-        # oscillator parameters
-        omega = 3  # gets overwritten
-        coupling = 1  # gets overwritten
-        osc_bool = False  # not used in paper
-        grf_bool = False  # not used in paper
-        randomize_osc_params = False
-        omega_range = [1.0, 4.0]  # [0.0, 10.]
-        coupling_range = [0.0, 1.0]
+    class osc(MiniCheetahOscCfg.osc):
+        randomize_osc_params = True
+        omega_range = [0.0, 0.0]  # [0.0, 10.]
+        coupling_range = [0.0, 0.0]
         offset_range = [0.0, 0.0]
-        stop_threshold = 0.5
-        omega_stop = 1.0
-        omega_step = 2.0
-        omega_slope = 1.0
-        omega_max = 4.0
-        omega_var = 0.25
-        # coupling_step = 0.
-        # coupling_stop = 0.
-        coupling_stop = 4.0
-        coupling_step = 1.0
-        coupling_slope = 0.0
-        coupling_max = 1.0
-        offset = 1.0
-        coupling_var = 0.25
-
-        init_to = "random"
-        init_w_offset = True
+        process_noise_std = 0.0
+        filter_coeff = 0.1
 
     class commands:
         resampling_time = 3.0  # time before command are changed[s]
         var = 1.0
 
         class ranges:
-            lin_vel_x = [-1.0, 0.0, 1.0, 3.0]  # min max [m/s]
+            lin_vel_x = [-3.0, 0.0, 7.0]  # min max [m/s]
             lin_vel_y = 1.0  # [-1., 0, 1.]  # max [m/s]
             yaw_vel = 3.0  # [-6., -3., 0., 3., 6.]    # max [rad/s]
 
-    class push_robots(MiniCheetahCfg.push_robots):
+    class push_robots(MiniCheetahOscCfg.push_robots):
         toggle = True
         interval_s = 15
         max_push_vel_xy = 0.05
         push_box_dims = [0.2, 0.2, 0.2]  # x,y,z [m]
 
-    class domain_rand(MiniCheetahCfg.domain_rand):
+    class domain_rand(MiniCheetahOscCfg.domain_rand):
         randomize_friction = True
         friction_range = [0.4, 1.0]
         randomize_base_mass = False
@@ -123,7 +101,7 @@ class HierarchicalOscCfg(MiniCheetahCfg):
         lower_x_offset = 0.0
         upper_x_offset = 0.0
 
-    class asset(MiniCheetahCfg.asset):
+    class asset(MiniCheetahOscCfg.asset):
         shank_length_diff = 0  # Units in cm
         # file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" \
         #     + "mini_cheetah/urdf/mini_cheetah_" \
@@ -142,7 +120,7 @@ class HierarchicalOscCfg(MiniCheetahCfg):
         disable_gravity = False
         disable_motors = False  # all torques set to 0
 
-    class reward_settings(MiniCheetahCfg.reward_settings):
+    class reward_settings(MiniCheetahOscCfg.reward_settings):
         soft_dof_pos_limit = 0.8
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
@@ -151,7 +129,7 @@ class HierarchicalOscCfg(MiniCheetahCfg):
         tracking_sigma = 0.25
         switch_scale = 0.5
 
-    class scaling(MiniCheetahCfg.scaling):
+    class scaling(MiniCheetahOscCfg.scaling):
         base_ang_vel = [0.3, 0.3, 0.1]
         base_lin_vel = BASE_HEIGHT_REF
         # dof_vel = 100.
@@ -164,35 +142,20 @@ class HierarchicalOscCfg(MiniCheetahCfg):
         tau_ff = 4 * [18, 18, 28]  # hip-abad, hip-pitch, knee
         # commands = [base_lin_vel, base_lin_vel, base_ang_vel]
         commands = [3, 1, 3]  # [base_lin_vel, base_lin_vel, base_ang_vel]
+        osc_action = 0.2
 
 
-class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
+class HierarchicalOscRunnerCfg(MiniCheetahOscRunnerCfg):
     seed = -1
     runner_class_name = "MyRunner"
 
-    class low_level_actor:
-        frequency = 100
-        hidden_dims = [256, 256, 128]
-        activation = "elu"
-        obs = [
-            "base_height",
-            "base_lin_vel",
-            "base_ang_vel",
-            "projected_gravity",
-            "commands",
-            "dof_pos_obs",
-            "dof_vel",
-            "oscillator_obs",
-            "dof_pos_target",
-        ]
-        normalize_obs = False
-        actions = ["dof_pos_target"]
-        path = "{LEGGED_GYM_ROOT_DIR}/logs/FullSend/Dec12_09-08-19_osc/model_500.pt "
+    class low_level_actor(MiniCheetahOscRunnerCfg.actor):
+        # path = "{LEGGED_GYM_ROOT_DIR}/logs/FullSend/Dec12_09-08-19_osc/model_500.pt "
         experiment_name = "FullSend"
-        load_run = "Dec15_11-04-21_"
+        load_run = "Dec15_14-57-48_"
         checkpoint = 500
 
-    class actor(MiniCheetahRunnerCfg.actor):
+    class actor:
         frequency = 50
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
@@ -210,12 +173,12 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
             "osc_omega",
             "osc_coupling",
             "osc_action",
-            #  "oscillators_vel",
+            #  "oscillator_vel",
             #  "grf",
         ]
         normalize_obs = False
 
-        actions = ["osc_action"]
+        actions = ["osc_action", "osc_omega"]
         disable_actions = False
 
         class noise:
@@ -228,7 +191,7 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
             ang_vel = [0.3, 0.15, 0.4]
             gravity_vec = 0.1
 
-    class critic(MiniCheetahRunnerCfg.critic):
+    class critic:
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
@@ -241,30 +204,30 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "oscillator_obs",
-            "oscillators_vel",
+            "oscillator_vel",
             "dof_pos_target",
         ]
         normalize_obs = True
 
         class reward:
             class weights:
-                tracking_lin_vel = 4.0
+                tracking_lin_vel = 5.0
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
                 orientation = 1.0
-                # torques = 5.0e-8
+                torques = 5.0e-8
                 dof_vel = 0.0
                 min_base_height = 1.0
                 collision = 0
-                # action_rate = 10  # -0.01
-                # action_rate2 = 1  # -0.001
+                action_rate = 1  # -0.01
+                action_rate2 = 0.1  # -0.001
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                swing_grf = 0.01
-                stance_grf = 0.01
+                swing_grf = 1.0
+                stance_grf = 1.0
                 swing_velocity = 0.0
                 stance_velocity = 0.0
                 coupled_grf = 0.0  # 8.
@@ -273,6 +236,7 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
                 standing_torques = 0.0  # 1.e-5
                 osc_action_sqrdexp = 1.0
                 osc_action_squared = 1e-5
+                omega_in_range = 0.5
 
             class termination_weight:
                 termination = 0.15
@@ -296,7 +260,7 @@ class HierarchicalOscRunnerCfg(MiniCheetahRunnerCfg):
         lr_range = [1e-5, 5e-3]
         lr_ratio = 1.5
 
-    class runner(MiniCheetahRunnerCfg.runner):
+    class runner(MiniCheetahOscRunnerCfg.runner):
         run_name = ""
         experiment_name = "Hierarch"
         max_iterations = 500  # number of policy updates

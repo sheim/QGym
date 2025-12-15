@@ -22,7 +22,7 @@ class MiniCheetahOsc(MiniCheetah):
         self.oscillators = torch.zeros(self.num_envs, 4, device=self.device)
         self.oscillator_obs = torch.zeros(self.num_envs, 8, device=self.device)
 
-        self.oscillators_vel = torch.zeros_like(self.oscillators)
+        self.oscillator_vel = torch.zeros_like(self.oscillators)
         self.grf = torch.zeros(self.num_envs, 4, device=self.device)
         self.osc_omega = self.cfg.osc.omega * torch.ones(
             self.num_envs, 1, device=self.device
@@ -177,20 +177,20 @@ class MiniCheetahOsc(MiniCheetah):
             torch.cos(self.oscillators) + self.osc_offset
         )
         grf = self._compute_grf()
-        self.oscillators_vel = self.osc_omega - grf * local_feedback
-        # self.oscillators_vel *= torch_rand_float(0.9,
+        self.oscillator_vel = self.osc_omega - grf * local_feedback
+        # self.oscillator_vel *= torch_rand_float(0.9,
         #                                          1.1,
-        #                                          self.oscillators_vel.shape,
+        #                                          self.oscillator_vel.shape,
         #                                          self.device)
-        self.oscillators_vel += (
-            torch.randn(self.oscillators_vel.shape, device=self.device)
+        self.oscillator_vel += (
+            torch.randn(self.oscillator_vel.shape, device=self.device)
             * self.cfg.osc.process_noise_std
         )
 
-        self.oscillators_vel *= 2 * torch.pi
+        self.oscillator_vel *= 2 * torch.pi
         self.oscillators += (
-            self.oscillators_vel * dt
-        )  # torch.clamp(self.oscillators_vel * dt, min=0)
+            self.oscillator_vel * dt
+        )  # torch.clamp(self.oscillator_vel * dt, min=0)
         self.oscillators = torch.remainder(self.oscillators, 2 * torch.pi)
         self.oscillator_obs = torch.cat(
             (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
