@@ -44,7 +44,7 @@ class KeyboardInterface:
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
 
-        self.min_height = 0.6
+        self.min_height = -1000
         self.max_height = 1.3
         self.increment_height = 0.1
 
@@ -90,7 +90,7 @@ class KeyboardInterface:
             elif evt.action == "height_down":
                 env.commands[:, 3] = torch.clamp(
                     env.commands[:, 3] - self.increment_height,
-                    max=self.min_height,
+                    min=self.min_height,
                 )
             elif evt.action == "QUIT":
                 env.exit = True

@@ -6,6 +6,7 @@ from gym.envs.horse.horse import Horse
 from isaacgym import gymtorch
 
 HORSE_WEIGHT = 536.38 * 9.81  # Weight of horse in Newtons
+BASE_HEIGHT_REF = 1.3
 
 
 class HorseOsc(Horse):
@@ -14,6 +15,99 @@ class HorseOsc(Horse):
 
     def _init_buffers(self):
         super()._init_buffers()
+
+        BASE = 0
+
+        RH = dict(haa=1, hfe=2, kfe=3, pfe=4, pastern=5)
+        LH = dict(haa=6, hfe=7, kfe=8, pfe=9, pastern=10)
+        RF = dict(haa=11, hfe=12, kfe=13, pfe=14, pastern=15)
+        LF = dict(haa=16, hfe=17, kfe=18, pfe=19, pastern=20)
+
+        # tensors for vectorized ops
+        self.idx = {
+            "base": torch.tensor([BASE], device=self.device),
+            # all legs by joint type (RH, LH, RF, LF order)
+            "haa": torch.tensor(
+                [RH["haa"], LH["haa"], RF["haa"], LF["haa"]], device=self.device
+            ),
+            "hfe": torch.tensor(
+                [RH["hfe"], LH["hfe"], RF["hfe"], LF["hfe"]], device=self.device
+            ),
+            "kfe": torch.tensor(
+                [RH["kfe"], LH["kfe"], RF["kfe"], LF["kfe"]], device=self.device
+            ),
+            "pfe": torch.tensor(
+                [RH["pfe"], LH["pfe"], RF["pfe"], LF["pfe"]], device=self.device
+            ),
+            "pastern": torch.tensor(
+                [RH["pastern"], LH["pastern"], RF["pastern"], LF["pastern"]],
+                device=self.device,
+            ),
+            # hind vs front splits (HIND = RH, LH / FRONT = RF, LF)
+            "hind_haa": torch.tensor([RH["haa"], LH["haa"]], device=self.device),
+            "hind_hfe": torch.tensor([RH["hfe"], LH["hfe"]], device=self.device),
+            "hind_kfe": torch.tensor([RH["kfe"], LH["kfe"]], device=self.device),
+            "hind_pfe": torch.tensor([RH["pfe"], LH["pfe"]], device=self.device),
+            "hind_pastern": torch.tensor(
+                [RH["pastern"], LH["pastern"]], device=self.device
+            ),
+            "front_haa": torch.tensor([RF["haa"], LF["haa"]], device=self.device),
+            "front_hfe": torch.tensor([RF["hfe"], LF["hfe"]], device=self.device),
+            "front_kfe": torch.tensor([RF["kfe"], LF["kfe"]], device=self.device),
+            "front_pfe": torch.tensor([RF["pfe"], LF["pfe"]], device=self.device),
+            "front_pastern": torch.tensor(
+                [RF["pastern"], LF["pastern"]], device=self.device
+            ),
+            # legs (all joints within each leg)
+            "rh_leg": torch.tensor(
+                [RH["haa"], RH["hfe"], RH["kfe"], RH["pfe"], RH["pastern"]],
+                device=self.device,
+            ),
+            "lh_leg": torch.tensor(
+                [LH["haa"], LH["hfe"], LH["kfe"], LH["pfe"], LH["pastern"]],
+                device=self.device,
+            ),
+            "rf_leg": torch.tensor(
+                [RF["haa"], RF["hfe"], RF["kfe"], RF["pfe"], RF["pastern"]],
+                device=self.device,
+            ),
+            "lf_leg": torch.tensor(
+                [LF["haa"], LF["hfe"], LF["kfe"], LF["pfe"], LF["pastern"]],
+                device=self.device,
+            ),
+            # group by front or hind legs
+            "hind_legs": torch.tensor(
+                [
+                    RH["haa"],
+                    RH["hfe"],
+                    RH["kfe"],
+                    RH["pfe"],
+                    RH["pastern"],
+                    LH["haa"],
+                    LH["hfe"],
+                    LH["kfe"],
+                    LH["pfe"],
+                    LH["pastern"],
+                ],
+                device=self.device,
+            ),
+            "front_legs": torch.tensor(
+                [
+                    RF["haa"],
+                    RF["hfe"],
+                    RF["kfe"],
+                    RF["pfe"],
+                    RF["pastern"],
+                    LF["haa"],
+                    LF["hfe"],
+                    LF["kfe"],
+                    LF["pfe"],
+                    LF["pastern"],
+                ],
+                device=self.device,
+            ),
+        }
+
         self.oscillators = torch.zeros(self.num_envs, 4, device=self.device)
         self.oscillator_obs = torch.zeros(self.num_envs, 8, device=self.device)
 
@@ -28,6 +122,8 @@ class HorseOsc(Horse):
         self.osc_offset = self.cfg.osc.offset * torch.ones(
             self.num_envs, 1, device=self.device
         )
+
+        self.commands[:, 3] = BASE_HEIGHT_REF
 
     def _reset_oscillators(self, env_ids):
         if len(env_ids) == 0:
@@ -48,7 +144,6 @@ class HorseOsc(Horse):
         if len(env_ids) == 0:
             return
         self._reset_oscillators(env_ids)
-
         self.oscillator_obs = torch.cat(
             (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
         )
@@ -63,6 +158,7 @@ class HorseOsc(Horse):
         if len(env_ids) == 0:
             return
         super()._reset_system(env_ids)
+        self.commands[env_ids, 3] = BASE_HEIGHT_REF
 
     def _pre_decimation_step(self):
         super()._pre_decimation_step()
@@ -164,6 +260,7 @@ class HorseOsc(Horse):
 
         if self.cfg.osc.randomize_osc_params:
             self._resample_osc_params(env_ids)
+        self.commands[env_ids, 3] = BASE_HEIGHT_REF
 
     def _resample_osc_params(self, env_ids):
         if len(env_ids) > 0:
@@ -225,15 +322,8 @@ class HorseOsc(Horse):
         we penalize (haa, hfe, kfe) for each of the 4 legs.
         Distal joint (pfe, pastern_to_foot) naturally flex a lot, shock absorbers
         """
-        # indices of major joints per leg (haa,hfe,kfe)
-        major_joint_idx = torch.tensor(
-            [1, 2, 3, 6, 7, 8, 11, 12, 13, 16, 17, 18], device=self.device
-        )
-
-        major_joints = self.dof_pos[:, major_joint_idx]
-        scaled = major_joints / self.scales["dof_pos"][0]  # normalize
-
-        return -torch.mean(torch.square(scaled), dim=1)
+        legs = torch.tensor(list(range(1, 21)), device=self.device)
+        return -torch.mean(torch.square(self.dof_pos[:, legs]), dim=1)
 
     def _reward_swing_grf(self):
         # Reward non-zero grf during swing (0 to pi)
@@ -314,3 +404,101 @@ class HorseOsc(Horse):
         error /= self.scales["base_height"]
 
         return self._sqrdexp(error)
+
+    def _reward_tendon_constraints(self):
+        """
+        Tendon-like coupling constraints (front/hind split):
+        - Desired KFE/PFE become dependant on HFE.
+        - Penalize deviation from those desired values.
+        """
+
+        # --- helpers ---
+        def lerp(x, x0, x1, y0, y1):
+            """Linear interpolation y(x) between (x0,y0)->(x1,y1), with clamping."""
+            # handle degenerate interval
+            denom = x1 - x0
+            denom = torch.where(torch.abs(denom) < 1e-8, torch.ones_like(denom), denom)
+            t = (x - x0) / denom
+            t = torch.clamp(t, 0.0, 1.0)
+            return y0 + t * (y1 - y0)
+
+        def piecewise_2seg(x, mid, x_lo, x_hi, y_lo, y_mid, y_hi):
+            """
+            Piecewise linear passing through:
+            (x=mid, y=y_mid)
+            and reaching:
+            (x=x_lo, y=y_lo) for x <= mid
+            (x=x_hi, y=y_hi) for x >= mid
+            """
+            y_left = lerp(
+                x, mid, x_lo, y_mid, y_lo
+            )  # x in [x_lo, mid] (or beyond -> clamped)
+            y_right = lerp(
+                x, mid, x_hi, y_mid, y_hi
+            )  # x in [mid, x_hi] (or beyond -> clamped)
+            return torch.where(x <= mid, y_left, y_right)
+
+        # Hind constraints (RH, LH)
+        hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # [N,2]
+        kfe_hind = self.dof_pos[:, self.idx["hind_kfe"]]
+        pfe_hind = self.dof_pos[:, self.idx["hind_pfe"]]
+
+        # 3) hind hfe: 0 -> -1.5  => kfe: 0 -> +1.0, pfe: 0 -> -1.2
+        # 4) hind hfe: 0 -> +0.5  => kfe: 0 -> -0.2, pfe: 0 -> -0.5
+        kfe_hind_des = piecewise_2seg(
+            hfe_hind,
+            mid=torch.zeros_like(hfe_hind),  # at hfe=0
+            x_lo=-1.5 * torch.ones_like(hfe_hind),
+            x_hi=+0.5 * torch.ones_like(hfe_hind),
+            y_lo=+1.0 * torch.ones_like(hfe_hind),
+            y_mid=0.0 * torch.ones_like(hfe_hind),
+            y_hi=-0.2 * torch.ones_like(hfe_hind),
+        )
+
+        pfe_hind_des = piecewise_2seg(
+            hfe_hind,
+            mid=torch.zeros_like(hfe_hind),
+            x_lo=-1.5 * torch.ones_like(hfe_hind),
+            x_hi=+0.5 * torch.ones_like(hfe_hind),
+            y_lo=-1.2 * torch.ones_like(hfe_hind),
+            y_mid=0.0 * torch.ones_like(hfe_hind),
+            y_hi=-0.5 * torch.ones_like(hfe_hind),
+        )
+
+        # Front constraints (RF, LF)
+        hfe_front = self.dof_pos[:, self.idx["front_hfe"]]  # [N,2]
+        kfe_front = self.dof_pos[:, self.idx["front_kfe"]]
+        pfe_front = self.dof_pos[:, self.idx["front_pfe"]]
+
+        # 5) front hfe: 0 -> +0.6 => kfe: 0 -> +0.1, pfe: 0 -> -0.3
+        # 6) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+        kfe_front_des = piecewise_2seg(
+            hfe_front,
+            mid=torch.zeros_like(hfe_front),
+            x_lo=-1.0 * torch.ones_like(hfe_front),
+            x_hi=+0.6 * torch.ones_like(hfe_front),
+            y_lo=-1.5 * torch.ones_like(hfe_front),
+            y_mid=0.0 * torch.ones_like(hfe_front),
+            y_hi=+0.1 * torch.ones_like(hfe_front),
+        )
+
+        pfe_front_des = piecewise_2seg(
+            hfe_front,
+            mid=torch.zeros_like(hfe_front),
+            x_lo=-1.0 * torch.ones_like(hfe_front),
+            x_hi=+0.6 * torch.ones_like(hfe_front),
+            y_lo=+3.0 * torch.ones_like(hfe_front),
+            y_mid=0.0 * torch.ones_like(hfe_front),
+            y_hi=-0.3 * torch.ones_like(hfe_front),
+        )
+
+        # penalty (soft “tendon coupling”)
+        # squared error around desired coupling curve
+        hind_pen = (kfe_hind - kfe_hind_des) ** 2 + (pfe_hind - pfe_hind_des) ** 2
+        front_pen = (kfe_front - kfe_front_des) ** 2 + (pfe_front - pfe_front_des) ** 2
+
+        # mean over joints (2 legs) then return per-env reward
+        pen = torch.mean(hind_pen, dim=1) + torch.mean(front_pen, dim=1)
+
+        # reward is negative penalty
+        return -pen

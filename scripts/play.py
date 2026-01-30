@@ -7,6 +7,8 @@ from gym.utils import VisualizationRecorder
 import torch
 import numpy as np
 
+BASE_HEIGHT_REF = 1.3
+
 
 def setup(args):
     env_cfg, train_cfg = task_registry.create_cfgs(args)
@@ -101,6 +103,8 @@ def play(env, runner, train_cfg):
 
     # track actual number of simulation steps
     actual_steps = 0
+    # track and print commanded height changes
+    last_height_cmd = None
 
     # * set up recording
     if env.cfg.viewer.record:
@@ -113,6 +117,7 @@ def play(env, runner, train_cfg):
     if COMMANDS_INTERFACE:
         # interface = GamepadInterface(env)
         interface = KeyboardInterface(env)
+        env.commands[:, 3] = BASE_HEIGHT_REF
 
     try:
         for i in range(10 * int(env.max_episode_length)):
@@ -120,6 +125,20 @@ def play(env, runner, train_cfg):
                 interface.update(env)
             if env.cfg.viewer.record:
                 recorder.update(i)
+
+            # print target/actual height (m)
+            target_height = env.commands[0, 3].item()
+            if (last_height_cmd is None) or (
+                abs(target_height - last_height_cmd) > 1e-6
+            ):
+                actual_height = env.base_height[0].item()
+
+                print(
+                    f"[HEIGHT] actual = {actual_height:.3f} m | "
+                    f"target = {target_height:.3f} m | "
+                    f"error = {actual_height - target_height:.3f}"
+                )
+                last_height_cmd = target_height
 
             runner.set_actions(
                 runner.actor_cfg["actions"],

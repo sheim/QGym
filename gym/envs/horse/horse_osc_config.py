@@ -49,9 +49,9 @@ class HorseOscCfg(HorseCfg):
         # }
         dof_pos_range = {
             "haa": [-0.2, 0.2],
-            "hfe": [-0.7, 0.5],
+            "hfe": [-1.0, 0.5],
             "kfe": [-0.2, 0.1],
-            "pfe": [-0.3, 1.0],
+            "pfe": [-0.3, 2.5],
             "pastern_to_foot": [-0.3, 1.8],
             "base_joint": [-0.0, 0.0],
         }
@@ -161,8 +161,8 @@ class HorseOscCfg(HorseCfg):
         shank_length_diff = 0  # Units in cm
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "horse/urdf/horse.urdf"
         foot_name = "foot"
-        penalize_contacts_on = ["thigh", "shank", "pastern"]
-        terminate_after_contacts_on = ["base"]  # turn off for laying down
+        penalize_contacts_on = ["thigh"]  # "thigh", "shank", "pastern"
+        terminate_after_contacts_on = ["thigh"]
         collapse_fixed_joints = False
         fix_base_link = False
         self_collisions = 1
@@ -185,9 +185,12 @@ class HorseOscCfg(HorseCfg):
         base_lin_vel = BASE_HEIGHT_REF
         dof_vel = [2.0] + (4 * [0.5, 0.5, 0.5, 0.5, 0.5])
         base_height = BASE_HEIGHT_REF
-        dof_pos = [0.2] + (4 * [0.4, 1.3, 1.4, 2.5, 2.1])
+        dof_pos = [0.2] + (
+            4 * [0.4, 1.3, 1.4, 2.5, 2.1]
+        )  # reducing this to be alot smaller 2.1 or 2.5
         dof_pos_obs = dof_pos
-        dof_pos_target = [2.0 * x for x in dof_pos]  # target joint angles
+        # dof_pos_target = [2.0 * x for x in dof_pos]  # target joint angles
+        dof_pos_target = [0.4] + (4 * [0.8, 2.6, 2.8, 5.0, 4.2])
         tau_ff = [1100] + (4 * [1000, 1000, 1000, 500, 300])  # not being used
         commands = [3, 1, 3, 1]  # add height as a command
 
@@ -270,9 +273,10 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 stance_velocity = 0.0
                 coupled_grf = 1.0  # penalize for grf during swing, no grf during stance
                 enc_pace = 0.0
-                cursorial = 0.75  # enourage legs to stay under body, don't splay out
+                cursorial = 1.0  # enourage legs to stay under body, don't splay out
                 standing_torques = 0.0  # 1.e-5
-                tracking_height = 1.5
+                tracking_height = 1.0
+                tendon_constraints = 1.0
 
             class termination_weight:
                 termination = 15.0 / 100.0
