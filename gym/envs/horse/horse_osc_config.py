@@ -20,7 +20,7 @@ class HorseOscCfg(HorseCfg):
         timeout_reset_ratio = 0.75
         reset_mode = "reset_to_range"
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 1.4]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.35]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -277,6 +277,9 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 standing_torques = 0.0  # 1.e-5
                 tracking_height = 1.0
                 tendon_constraints = 1.0
+                feet_support_during_descent = 100.0
+                controlled_descent = 100
+                kneel_front_then_hind = 0
 
             class termination_weight:
                 termination = 15.0 / 100.0
