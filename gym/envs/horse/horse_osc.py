@@ -128,7 +128,15 @@ class HorseOsc(Horse):
             self.num_envs, 1, device=self.device
         )
 
-        self.commands[:, 3] = BASE_HEIGHT_REF
+        env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
+
+        self._reset_to_custom_pos(env_ids, self.root_states[env_ids, 2].clone())
+
+        # resample height command
+        h_min, h_max = self.cfg.commands.ranges.height
+        self.commands[env_ids, 3] = h_min + (h_max - h_min) * torch.rand(
+            (len(env_ids),), device=self.device
+        )
 
     def _reset_oscillators(self, env_ids):
         if len(env_ids) == 0:
@@ -163,7 +171,16 @@ class HorseOsc(Horse):
         if len(env_ids) == 0:
             return
         super()._reset_system(env_ids)
-        self.commands[env_ids, 3] = BASE_HEIGHT_REF
+
+        # pose horse based set height
+        self._reset_to_custom_pos(env_ids, self.root_states[env_ids, 2].clone())
+
+        # resample height command
+        h_min, h_max = self.cfg.commands.ranges.height
+        self.commands[env_ids, 3] = h_min + (h_max - h_min) * torch.rand(
+            (len(env_ids),), device=self.device
+        )
+
         if len(env_ids) > 0:
             h_cmd = self.commands[env_ids, 3].flatten()
             h_now = self.base_height[env_ids].flatten()
@@ -270,7 +287,12 @@ class HorseOsc(Horse):
 
         if self.cfg.osc.randomize_osc_params:
             self._resample_osc_params(env_ids)
-        self.commands[env_ids, 3] = BASE_HEIGHT_REF
+
+        # resample height command
+        h_min, h_max = self.cfg.commands.ranges.height
+        self.commands[env_ids, 3] = h_min + (h_max - h_min) * torch.rand(
+            (len(env_ids),), device=self.device
+        )
 
     def _resample_osc_params(self, env_ids):
         if len(env_ids) > 0:
@@ -448,6 +470,18 @@ class HorseOsc(Horse):
             )  # x in [mid, x_hi] (or beyond -> clamped)
             return torch.where(x <= mid, y_left, y_right)
 
+        # make desired match (N,2) like the actual joint tensor
+        def _match_legs(desired, actual_legs):
+            # actual_legs: (N,2)
+            if desired.dim() == 0:
+                return desired.view(1, 1).expand_as(actual_legs)
+            if desired.dim() == 1:
+                return desired.unsqueeze(1).expand_as(actual_legs)  # (N,) -> (N,2)
+            if desired.dim() == 2:
+                # if already (N,2) it's good
+                return desired
+            raise RuntimeError(f"Unexpected desired shape: {tuple(desired.shape)}")
+
         # Hind constraints (RH, LH)
         hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # [N,2]
         kfe_hind = self.dof_pos[:, self.idx["hind_kfe"]]
@@ -480,96 +514,212 @@ class HorseOsc(Horse):
         kfe_front = self.dof_pos[:, self.idx["front_kfe"]]
         pfe_front = self.dof_pos[:, self.idx["front_pfe"]]
 
-        # 5) front hfe: 0 -> +0.6 => kfe: 0 -> +0.1, pfe: 0 -> -0.3
-        # 6) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+        # 5) front hfe: 0 -> +0.6 => kfe: 0 -> 0, pfe: 0 -> 0
+        # 6) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +1.5
+        # 7) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+
+        zeros = torch.zeros_like(hfe_front)
+        ones = torch.ones_like(hfe_front)
+
+        # kfe: flat 0 for hfe in [0, +0.6], ramp to -1.5 for hfe in [-1.0, 0]
         kfe_front_des = piecewise_2seg(
             hfe_front,
-            mid=torch.zeros_like(hfe_front),
-            x_lo=-1.0 * torch.ones_like(hfe_front),
-            x_hi=+0.6 * torch.ones_like(hfe_front),
-            y_lo=-1.5 * torch.ones_like(hfe_front),
-            y_mid=0.0 * torch.ones_like(hfe_front),
-            y_hi=+0.1 * torch.ones_like(hfe_front),
+            mid=zeros,
+            x_lo=-1.0 * ones,
+            x_hi=+0.6 * ones,
+            y_lo=-1.5 * ones,  # at hfe=-1.0
+            y_mid=0.0 * ones,  # at hfe=0
+            y_hi=0.0 * ones,  # at hfe=+0.6
         )
 
-        pfe_front_des = piecewise_2seg(
+        # pfe: flat 0 for hfe in [0, +0.6], ramp to +1.5 for hfe in [-1.0, 0]
+        pfe_front_des_15 = piecewise_2seg(
             hfe_front,
-            mid=torch.zeros_like(hfe_front),
-            x_lo=-1.0 * torch.ones_like(hfe_front),
-            x_hi=+0.6 * torch.ones_like(hfe_front),
-            y_lo=+3.0 * torch.ones_like(hfe_front),
-            y_mid=0.0 * torch.ones_like(hfe_front),
-            y_hi=-0.3 * torch.ones_like(hfe_front),
+            mid=zeros,
+            x_lo=-1.0 * ones,
+            x_hi=+0.6 * ones,
+            y_lo=+1.5 * ones,  # at hfe=-1.0
+            y_mid=0.0 * ones,  # at hfe=0
+            y_hi=0.0 * ones,  # at hfe=+0.6
         )
 
-        # penalty (soft “tendon coupling”)
-        # squared error around desired coupling curve
-        hind_pen = (kfe_hind - kfe_hind_des) ** 2 + (pfe_hind - pfe_hind_des) ** 2
-        front_pen = (kfe_front - kfe_front_des) ** 2 + (pfe_front - pfe_front_des) ** 2
+        # pfe: flat 0 for hfe in [0, +0.6], ramp to +3.0 for hfe in [-1.0, 0]
+        pfe_front_des_30 = piecewise_2seg(
+            hfe_front,
+            mid=zeros,
+            x_lo=-1.0 * ones,
+            x_hi=+0.6 * ones,
+            y_lo=+3.0 * ones,  # at hfe=-1.0
+            y_mid=0.0 * ones,  # at hfe=0
+            y_hi=0.0 * ones,  # at hfe=+0.6
+        )
 
-        # mean over joints (2 legs) then return per-env reward
-        pen = torch.mean(hind_pen, dim=1) + torch.mean(front_pen, dim=1)
+        # --- HIND ---
+        kfe_hind_des_ = _match_legs(kfe_hind_des, kfe_hind)  # -> (N,2)
+        pfe_hind_des_ = _match_legs(pfe_hind_des, pfe_hind)  # -> (N,2)
+        hind_pen = (kfe_hind - kfe_hind_des_) ** 2 + (
+            pfe_hind - pfe_hind_des_
+        ) ** 2  # (N,2)
 
-        # reward is negative penalty
+        # --- FRONT ---
+        # KFE: flat 0 for hfe in [0, 0.6], ramp to -1.5 for hfe in [-1,0]
+        kfe_front_des_ = _match_legs(kfe_front_des, kfe_front)  # -> (N,2)
+        kfe_err = (kfe_front - kfe_front_des_) ** 2  # (N,2)
+
+        # negative HFE:
+        #   - PFE: 0 -> +1.5  (hfe 0 -> -1)
+        #   - PFE: 0 -> +3.0  (hfe 0 -> -1)
+        pfe_front_des15_ = _match_legs(pfe_front_des_15, pfe_front)  # -> (N,2)
+        pfe_front_des30_ = _match_legs(pfe_front_des_30, pfe_front)  # -> (N,2)
+
+        pfe_err15 = (pfe_front - pfe_front_des15_) ** 2
+        pfe_err30 = (pfe_front - pfe_front_des30_) ** 2
+
+        # BOTH branches acceptable always:
+        pfe_term = torch.minimum(pfe_err15, pfe_err30)  # (N,2)
+
+        front_pen = kfe_err + pfe_term  # (N,2)
+
+        # --- aggregate per env ---
+        pen = hind_pen.mean(dim=1) + front_pen.mean(dim=1)  # (N,)
         return -pen
 
-    def _reward_feet_support_during_descent(self):
-        """
-        Reward having support forces (GRF) on the feet during lie-down / descent
-        """
-        # Lie-down is when commanded height is low
-        lie_cmd = self.commands[:, 3]  # (num_envs,)
-        lie_mode = lie_cmd < 1.0  # bool (num_envs,)
+    def _reset_to_custom_pos(self, env_ids, reset_h):
+        env_ids = env_ids.to(dtype=torch.long, device=self.device)
+        B = env_ids.numel()
+        if B == 0:
+            return
 
-        # Descending means base vertical velocity is negative (falling down)
-        descending = self.base_lin_vel[:, 2] < 0.0
+        # --- normalize reset_h to (B,) on device ---
+        if not torch.is_tensor(reset_h):
+            reset_h = torch.tensor(
+                reset_h, device=self.device, dtype=torch.float32
+            ).repeat(B)
+        else:
+            reset_h = reset_h.to(device=self.device, dtype=torch.float32)
+            if reset_h.numel() == 1:
+                reset_h = reset_h.repeat(B)
+            elif reset_h.shape[0] != B:
+                # if passed full (num_envs,), subset it
+                if reset_h.shape[0] == self.num_envs:
+                    reset_h = reset_h[env_ids]
+                else:
+                    raise RuntimeError(
+                        f"reset_h shape {reset_h.shape} incompatible env_id batch {B}"
+                    )
 
-        # Only reward support when we're actually trying to go down
-        phase = (lie_mode & descending).float().unsqueeze(1)  # (num_envs, 1)
+        # env_ids must be LongTensor on device
+        env_ids = env_ids.to(device=self.device, dtype=torch.long)
 
-        # Get per-foot GRF
-        grf = self._compute_grf(grf_norm=True)  # (num_envs, 4), already 0–1
+        # Get a per-env base pose, regardless of how default_dof_pos is stored
+        ddp = self.default_dof_pos
 
-        # contact = (grf > 0.1).float()
-        # rewards proportional load sharing
-        support = torch.mean(grf, dim=1)
+        if ddp.dim() == 1:
+            # (num_dofs,) -> make (B, num_dofs)
+            base_pose = ddp.unsqueeze(0).repeat(env_ids.numel(), 1).clone()
+        elif ddp.dim() == 2 and ddp.shape[0] == 1:
+            # (1, num_dofs) -> expand to (B, num_dofs)
+            base_pose = ddp.expand(env_ids.numel(), -1).clone()
+        elif ddp.dim() == 2 and ddp.shape[0] == self.num_envs:
+            # (num_envs, num_dofs) -> index by env ids
+            base_pose = ddp[env_ids].clone()
+        else:
+            raise RuntimeError(f"Unexpected default_dof_pos shape: {tuple(ddp.shape)}")
 
-        return phase.squeeze(1) * support
+        # Decide stand vs lie by z pos
+        h_mid = 0.7
 
-    def _reward_controlled_descent(self):
-        lie_cmd = self.commands[:, 3]
-        lie_mode = lie_cmd < 1.0
+        use_stand = reset_h >= h_mid  # (B,) bool
 
-        # Only while still above target height (avoid bounce farming near the ground)
-        above_target = self.base_height.flatten() > (lie_cmd + 0.05)
+        stand_pose = base_pose.clone()
+        lie_pose = base_pose.clone()
 
-        # "done" after first settle/impact so reward doesn't apply during bounces
-        grf = self._compute_grf(grf_norm=True)  # (N,4) 0..1
-        support_all = (grf > 0.1).float().mean(dim=1)  # (N,)
-        # impact_event: 4 feet making contact and height is 12 cm above height
-        impact_event = (support_all > 0.75) & (
-            self.base_height.flatten() < lie_cmd + 0.12
-        )
-        # Once impact_event happens, lie_down_done stays True
-        self.lie_down_done |= impact_event
+        # DOF map: 0 base_joint
+        # RH: 1..5, LH: 6..10, RF: 11..15, LF: 16..20 (haa,hfe,kfe,pfe,pastern)
 
-        # Reward only applies when: in lie-down command, still above the target, haven’t
-        # “completed” the lie-down yet.
-        active = lie_mode & above_target & (~self.lie_down_done)
+        pos_range = self.cfg.init_state.dof_pos_range
 
-        # penalize downward speed and upward bounce separately
-        vz = self.base_lin_vel[:, 2]
-        fall_speed = torch.clamp(-vz, min=0.0)  # downward only
-        bounce_speed = torch.clamp(vz, min=0.0)  # upward only
+        for base in [1, 6, 11, 16]:
+            haa = base + 0
+            hfe = base + 1
+            kfe = base + 2
+            pfe = base + 3
+            pas = base + 4
 
-        # penalize force above 5000 (hard threshold), squared, averaged across feet
-        foot_F = torch.norm(
-            self.contact_forces[:, self.feet_indices, :], dim=-1
-        )  # (N,4)
-        impact_pen = torch.mean(torch.clamp(foot_F - 5000.0, min=0.0) ** 2, dim=1)
+            # standing (tune)
+            stand_pose[:, haa] = pos_range["haa"][0] + (
+                pos_range["haa"][1] - pos_range["haa"][0]
+            ) * torch.rand((lie_pose.shape[0],), device=self.device)
+            stand_pose[:, hfe] = pos_range["hfe"][0] + (
+                pos_range["hfe"][1] - pos_range["hfe"][0]
+            ) * torch.rand((lie_pose.shape[0],), device=self.device)
+            stand_pose[:, kfe] = pos_range["kfe"][0] + (
+                pos_range["kfe"][1] - pos_range["kfe"][0]
+            ) * torch.rand((lie_pose.shape[0],), device=self.device)
+            stand_pose[:, pfe] = pos_range["pfe"][0] + (
+                pos_range["pfe"][1] - pos_range["pfe"][0]
+            ) * torch.rand((lie_pose.shape[0],), device=self.device)
+            stand_pose[:, pas] = pos_range["pastern_to_foot"][0] + (
+                pos_range["pastern_to_foot"][1] - pos_range["pastern_to_foot"][0]
+            ) * torch.rand((lie_pose.shape[0],), device=self.device)
 
-        # Encourage small downward speed during the *first* descent,
-        # penalize bounce and impact spikes
-        reward = -(fall_speed**2) - 2.0 * (bounce_speed**2) - 2.0 * impact_pen
+        # front kneel (tune)
+        for base in [11, 16]:
+            haa = base + 0
+            hfe = base + 1
+            kfe = base + 2
+            pfe = base + 3
+            pas = base + 4
+            lie_pose[:, haa] = 0.0
+            lie_pose[:, hfe] = -1.0 + (0.2 - -1.0) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
+            lie_pose[:, kfe] = -1.5 + (-0.5 - -1.5) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
+            lie_pose[:, pfe] = -0.3 + (3.0 - -0.3) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
+            lie_pose[:, pas] = -0.3 + (1.8 - -0.3) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
 
-        return active.float() * reward
+        # hind tuck (tune)
+        for base in [1, 6]:
+            haa = base + 0
+            hfe = base + 1
+            kfe = base + 2
+            pfe = base + 3
+            pas = base + 4
+            lie_pose[:, haa] = 0.0
+            lie_pose[:, hfe] = -1.5 + (-1 - -1.5) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
+            lie_pose[:, kfe] = -0.2 + (1 - -0.2) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
+            lie_pose[:, pfe] = 0.0 + (-1.2 - 0.0) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
+            lie_pose[:, pas] = -0.3 + (1.8 - -0.3) * torch.rand(
+                (lie_pose.shape[0],), device=self.device
+            )
+
+        new_pose = torch.where(use_stand.unsqueeze(1), stand_pose, lie_pose)
+
+        # clamp to limits (dof_pos_limits: (num_dof, 2))
+        lo = self.dof_pos_limits[:, 0].unsqueeze(0)
+        hi = self.dof_pos_limits[:, 1].unsqueeze(0)
+        new_pose = torch.max(torch.min(new_pose, hi), lo)
+
+        # apply to buffers
+        self.dof_pos[env_ids] = new_pose
+        self.dof_vel[env_ids] = 0.0
+
+        if (
+            hasattr(self, "dof_state")
+            and self.dof_state.dim() == 3
+            and self.dof_state.shape[2] >= 2
+        ):
+            self.dof_state[env_ids, :, 0] = new_pose
+            self.dof_state[env_ids, :, 1] = 0.0
