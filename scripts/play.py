@@ -6,7 +6,6 @@ from gym.utils import VisualizationRecorder
 # torch needs to be imported after isaacgym imports in local source
 import torch
 import numpy as np
-import os
 
 BASE_HEIGHT_REF = 1.3
 
@@ -102,46 +101,6 @@ def play(env, runner, train_cfg):
 
     obs_log = create_obs_logging_dict(env, obs_vars, num_steps)
 
-    # --- height reward logging ---
-    height_rew = np.zeros((num_steps,), dtype=np.float32)
-    height_actual = np.zeros((num_steps,), dtype=np.float32)
-    height_target = np.zeros((num_steps,), dtype=np.float32)
-
-    # ---------- record init pos/height ----------
-    OUT_DIR = "play_logs"
-    os.makedirs(OUT_DIR, exist_ok=True)
-
-    # num dofs (don't rely on env.num_dofs, use tensor shape)
-    num_dofs = env.dof_pos.shape[1]
-
-    # Capture *one-time* init snapshot for all envs
-    # root z: prefer root_states[:,2] if it exists; otherwise fall back to base_height
-    if hasattr(env, "root_states"):
-        init_root_z = env.root_states[:, 2].detach().cpu().numpy().astype(np.float32)
-    else:
-        init_root_z = env.base_height.detach().cpu().numpy().astype(np.float32)
-
-    # commanded height at start
-    init_cmd_h = env.commands[:, 3].detach().cpu().numpy().astype(np.float32)
-    # starting joint positions
-    init_dof_pos = env.dof_pos.detach().cpu().numpy().astype(np.float32)
-
-    # Build a single 2D table: (num_envs, 2 + num_dofs)
-    # col0 = init_root_z, col1 = init_cmd_h, col2.. = dof_pos
-    init_table = np.zeros((env.num_envs, 2 + num_dofs), dtype=np.float32)
-    init_table[:, 0] = init_root_z
-    init_table[:, 1] = init_cmd_h
-    init_table[:, 2:] = init_dof_pos
-
-    # Column names/joint names
-    if hasattr(env, "dof_names"):
-        dof_names = list(env.dof_names)
-    else:
-        # fallback: generic names
-        dof_names = [f"dof_{i}" for i in range(num_dofs)]
-
-    col_names = ["init_root_z", "init_cmd_height"] + [f"init_{n}" for n in dof_names]
-
     # track actual number of simulation steps
     actual_steps = 0
     # track and print commanded height changes
@@ -158,12 +117,7 @@ def play(env, runner, train_cfg):
     if COMMANDS_INTERFACE:
         # interface = GamepadInterface(env)
         interface = KeyboardInterface(env)
-
-        # resample height command only
-        h_min, h_max = env.cfg.commands.ranges.height
-        env.commands[:, 3] = h_min + (h_max - h_min) * torch.rand(
-            (env.num_envs,), device=env.device
-        )
+        env.commands[:, 3] = BASE_HEIGHT_REF
 
     try:
         for i in range(10 * int(env.max_episode_length)):
@@ -205,12 +159,6 @@ def play(env, runner, train_cfg):
                 # log observations
                 log_obs_step(env, obs_log, obs_vars, actual_steps)
 
-                # _reward_tracking_height returns (num_envs,) tensor
-                r = env._reward_tracking_height()  # torch tensor
-                height_rew[actual_steps] = r[0].item()
-                height_actual[actual_steps] = env.base_height[0].item()
-                height_target[actual_steps] = env.commands[0, 3].item()
-
                 actual_steps += 1
 
             env.check_exit()  # user exit or viewer closed
@@ -240,22 +188,6 @@ def play(env, runner, train_cfg):
 
         np.savez_compressed("obs_logs.npz", **obs_log_cpu)
         print(f"\nSaved obs log to obs_logs.npz ({actual_steps} steps)")
-
-    # ---------- save init data ----------
-    init_npz_path = os.path.join(OUT_DIR, "init_snapshot.npz")
-    np.savez_compressed(
-        init_npz_path,
-        init_table=init_table,
-        col_names=np.array(col_names, dtype=object),
-    )
-    print(f"[saved] init snapshot -> {init_npz_path}")
-
-    # save as csv
-    init_csv_path = os.path.join(OUT_DIR, "init_snapshot.csv")
-    with open(init_csv_path, "w") as f:
-        f.write(",".join(col_names) + "\n")
-        np.savetxt(f, init_table, delimiter=",", fmt="%.6f")
-    print(f"[saved] init snapshot csv -> {init_csv_path}")
 
 
 if __name__ == "__main__":

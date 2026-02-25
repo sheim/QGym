@@ -67,7 +67,7 @@ class HorseOscCfg(HorseCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.6, 1.35],  # z
+            [1.35, 1.35],  # z
             [-0.0, 0.0],  # roll
             [-0.0, 0.0],  # pitch
             [-0.2, 0.2],  # yaw
@@ -138,7 +138,7 @@ class HorseOscCfg(HorseCfg):
             lin_vel_x = [-1.0, 0.0, 1.0, 3.0, 6.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 6  # max [rad/s]
-            height = [0.0, 1.30]  # m, command range of height during training
+            height = [0.61, 1.30]  # m
 
     class push_robots:
         toggle = False
@@ -162,7 +162,7 @@ class HorseOscCfg(HorseCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "horse/urdf/horse.urdf"
         foot_name = "foot"
         penalize_contacts_on = ["thigh"]  # "thigh", "shank", "pastern"
-        terminate_after_contacts_on = ["top"]
+        terminate_after_contacts_on = ["thigh"]
         collapse_fixed_joints = False
         fix_base_link = False
         self_collisions = 1
@@ -275,8 +275,11 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 enc_pace = 0.0
                 cursorial = 1.0  # enourage legs to stay under body, don't splay out
                 standing_torques = 0.0  # 1.e-5
-                tracking_height = 5.0
+                tracking_height = 1.0
                 tendon_constraints = 1.0
+                feet_support_during_descent = 100.0
+                controlled_descent = 100
+                kneel_front_then_hind = 0
 
             class termination_weight:
                 termination = 15.0 / 100.0
