@@ -46,7 +46,7 @@ class KeyboardInterface:
 
         self.min_height = -1000
         self.max_height = 1.3
-        self.increment_height = 0.7
+        self.increment_height = 0.1
 
     def update(self, env):
         for evt in env.gym.query_viewer_action_events(env.viewer):

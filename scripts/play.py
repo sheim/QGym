@@ -136,8 +136,7 @@ def play(env, runner, train_cfg):
                 print(
                     f"[HEIGHT] actual = {actual_height:.3f} m | "
                     f"target = {target_height:.3f} m | "
-                    f"error = {actual_height - target_height:.3f} | "
-                    f"descend mode = {(env.commands[:, 3][0]) < 1.0}"
+                    f"error = {actual_height - target_height:.3f}"
                 )
                 last_height_cmd = target_height
 

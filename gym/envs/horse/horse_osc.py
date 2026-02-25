@@ -108,11 +108,6 @@ class HorseOsc(Horse):
             ),
         }
 
-        self.prev_height_error = torch.zeros(self.num_envs, device=self.device)
-        self.lie_down_done = torch.zeros(
-            self.num_envs, dtype=torch.bool, device=self.device
-        )
-
         self.oscillators = torch.zeros(self.num_envs, 4, device=self.device)
         self.oscillator_obs = torch.zeros(self.num_envs, 8, device=self.device)
 
@@ -164,11 +159,6 @@ class HorseOsc(Horse):
             return
         super()._reset_system(env_ids)
         self.commands[env_ids, 3] = BASE_HEIGHT_REF
-        if len(env_ids) > 0:
-            h_cmd = self.commands[env_ids, 3].flatten()
-            h_now = self.base_height[env_ids].flatten()
-            self.prev_height_error[env_ids] = torch.abs(h_now - h_cmd)
-        self.lie_down_done[env_ids] = False
 
     def _pre_decimation_step(self):
         super()._pre_decimation_step()
@@ -512,64 +502,3 @@ class HorseOsc(Horse):
 
         # reward is negative penalty
         return -pen
-
-    def _reward_feet_support_during_descent(self):
-        """
-        Reward having support forces (GRF) on the feet during lie-down / descent
-        """
-        # Lie-down is when commanded height is low
-        lie_cmd = self.commands[:, 3]  # (num_envs,)
-        lie_mode = lie_cmd < 1.0  # bool (num_envs,)
-
-        # Descending means base vertical velocity is negative (falling down)
-        descending = self.base_lin_vel[:, 2] < 0.0
-
-        # Only reward support when we're actually trying to go down
-        phase = (lie_mode & descending).float().unsqueeze(1)  # (num_envs, 1)
-
-        # Get per-foot GRF
-        grf = self._compute_grf(grf_norm=True)  # (num_envs, 4), already 0–1
-
-        # contact = (grf > 0.1).float()
-        # rewards proportional load sharing
-        support = torch.mean(grf, dim=1)
-
-        return phase.squeeze(1) * support
-
-    def _reward_controlled_descent(self):
-        lie_cmd = self.commands[:, 3]
-        lie_mode = lie_cmd < 1.0
-
-        # Only while still above target height (avoid bounce farming near the ground)
-        above_target = self.base_height.flatten() > (lie_cmd + 0.05)
-
-        # "done" after first settle/impact so reward doesn't apply during bounces
-        grf = self._compute_grf(grf_norm=True)  # (N,4) 0..1
-        support_all = (grf > 0.1).float().mean(dim=1)  # (N,)
-        # impact_event: 4 feet making contact and height is 12 cm above height
-        impact_event = (support_all > 0.75) & (
-            self.base_height.flatten() < lie_cmd + 0.12
-        )
-        # Once impact_event happens, lie_down_done stays True
-        self.lie_down_done |= impact_event
-
-        # Reward only applies when: in lie-down command, still above the target, haven’t
-        # “completed” the lie-down yet.
-        active = lie_mode & above_target & (~self.lie_down_done)
-
-        # penalize downward speed and upward bounce separately
-        vz = self.base_lin_vel[:, 2]
-        fall_speed = torch.clamp(-vz, min=0.0)  # downward only
-        bounce_speed = torch.clamp(vz, min=0.0)  # upward only
-
-        # penalize force above 5000 (hard threshold), squared, averaged across feet
-        foot_F = torch.norm(
-            self.contact_forces[:, self.feet_indices, :], dim=-1
-        )  # (N,4)
-        impact_pen = torch.mean(torch.clamp(foot_F - 5000.0, min=0.0) ** 2, dim=1)
-
-        # Encourage small downward speed during the *first* descent,
-        # penalize bounce and impact spikes
-        reward = -(fall_speed**2) - 2.0 * (bounce_speed**2) - 2.0 * impact_pen
-
-        return active.float() * reward
