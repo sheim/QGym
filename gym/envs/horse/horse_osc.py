@@ -6,7 +6,7 @@ from gym.envs.horse.horse import Horse
 from isaacgym import gymtorch
 
 HORSE_WEIGHT = 536.38 * 9.81  # Weight of horse in Newtons
-BASE_HEIGHT_REF = 1.3
+BASE_HEIGHT_REF = 1.0
 
 
 class HorseOsc(Horse):
@@ -305,6 +305,12 @@ class HorseOsc(Horse):
             / self.cfg.reward_settings.switch_scale
         )
 
+    def _switch_height(self):
+        h_cmd = self.commands[:, 3]
+        h_err = torch.abs(h_cmd - BASE_HEIGHT_REF)  # (num_envs,)
+        x = torch.clamp(h_err - 0.02, min=0.0)  # 2 cm deadzone (tune)
+        return torch.exp(-(x * x) / self.cfg.reward_settings.switch_scale_height)
+
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""
         return self._sqrdexp(self.base_lin_vel[:, 2] / self.scales["base_lin_vel"][0])
@@ -328,12 +334,12 @@ class HorseOsc(Horse):
     def _reward_swing_grf(self):
         # Reward non-zero grf during swing (0 to pi)
         rew = self.get_swing_grf(self.cfg.osc.osc_bool, self.cfg.osc.grf_bool)
-        return -torch.sum(rew, dim=1)
+        return -torch.sum(rew, dim=1) * self._switch_height()
 
     def _reward_stance_grf(self):
         # Reward non-zero grf during stance (pi to 2pi)
         rew = self.get_stance_grf(self.cfg.osc.osc_bool, self.cfg.osc.grf_bool)
-        return torch.sum(rew, dim=1)
+        return torch.sum(rew, dim=1) * self._switch_height()
 
     def get_swing_grf(self, osc_bool=False, contact_bool=False):
         if osc_bool:
@@ -386,11 +392,13 @@ class HorseOsc(Horse):
         rew_vel = torch.mean(self._sqrdexp(self.dof_vel), dim=1)
         rew_base_vel = torch.mean(torch.square(self.base_lin_vel), dim=1)
         rew_base_vel += torch.mean(torch.square(self.base_ang_vel), dim=1)
-        return (rew_vel + rew_pos - rew_base_vel) * self._switch()
+        return (
+            (rew_vel + rew_pos - rew_base_vel) * self._switch() * self._switch_height()
+        )
 
     def _reward_standing_torques(self):
         """Penalize torques at zero commands"""
-        return super()._reward_torques() * self._switch()
+        return super()._reward_torques() * self._switch() * self._switch_height()
 
     # * gait similarity scores
     def angle_difference(self, theta1, theta2):
@@ -438,6 +446,18 @@ class HorseOsc(Horse):
             )  # x in [mid, x_hi] (or beyond -> clamped)
             return torch.where(x <= mid, y_left, y_right)
 
+        # make desired match (N,2) like the actual joint tensor
+        def _match_legs(desired, actual_legs):
+            # actual_legs: (N,2)
+            if desired.dim() == 0:
+                return desired.view(1, 1).expand_as(actual_legs)
+            if desired.dim() == 1:
+                return desired.unsqueeze(1).expand_as(actual_legs)  # (N,) -> (N,2)
+            if desired.dim() == 2:
+                # if already (N,2) it's good
+                return desired
+            raise RuntimeError(f"Unexpected desired shape: {tuple(desired.shape)}")
+
         # Hind constraints (RH, LH)
         hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # [N,2]
         kfe_hind = self.dof_pos[:, self.idx["hind_kfe"]]
@@ -470,35 +490,72 @@ class HorseOsc(Horse):
         kfe_front = self.dof_pos[:, self.idx["front_kfe"]]
         pfe_front = self.dof_pos[:, self.idx["front_pfe"]]
 
-        # 5) front hfe: 0 -> +0.6 => kfe: 0 -> +0.1, pfe: 0 -> -0.3
-        # 6) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+        # 5) front hfe: 0 -> +0.6 => kfe: 0 -> 0, pfe: 0 -> 0
+        # 6) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +1.5
+        # 7) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+
+        zeros = torch.zeros_like(hfe_front)
+        ones = torch.ones_like(hfe_front)
+
+        # kfe: flat 0 for hfe in [0, +0.6], ramp to -1.5 for hfe in [-1.0, 0]
         kfe_front_des = piecewise_2seg(
             hfe_front,
-            mid=torch.zeros_like(hfe_front),
-            x_lo=-1.0 * torch.ones_like(hfe_front),
-            x_hi=+0.6 * torch.ones_like(hfe_front),
-            y_lo=-1.5 * torch.ones_like(hfe_front),
-            y_mid=0.0 * torch.ones_like(hfe_front),
-            y_hi=+0.1 * torch.ones_like(hfe_front),
+            mid=zeros,
+            x_lo=-1.0 * ones,
+            x_hi=+0.6 * ones,
+            y_lo=-1.5 * ones,  # at hfe=-1.0
+            y_mid=0.0 * ones,  # at hfe=0
+            y_hi=0.0 * ones,  # at hfe=+0.6
         )
 
-        pfe_front_des = piecewise_2seg(
+        # pfe: flat 0 for hfe in [0, +0.6], ramp to +1.5 for hfe in [-1.0, 0]
+        pfe_front_des_15 = piecewise_2seg(
             hfe_front,
-            mid=torch.zeros_like(hfe_front),
-            x_lo=-1.0 * torch.ones_like(hfe_front),
-            x_hi=+0.6 * torch.ones_like(hfe_front),
-            y_lo=+3.0 * torch.ones_like(hfe_front),
-            y_mid=0.0 * torch.ones_like(hfe_front),
-            y_hi=-0.3 * torch.ones_like(hfe_front),
+            mid=zeros,
+            x_lo=-1.0 * ones,
+            x_hi=+0.6 * ones,
+            y_lo=+1.5 * ones,  # at hfe=-1.0
+            y_mid=0.0 * ones,  # at hfe=0
+            y_hi=0.0 * ones,  # at hfe=+0.6
         )
 
-        # penalty (soft “tendon coupling”)
-        # squared error around desired coupling curve
-        hind_pen = (kfe_hind - kfe_hind_des) ** 2 + (pfe_hind - pfe_hind_des) ** 2
-        front_pen = (kfe_front - kfe_front_des) ** 2 + (pfe_front - pfe_front_des) ** 2
+        # pfe: flat 0 for hfe in [0, +0.6], ramp to +3.0 for hfe in [-1.0, 0]
+        pfe_front_des_30 = piecewise_2seg(
+            hfe_front,
+            mid=zeros,
+            x_lo=-1.0 * ones,
+            x_hi=+0.6 * ones,
+            y_lo=+3.0 * ones,  # at hfe=-1.0
+            y_mid=0.0 * ones,  # at hfe=0
+            y_hi=0.0 * ones,  # at hfe=+0.6
+        )
 
-        # mean over joints (2 legs) then return per-env reward
-        pen = torch.mean(hind_pen, dim=1) + torch.mean(front_pen, dim=1)
+        # --- HIND ---
+        kfe_hind_des_ = _match_legs(kfe_hind_des, kfe_hind)  # -> (N,2)
+        pfe_hind_des_ = _match_legs(pfe_hind_des, pfe_hind)  # -> (N,2)
+        hind_pen = (kfe_hind - kfe_hind_des_) ** 2 + (
+            pfe_hind - pfe_hind_des_
+        ) ** 2  # (N,2)
 
-        # reward is negative penalty
+        # --- FRONT ---
+        # KFE: flat 0 for hfe in [0, 0.6], ramp to -1.5 for hfe in [-1,0]
+        kfe_front_des_ = _match_legs(kfe_front_des, kfe_front)  # -> (N,2)
+        kfe_err = (kfe_front - kfe_front_des_) ** 2  # (N,2)
+
+        # negative HFE:
+        #   - PFE: 0 -> +1.5  (hfe 0 -> -1)
+        #   - PFE: 0 -> +3.0  (hfe 0 -> -1)
+        pfe_front_des15_ = _match_legs(pfe_front_des_15, pfe_front)  # -> (N,2)
+        pfe_front_des30_ = _match_legs(pfe_front_des_30, pfe_front)  # -> (N,2)
+
+        pfe_err15 = (pfe_front - pfe_front_des15_) ** 2
+        pfe_err30 = (pfe_front - pfe_front_des30_) ** 2
+
+        # BOTH branches acceptable always:
+        pfe_term = torch.minimum(pfe_err15, pfe_err30)  # (N,2)
+
+        front_pen = kfe_err + pfe_term  # (N,2)
+
+        # --- aggregate per env ---
+        pen = hind_pen.mean(dim=1) + front_pen.mean(dim=1)  # (N,)
         return -pen

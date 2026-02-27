@@ -7,7 +7,26 @@ from gym.utils import VisualizationRecorder
 import torch
 import numpy as np
 
-BASE_HEIGHT_REF = 1.3
+BASE_HEIGHT_REF = 1.0
+
+
+def get_reward_fns(env):
+    requested = [
+        "tracking_height",
+        "tendon_constraints",
+        "tracking_lin_vel",
+        "swing_grf",
+        "stance_grf",
+    ]
+
+    out = {}
+    for name in requested:
+        fn_name = f"_reward_{name}"
+        if hasattr(env, fn_name):
+            out[name] = getattr(env, fn_name)
+        else:
+            print(f"reward not found (skipping): {fn_name}")
+    return out
 
 
 def setup(args):
@@ -88,6 +107,17 @@ def play(env, runner, train_cfg):
     num_steps = int(env.max_episode_length)
     log_data = create_logging_dict(env, num_steps)
 
+    reward_fns = get_reward_fns(env)
+    reward_names = list(reward_fns.keys())
+
+    reward_log = {
+        "reward_names": np.array(reward_names, dtype=object),
+        "total_reward": np.zeros((num_steps,), dtype=np.float32),
+    }
+
+    for name in reward_names:
+        reward_log[name] = np.zeros((num_steps,), dtype=np.float32)
+
     obs_vars = [
         "base_height",
         "base_lin_vel",
@@ -136,7 +166,8 @@ def play(env, runner, train_cfg):
                 print(
                     f"[HEIGHT] actual = {actual_height:.3f} m | "
                     f"target = {target_height:.3f} m | "
-                    f"error = {actual_height - target_height:.3f}"
+                    f"error = {actual_height - target_height:.3f} | "
+                    f"descend mode = {(env.commands[:, 3][0]) < 1.0}"
                 )
                 last_height_cmd = target_height
 
@@ -157,7 +188,15 @@ def play(env, runner, train_cfg):
 
                 # log observations
                 log_obs_step(env, obs_log, obs_vars, actual_steps)
+                total = 0.0
 
+                for name, fn in reward_fns.items():
+                    r = fn()
+                    r0 = r[0].item()
+                    reward_log[name][actual_steps] = r0
+                    total += r0
+
+                reward_log["total_reward"][actual_steps] = total
                 actual_steps += 1
 
             env.check_exit()  # user exit or viewer closed
@@ -187,6 +226,15 @@ def play(env, runner, train_cfg):
 
         np.savez_compressed("obs_logs.npz", **obs_log_cpu)
         print(f"\nSaved obs log to obs_logs.npz ({actual_steps} steps)")
+
+        # save rewards
+        reward_log_cpu = {}
+        for k, v in reward_log.items():
+            if isinstance(v, np.ndarray) and v.shape[0] == num_steps:
+                reward_log_cpu[k] = v[:actual_steps]
+            else:
+                reward_log_cpu[k] = v
+        np.savez_compressed("reward_logs.npz", **reward_log_cpu)
 
 
 if __name__ == "__main__":
