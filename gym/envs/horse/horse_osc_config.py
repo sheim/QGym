@@ -10,7 +10,7 @@ class HorseOscCfg(HorseCfg):
     class env(HorseCfg.env):
         num_envs = 2**12
         num_actuators = 1 + 4 * 5
-        episode_length_s = 30
+        episode_length_s = 10
 
     class terrain(HorseCfg.terrain):
         mesh_type = "plane"
@@ -20,7 +20,7 @@ class HorseOscCfg(HorseCfg):
         timeout_reset_ratio = 0.75
         reset_mode = "reset_to_range"
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 1.0]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.4]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -67,7 +67,7 @@ class HorseOscCfg(HorseCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [1.0, 1.0],  # z
+            [1.35, 1.35],  # z
             [-0.0, 0.0],  # roll
             [-0.0, 0.0],  # pitch
             [-0.2, 0.2],  # yaw
@@ -131,14 +131,14 @@ class HorseOscCfg(HorseCfg):
         init_to = "random"
 
     class commands:
-        resampling_time = 10.0  # * time before command are changed[s]
+        resampling_time = 3.0  # * time before command are changed[s]
         var = 1.0
 
         class ranges:
             lin_vel_x = [-1.0, 0.0, 1.0, 3.0, 6.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 6  # max [rad/s]
-            height = [0.6, 1.0]  # m
+            height = [0.61, 1.30]  # m
 
     class push_robots:
         toggle = False
@@ -162,7 +162,7 @@ class HorseOscCfg(HorseCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "horse/urdf/horse.urdf"
         foot_name = "foot"
         penalize_contacts_on = ["thigh"]  # "thigh", "shank", "pastern"
-        terminate_after_contacts_on = ["thigh", "base"]
+        terminate_after_contacts_on = ["thigh"]
         collapse_fixed_joints = False
         fix_base_link = False
         self_collisions = 1
@@ -179,7 +179,6 @@ class HorseOscCfg(HorseCfg):
         base_height_target = BASE_HEIGHT_REF + 0.03
         tracking_sigma = 0.25
         switch_scale = 0.5
-        switch_scale_height = 0.5
 
     class scaling(HorseCfg.scaling):
         base_ang_vel = [0.3, 0.3, 0.1]
@@ -268,8 +267,8 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                swing_grf = 1.0
-                stance_grf = 1.0
+                swing_grf = 5.0
+                stance_grf = 5.0
                 swing_velocity = 0.0
                 stance_velocity = 0.0
                 coupled_grf = 1.0  # penalize for grf during swing, no grf during stance
