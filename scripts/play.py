@@ -206,6 +206,16 @@ def play(env, runner, train_cfg):
     except SystemExit:
         print("\n[INFO] Viewer closed, saving logs...")
     finally:
+        if env.cfg.viewer.record:
+            if hasattr(recorder, "close"):
+                recorder.close()
+                print("[RECORD] recorder.close() called")
+            elif hasattr(recorder, "save"):
+                recorder.save()
+                print("[RECORD] recorder.save() called")
+            elif hasattr(recorder, "finish"):
+                recorder.finish()
+                print("[RECORD] recorder.finish() called")
         # slice to actual steps before saving
         log_data_cpu = {
             k: (v.detach().cpu().numpy() if torch.is_tensor(v) else v)
