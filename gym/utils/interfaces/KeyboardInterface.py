@@ -19,6 +19,9 @@ class KeyboardInterface:
         env.gym.subscribe_viewer_keyboard_event(
             env.viewer, gymapi.KEY_DOWN, "height_down"
         )
+        env.gym.subscribe_viewer_keyboard_event(
+            env.viewer, gymapi.KEY_B, "toggle_belay"
+        )
         env.gym.subscribe_viewer_mouse_event(
             env.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_shoot"
         )
@@ -33,6 +36,7 @@ class KeyboardInterface:
         print("______________________________________________________________")
 
         env.commands[:] = 0.0
+        env.commands[:, 3] = 1.0
         env.cfg.commands.resampling_time = env.max_episode_length_s + 1
         self.max_vel_backward = -1.0
         self.max_vel_forward = 4.0
@@ -101,3 +105,7 @@ class KeyboardInterface:
                 evt.action == "space_shoot" or evt.action == "mouse_shoot"
             ) and evt.value > 0:
                 env.shoot()
+
+            elif evt.action == "toggle_belay" and evt.value > 0:
+                env.belay_enabled = not env.belay_enabled
+                print(f"[BELAY] enabled = {env.belay_enabled}")

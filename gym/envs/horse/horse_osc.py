@@ -3,10 +3,13 @@ from isaacgym.torch_utils import torch_rand_float
 
 from gym.envs.horse.horse import Horse
 
-from isaacgym import gymtorch
+from isaacgym import gymtorch, gymapi
 
 HORSE_WEIGHT = 536.38 * 9.81  # Weight of horse in Newtons
 BASE_HEIGHT_REF = 1.0
+
+BELAY_MASS_KG = 20.0
+BELAY_FORCE_N = BELAY_MASS_KG * 9.81  # 196.2 N
 
 
 class HorseOsc(Horse):
@@ -125,6 +128,50 @@ class HorseOsc(Horse):
 
         self.commands[:, 3] = BASE_HEIGHT_REF
 
+        # belay
+        self.belay_force_n = BELAY_FORCE_N
+        self.belay_enabled = False
+
+        # total rigid bodies
+        self.num_sim_bodies = self.gym.get_sim_rigid_body_count(self.sim)
+
+        self.rb_forces = torch.zeros(
+            (self.num_sim_bodies, 3),
+            device=self.device,
+            dtype=torch.float,
+        )
+        self.rb_torques = torch.zeros_like(self.rb_forces)
+
+        # body we want to pull on
+        body_name = "front_base"
+
+        # find local rigid body index inside the horse actor
+        self.front_base_local_id = self.gym.find_actor_rigid_body_handle(
+            self.envs[0],
+            self.actor_handles[0],
+            body_name,
+        )
+
+        print(
+            f"[BELAY] local body index for '{body_name}' = {self.front_base_local_id}"
+        )
+
+        # convert to sim global rigid body indices
+        self.base_body_ids = torch.zeros(
+            self.num_envs, device=self.device, dtype=torch.long
+        )
+
+        for i in range(self.num_envs):
+            sim_body_id = self.gym.get_actor_rigid_body_index(
+                self.envs[i],
+                self.actor_handles[i],
+                self.front_base_local_id,
+                gymapi.DOMAIN_SIM,
+            )
+            self.base_body_ids[i] = sim_body_id
+
+        print("[BELAY] sim body ids:", self.base_body_ids[:5])
+
     def _reset_oscillators(self, env_ids):
         if len(env_ids) == 0:
             return
@@ -195,6 +242,8 @@ class HorseOsc(Horse):
 
     def _post_physx_step(self):
         super()._post_physx_step()
+
+        self._apply_belay_force()
         self._step_oscillators(self.dt / self.cfg.control.decimation)
         return None
 
@@ -561,3 +610,24 @@ class HorseOsc(Horse):
 
         pen = hind_pen.mean(dim=1) + front_pen.mean(dim=1)  # (N,)
         return -pen
+
+    def _apply_belay_force(self):
+        self.rb_forces.zero_()
+        self.rb_torques.zero_()
+
+        if self.belay_enabled:
+            self.rb_forces[self.base_body_ids, 2] = self.belay_force_n
+
+            self.gym.apply_rigid_body_force_tensors(
+                self.sim,
+                gymtorch.unwrap_tensor(self.rb_forces),
+                gymtorch.unwrap_tensor(self.rb_torques),
+                gymapi.ENV_SPACE,
+            )
+
+    def toggle_belay(self):
+        self.belay_enabled = not self.belay_enabled
+        print(
+            f"[BELAY] enabled = {self.belay_enabled} | "
+            f"force = {self.belay_force_n:.1f} N"
+        )
