@@ -107,5 +107,5 @@ class KeyboardInterface:
                 env.shoot()
 
             elif evt.action == "toggle_belay" and evt.value > 0:
-                env.belay_enabled = not env.belay_enabled
-                print(f"[BELAY] enabled = {env.belay_enabled}")
+                if hasattr(env, "toggle_belay"):
+                    env.toggle_belay()
