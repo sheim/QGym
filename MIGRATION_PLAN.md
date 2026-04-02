@@ -114,27 +114,207 @@ be identical to pre-refactor (no behavioural change).
 
 ---
 
-## Phase 1 — MuJoCo Warp backend, FixedRobot
+## Phase 1 — MuJoCo backends, FixedRobot
 
-**Goal:** `MuJocoWarpBackend` implementing `SimBackend`.  Pendulum and Cartpole
-train to convergence using the new backend on GPU and CPU Linux.
+**Goal:** `MuJocoCPUBackend` and `MuJocoWarpBackend` both implementing `SimBackend`.
+Pendulum trains to convergence using the new backends on CPU and GPU Linux.
+CPU backend is implemented first — it has no Warp dependency, validates the interface,
+and produces a running contract test suite that the Warp backend can then inherit.
 
-### Key design decisions
+### Sub-tasks
 
-- `mjw.make_data(mjm, nworld=num_envs)` maps directly to `num_envs`
-- `dof_pos` / `dof_vel` exposed as `wp.to_torch(d.qpos)` / `wp.to_torch(d.qvel)` — zero-copy on GPU
-- Torques applied via `d.qfrc_applied` (raw generalised forces, matching the PD-computed torques from `_compute_torques`)
-- No `refresh_*` calls needed — tensors are live after `mjw.step()`
-- `reset_dof_state` writes via `wp.from_torch(...)` indexed slice
-- Device selected as `"cuda"` or `"cpu"` and passed to `wp.init()`
+#### 1a — Extend `SimBackend` ABC with contact-index properties
 
-### Files to create / modify
+`FixedRobot._initialize_sim()` reads `penalised_contact_indices` and
+`termination_contact_indices` from the backend immediately after `setup()`.
+These are not yet in the ABC.  Add them as concrete default-raise properties
+(same pattern as `rigid_body_states`):
+
+```python
+@property
+def penalised_contact_indices(self) -> torch.Tensor:
+    raise NotImplementedError
+
+@property
+def termination_contact_indices(self) -> torch.Tensor:
+    raise NotImplementedError
+```
+
+`IsaacGymBackend` already implements them and is unaffected.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/sim_backend.py` | Add two default-raise properties |
+
+---
+
+#### 1b — Implement `MuJocoCPUBackend`
+
+**New file:** `gym/envs/base/mujoco_cpu_backend.py`
+
+One `mujoco.MjModel` shared across all envs; one `mujoco.MjData` per env.
+
+**`setup(cfg, num_envs, device, task)` sequence:**
+1. Resolve asset path from `cfg.asset.file`
+2. `mjm = mujoco.MjModel.from_xml_file(asset_path)` — MuJoCo's built-in URDF importer
+3. Apply physics params from cfg: `mjm.opt.timestep = cfg.sim_dt`, gravity, `dof_damping`, `dof_armature`
+4. Extract metadata — `num_dof`, `num_bodies`, `dof_names`, `body_names`
+5. Build contact index tensors from `cfg.asset.penalize_contacts_on` / `terminate_after_contacts_on`
+6. Call task callbacks: `_get_env_origins()`, `_process_dof_props(props, 0)` where props dict has
+   keys `lower`, `upper`, `velocity`, `effort` (matching the existing IsaacGym interface)
+7. Create `self._datas = [mujoco.MjData(mjm) for _ in range(num_envs)]`
+8. Allocate PyTorch state tensors:
+   ```python
+   self._dof_state_t  = torch.zeros(num_envs, num_dof, 2, device=device)
+   self._dof_pos_view = self._dof_state_t[..., 0]   # [N, num_dof] view — satisfies dof_state contract
+   self._dof_vel_view = self._dof_state_t[..., 1]   # [N, num_dof] view
+   self._root_states_t    = torch.zeros(num_envs, 13, device=device)
+   self._contact_forces_t = torch.zeros(num_envs, mjm.nbody, 3, device=device)
+   ```
+
+**`step(torques)`:** write `qfrc_applied`, call `mj_step` for each env, bulk-copy numpy→torch.
+
+**`reset_dof_state(env_ids)`:** write torch views back into `d.qpos`/`d.qvel`, call `mj_forward`.
+
+**Coordinate note:** for fixed-base robots `nq == nv == num_dof` — no free-joint offset.
+Validated by asserting `mjm.nq == mjm.nv` in `setup()`.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/mujoco_cpu_backend.py` | **New** — `MuJocoCPUBackend(SimBackend)` |
+
+---
+
+#### 1c — Contract tests for `MuJocoCPUBackend`
+
+Add fixture in `tests/unit_tests/conftest.py` using the existing `pendulum.urdf`.
+Parametrise `test_backend_contract.py` over `MockBackend` and `MuJocoCPUBackend`.
+All 44 contract tests must pass before proceeding to 1d.
+
+```
+uv run python -m pytest tests/unit_tests/ -v -k "mujoco_cpu"
+```
+
+| File | Change |
+|---|---|
+| `tests/unit_tests/conftest.py` | Add `mujoco_cpu_pendulum_backend` fixture |
+
+---
+
+#### 1d — Backend injection into `FixedRobot` and `task_registry`
+
+**`gym/envs/base/fixed_robot.py`:** add `backend=None` kwarg.  If provided, use it directly;
+otherwise fall back to `IsaacGymBackend`.  Fully backward-compatible.
+
+**`gym/utils/task_registry.py`:** add `select_backend(cfg, device)` with platform/import detection:
+
+```python
+def select_backend(cfg, device: str):
+    import platform
+    if platform.system() == "Darwin":
+        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+        return MuJocoCPUBackend()
+    try:
+        import mujoco_warp
+        from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
+        return MuJocoWarpBackend()
+    except ImportError:
+        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+        return MuJocoCPUBackend()
+```
+
+Add `make_env_mujoco(name, env_cfg, device)` that constructs the backend and passes it
+as `backend=` to the task constructor.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/fixed_robot.py` | Add `backend=None` kwarg |
+| `gym/utils/task_registry.py` | Add `select_backend()` + `make_env_mujoco()` |
+
+---
+
+#### 1e — Physics sanity test (CPU backend, pendulum)
+
+Before running any RL, verify the physics are correct.  Add a script / pytest test that:
+
+1. Instantiates `MuJocoCPUBackend` with N environments at random initial conditions
+   (positions and velocities drawn uniformly from a wide range)
+2. Runs for several thousand steps with **zero torque** — the pendulum has joint damping,
+   so it must always dissipate energy
+3. Asserts two things:
+   - **Monotonic energy decrease:** at every step, mean total mechanical energy ≤ previous step
+   - **Convergence:** after sufficient steps all envs reach the same fixed energy
+     (bottom equilibrium `E = 0`, within a small tolerance) regardless of IC
+
+```
+uv run python -m pytest tests/unit_tests/test_mujoco_cpu_physics.py -v
+```
+
+This test is backend-agnostic and will be re-run against `MuJocoWarpBackend` in 1g.
+
+| File | Change |
+|---|---|
+| `tests/unit_tests/test_mujoco_cpu_physics.py` | **New** — damped pendulum convergence test |
+
+---
+
+#### 1f — RL smoke test (CPU backend, pendulum only)
+
+```
+uv run scripts/train.py --task pendulum --headless --backend mujoco_cpu
+```
+
+Expected: policy converges to upright balance within 200 iterations.
+Compare learning curve to IsaacGym baseline (same random seed).
+
+---
+
+#### 1g — Implement `MuJocoWarpBackend`
+
+**New file:** `gym/envs/base/mujoco_warp_backend.py`
+
+Uses `mjw.make_data(mjm, nworld=num_envs)` for fully vectorised GPU execution.
+
+Key differences from `MuJocoCPUBackend`:
+
+| Concern | CPU Backend | Warp Backend |
+|---|---|---|
+| World creation | N `MjData` instances | `mjw.make_data(mjm, nworld=N)` |
+| `step()` | Python loop + `mj_step` | `mjw.step(mjm, mjd)` (one kernel) |
+| State tensors | numpy copy → torch | `wp.to_torch(mjd.qpos)` (zero-copy) |
+| Device | always CPU | `cuda` or `cpu` via `wp.init()` |
+
+The `dof_state` view contract is satisfied because `dof_pos` and `dof_state` both
+reference the same underlying Warp array.  `reset_dof_state` writes into the torch
+view (which is zero-copy into Warp storage) then calls `mjw.mj_forward`.
 
 | File | Change |
 |---|---|
 | `gym/envs/base/mujoco_warp_backend.py` | **New** — `MuJocoWarpBackend(SimBackend)` |
-| `gym/utils/task_registry.py` | Add backend selection logic; `make_env()` passes backend to task constructor |
-| `gym/envs/base/sim_config.py` | Add MuJoCo solver params alongside existing `physx.*` block |
+
+---
+
+#### 1h — Contract + physics tests for `MuJocoWarpBackend`
+
+Add `mujoco_warp_pendulum_backend` fixture in `conftest.py` (skipped if `mujoco_warp`
+unavailable).  Run full contract suite and the damped-pendulum physics test from 1e.
+
+```
+uv run python -m pytest tests/unit_tests/ -v -k "mujoco_warp"
+```
+
+---
+
+#### 1i — GPU convergence + performance benchmark
+
+```
+uv run scripts/train.py --task pendulum --headless --backend mujoco_warp
+```
+
+Expected: policy converges to upright balance within 200 iterations.  Compare
+wall-clock per iteration and GPU utilisation to IsaacGym baseline.
+
+---
 
 ### MuJoCo coordinate note
 
@@ -143,30 +323,6 @@ For `FixedRobot` (fixed-base), `qpos` and joint DOFs are the same — no offset.
 
 URDF assets are loaded natively via MuJoCo's built-in URDF importer
 (`mujoco.MjModel.from_xml_file(urdf_path)`).
-
-### Tests
-
-Run the existing contract suite against the new backend by adding a fixture:
-
-```python
-# conftest.py addition
-@pytest.fixture
-def mujoco_warp_pendulum_backend(device):
-    from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
-    b = MuJocoWarpBackend()
-    b.setup_from_mjcf(PENDULUM_MJCF, num_envs=16, device=device)
-    return b
-```
-
-Then run `test_backend_contract.py` parametrised over both `MockBackend` and
-`MuJocoWarpBackend`.
-
-**Convergence test:**
-```
-uv run scripts/train.py --task pendulum --headless
-```
-Expected: policy converges to upright balance within 200 iterations.  Compare
-learning curve to IsaacGym baseline (same random seed).
 
 ---
 
