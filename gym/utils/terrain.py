@@ -32,7 +32,10 @@
 
 import numpy as np
 
-from isaacgym import terrain_utils
+try:
+    from isaacgym import terrain_utils
+except ImportError:
+    terrain_utils = None
 from gym.envs.base.legged_robot_config import LeggedRobotCfg
 
 

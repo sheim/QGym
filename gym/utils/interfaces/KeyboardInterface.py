@@ -1,4 +1,7 @@
-from isaacgym import gymapi
+try:
+    from isaacgym import gymapi
+except ImportError:
+    gymapi = None
 import torch
 
 

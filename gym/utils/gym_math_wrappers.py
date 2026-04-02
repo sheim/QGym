@@ -30,7 +30,12 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-from isaacgym.torch_utils import quat_apply, normalize, torch_rand_float
+try:
+    from isaacgym.torch_utils import quat_apply, normalize, torch_rand_float
+except ImportError:
+    quat_apply = None
+    normalize = None
+    torch_rand_float = None
 
 
 # @ torch.jit.script

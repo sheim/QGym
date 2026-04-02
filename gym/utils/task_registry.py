@@ -32,9 +32,13 @@
 
 import os
 import importlib
-from isaacgym import gymapi
-from isaacgym import gymutil
 from datetime import datetime
+
+try:
+    from isaacgym import gymapi, gymutil
+except ImportError:
+    gymapi = None
+    gymutil = None
 from typing import Tuple
 
 from learning.runners import *  # noqa: F403

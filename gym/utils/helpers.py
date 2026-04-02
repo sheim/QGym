@@ -33,11 +33,26 @@
 import os
 import numpy as np
 import random
-from isaacgym import gymapi
-from isaacgym import gymutil
-from gym import LEGGED_GYM_ROOT_DIR
+
+# IsaacGym must be imported before torch when it is available.
+try:
+    from isaacgym import gymapi, gymutil
+
+    _ISAACGYM_AVAILABLE = True
+except ImportError:
+    gymapi = None
+    gymutil = None
+    _ISAACGYM_AVAILABLE = False
+
 import torch
-from isaacgym.torch_utils import to_torch
+from gym import LEGGED_GYM_ROOT_DIR
+
+if _ISAACGYM_AVAILABLE:
+    from isaacgym.torch_utils import to_torch
+else:
+
+    def to_torch(x, dtype=torch.float, device="cpu", requires_grad=False):
+        return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
 
 
 def class_to_dict(obj, torch_device=None) -> dict:

@@ -1,17 +1,24 @@
 import os
-import torch
 import numpy as np
-from isaacgym.torch_utils import (
-    get_axis_params,
-    torch_rand_float,
-    quat_rotate_inverse,
-    to_torch,
-    quat_from_euler_xyz,
-)
-from isaacgym import gymtorch, gymapi
+
+try:
+    from isaacgym.torch_utils import (
+        get_axis_params,
+        torch_rand_float,
+        quat_rotate_inverse,
+        to_torch,
+        quat_from_euler_xyz,
+    )
+    from isaacgym import gymtorch, gymapi
+except ImportError:
+    gymtorch = None
+    gymapi = None
+
+import torch
 
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.base_task import BaseTask
+from gym.envs.base.isaac_gym_backend import IsaacGymBackend
 from gym.utils.terrain import Terrain
 from gym.utils import random_sample, quat_apply_yaw
 from gym.utils.helpers import class_to_dict
@@ -19,26 +26,15 @@ from gym.utils.helpers import class_to_dict
 
 class LeggedRobot(BaseTask):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
-        """Parses the provided config file,
-            calls create_sim() (which creates, simulation, terrain and
-            environments),
-            initilizes pytorch buffers used during training
-
-        Args:
-            cfg (Dict): Environment config file
-            sim_params (gymapi.SimParams): simulation parameters
-            physics_engine (gymapi.SimType): gymapi.SIM_PHYSX (must be PhysX)
-            device_type (string): 'cuda' or 'cpu'
-            device_id (int): 0, 1, ...
-            headless (bool): Run without rendering if True
-        """
         self.cfg = cfg
         self.sim_params = sim_params
         self.height_samples = None
         self.init_done = False
         self.device = sim_device  # todo CRIME: remove this from __init__ then
         self._parse_cfg(self.cfg)
-        super().__init__(gym, sim, self.cfg, sim_params, sim_device, headless)
+
+        backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
+        super().__init__(backend, cfg, backend.device, headless)
 
         if not self.headless:
             self._set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -78,17 +74,10 @@ class LeggedRobot(BaseTask):
             self.torques[:] = 0.0
 
     def _step_physx_sim(self):
-        self.gym.set_dof_actuation_force_tensor(
-            self.sim, gymtorch.unwrap_tensor(self.torques)
-        )
-        self.gym.simulate(self.sim)
-        if self.device == "cpu":
-            self.gym.fetch_results(self.sim, True)
-        self.gym.refresh_dof_state_tensor(self.sim)
+        self._backend.step(self.torques)
 
     def _post_physx_step(self):
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        self.gym.refresh_net_contact_force_tensor(self.sim)
+        # backend.step() already refreshed all tensors; compute derived quantities.
         self.base_quat[:] = self.root_states[:, 3:7]
         self.base_lin_vel[:] = quat_rotate_inverse(
             self.base_quat, self.root_states[:, 7:10]
@@ -457,6 +446,12 @@ class LeggedRobot(BaseTask):
             )
 
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+        # Register dof_state with the backend so reset_dof_state() uses the
+        # correct tensor (LeggedRobot acquires its own tensors due to num_projs).
+        # TODO Phase 3: remove once LeggedRobot calls backend.setup().
+        self._backend._num_dof = self.num_dof
+        self._backend.register_dof_state(self.dof_state, self.num_envs)
+
         self._rigid_body_pos = self._rigid_body_state.view(
             self.num_envs, self.num_bodies, 13
         )[..., 0:3]

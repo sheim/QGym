@@ -3,7 +3,11 @@ import subprocess
 import os
 import mss
 from gym import LEGGED_GYM_ROOT_DIR
-from isaacgym import gymapi
+
+try:
+    from isaacgym import gymapi
+except ImportError:
+    gymapi = None
 from ..helpers import select_run
 
 
