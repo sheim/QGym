@@ -94,6 +94,24 @@ class SimBackend(ABC):
         """
         raise NotImplementedError("This backend does not expose rigid_body_states")
 
+    @property
+    def penalised_contact_indices(self) -> torch.Tensor:
+        """Body indices whose contact forces contribute to the penalty reward.
+
+        Populated from cfg.asset.penalize_contacts_on during setup().
+        Raises NotImplementedError for backends that have not implemented it.
+        """
+        raise NotImplementedError
+
+    @property
+    def termination_contact_indices(self) -> torch.Tensor:
+        """Body indices whose contact forces trigger episode termination.
+
+        Populated from cfg.asset.terminate_after_contacts_on during setup().
+        Raises NotImplementedError for backends that have not implemented it.
+        """
+        raise NotImplementedError
+
     # ── Per-step ────────────────────────────────────────────────────────────
 
     @abstractmethod
@@ -137,7 +155,12 @@ class SimBackend(ABC):
     def device(self) -> str:
         """The PyTorch device string ('cpu', 'cuda:0', …)."""
 
-    def render(self) -> None:
+    # IsaacGym shims — non-IsaacGym backends leave these as None.
+    # BaseTask.gym / BaseTask.sim forward here for LeggedRobot compatibility.
+    gym = None
+    sim = None
+
+    def render(self, sync_frame_time: bool = True) -> None:
         pass
 
     def close(self) -> None:

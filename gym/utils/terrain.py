@@ -36,11 +36,14 @@ try:
     from isaacgym import terrain_utils
 except ImportError:
     terrain_utils = None
-from gym.envs.base.legged_robot_config import LeggedRobotCfg
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gym.envs.base.legged_robot_config import LeggedRobotCfg
 
 
 class Terrain:
-    def __init__(self, cfg: LeggedRobotCfg.terrain, num_robots) -> None:
+    def __init__(self, cfg: "LeggedRobotCfg.terrain", num_robots) -> None:
         self.cfg = cfg
         self.num_robots = num_robots
         self.type = cfg.mesh_type

@@ -33,9 +33,13 @@
 try:
     from isaacgym.torch_utils import quat_apply, normalize, torch_rand_float
 except ImportError:
+    import torch as _torch
+
     quat_apply = None
     normalize = None
-    torch_rand_float = None
+
+    def torch_rand_float(lower, upper, shape, device):
+        return (upper - lower) * _torch.rand(*shape, device=device) + lower
 
 
 # @ torch.jit.script

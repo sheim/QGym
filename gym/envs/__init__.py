@@ -1,7 +1,5 @@
 import importlib
 
-from gym.utils.task_registry import task_registry
-
 # * To add a new env:
 # * 1. add the base env and env class name and location to the class dict
 # * 2. add the config name and location to the config dict
@@ -73,33 +71,52 @@ task_dict = {
         "HumanoidRunningCfg",
         "HumanoidRunningRunnerCfg",
     ],
+    "pendulum": ["Pendulum", "PendulumCfg", "PendulumRunnerCfg"],
     "sac_pendulum": ["Pendulum", "PendulumSACCfg", "PendulumSACRunnerCfg"],
     "lander": ["Lander", "LanderCfg", "LanderRunnerCfg"],
     "psd_pendulum": ["Pendulum", "PendulumPSDCfg", "PendulumPSDRunnerCfg"],
 }
 
 try:
+    from gym.utils.task_registry import task_registry
+
+    # Load each class/config individually so a single missing isaacgym dep
+    # in one env (e.g. mini_cheetah_ref) does not block registration of
+    # isaacgym-free envs (e.g. pendulum, cartpole).
+    _loaded = {}
     for class_name, class_location in class_dict.items():
-        locals()[class_name] = getattr(
-            importlib.import_module(class_location, __name__), class_name
-        )
+        try:
+            _loaded[class_name] = getattr(
+                importlib.import_module(class_location, __name__), class_name
+            )
+            locals()[class_name] = _loaded[class_name]
+        except ImportError:
+            pass
     for config_name, config_location in config_dict.items():
-        locals()[config_name] = getattr(
-            importlib.import_module(config_location, __name__), config_name
-        )
+        try:
+            _loaded[config_name] = getattr(
+                importlib.import_module(config_location, __name__), config_name
+            )
+            locals()[config_name] = _loaded[config_name]
+        except ImportError:
+            pass
     for runner_config_name, runner_config_location in runner_config_dict.items():
-        locals()[runner_config_name] = getattr(
-            importlib.import_module(runner_config_location, __name__),
-            runner_config_name,
-        )
+        try:
+            _loaded[runner_config_name] = getattr(
+                importlib.import_module(runner_config_location, __name__),
+                runner_config_name,
+            )
+            locals()[runner_config_name] = _loaded[runner_config_name]
+        except ImportError:
+            pass
     for task_name, class_list in task_dict.items():
-        task_registry.register(
-            task_name,
-            locals()[class_list[0]],
-            locals()[class_list[1]](),
-            locals()[class_list[2]](),
-        )
+        if all(name in _loaded for name in class_list):
+            task_registry.register(
+                task_name,
+                _loaded[class_list[0]],
+                _loaded[class_list[1]](),
+                _loaded[class_list[2]](),
+            )
 except ImportError:
-    # IsaacGym not available (e.g. Mac, CI without GPU) or imported after torch.
-    # The dictionaries above are still accessible; task registration is skipped.
+    # gym.utils or task_registry itself unavailable; dictionaries still accessible.
     pass

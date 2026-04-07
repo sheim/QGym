@@ -32,6 +32,7 @@
 
 import os
 import importlib
+import platform
 from datetime import datetime
 
 try:
@@ -51,12 +52,6 @@ from .helpers import (
     get_load_path,
     set_seed,
 )
-from gym.envs.base.legged_robot_config import (
-    LeggedRobotCfg,
-    LeggedRobotRunnerCfg,
-)
-from gym.envs.base.base_config import BaseConfig
-from gym.envs.base.sim_config import SimCfg
 
 
 class TaskRegistry:
@@ -64,16 +59,13 @@ class TaskRegistry:
         self.task_classes = {}
         self.env_cfgs = {}
         self.train_cfgs = {}
-        self.sim_cfg = class_to_dict(SimCfg)
+        # sim_cfg is populated lazily by update_sim_cfg() (IsaacGym path only).
+        # Initialised as an empty dict so set_control_and_sim_dt can write to it
+        # without triggering the gym.envs circular import at module load time.
+        self.sim_cfg = {}
         self.sim = {}
 
-    def register(
-        self,
-        name: str,
-        task_class,
-        env_cfg: BaseConfig,
-        train_cfg: LeggedRobotRunnerCfg,
-    ):
+    def register(self, name: str, task_class, env_cfg, train_cfg):
         self.task_classes[name] = task_class
         self.env_cfgs[name] = env_cfg
         self.train_cfgs[name] = train_cfg
@@ -81,7 +73,7 @@ class TaskRegistry:
     def get_task_class(self, name: str):
         return self.task_classes[name]
 
-    def get_cfgs(self, name) -> Tuple[LeggedRobotCfg, LeggedRobotRunnerCfg]:
+    def get_cfgs(self, name) -> Tuple:
         env_cfg = self.env_cfgs[name]
         train_cfg = self.train_cfgs[name]
         return env_cfg, train_cfg
@@ -239,6 +231,31 @@ class TaskRegistry:
         )
         return env
 
+    def make_env_mujoco(self, name: str, env_cfg, device: str = "cpu"):
+        """Instantiate a task using a MuJoCo backend (no IsaacGym required).
+
+        Selects MuJocoWarpBackend on Linux (if mujoco_warp available) or
+        MuJocoCPUBackend on Mac / fallback.  Passes the constructed backend
+        as the ``backend`` kwarg to the task constructor so FixedRobot skips
+        its default IsaacGymBackend construction.
+        """
+        if name in self.task_classes:
+            task_class = self.get_task_class(name)
+        else:
+            raise ValueError(f"Task with name: {name} was not registered")
+        set_seed(env_cfg.seed)
+        backend = select_backend(env_cfg, device)
+        env = task_class(
+            gym=None,
+            sim=None,
+            cfg=env_cfg,
+            sim_params=None,
+            sim_device=device,
+            headless=True,
+            backend=backend,
+        )
+        return env
+
     def make_alg_runner(self, env, train_cfg):
         train_cfg_dict = class_to_dict(train_cfg)
         runner_class = eval(train_cfg.runner_class_name)
@@ -253,6 +270,34 @@ class TaskRegistry:
             print(f"Loading model from: {resume_path}")
             runner.load(resume_path)
         return runner
+
+
+def select_backend(cfg, device: str):
+    """Choose a physics backend based on platform and available packages.
+
+    Priority: Mac → MuJocoCPUBackend; mujoco_warp available → MuJocoWarpBackend;
+    otherwise → MuJocoCPUBackend.
+    """
+    if platform.system() == "Darwin":
+        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+
+        return MuJocoCPUBackend()
+    wants_gpu = device.startswith("cuda")
+    try:
+        import mujoco_warp  # noqa: F401
+        from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
+
+        return MuJocoWarpBackend()
+    except ImportError:
+        if wants_gpu:
+            raise RuntimeError(
+                f"Device '{device}' requested but mujoco_warp is not installed in this "
+                "Python environment.  Install it (requires Python ≥ 3.10) or use "
+                "--device cpu for the CPU backend."
+            )
+        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+
+        return MuJocoCPUBackend()
 
 
 # make global task registry

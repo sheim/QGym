@@ -3,8 +3,17 @@ import numpy as np
 try:
     from isaacgym.torch_utils import get_axis_params, to_torch
 except ImportError:
-    get_axis_params = None
-    to_torch = None
+    import torch as _torch
+
+    def get_axis_params(value, axis_idx, x_val=0.0, dtype=float, n_dims=3):
+        """Minimal fallback: returns a list with value at axis_idx, x_val elsewhere."""
+        params = [x_val] * n_dims
+        params[axis_idx] = value
+        return params
+
+    def to_torch(x, dtype=_torch.float, device="cpu", requires_grad=False):
+        return _torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
+
 
 import torch
 
@@ -14,16 +23,16 @@ from gym.utils import random_sample
 
 
 class FixedRobot(BaseTask):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
+    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
         self.cfg = cfg
         self.sim_params = sim_params
         self.init_done = False
-        # Temporary device assignment so _parse_cfg can run; corrected below.
-        self.device = sim_device
-        self._parse_cfg(self.cfg)
 
-        backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
+        if backend is None:
+            backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
         super().__init__(backend, cfg, backend.device, headless)
+        # self.device is now correctly set by TaskSkeleton.__init__ via backend.device
+        self._parse_cfg(self.cfg)
 
         if not self.headless:
             self._backend.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -122,7 +131,7 @@ class FixedRobot(BaseTask):
             self.torque_limits = torch.zeros(
                 self.num_actuators, dtype=torch.float, device=self.device
             )
-            for i in range(len(props)):
+            for i in range(self.num_dof):
                 self.dof_pos_limits[i, 0] = props["lower"][i].item()
                 self.dof_pos_limits[i, 1] = props["upper"][i].item()
                 self.dof_vel_limits[i] = props["velocity"][i].item()
