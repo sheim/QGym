@@ -18,6 +18,8 @@ only removed once the MuJoCo Warp backend is validated end-to-end.
 ## Style Guidelines
 
 We use uv for environment management and ruff for style and linting.
+Do not `try ... catch` exceptions, things should just fail instead.
+This is dev code, we want the code to fail fast and obviously.
 
 ## Architecture
 

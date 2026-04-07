@@ -278,26 +278,17 @@ def select_backend(cfg, device: str):
     Priority: Mac → MuJocoCPUBackend; mujoco_warp available → MuJocoWarpBackend;
     otherwise → MuJocoCPUBackend.
     """
+    if device.startswith("cuda"):
+        from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
+
+        return MuJocoWarpBackend()
     if platform.system() == "Darwin":
         from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
 
         return MuJocoCPUBackend()
-    wants_gpu = device.startswith("cuda")
-    try:
-        import mujoco_warp  # noqa: F401
-        from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
+    from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
 
-        return MuJocoWarpBackend()
-    except ImportError:
-        if wants_gpu:
-            raise RuntimeError(
-                f"Device '{device}' requested but mujoco_warp is not installed in this "
-                "Python environment.  Install it (requires Python ≥ 3.10) or use "
-                "--device cpu for the CPU backend."
-            )
-        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
-
-        return MuJocoCPUBackend()
+    return MuJocoCPUBackend()
 
 
 # make global task registry
