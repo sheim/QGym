@@ -4,7 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "mujoco>=3.6",
-    "mujoco-warp>=3.6",
     "torch",
     "tensordict",
     "numpy",
@@ -14,11 +13,15 @@ dependencies = [
     "pandas",
 ]
 
+[project.optional-dependencies]
+gpu = ["mujoco-warp>=3.6"]
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.5.1",
     "pytest",
     "ruff>=0.15.9",
+    "mujoco-warp>=3.6",
 ]
 
 [build-system]
