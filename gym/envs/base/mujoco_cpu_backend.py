@@ -27,14 +27,6 @@ def _xyzw_to_mj_quat(q):
     return q[..., [3, 0, 1, 2]]
 
 
-def _set_balanceinertia(spec):
-    """Set balanceinertia on MjSpec, handling API differences across versions."""
-    if "compiler" in dir(spec):
-        spec.compiler.balanceinertia = True  # mujoco >= 3.6
-    else:
-        spec.balanceinertia = True  # mujoco < 3.6
-
-
 class MuJocoCPUBackend(SimBackend):
     """SimBackend backed by plain mujoco.mj_step.
 
@@ -142,9 +134,8 @@ class MuJocoCPUBackend(SimBackend):
 
         # 1. Load URDF via MuJoCo's spec API (allows compiler flags + ground plane)
         asset_path = cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
-        spec = mujoco.MjSpec()
-        spec.from_file(asset_path)
-        _set_balanceinertia(spec)
+        spec = mujoco.MjSpec.from_file(asset_path)
+        spec.compiler.balanceinertia = True
 
         # Add free joint for floating-base robots
         if not getattr(cfg.asset, "fix_base_link", True):

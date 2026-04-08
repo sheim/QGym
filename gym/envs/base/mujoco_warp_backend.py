@@ -1,8 +1,6 @@
 """MuJoCo Warp backend — fully vectorised GPU/CPU execution via mujoco_warp.
 
-Requires Python >= 3.10 and mujoco_warp >= 3.6.0 (installed separately from
-the IsaacGym Python-3.8 environment).  This file is imported lazily inside
-select_backend() so the project loads cleanly on Python 3.8.
+Requires mujoco >= 3.6 and mujoco_warp >= 3.6.
 
 Step pipeline (mirrors mj_step):
     qfrc_applied[:, offset:] = torques
@@ -22,7 +20,6 @@ import torch
 
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.sim_backend import SimBackend
-from gym.envs.base.mujoco_cpu_backend import _set_balanceinertia
 
 
 class MuJocoWarpBackend(SimBackend):
@@ -159,9 +156,8 @@ class MuJocoWarpBackend(SimBackend):
 
         # 1. Load URDF via MuJoCo's spec API (allows compiler flags + ground plane)
         asset_path = cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
-        spec = mujoco.MjSpec()
-        spec.from_file(asset_path)
-        _set_balanceinertia(spec)
+        spec = mujoco.MjSpec.from_file(asset_path)
+        spec.compiler.balanceinertia = True
 
         # Add free joint for floating-base robots
         if not getattr(cfg.asset, "fix_base_link", True):

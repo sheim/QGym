@@ -586,17 +586,31 @@ Once all checks pass:
 
 ---
 
+## Python and environment setup
+
+The project targets **Python >= 3.11** with **mujoco >= 3.6** and
+**mujoco-warp >= 3.6**.  The default `uv` environment is the primary
+development environment for all MuJoCo backends.
+
+```bash
+uv sync                           # creates .venv with Python 3.11+
+uv run python -m pytest tests/    # run tests
+uv run scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
+uv run scripts/train_mujoco.py --task pendulum --device cuda:0 --num_envs 4096
+```
+
+**IsaacGym legacy:** IsaacGym requires Python 3.8 and has its own venv.
+The IsaacGym backend continues to work when run from that venv (`scripts/train.py`).
+It will be removed in Phase 4.
+
 ## Notes and known gotchas
 
 - **isaacgym import order:** IsaacGym must be imported before PyTorch.  All
   files that import isaacgym use `try/except ImportError` with the isaacgym
   import placed before `import torch`.
-- **`uv run` vs `.venv/bin/python`:** The project venv requires ninja to
-  JIT-compile the gymtorch extension.  Always use `uv run` for both training
-  and tests.
-- **MuJoCo quaternion convention:** scalar-last `[qx, qy, qz, qw]`.  IsaacGym
-  also uses scalar-last.  Verify this on a per-function basis before assuming
-  they are identical.
+- **MuJoCo quaternion convention:** scalar-first `[qw, qx, qy, qz]` internally,
+  converted to scalar-last `[qx, qy, qz, qw]` at the backend boundary.
+  The task layer always sees scalar-last (matching IsaacGym convention).
 - **`dof_state` view contract:** `dof_pos` and `dof_vel` must be views into
   `dof_state`, not copies.  Writing into `dof_pos[env_ids]` must be reflected
   in `dof_state` automatically.  Verified by `test_dof_state_view_consistent_*`.
