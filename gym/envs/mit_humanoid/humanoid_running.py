@@ -1,6 +1,9 @@
 import torch
 
-from isaacgym.torch_utils import quat_rotate_inverse
+try:
+    from isaacgym.torch_utils import quat_rotate_inverse
+except ImportError:
+    from gym.utils.torch_quat import quat_rotate_inverse
 from gym.envs import LeggedRobot
 
 
@@ -14,26 +17,12 @@ class HumanoidRunning(LeggedRobot):
     def _init_buffers(self):
         super()._init_buffers()
 
-        # * get the body_name to body_index dict
-        body_dict = self.gym.get_actor_rigid_body_dict(
-            self.envs[0], self.actor_handles[0]
-        )
-        # * extract a list of body_names where the index is the id number
-        body_names = [
-            body_tuple[0]
-            for body_tuple in sorted(
-                body_dict.items(), key=lambda body_tuple: body_tuple[1]
-            )
-        ]
-        # * construct a list of id numbers corresponding to end_effectors
+        # Build end-effector index list from backend body names
+        body_names = self._backend.body_names
         self.end_effector_ids = []
         for end_effector_name in self.cfg.asset.end_effector_names:
             self.end_effector_ids.extend(
-                [
-                    body_names.index(body_name)
-                    for body_name in body_names
-                    if end_effector_name in body_name
-                ]
+                [i for i, name in enumerate(body_names) if end_effector_name in name]
             )
 
         # * end_effector_pos is world-frame and converted to env_origin

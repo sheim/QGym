@@ -110,7 +110,6 @@ class LeggedRobot(BaseTask):
         self.dof_pos_obs = self.dof_pos - self.default_dof_pos
 
         self.dof_pos_history = self.dof_pos_history.roll(self.num_actuators)
-        # self.dof_pos_history[:, : self.num_actuators] = self.dof_pos_obs
         self.dof_pos_history[:, : self.num_actuators] = self.dof_pos_target
 
         env_ids = (
@@ -131,7 +130,6 @@ class LeggedRobot(BaseTask):
         self._resample_commands(env_ids)
         # * reset buffers
         self.dof_pos_obs[env_ids] = self.dof_pos[env_ids] - self.default_dof_pos
-        # self.dof_pos_history[env_ids] = self.dof_pos_obs[env_ids].tile(3)
         self.dof_pos_target[env_ids] = self.default_dof_pos
         self.dof_pos_history[env_ids] = self.dof_pos_target[env_ids].tile(3)
         self.episode_length_buf[env_ids] = 0
@@ -291,13 +289,6 @@ class LeggedRobot(BaseTask):
         return props
 
     def _process_rigid_body_props(self, props, env_id):
-        # if env_id==0:
-        #     sum = 0
-        #     for i, p in enumerate(props):
-        #         sum += p.mass
-        #         print(f"Mass of body {i}: {p.mass} (before randomization)")
-        #     print(f"Total mass {sum} (before randomization)")
-        # randomize base mass
         if self.cfg.domain_rand.randomize_base_mass:
             rng = self.cfg.domain_rand.added_mass_range
             props[0].mass += np.random.uniform(rng[0], rng[1])
@@ -553,29 +544,6 @@ class LeggedRobot(BaseTask):
         self.base_height = torch.zeros(
             self.num_envs, 1, dtype=torch.float, device=self.device
         )
-
-        # # * get the body_name to body_index dict
-        # body_dict = self.gym.get_actor_rigid_body_dict(
-        #     self.envs[0], self.actor_handles[0]
-        # )
-        # # * extract a list of body_names where the index is the id number
-        # body_names = [
-        #     body_tuple[0]
-        #     for body_tuple in sorted(
-        #         body_dict.items(), key=lambda body_tuple: body_tuple[1]
-        #     )
-        # ]
-        # # * construct a list of id numbers corresponding to end_effectors
-        # self.end_effector_ids = []
-        # for end_effector_name in self.cfg.asset.foot_collisionbox_names:
-        #     self.end_effector_ids.extend(
-        #         [
-        #             body_names.index(body_name)
-        #             for body_name in body_names
-        #             if end_effector_name in body_name
-        #         ]
-        #     )
-        # # ----------------------------------------
 
         if self.cfg.terrain.measure_heights:
             self.height_points = self._init_height_points()

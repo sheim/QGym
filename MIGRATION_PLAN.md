@@ -20,6 +20,7 @@ only removed once the MuJoCo Warp backend is validated end-to-end.
 We use uv for environment management and ruff for style and linting.
 Do not `try ... catch` exceptions, things should just fail instead.
 This is dev code, we want the code to fail fast and obviously.
+Always run ruff on the code at the end of a session to clean up.
 
 ## Architecture
 
@@ -361,7 +362,7 @@ body-index computation moves into the backend, matching the FixedRobot pattern.
 
 ### Sub-tasks
 
-#### 3a — Pure-torch quaternion utilities
+#### 3a — Pure-torch quaternion utilities  ✅ COMPLETE
 
 `legged_robot.py` imports `quat_rotate_inverse`, `quat_from_euler_xyz`,
 `to_torch`, `get_axis_params` from `isaacgym.torch_utils` with no fallback.
@@ -378,7 +379,7 @@ import fallback blocks in `legged_robot.py`, `gym_math_wrappers.py`,
 
 ---
 
-#### 3b — `backend=` kwarg for LeggedRobot
+#### 3b — `backend=` kwarg for LeggedRobot  ✅ COMPLETE
 
 Same pattern as FixedRobot.  Also fix the `_parse_cfg` ordering bug
 (`_parse_cfg` runs before `super().__init__`, causing device mismatch).
@@ -395,7 +396,7 @@ Same pattern as FixedRobot.  Also fix the `_parse_cfg` ordering bug
 
 ---
 
-#### 3c — Floating-base coordinate handling in MuJoCo backends
+#### 3c — Floating-base coordinate handling in MuJoCo backends ✅
 
 Both backends currently assume `nq == nv` (fixed-base).  For floating-base:
 `nq = 7 + num_joints`, `nv = 6 + num_joints`.
@@ -417,7 +418,7 @@ Enable contacts (remove `geom_contype[:] = 0` for floating-base).
 
 ---
 
-#### 3d — Ground plane in MuJoCo backends
+#### 3d — Ground plane in MuJoCo backends ✅
 
 Use `mujoco.MjSpec` to add a plane geom after loading the URDF:
 ```python
@@ -438,7 +439,7 @@ Only add when `cfg` has terrain config and `mesh_type == "plane"`.
 
 ---
 
-#### 3e — Rigid body states in MuJoCo backends
+#### 3e — Rigid body states in MuJoCo backends ✅
 
 MuJoCo sources: `d.xpos [nbody, 3]`, `d.xquat [nbody, 4]` (scalar-first),
 `d.cvel [nbody, 6]` (angular-first then linear).
@@ -458,7 +459,7 @@ rbs[..., 10:13] = cvel[..., 0:3]          # angular velocity
 
 ---
 
-#### 3f — Migrate `_initialize_sim()` and `_create_envs()`
+#### 3f — Migrate `_initialize_sim()` and `_create_envs()` ✅
 
 Replace the 137-line `_create_envs()` (47 gym calls) with `backend.setup()`.
 Move terrain/env creation logic into `IsaacGymBackend.setup()` for backward
@@ -472,7 +473,7 @@ using `backend.body_names` / `backend.find_body_index()`.
 
 ---
 
-#### 3g — Migrate `_init_buffers()`
+#### 3g — Migrate `_init_buffers()` ✅
 
 Replace gym tensor acquisition with backend properties.  Remove
 `register_dof_state()` hack.
@@ -484,7 +485,7 @@ Replace gym tensor acquisition with backend properties.  Remove
 
 ---
 
-#### 3h — Migrate `_reset_system()` and `_push_robots()`
+#### 3h — Migrate `_reset_system()` and `_push_robots()` ✅
 
 Replace `gym.set_dof_state_tensor_indexed` → `backend.reset_dof_state()`.
 Replace `gym.set_actor_root_state_tensor_indexed` → `backend.reset_root_state()`.
@@ -496,20 +497,16 @@ Replace `gym.set_actor_root_state_tensor` → `backend.set_all_root_states()`.
 
 ---
 
-#### 3i — Remove gym/sim shims, gate projectiles
+#### 3i — Remove gym/sim shims, gate projectiles ✅
 
-Delete `gym`/`sim` properties from `base_task.py`.  Remove
-`self.gym.prepare_sim(self.sim)`.  Gate `init_projectiles()` / `shoot()`
-behind `isinstance(self._backend, IsaacGymBackend)`.
-
-| File | Change |
-|---|---|
-| `gym/envs/base/base_task.py` | Remove `gym`/`sim` shim properties |
-| `gym/envs/base/legged_robot.py` | Remove `prepare_sim`, gate projectiles |
+`prepare_sim` gated behind `isinstance(IsaacGymBackend)`.  Projectiles
+only called from `_create_envs()` which is IsaacGym-only.  `gym`/`sim`
+shim properties in `base_task.py` kept until Phase 4 (IsaacGym removal).
+Commented-out dead code cleaned up throughout `legged_robot.py`.
 
 ---
 
-#### 3j — Legged robot contract tests
+#### 3j — Legged robot contract tests ✅
 
 New `tests/unit_tests/test_legged_backend_contract.py` using mini_cheetah URDF.
 Tests: `num_dof == 12`, `root_states` shape + quaternion convention,
@@ -523,7 +520,7 @@ cross-backend trajectory comparison.
 
 ---
 
-#### 3k — End-to-end mini_cheetah smoke test
+#### 3k — End-to-end mini_cheetah smoke test ✅
 
 ```
 uv run scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64 --max_iterations 50
@@ -534,7 +531,7 @@ Expected: reward improves, no crashes, no NaNs.
 
 ---
 
-#### 3l — HumanoidRunning compatibility
+#### 3l — HumanoidRunning compatibility ✅
 
 Replace `self.gym.get_actor_rigid_body_dict()` with
 `self._backend.body_names` lookup.
