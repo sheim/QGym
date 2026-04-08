@@ -43,4 +43,5 @@ class BaseTask(TaskSkeleton):
     # ── Rendering ────────────────────────────────────────────────────────────
 
     def _render(self, sync_frame_time: bool = True) -> None:
-        self._backend.render(sync_frame_time)
+        if not self.headless:
+            self._backend.render(sync_frame_time)

@@ -216,9 +216,7 @@ class LeggedRobot(BaseTask):
 
     def _set_camera(self, position, lookat):
         """Set camera position and direction"""
-        cam_pos = gymapi.Vec3(position[0], position[1], position[2])
-        cam_target = gymapi.Vec3(lookat[0], lookat[1], lookat[2])
-        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
+        self._backend.set_camera(position, lookat)
 
     def _process_rigid_shape_props(self, props, env_id):
         """Callback allowing to store/change/randomize the rigid shape

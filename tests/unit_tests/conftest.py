@@ -17,6 +17,14 @@ from gym import LEGGED_GYM_ROOT_DIR
 PENDULUM_URDF = os.path.join(
     LEGGED_GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
 )
+MINI_CHEETAH_URDF = os.path.join(
+    LEGGED_GYM_ROOT_DIR,
+    "resources",
+    "robots",
+    "mini_cheetah",
+    "urdf",
+    "mini_cheetah_simple.urdf",
+)
 
 
 def _make_pendulum_cfg(sim_dt: float = 0.005) -> types.SimpleNamespace:
@@ -125,4 +133,53 @@ def mujoco_warp_backend_16(device):
     b = MuJocoWarpBackend()
     warp_device = device if torch.cuda.is_available() else "cpu"
     b.setup(_make_pendulum_cfg(), num_envs=16, device=warp_device, task=None)
+    return b
+
+
+# ── Floating-base (mini_cheetah) fixtures ───────────────────────────────────
+
+
+def _make_mini_cheetah_cfg(sim_dt: float = 0.002) -> types.SimpleNamespace:
+    """Minimal cfg for mini_cheetah (floating-base, 12 DOFs)."""
+    asset = types.SimpleNamespace(
+        file=MINI_CHEETAH_URDF,
+        joint_damping=0.01,
+        rotor_inertia=0.0,
+        disable_gravity=False,
+        fix_base_link=False,
+        penalize_contacts_on=["thigh"],
+        terminate_after_contacts_on=["base"],
+        foot_name="foot",
+    )
+    terrain = types.SimpleNamespace(
+        mesh_type="plane",
+        static_friction=1.0,
+        dynamic_friction=1.0,
+    )
+    sim = types.SimpleNamespace(gravity=[0.0, 0.0, -9.81])
+    return types.SimpleNamespace(asset=asset, sim=sim, terrain=terrain, sim_dt=sim_dt)
+
+
+@pytest.fixture
+def legged_cpu_backend():
+    """4-env mini_cheetah on MuJocoCPUBackend (floating-base)."""
+    pytest.importorskip("mujoco")
+    from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+
+    b = MuJocoCPUBackend()
+    b.setup(_make_mini_cheetah_cfg(), num_envs=4, device="cpu", task=None)
+    return b
+
+
+@pytest.fixture
+def legged_warp_backend():
+    """4-env mini_cheetah on MuJocoWarpBackend (floating-base)."""
+    pytest.importorskip("mujoco_warp")
+    from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
+
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA required for MuJocoWarpBackend")
+
+    b = MuJocoWarpBackend()
+    b.setup(_make_mini_cheetah_cfg(), num_envs=4, device="cuda:0", task=None)
     return b

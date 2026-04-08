@@ -231,13 +231,14 @@ class TaskRegistry:
         )
         return env
 
-    def make_env_mujoco(self, name: str, env_cfg, device: str = "cpu"):
+    def make_env_mujoco(
+        self, name: str, env_cfg, device: str = "cpu", headless: bool = True
+    ):
         """Instantiate a task using a MuJoCo backend (no IsaacGym required).
 
-        Selects MuJocoWarpBackend on Linux (if mujoco_warp available) or
-        MuJocoCPUBackend on Mac / fallback.  Passes the constructed backend
-        as the ``backend`` kwarg to the task constructor so FixedRobot skips
-        its default IsaacGymBackend construction.
+        Selects MuJocoWarpBackend or MuJocoCPUBackend based on device.
+        Passes the constructed backend as the ``backend`` kwarg to the task
+        constructor so FixedRobot/LeggedRobot skips IsaacGymBackend.
         """
         if name in self.task_classes:
             task_class = self.get_task_class(name)
@@ -251,7 +252,7 @@ class TaskRegistry:
             cfg=env_cfg,
             sim_params=None,
             sim_device=device,
-            headless=True,
+            headless=headless,
             backend=backend,
         )
         return env

@@ -30,7 +30,7 @@ def get_mujoco_args():
         "--max_iterations", type=int, default=None, help="Override max_iterations"
     )
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
-    parser.add_argument("--headless", action="store_true", default=True)
+    parser.add_argument("--headless", action="store_true", default=False)
     parser.add_argument("--disable_wandb", action="store_true", default=True)
     return parser.parse_args()
 
@@ -66,7 +66,9 @@ def setup():
     set_seed(env_cfg.seed)
 
     # Build the environment using the MuJoCo backend
-    env = task_registry.make_env_mujoco(args.task, env_cfg, device=args.device)
+    env = task_registry.make_env_mujoco(
+        args.task, env_cfg, device=args.device, headless=args.headless
+    )
 
     from gym.utils import randomize_episode_counters
 

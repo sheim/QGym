@@ -163,5 +163,8 @@ class SimBackend(ABC):
     def render(self, sync_frame_time: bool = True) -> None:
         pass
 
+    def set_camera(self, position, lookat) -> None:
+        pass
+
     def close(self) -> None:
         pass
