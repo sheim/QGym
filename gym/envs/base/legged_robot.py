@@ -40,7 +40,8 @@ class LeggedRobot(BaseTask):
 
         if backend is None:
             backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
-        super().__init__(backend, cfg, backend.device, headless)
+        # Use sim_device directly — backend.device isn't set until setup() runs.
+        super().__init__(backend, cfg, sim_device, headless)
         self._parse_cfg(self.cfg)
 
         if not self.headless:

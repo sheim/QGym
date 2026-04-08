@@ -10,7 +10,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 12
-        episode_length_s = 10
+        episode_length_s = 3
 
     class terrain(LeggedRobotCfg.terrain):
         mesh_type = "plane"

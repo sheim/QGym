@@ -21,8 +21,8 @@ class FixedRobot(BaseTask):
 
         if backend is None:
             backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
-        super().__init__(backend, cfg, backend.device, headless)
-        # self.device is now correctly set by TaskSkeleton.__init__ via backend.device
+        # Use sim_device directly — backend.device isn't set until setup() runs.
+        super().__init__(backend, cfg, sim_device, headless)
         self._parse_cfg(self.cfg)
 
         if not self.headless:
