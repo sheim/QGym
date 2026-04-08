@@ -10,8 +10,10 @@ MINI_CHEETAH_WEIGHT = 8.292 * 9.81  # Weight of mini cheetah in Newtons
 
 
 class MiniCheetahOsc(MiniCheetah):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
-        super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
+        super().__init__(
+            gym, sim, cfg, sim_params, sim_device, headless, backend=backend
+        )
         self.process_noise_std = self.cfg.osc.process_noise_std
 
     def _init_buffers(self):

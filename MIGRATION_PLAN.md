@@ -39,14 +39,12 @@ TaskSkeleton  (unchanged: get_states / set_states / scaling / episode tracking)
 `task_registry.py` selects the backend based on config / platform:
 
 ```python
-def select_backend(device: str) -> SimBackend:
+def select_backend(cfg, device: str) -> SimBackend:
+    if device.startswith("cuda"):
+        return MuJocoWarpBackend()   # fails if mujoco_warp not installed
     if platform.system() == "Darwin":
         return MuJocoCPUBackend()
-    try:
-        import mujoco_warp
-        return MuJocoWarpBackend()
-    except ImportError:
-        return MuJocoCPUBackend()
+    return MuJocoCPUBackend()
 ```
 
 ### SimBackend contract (summary)
@@ -328,107 +326,238 @@ URDF assets are loaded natively via MuJoCo's built-in URDF importer
 
 ---
 
-## Phase 2 — Mac / CPU fallback (`MuJocoCPUBackend`)
+## Phase 2 — Mac / CPU fallback  ✅ COMPLETE
 
-**Goal:** Plain `mujoco.mj_step` loop with no Warp dependency.  Runs on Mac
-(Apple Silicon) and any Linux CPU.  Slower (serial across envs) but
-functionally identical.
-
-### Key design decisions
-
-- One `mujoco.MjModel` + `mujoco.MjData` per environment, stored in lists
-- `step()` loops over envs in Python, calls `mujoco.mj_step(m, d)`
-- After each step, numpy arrays are explicitly copied into PyTorch tensors
-  (`self.dof_pos[:] = torch.from_numpy(np.stack([d.qpos for d in datas]))`)
-- `dof_pos` / `dof_vel` are regular CPU PyTorch tensors (no zero-copy)
-- `reset_dof_state` writes directly into `MjData.qpos` / `MjData.qvel`
-
-### Files to create / modify
-
-| File | Change |
-|---|---|
-| `gym/envs/base/mujoco_cpu_backend.py` | **New** — `MuJocoCPUBackend(SimBackend)` |
-| `gym/utils/task_registry.py` | `select_backend()` returns `MuJocoCPUBackend` on Mac or when Warp unavailable |
-
-### Tests
-
-Add `MuJocoCPUBackend` fixture to `conftest.py` and run the full contract suite.
-This suite is the primary gate for Mac CI since it requires no GPU.
-
-**Mac smoke test (to be added to CI):**
-```
-python -m pytest tests/unit_tests/ -v      # no uv, no GPU
-python -m pytest tests/unit_tests/ -k "cpu" -v
-```
-Expected: all contract tests pass on CPU.
+Implemented during Phase 1.  `MuJocoCPUBackend` exists and passes all contract
+tests.  `select_backend()` routes `--device cpu` to it; Mac always gets CPU backend.
 
 ---
 
 ## Phase 3 — LeggedRobot migration
 
 **Goal:** `LeggedRobot` fully migrated to `SimBackend`.  Remove `gym`/`sim`
-shim properties from `BaseTask`.  Mini-cheetah and humanoid train with
-MuJoCo Warp backend.
+shim properties from `BaseTask`.  Mini-cheetah trains with MuJoCo backends
+on CPU and GPU.
 
-### Additional complexity vs FixedRobot
+**MVP scope:** flat ground plane, no heightfield/trimesh terrain, no projectiles.
 
-**Generalised coordinate indexing:**
-MuJoCo `qpos` for a free-floating robot is `[px, py, pz, qx, qy, qz, qw, j0, j1, ...]`
-(`nq = 7 + num_joints`), `qvel` is `[vx, vy, vz, wx, wy, wz, dj0, dj1, ...]`
-(`nv = 6 + num_joints`).  The backend assembles `root_states` from these slices:
+### Key design decisions
 
-```python
-# root_states: [num_envs, 13]  pos(3) quat(4) linvel(3) angvel(3)
-root_states[:, :3]  = qpos[:, :3]   # position
-root_states[:, 3:7] = qpos[:, 3:7]  # quaternion (MuJoCo: scalar-last [qx,qy,qz,qw])
-root_states[:, 7:10] = qvel[:, :3]  # linear velocity
-root_states[:, 10:13] = qvel[:, 3:6] # angular velocity
-dof_pos = qpos[:, 7:]
-dof_vel = qvel[:, 6:]
-```
+**Quaternion convention:** MuJoCo uses scalar-first `[w,x,y,z]`.  IsaacGym and
+the entire task layer use scalar-last `[x,y,z,w]`.  Conversion happens **inside
+the backend only** — two swizzle operations (read qpos → root_states, write
+root_states → qpos during reset).  Task-layer code is untouched.
 
-⚠️ Verify quaternion convention matches existing reward functions (e.g.
-`quat_rotate_inverse` in `_post_physx_step`).
+**Terrain:** The `Terrain` class (generates numpy heightfield data) stays in the
+task layer.  The upload to the physics engine moves into `backend.setup()`.
+MVP = ground plane only; heightfield/trimesh added later.
 
-**Contact forces:**
-`d.cfrc_ext` shape is `[nworld, nbody, 6]` (torque + force).  Expose as:
-```python
-contact_forces = wp.to_torch(d.cfrc_ext)[..., 3:6]  # [N, nbody, 3]
-```
+**Projectiles:** Deferred.  Deeply IsaacGym-specific (multi-actor env,
+`gym.create_sphere`).  Gated behind `isinstance(backend, IsaacGymBackend)`.
+Mini-cheetah default config has `push_robots.toggle = False` and no projectiles.
 
-**Terrain:**
-Replace `gym.add_heightfield()` with a procedurally generated MuJoCo
-`<hfield>` asset written at init time.  The height data from `terrain.py` is
-reused; only the upload mechanism changes.
+**`_create_envs()` → `backend.setup()`:** All asset loading, env creation, and
+body-index computation moves into the backend, matching the FixedRobot pattern.
 
-**Projectiles / push_robots:**
-These call `gym.set_actor_root_state_tensor()` directly via the shim.
-Migrate to `backend.set_all_root_states()` / `backend.reset_root_state()`.
+### Sub-tasks
 
-### Files to modify
+#### 3a — Pure-torch quaternion utilities
+
+`legged_robot.py` imports `quat_rotate_inverse`, `quat_from_euler_xyz`,
+`to_torch`, `get_axis_params` from `isaacgym.torch_utils` with no fallback.
+
+Create `gym/utils/torch_quat.py` with pure-torch implementations.  Update
+import fallback blocks in `legged_robot.py`, `gym_math_wrappers.py`,
+`fixed_robot.py`.
 
 | File | Change |
 |---|---|
-| `gym/envs/base/legged_robot.py` | Full migration: call `backend.setup()`, remove `_create_envs`, `_create_*terrain`, `_init_buffers` tensor acquisition, `_step_physx_sim`, `_reset_system`; root_states sliced from qpos/qvel |
-| `gym/envs/base/mujoco_warp_backend.py` | Add `root_states` property with free-joint slicing |
-| `gym/envs/base/base_task.py` | Remove `gym` / `sim` shim properties |
-| `gym/utils/terrain.py` | Add `to_mjcf_hfield()` method alongside existing IsaacGym upload |
+| `gym/utils/torch_quat.py` | **New** — `quat_rotate_inverse`, `quat_from_euler_xyz`, `quat_apply`, `normalize` |
+| `gym/envs/base/legged_robot.py` | Update `except ImportError` fallback |
+| `gym/utils/gym_math_wrappers.py` | Import from `torch_quat` instead of `None` |
 
-### Tests
+---
 
-Add legged robot contract tests:
-```
-tests/unit_tests/test_legged_backend_contract.py
-```
-Testing root_states shape/content, contact_forces shape, and reset of both
-DOF and root state.
+#### 3b — `backend=` kwarg for LeggedRobot
 
-**Convergence test:**
+Same pattern as FixedRobot.  Also fix the `_parse_cfg` ordering bug
+(`_parse_cfg` runs before `super().__init__`, causing device mismatch).
+
+| File | Change |
+|---|---|
+| `gym/envs/base/legged_robot.py` | Add `backend=None` kwarg, move `_parse_cfg` after `super().__init__` |
+| `gym/envs/mini_cheetah/mini_cheetah.py` | Pass through `backend=` |
+| `gym/envs/mini_cheetah/mini_cheetah_osc.py` | Pass through `backend=` |
+| `gym/envs/mini_cheetah/mini_cheetah_ref.py` | Pass through `backend=` |
+| `gym/envs/mit_humanoid/mit_humanoid.py` | Pass through `backend=` |
+| `gym/envs/mit_humanoid/humanoid_running.py` | Pass through `backend=` |
+| `gym/envs/mit_humanoid/lander.py` | Pass through `backend=` |
+
+---
+
+#### 3c — Floating-base coordinate handling in MuJoCo backends
+
+Both backends currently assume `nq == nv` (fixed-base).  For floating-base:
+`nq = 7 + num_joints`, `nv = 6 + num_joints`.
+
+Detect `has_free_joint = (mjm.nq == mjm.nv + 1)`.  Set `qpos_offset = 7`,
+`qvel_offset = 6`.  `dof_pos = qpos[:, 7:]`, `dof_vel = qvel[:, 6:]`.
+
+Assemble `root_states` from `qpos[:, 0:7]` + `qvel[:, 0:6]` with quaternion
+swizzle `[w,x,y,z] → [x,y,z,w]`.
+
+Implement `reset_root_state(env_ids)` and `set_all_root_states()` with
+reverse swizzle.  Apply torques to `qfrc_applied[:, qvel_offset:]` only.
+Enable contacts (remove `geom_contype[:] = 0` for floating-base).
+
+| File | Change |
+|---|---|
+| `gym/envs/base/mujoco_cpu_backend.py` | Floating-base detection, coordinate slicing, root state assembly, quat swizzle |
+| `gym/envs/base/mujoco_warp_backend.py` | Same |
+
+---
+
+#### 3d — Ground plane in MuJoCo backends
+
+Use `mujoco.MjSpec` to add a plane geom after loading the URDF:
+```python
+spec = mujoco.MjSpec.from_file(urdf_path)
+ground = spec.worldbody.add_geom()
+ground.type = mujoco.mjtGeom.mjGEOM_PLANE
+ground.size = [100, 100, 0.1]
+ground.friction = [static_friction, dynamic_friction, 0.0001]
+mjm = spec.compile()
 ```
-uv run scripts/train.py --task mini_cheetah_ref --headless
+
+Only add when `cfg` has terrain config and `mesh_type == "plane"`.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/mujoco_cpu_backend.py` | Ground plane creation in `setup()` |
+| `gym/envs/base/mujoco_warp_backend.py` | Same |
+
+---
+
+#### 3e — Rigid body states in MuJoCo backends
+
+MuJoCo sources: `d.xpos [nbody, 3]`, `d.xquat [nbody, 4]` (scalar-first),
+`d.cvel [nbody, 6]` (angular-first then linear).
+
+Assemble `[N * num_bodies, 13]`:
+```python
+rbs[..., 0:3]   = xpos                    # position
+rbs[..., 3:7]   = xquat[..., [1,2,3,0]]   # wxyz → xyzw
+rbs[..., 7:10]  = cvel[..., 3:6]          # linear velocity
+rbs[..., 10:13] = cvel[..., 0:3]          # angular velocity
 ```
-Expected: locomotion policy converges.  Gait pattern and reward curves
-qualitatively match IsaacGym baseline.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/mujoco_cpu_backend.py` | Implement `rigid_body_states` property |
+| `gym/envs/base/mujoco_warp_backend.py` | Same |
+
+---
+
+#### 3f — Migrate `_initialize_sim()` and `_create_envs()`
+
+Replace the 137-line `_create_envs()` (47 gym calls) with `backend.setup()`.
+Move terrain/env creation logic into `IsaacGymBackend.setup()` for backward
+compat.  Move task-level init (base_init_state, feet_indices) into LeggedRobot
+using `backend.body_names` / `backend.find_body_index()`.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/legged_robot.py` | Rewrite `_initialize_sim()`, delete `_create_*` methods |
+| `gym/envs/base/isaac_gym_backend.py` | Extend `setup()` to handle terrain + env creation |
+
+---
+
+#### 3g — Migrate `_init_buffers()`
+
+Replace gym tensor acquisition with backend properties.  Remove
+`register_dof_state()` hack.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/legged_robot.py` | Use `self._backend.root_states`, `.dof_pos`, etc. |
+| `gym/envs/base/isaac_gym_backend.py` | Remove `register_dof_state()` |
+
+---
+
+#### 3h — Migrate `_reset_system()` and `_push_robots()`
+
+Replace `gym.set_dof_state_tensor_indexed` → `backend.reset_dof_state()`.
+Replace `gym.set_actor_root_state_tensor_indexed` → `backend.reset_root_state()`.
+Replace `gym.set_actor_root_state_tensor` → `backend.set_all_root_states()`.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/legged_robot.py` | Route through backend |
+
+---
+
+#### 3i — Remove gym/sim shims, gate projectiles
+
+Delete `gym`/`sim` properties from `base_task.py`.  Remove
+`self.gym.prepare_sim(self.sim)`.  Gate `init_projectiles()` / `shoot()`
+behind `isinstance(self._backend, IsaacGymBackend)`.
+
+| File | Change |
+|---|---|
+| `gym/envs/base/base_task.py` | Remove `gym`/`sim` shim properties |
+| `gym/envs/base/legged_robot.py` | Remove `prepare_sim`, gate projectiles |
+
+---
+
+#### 3j — Legged robot contract tests
+
+New `tests/unit_tests/test_legged_backend_contract.py` using mini_cheetah URDF.
+Tests: `num_dof == 12`, `root_states` shape + quaternion convention,
+`rigid_body_states` shape, robot doesn't fall through ground, reset persists,
+cross-backend trajectory comparison.
+
+| File | Change |
+|---|---|
+| `tests/unit_tests/test_legged_backend_contract.py` | **New** |
+| `tests/unit_tests/conftest.py` | Add mini_cheetah fixtures |
+
+---
+
+#### 3k — End-to-end mini_cheetah smoke test
+
+```
+uv run scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64 --max_iterations 50
+PYTHONPATH=. .venv311/bin/python scripts/train_mujoco.py --task mini_cheetah --device cuda:0 --num_envs 4096 --max_iterations 200
+```
+
+Expected: reward improves, no crashes, no NaNs.
+
+---
+
+#### 3l — HumanoidRunning compatibility
+
+Replace `self.gym.get_actor_rigid_body_dict()` with
+`self._backend.body_names` lookup.
+
+| File | Change |
+|---|---|
+| `gym/envs/mit_humanoid/humanoid_running.py` | Use backend body_names |
+
+---
+
+### Ordering
+
+3a, 3b, 3c, 3d, 3e can proceed in parallel.  3f requires all of these.
+Then 3g → 3h → 3i sequentially.  3j scaffolded early, finalized after 3i.
+3k after 3i.  3l after 3g.
+
+### Gotchas
+
+- **MuJoCo URDF free joint:** auto-created, name may be empty — skip in DOF name extraction
+- **Contact forces:** MuJoCo `cfrc_ext` is body-frame `[torque, force]`; IsaacGym is world-frame `[force]` — may need reward threshold tuning
+- **URDF mesh paths:** mini_cheetah uses relative paths (`meshes/*.dae`) — MuJoCo resolves relative to URDF location
+- **Warp sliced views:** `qpos[:, 7:]` from `wp.to_torch` is non-contiguous — verify writes propagate through `mjw.forward()`
+- **Quaternion swizzle:** MuJoCo scalar-first `[w,x,y,z]` ↔ task-layer scalar-last `[x,y,z,w]`
 
 ---
 

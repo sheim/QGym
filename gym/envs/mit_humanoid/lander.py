@@ -6,8 +6,10 @@ from isaacgym.torch_utils import torch_rand_float
 
 
 class Lander(MIT_Humanoid):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
-        super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
+        super().__init__(
+            gym, sim, cfg, sim_params, sim_device, headless, backend=backend
+        )
 
     def _resample_commands(self, env_ids):
         """Randommly select commands of some environments

@@ -5,9 +5,11 @@ from gym.envs import LeggedRobot
 
 
 class HumanoidRunning(LeggedRobot):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
+    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
         self.omega = 2 * torch.pi * cfg.control.gait_freq
-        super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+        super().__init__(
+            gym, sim, cfg, sim_params, sim_device, headless, backend=backend
+        )
 
     def _init_buffers(self):
         super()._init_buffers()

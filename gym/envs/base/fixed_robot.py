@@ -3,16 +3,7 @@ import numpy as np
 try:
     from isaacgym.torch_utils import get_axis_params, to_torch
 except ImportError:
-    import torch as _torch
-
-    def get_axis_params(value, axis_idx, x_val=0.0, dtype=float, n_dims=3):
-        """Minimal fallback: returns a list with value at axis_idx, x_val elsewhere."""
-        params = [x_val] * n_dims
-        params[axis_idx] = value
-        return params
-
-    def to_torch(x, dtype=_torch.float, device="cpu", requires_grad=False):
-        return _torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
+    from gym.utils.torch_quat import get_axis_params, to_torch
 
 
 import torch

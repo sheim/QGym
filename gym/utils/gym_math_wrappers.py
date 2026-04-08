@@ -35,8 +35,7 @@ try:
 except ImportError:
     import torch as _torch
 
-    quat_apply = None
-    normalize = None
+    from gym.utils.torch_quat import quat_apply, normalize
 
     def torch_rand_float(lower, upper, shape, device):
         return (upper - lower) * _torch.rand(*shape, device=device) + lower

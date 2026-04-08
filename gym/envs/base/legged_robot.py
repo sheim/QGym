@@ -13,6 +13,13 @@ try:
 except ImportError:
     gymtorch = None
     gymapi = None
+    from gym.utils.torch_quat import (
+        get_axis_params,
+        to_torch,
+        quat_rotate_inverse,
+        quat_from_euler_xyz,
+    )
+    from gym.utils.gym_math_wrappers import torch_rand_float
 
 import torch
 
@@ -25,22 +32,23 @@ from gym.utils.helpers import class_to_dict
 
 
 class LeggedRobot(BaseTask):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
+    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
         self.cfg = cfg
         self.sim_params = sim_params
         self.height_samples = None
         self.init_done = False
-        self.device = sim_device  # todo CRIME: remove this from __init__ then
-        self._parse_cfg(self.cfg)
 
-        backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
+        if backend is None:
+            backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
         super().__init__(backend, cfg, backend.device, headless)
+        self._parse_cfg(self.cfg)
 
         if not self.headless:
             self._set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
 
         self._initialize_sim()
-        self.gym.prepare_sim(self.sim)
+        if isinstance(self._backend, IsaacGymBackend):
+            self.gym.prepare_sim(self.sim)
         self._init_buffers()
         self.init_done = True
         self.reset()
@@ -129,23 +137,53 @@ class LeggedRobot(BaseTask):
         self.episode_length_buf[env_ids] = 0
 
     def _initialize_sim(self):
-        """Creates simulation, terrain and evironments"""
+        """Creates simulation, terrain and environments."""
         self.up_axis_idx = 2  # 2 for z, 1 for y -> adapt gravity accordingly
         mesh_type = self.cfg.terrain.mesh_type
         if mesh_type in ["heightfield", "trimesh"]:
             self.terrain = Terrain(self.cfg.terrain, self.num_envs)
-        if mesh_type == "plane":
-            self._create_ground_plane()
-        elif mesh_type == "heightfield":
-            self._create_heightfield()
-        elif mesh_type == "trimesh":
-            self._create_trimesh()
-        elif mesh_type is not None:
-            raise ValueError(
-                "Terrain mesh type not recognised. Allowed types are "
-                + "[None, plane, heightfield, trimesh]"
+
+        if isinstance(self._backend, IsaacGymBackend):
+            # IsaacGym path — existing code unchanged
+            if mesh_type == "plane":
+                self._create_ground_plane()
+            elif mesh_type == "heightfield":
+                self._create_heightfield()
+            elif mesh_type == "trimesh":
+                self._create_trimesh()
+            elif mesh_type is not None:
+                raise ValueError(
+                    "Terrain mesh type not recognised. Allowed types are "
+                    + "[None, plane, heightfield, trimesh]"
+                )
+            self._create_envs()
+        else:
+            # MuJoCo backend path — backend.setup() handles everything
+            self._backend.setup(self.cfg, self.num_envs, self.device, task=self)
+            self.num_dof = self._backend.num_dof
+            self.num_bodies = self._backend.num_bodies
+            self.dof_names = self._backend.dof_names
+            self.penalised_contact_indices = self._backend.penalised_contact_indices
+            self.termination_contact_indices = self._backend.termination_contact_indices
+
+            # Task-level state that _create_envs normally sets up
+            body_names = self._backend.body_names
+            feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
+            self.feet_indices = torch.tensor(
+                [self._backend.find_body_index(n) for n in feet_names],
+                dtype=torch.long,
+                device=self.device,
             )
-        self._create_envs()
+            base_init_state_list = (
+                self.cfg.init_state.pos
+                + self.cfg.init_state.rot
+                + self.cfg.init_state.lin_vel
+                + self.cfg.init_state.ang_vel
+            )
+            self.base_init_state = to_torch(base_init_state_list, device=self.device)
+            self.envs = []
+            self.actor_handles = []
+            self.num_projs = 0
 
     def _resample_commands(self, env_ids):
         """Randommly select commands of some environments
@@ -286,31 +324,33 @@ class LeggedRobot(BaseTask):
         else:
             raise NameError(f"Unknown default setup: {self.cfg.init_state.reset_mode}")
 
-        env_ids_int32 = env_ids.to(dtype=torch.int32)
-        self.gym.set_dof_state_tensor_indexed(
-            self.sim,
-            gymtorch.unwrap_tensor(self.dof_state),
-            gymtorch.unwrap_tensor(env_ids_int32),
-            len(env_ids_int32),
-        )
-
         # * start base position shifted in X-Y plane
         if self.custom_origins:
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
-            # * xy position within 1m of the center
             self.root_states[env_ids, :2] += torch_rand_float(
                 -1.0, 1.0, (len(env_ids), 2), device=self.device
             )
         else:
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
 
-        root_state = torch.cat((self.root_states, self.proj_root_state), dim=0)
-        self.gym.set_actor_root_state_tensor_indexed(
-            self.sim,
-            gymtorch.unwrap_tensor(root_state),
-            gymtorch.unwrap_tensor(env_ids_int32),
-            len(env_ids_int32),
-        )
+        if isinstance(self._backend, IsaacGymBackend):
+            env_ids_int32 = env_ids.to(dtype=torch.int32)
+            self.gym.set_dof_state_tensor_indexed(
+                self.sim,
+                gymtorch.unwrap_tensor(self.dof_state),
+                gymtorch.unwrap_tensor(env_ids_int32),
+                len(env_ids_int32),
+            )
+            root_state = torch.cat((self.root_states, self.proj_root_state), dim=0)
+            self.gym.set_actor_root_state_tensor_indexed(
+                self.sim,
+                gymtorch.unwrap_tensor(root_state),
+                gymtorch.unwrap_tensor(env_ids_int32),
+                len(env_ids_int32),
+            )
+        else:
+            self._backend.reset_dof_state(env_ids)
+            self._backend.reset_root_state(env_ids)
 
     # * implement reset methods
     def reset_to_basic(self, env_ids):
@@ -403,74 +443,75 @@ class LeggedRobot(BaseTask):
         vel_vec[:, 2] = 0  # no z velocity
         self.root_states[:, 7:10] += vel_vec
         self.root_states[:, 10:13] += torch.cross(r_vec, vel_vec, dim=1)
-        root_state = torch.cat((self.root_states, self.proj_root_state), dim=0)
-        self.gym.set_actor_root_state_tensor(
-            self.sim, gymtorch.unwrap_tensor(root_state)
-        )
+        if isinstance(self._backend, IsaacGymBackend):
+            root_state = torch.cat((self.root_states, self.proj_root_state), dim=0)
+            self.gym.set_actor_root_state_tensor(
+                self.sim, gymtorch.unwrap_tensor(root_state)
+            )
+        else:
+            self._backend.set_all_root_states()
 
     # ----------------------------------------
     def _init_buffers(self):
         """Initialize torch tensors which will contain simulation states and
         processed quantities
         """
-        # * get gym GPU state tensors
-        actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
-        dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
-        net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
-        rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        if isinstance(self._backend, IsaacGymBackend):
+            # IsaacGym path — acquire tensors from GPU
+            actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
+            dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
+            net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+            rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
 
-        self.gym.refresh_dof_state_tensor(self.sim)
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        self.gym.refresh_net_contact_force_tensor(self.sim)
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
+            self.gym.refresh_dof_state_tensor(self.sim)
+            self.gym.refresh_actor_root_state_tensor(self.sim)
+            self.gym.refresh_net_contact_force_tensor(self.sim)
+            self.gym.refresh_rigid_body_state_tensor(self.sim)
 
-        if self.num_projs:
-            self.root_states = gymtorch.wrap_tensor(actor_root_state)[
-                : -self.num_projs, :
-            ]
-            self.proj_root_state = gymtorch.wrap_tensor(actor_root_state)[
-                -self.num_projs :, :
-            ]
-            self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)[
-                : -self.num_projs, :
-            ]
-            self.contact_forces = gymtorch.wrap_tensor(net_contact_forces)[
-                : -self.num_projs, :
-            ].view(self.num_envs, -1, 3)
+            if self.num_projs:
+                self.root_states = gymtorch.wrap_tensor(actor_root_state)[
+                    : -self.num_projs, :
+                ]
+                self.proj_root_state = gymtorch.wrap_tensor(actor_root_state)[
+                    -self.num_projs :, :
+                ]
+                self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)[
+                    : -self.num_projs, :
+                ]
+                self.contact_forces = gymtorch.wrap_tensor(net_contact_forces)[
+                    : -self.num_projs, :
+                ].view(self.num_envs, -1, 3)
+            else:
+                self.root_states = gymtorch.wrap_tensor(actor_root_state)
+                self.proj_root_state = torch.empty(0, 13, device=self.device)
+                self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
+                self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(
+                    self.num_envs, -1, 3
+                )
+
+            self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+            self._backend._num_dof = self.num_dof
+            self._backend.register_dof_state(self.dof_state, self.num_envs)
+
+            self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
+            self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
         else:
-            self.root_states = gymtorch.wrap_tensor(actor_root_state)
+            # MuJoCo backend path — tensors come from backend properties
+            self.root_states = self._backend.root_states
             self.proj_root_state = torch.empty(0, 13, device=self.device)
-            self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
-            self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(
-                self.num_envs, -1, 3
-            )
+            self.dof_state = self._backend.dof_state
+            self.dof_pos = self._backend.dof_pos
+            self.dof_vel = self._backend.dof_vel
+            self.contact_forces = self._backend.contact_forces
+            self._rigid_body_state = self._backend.rigid_body_states
 
-        self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
-        # Register dof_state with the backend so reset_dof_state() uses the
-        # correct tensor (LeggedRobot acquires its own tensors due to num_projs).
-        # TODO Phase 3: remove once LeggedRobot calls backend.setup().
-        self._backend._num_dof = self.num_dof
-        self._backend.register_dof_state(self.dof_state, self.num_envs)
-
-        self._rigid_body_pos = self._rigid_body_state.view(
-            self.num_envs, self.num_bodies, 13
-        )[..., 0:3]
-        self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
-        self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
+        # Rigid body state views (same for both backends)
         self.base_quat = self.root_states[:, 3:7]
-
-        self._rigid_body_pos = self._rigid_body_state.view(
-            self.num_envs, self.num_bodies, 13
-        )[..., 0:3]
-        self._rigid_body_quat = self._rigid_body_state.view(
-            self.num_envs, self.num_bodies, 13
-        )[..., 3:7]
-        self._rigid_body_lin_vel = self._rigid_body_state.view(
-            self.num_envs, self.num_bodies, 13
-        )[..., 7:10]
-        self._rigid_body_ang_vel = self._rigid_body_state.view(
-            self.num_envs, self.num_bodies, 13
-        )[..., 10:13]
+        rbs = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)
+        self._rigid_body_pos = rbs[..., 0:3]
+        self._rigid_body_quat = rbs[..., 3:7]
+        self._rigid_body_lin_vel = rbs[..., 7:10]
+        self._rigid_body_ang_vel = rbs[..., 10:13]
 
         # * initialize some data used later on
         self.common_step_counter = 0

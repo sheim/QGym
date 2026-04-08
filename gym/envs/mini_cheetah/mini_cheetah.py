@@ -4,8 +4,10 @@ from gym.envs.base.legged_robot import LeggedRobot
 
 
 class MiniCheetah(LeggedRobot):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
-        super().__init__(gym, sim, cfg, sim_params, sim_device, headless)
+    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
+        super().__init__(
+            gym, sim, cfg, sim_params, sim_device, headless, backend=backend
+        )
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""
