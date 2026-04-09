@@ -43,6 +43,12 @@ uv run scripts/train_mujoco.py --task mini_cheetah --device cuda:0 --num_envs 40
 uv run python -m pytest tests/unit_tests/ -v
 ```
 
+## Notes
+
+**NaN rewards at startup:** reward logging averages over completed episodes.
+Until the first episode finishes, all reward values show `nan` — this is
+expected and not an error.
+
 ## CLI Reference
 
 ```
@@ -95,10 +101,21 @@ Works out of the box with `--device cpu`. The CPU backend uses plain
 `mujoco.mj_step` with one MjData per environment (Python loop).
 Performance scales linearly with `--num_envs`.
 
-The GUI viewer (MuJoCo's built-in passive viewer) works on macOS.
-Use mouse to rotate/zoom.
-
 GPU training (`--device cuda:0`) is not available on macOS.
+
+**GUI viewer on macOS:** MuJoCo's passive viewer requires `mjpython` (bundled
+with the `mujoco` pip package) instead of the standard Python interpreter.
+`mjpython` needs to dlopen `libpython3.13.dylib`, which uv's bundled Python
+does not ship. The fix is to create the venv using Homebrew's Python instead:
+
+```bash
+brew install python@3.13   # if not already installed
+uv venv --python /opt/homebrew/opt/python@3.13/bin/python3.13
+uv sync
+.venv/bin/mjpython scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
+```
+
+Alternatively, use `--headless` to skip the viewer entirely (works with uv's default Python).
 
 ### Linux (CPU)
 

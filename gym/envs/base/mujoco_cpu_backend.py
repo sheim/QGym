@@ -141,9 +141,18 @@ class MuJocoCPUBackend(MuJocoBackendBase):
     # ── Rendering ─────────────────────────────────────────────────────────────
 
     def render(self, sync_frame_time: bool = True) -> None:
+        import platform
         import mujoco.viewer
 
         if self._viewer is None:
+            if platform.system() == "Darwin":
+                import mujoco.viewer as _mjv
+                if _mjv._MJPYTHON is None:
+                    raise RuntimeError(
+                        "MuJoCo passive viewer on macOS requires mjpython.\n"
+                        "Run with: .venv/bin/mjpython scripts/train_mujoco.py ...\n"
+                        "Or use --headless to disable the viewer."
+                    )
             self._viewer = mujoco.viewer.launch_passive(self._mjm, self._datas[0])
         if self._viewer.is_running():
             self._viewer.sync()
