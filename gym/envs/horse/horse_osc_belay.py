@@ -4,10 +4,6 @@ from isaacgym import gymtorch, gymapi
 from gym.envs.horse.horse_osc import HorseOsc
 
 
-BELAY_MASS_KG = 20.0
-BELAY_FORCE_N = BELAY_MASS_KG * 9.81
-
-
 class HorseOscBelay(HorseOsc):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless):
         super().__init__(gym, sim, cfg, sim_params, sim_device, headless)

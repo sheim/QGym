@@ -123,7 +123,7 @@ class HorseOsc(Horse):
             self.num_envs, 1, device=self.device
         )
 
-        self.commands[:, 3] = BASE_HEIGHT_REF
+        self.commands[:, 3] = 0.6
 
     def _reset_oscillators(self, env_ids):
         if len(env_ids) == 0:
@@ -158,7 +158,7 @@ class HorseOsc(Horse):
         if len(env_ids) == 0:
             return
         super()._reset_system(env_ids)
-        self.commands[env_ids, 3] = BASE_HEIGHT_REF
+        self.commands[env_ids, 3] = 0.6
 
     def _pre_decimation_step(self):
         super()._pre_decimation_step()
@@ -260,7 +260,11 @@ class HorseOsc(Horse):
 
         if self.cfg.osc.randomize_osc_params:
             self._resample_osc_params(env_ids)
-        self.commands[env_ids, 3] = BASE_HEIGHT_REF
+
+        height_min, height_max = self.cfg.commands.ranges.height
+        self.commands[env_ids, 3] = torch_rand_float(
+            height_min, height_max, (len(env_ids), 1), device=self.device
+        ).squeeze(1)
 
     def _resample_osc_params(self, env_ids):
         if len(env_ids) > 0:
@@ -416,61 +420,34 @@ class HorseOsc(Horse):
 
         return self._sqrdexp(error)
 
-    def _reward_tendon_constraints(self):
+    def _lerp_clamped(self, x, x0, x1, y0, y1):
+        """Linear interpolation y(x) between (x0,y0)->(x1,y1), with clamping."""
+        denom = x1 - x0
+        denom = torch.where(torch.abs(denom) < 1e-8, torch.ones_like(denom), denom)
+        t = (x - x0) / denom
+        t = torch.clamp(t, 0.0, 1.0)
+        return y0 + t * (y1 - y0)
+
+    def _piecewise_2seg(self, x, mid, x_lo, x_hi, y_lo, y_mid, y_hi):
         """
-        Tendon-like coupling constraints (front/hind split):
-        - Desired KFE/PFE become dependant on HFE.
-        - Penalize deviation from those desired values.
+        Piecewise linear passing through:
+        (x=mid, y=y_mid)
+        and reaching:
+        (x=x_lo, y=y_lo) for x <= mid
+        (x=x_hi, y=y_hi) for x >= mid
         """
+        y_left = self._lerp_clamped(x, mid, x_lo, y_mid, y_lo)
+        y_right = self._lerp_clamped(x, mid, x_hi, y_mid, y_hi)
+        return torch.where(x <= mid, y_left, y_right)
 
-        # --- helpers ---
-        def lerp(x, x0, x1, y0, y1):
-            """Linear interpolation y(x) between (x0,y0)->(x1,y1), with clamping."""
-            # handle degenerate interval
-            denom = x1 - x0
-            denom = torch.where(torch.abs(denom) < 1e-8, torch.ones_like(denom), denom)
-            t = (x - x0) / denom
-            t = torch.clamp(t, 0.0, 1.0)
-            return y0 + t * (y1 - y0)
+    def _reward_hind_kfe_tendon(self):
+        # hind hfe: 0 -> -1.5  => kfe: 0 -> +1.0
+        hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # (N,2)
+        kfe_hind = self.dof_pos[:, self.idx["hind_kfe"]]  # (N,2)
 
-        def piecewise_2seg(x, mid, x_lo, x_hi, y_lo, y_mid, y_hi):
-            """
-            Piecewise linear passing through:
-            (x=mid, y=y_mid)
-            and reaching:
-            (x=x_lo, y=y_lo) for x <= mid
-            (x=x_hi, y=y_hi) for x >= mid
-            """
-            y_left = lerp(
-                x, mid, x_lo, y_mid, y_lo
-            )  # x in [x_lo, mid] (or beyond -> clamped)
-            y_right = lerp(
-                x, mid, x_hi, y_mid, y_hi
-            )  # x in [mid, x_hi] (or beyond -> clamped)
-            return torch.where(x <= mid, y_left, y_right)
-
-        # make desired match (N,2) like the actual joint tensor
-        def _match_legs(desired, actual_legs):
-            # actual_legs: (N,2)
-            if desired.dim() == 0:
-                return desired.view(1, 1).expand_as(actual_legs)
-            if desired.dim() == 1:
-                return desired.unsqueeze(1).expand_as(actual_legs)  # (N,) -> (N,2)
-            if desired.dim() == 2:
-                # if already (N,2) it's good
-                return desired
-            raise RuntimeError(f"Unexpected desired shape: {tuple(desired.shape)}")
-
-        # Hind constraints (RH, LH)
-        hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # [N,2]
-        kfe_hind = self.dof_pos[:, self.idx["hind_kfe"]]
-        pfe_hind = self.dof_pos[:, self.idx["hind_pfe"]]
-
-        # 3) hind hfe: 0 -> -1.5  => kfe: 0 -> +1.0, pfe: 0 -> -1.2
-        # 4) hind hfe: 0 -> +0.5  => kfe: 0 -> -0.2, pfe: 0 -> -0.5
-        kfe_hind_des = piecewise_2seg(
+        kfe_hind_des = self._piecewise_2seg(
             hfe_hind,
-            mid=torch.zeros_like(hfe_hind),  # at hfe=0
+            mid=torch.zeros_like(hfe_hind),
             x_lo=-1.5 * torch.ones_like(hfe_hind),
             x_hi=+0.5 * torch.ones_like(hfe_hind),
             y_lo=+1.0 * torch.ones_like(hfe_hind),
@@ -478,7 +455,15 @@ class HorseOsc(Horse):
             y_hi=-0.2 * torch.ones_like(hfe_hind),
         )
 
-        pfe_hind_des = piecewise_2seg(
+        err = (kfe_hind - kfe_hind_des) ** 2
+        return -err.mean(dim=1)
+
+    def _reward_hind_pfe_tendon(self):
+        # hind hfe: 0 -> -1.5  => pfe: 0 -> -1.2
+        hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # (N,2)
+        pfe_hind = self.dof_pos[:, self.idx["hind_pfe"]]  # (N,2)
+
+        pfe_hind_des = self._piecewise_2seg(
             hfe_hind,
             mid=torch.zeros_like(hfe_hind),
             x_lo=-1.5 * torch.ones_like(hfe_hind),
@@ -488,76 +473,93 @@ class HorseOsc(Horse):
             y_hi=-0.5 * torch.ones_like(hfe_hind),
         )
 
-        # Front constraints (RF, LF)
-        hfe_front = self.dof_pos[:, self.idx["front_hfe"]]  # [N,2]
-        kfe_front = self.dof_pos[:, self.idx["front_kfe"]]
-        pfe_front = self.dof_pos[:, self.idx["front_pfe"]]
+        err = (pfe_hind - pfe_hind_des) ** 2
+        return -err.mean(dim=1)
 
-        # 5) front hfe: 0 -> +0.6 => kfe: 0 -> 0, pfe: 0 -> 0
-        # 6) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +1.5
-        # 7) front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+    def _reward_front_kfe_tendon(self):
+        # front hfe: 0 -> +0.6 => kfe: 0 -> 0, pfe: 0 -> 0
+        # front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +1.5
+        # front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+        hfe_front = self.dof_pos[:, self.idx["front_hfe"]]  # (N,2)
+        kfe_front = self.dof_pos[:, self.idx["front_kfe"]]  # (N,2)
 
         zeros = torch.zeros_like(hfe_front)
         ones = torch.ones_like(hfe_front)
 
-        # kfe: flat 0 for hfe in [0, +0.6], ramp to -1.5 for hfe in [-1.0, 0]
-        kfe_front_des = piecewise_2seg(
+        kfe_front_des = self._piecewise_2seg(
             hfe_front,
             mid=zeros,
             x_lo=-1.0 * ones,
             x_hi=+0.6 * ones,
-            y_lo=-1.5 * ones,  # at hfe=-1.0
-            y_mid=0.0 * ones,  # at hfe=0
-            y_hi=0.0 * ones,  # at hfe=+0.6
+            y_lo=-1.5 * ones,
+            y_mid=0.0 * ones,
+            y_hi=0.0 * ones,
         )
 
-        # pfe: flat 0 for hfe in [0, +0.6], ramp to +1.5 for hfe in [-1.0, 0]
-        pfe_front_des_15 = piecewise_2seg(
+        err = (kfe_front - kfe_front_des) ** 2
+        return -err.mean(dim=1)
+
+    def _reward_front_pfe_tendon(self):
+        # front hfe: 0 -> +0.6 => kfe: 0 -> 0, pfe: 0 -> 0
+        # front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +1.5
+        # front hfe: 0 -> -1.0 => kfe: 0 -> -1.5, pfe: 0 -> +3.0
+        hfe_front = self.dof_pos[:, self.idx["front_hfe"]]  # (N,2)
+        pfe_front = self.dof_pos[:, self.idx["front_pfe"]]  # (N,2)
+
+        zeros = torch.zeros_like(hfe_front)
+        ones = torch.ones_like(hfe_front)
+
+        pfe_front_des_15 = self._piecewise_2seg(
             hfe_front,
             mid=zeros,
             x_lo=-1.0 * ones,
             x_hi=+0.6 * ones,
-            y_lo=+1.5 * ones,  # at hfe=-1.0
-            y_mid=0.0 * ones,  # at hfe=0
-            y_hi=0.0 * ones,  # at hfe=+0.6
+            y_lo=+1.5 * ones,
+            y_mid=0.0 * ones,
+            y_hi=0.0 * ones,
         )
 
-        # pfe: flat 0 for hfe in [0, +0.6], ramp to +3.0 for hfe in [-1.0, 0]
-        pfe_front_des_30 = piecewise_2seg(
+        pfe_front_des_30 = self._piecewise_2seg(
             hfe_front,
             mid=zeros,
             x_lo=-1.0 * ones,
             x_hi=+0.6 * ones,
-            y_lo=+3.0 * ones,  # at hfe=-1.0
-            y_mid=0.0 * ones,  # at hfe=0
-            y_hi=0.0 * ones,  # at hfe=+0.6
+            y_lo=+3.0 * ones,
+            y_mid=0.0 * ones,
+            y_hi=0.0 * ones,
         )
 
-        # --- HIND ---
-        kfe_hind_des_ = _match_legs(kfe_hind_des, kfe_hind)  # -> (N,2)
-        pfe_hind_des_ = _match_legs(pfe_hind_des, pfe_hind)  # -> (N,2)
-        hind_pen = (kfe_hind - kfe_hind_des_) ** 2 + (
-            pfe_hind - pfe_hind_des_
-        ) ** 2  # (N,2)
+        err15 = (pfe_front - pfe_front_des_15) ** 2
+        err30 = (pfe_front - pfe_front_des_30) ** 2
+        err = torch.minimum(err15, err30)
 
-        # --- FRONT ---
-        # KFE: flat 0 for hfe in [0, 0.6], ramp to -1.5 for hfe in [-1,0]
-        kfe_front_des_ = _match_legs(kfe_front_des, kfe_front)  # -> (N,2)
-        kfe_err = (kfe_front - kfe_front_des_) ** 2  # (N,2)
+        return -err.mean(dim=1)
 
-        # negative HFE:
-        #   - PFE: 0 -> +1.5  (hfe 0 -> -1)
-        #   - PFE: 0 -> +3.0  (hfe 0 -> -1)
-        pfe_front_des15_ = _match_legs(pfe_front_des_15, pfe_front)  # -> (N,2)
-        pfe_front_des30_ = _match_legs(pfe_front_des_30, pfe_front)  # -> (N,2)
+    def _reward_feet_contact_count(self):
+        grf = self._compute_grf(grf_norm=True)
+        contact = (grf > self.cfg.osc.grf_threshold).float()
+        return contact.mean(dim=1)
 
-        pfe_err15 = (pfe_front - pfe_front_des15_) ** 2
-        pfe_err30 = (pfe_front - pfe_front_des30_) ** 2
+    def _reward_feet_support_upright(self):
+        grf = self._compute_grf(grf_norm=True)
+        support = torch.min(grf, dim=1).values
+        return support * self._switch_height()
 
-        # BOTH branches acceptable always:
-        pfe_term = torch.minimum(pfe_err15, pfe_err30)  # (N,2)
+    def _reward_hfe_upright(self):
+        # commanded height
+        h_cmd = self.commands[:, 3]
 
-        front_pen = kfe_err + pfe_term  # (N,2)
+        # gate: only active near standing height
+        h_err = torch.abs(h_cmd - BASE_HEIGHT_REF)
+        gate = torch.exp(-(h_err**2) / self.cfg.reward_settings.switch_scale_height)
 
-        pen = hind_pen.mean(dim=1) + front_pen.mean(dim=1)  # (N,)
-        return -pen
+        # all 4 HFE joints
+        hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # (N, 2)
+        hfe_front = self.dof_pos[:, self.idx["front_hfe"]]  # (N, 2)
+        hfe = torch.cat([hfe_hind, hfe_front], dim=1)  # (N, 4)
+
+        # want all HFE joints near 0
+        err = hfe**2
+        rew = torch.exp(-err / 0.05).mean(dim=1)
+
+        return gate * rew

@@ -20,7 +20,7 @@ class HorseOscCfg(HorseCfg):
         timeout_reset_ratio = 0.75
         reset_mode = "reset_to_range"
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 1.0]  # x,y,z [m]
+        pos = [0.0, 0.0, 0.6]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -47,11 +47,22 @@ class HorseOscCfg(HorseCfg):
         #   h_pastern_to_foot": [-0.3, 1.8],
         #   base_joint": [-0.2, 0.2],
         # }
+        # dof_pos_range = {
+        #     "haa": [-0.2, 0.2],
+        #     "hfe": [-1.0, 0.5],
+        #     "kfe": [-0.2, 0.1],
+        #     "pfe": [-0.3, 2.5],
+        #     "pastern_to_foot": [-0.3, 1.8],
+        #     "base_joint": [-0.0, 0.0],
+        # }
         dof_pos_range = {
             "haa": [-0.2, 0.2],
-            "hfe": [-1.0, 0.5],
-            "kfe": [-0.2, 0.1],
-            "pfe": [-0.3, 2.5],
+            "h_hfe": [-1.5, -1.5],
+            "f_hfe": [-1.0, -1.0],
+            "h_kfe": [1.0, 1.0],
+            "f_kfe": [-1.5, -1.5],
+            "h_pfe": [-1.2, -1.2],
+            "f_pfe": [1.5, 1.5],
             "pastern_to_foot": [-0.3, 1.8],
             "base_joint": [-0.0, 0.0],
         }
@@ -67,7 +78,7 @@ class HorseOscCfg(HorseCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [1.0, 1.0],  # z
+            [0.6, 0.6],  # z
             [-0.0, 0.0],  # roll
             [-0.0, 0.0],  # pitch
             [-0.2, 0.2],  # yaw
@@ -93,9 +104,9 @@ class HorseOscCfg(HorseCfg):
             "base_joint": 50,  # still needs modifying
         }
         damping = {
-            "haa": 0.0001,
-            "hfe": 0.0001,
-            "kfe": 0.0001,
+            "haa": 0.001,
+            "hfe": 0.001,
+            "kfe": 0.001,
             "pfe": 0.5,
             "pastern_to_foot": 0.5,
             "base_joint": 10,
@@ -135,10 +146,10 @@ class HorseOscCfg(HorseCfg):
         var = 1.0
 
         class ranges:
-            lin_vel_x = [-1.0, 0.0, 1.0, 3.0, 6.0]  # min max [m/s]
-            lin_vel_y = 1.0  # max [m/s]
-            yaw_vel = 6  # max [rad/s]
-            height = [0.4, 1.0]  # m
+            lin_vel_x = [0.0, 0.0]  # min max [m/s]
+            lin_vel_y = 0.0  # max [m/s]
+            yaw_vel = 0  # max [rad/s]
+            height = [0.6, 1.0]  # m
 
     class push_robots:
         toggle = False
@@ -162,7 +173,7 @@ class HorseOscCfg(HorseCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "horse/urdf/horse.urdf"
         foot_name = "foot"
         penalize_contacts_on = ["thigh"]  # "thigh", "shank", "pastern"
-        terminate_after_contacts_on = ["thigh", "top"]
+        terminate_after_contacts_on = ["top"]
         collapse_fixed_joints = False
         fix_base_link = False
         self_collisions = 1
@@ -175,11 +186,11 @@ class HorseOscCfg(HorseCfg):
         soft_dof_pos_limit = 0.9
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
-        max_contact_force = 2000.0  # testing, this was too low for a horse weight
-        base_height_target = BASE_HEIGHT_REF + 0.03
-        tracking_sigma = 0.25
+        max_contact_force = 3000.0  # testing, this was too low for a horse weight
+        base_height_target = 1.0 + 0.03
+        tracking_sigma = 0.01  # punishes even slight tilt
         switch_scale = 0.5
-        switch_scale_height = 0.5
+        switch_scale_height = 0.05  # drops to near 0 when cmd_h is 0.6
 
     class scaling(HorseCfg.scaling):
         base_ang_vel = [0.3, 0.3, 0.1]
@@ -258,7 +269,7 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
-                orientation = 1.0
+                orientation = 4.0
                 torques = 5.0e-10
                 dof_vel = 0.0
                 # min_base_height = 1.0
@@ -276,11 +287,17 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 enc_pace = 0.0
                 cursorial = 1.0  # enourage legs to stay under body, don't splay out
                 standing_torques = 0.0  # 1.e-5
-                tracking_height = 1.0
-                tendon_constraints = 1.0
+                tracking_height = 3.0
+                hind_kfe_tendon = 2.0
+                hind_pfe_tendon = 2.0
+                front_kfe_tendon = 1
+                front_pfe_tendon = 1
+                feet_contact_count = 3
+                feet_support_upright = 3
+                hfe_upright = 3
 
             class termination_weight:
-                termination = 15.0 / 100.0
+                termination = 50.0 / 100.0
 
     class algorithm:
         # both

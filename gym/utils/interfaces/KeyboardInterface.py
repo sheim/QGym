@@ -36,7 +36,7 @@ class KeyboardInterface:
         print("______________________________________________________________")
 
         env.commands[:] = 0.0
-        env.commands[:, 3] = 1.0
+        env.commands[:, 3] = 0.6
         env.cfg.commands.resampling_time = env.max_episode_length_s + 1
         self.max_vel_backward = -1.0
         self.max_vel_forward = 4.0
