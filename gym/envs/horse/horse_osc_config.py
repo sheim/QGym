@@ -188,7 +188,7 @@ class HorseOscCfg(HorseCfg):
         soft_torque_limit = 0.9
         max_contact_force = 3000.0  # testing, this was too low for a horse weight
         base_height_target = 1.0 + 0.03
-        tracking_sigma = 0.01  # punishes even slight tilt
+        tracking_sigma = 0.25
         switch_scale = 0.5
         switch_scale_height = 0.05  # drops to near 0 when cmd_h is 0.6
 
@@ -272,7 +272,7 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 orientation = 4.0
                 torques = 5.0e-10
                 dof_vel = 0.0
-                # min_base_height = 1.0
+                min_base_height = 0.0
                 action_rate = 1e-5
                 action_rate2 = 1e-6
                 stand_still = 0.0
@@ -287,14 +287,14 @@ class HorseOscRunnerCfg(HorseRunnerCfg):
                 enc_pace = 0.0
                 cursorial = 1.0  # enourage legs to stay under body, don't splay out
                 standing_torques = 0.0  # 1.e-5
-                tracking_height = 3.0
+                tracking_height = 10.0
                 hind_kfe_tendon = 2.0
                 hind_pfe_tendon = 2.0
-                front_kfe_tendon = 1
-                front_pfe_tendon = 1
+                front_kfe_tendon = 3
+                front_pfe_tendon = 3
                 feet_contact_count = 3
-                feet_support_upright = 3
-                hfe_upright = 3
+                feet_support_upright = 10
+                hfe_upright = 10
 
             class termination_weight:
                 termination = 50.0 / 100.0

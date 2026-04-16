@@ -123,7 +123,7 @@ class HorseOsc(Horse):
             self.num_envs, 1, device=self.device
         )
 
-        self.commands[:, 3] = 0.6
+        self.commands[:, 3] = 1.0
 
     def _reset_oscillators(self, env_ids):
         if len(env_ids) == 0:
@@ -158,7 +158,7 @@ class HorseOsc(Horse):
         if len(env_ids) == 0:
             return
         super()._reset_system(env_ids)
-        self.commands[env_ids, 3] = 0.6
+        self.commands[env_ids, 3] = 1.0
 
     def _pre_decimation_step(self):
         super()._pre_decimation_step()
@@ -416,9 +416,7 @@ class HorseOsc(Horse):
         """Reward for base height."""
         # error between current and commanded height
         error = self.base_height.flatten() - self.commands[:, 3].flatten()
-        error /= self.scales["base_height"]
-
-        return self._sqrdexp(error)
+        return -(error**2)
 
     def _lerp_clamped(self, x, x0, x1, y0, y1):
         """Linear interpolation y(x) between (x0,y0)->(x1,y1), with clamping."""
@@ -553,13 +551,15 @@ class HorseOsc(Horse):
         h_err = torch.abs(h_cmd - BASE_HEIGHT_REF)
         gate = torch.exp(-(h_err**2) / self.cfg.reward_settings.switch_scale_height)
 
-        # all 4 HFE joints
-        hfe_hind = self.dof_pos[:, self.idx["hind_hfe"]]  # (N, 2)
-        hfe_front = self.dof_pos[:, self.idx["front_hfe"]]  # (N, 2)
-        hfe = torch.cat([hfe_hind, hfe_front], dim=1)  # (N, 4)
+        # HFE joints (both legs)
+        hfe = self.dof_pos[:, self.idx["hind_hfe"]]  # (N, 2) just the hind legs for now
 
-        # want all HFE joints near 0
-        err = hfe**2
-        rew = torch.exp(-err / 0.05).mean(dim=1)
+        # want HFE -> 0
+        err = hfe**2  # squared error to 0
+
+        rew = torch.exp(-err / 0.5)
+
+        # average across legs
+        rew = rew.mean(dim=1)
 
         return gate * rew
