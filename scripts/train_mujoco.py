@@ -10,9 +10,10 @@ backend-agnostic path that calls task_registry.make_env_mujoco().
 
 import argparse
 
-from gym.utils.task_registry import task_registry  # , select_backend
+from gym.utils.task_registry import task_registry
 from gym.utils.helpers import set_seed
 from gym.utils.logging_and_saving import local_code_save_helper
+from gym.utils.logging_and_saving import wandb_singleton
 
 
 def get_mujoco_args():
@@ -34,7 +35,10 @@ def get_mujoco_args():
         "--batch_size", type=int, default=None, help="Override batch_size from cfg"
     )
     parser.add_argument("--headless", action="store_true", default=False)
-    parser.add_argument("--disable_wandb", action="store_true", default=True)
+    # wandb
+    parser.add_argument("--disable_wandb", action="store_true", default=False)
+    parser.add_argument("--wandb_project", type=str, default=None)
+    parser.add_argument("--wandb_entity", type=str, default=None)
     return parser.parse_args()
 
 
@@ -70,6 +74,10 @@ def setup():
 
     set_seed(env_cfg.seed)
 
+    # wandb
+    wandb_helper = wandb_singleton.WandbSingleton()
+    wandb_helper.setup_wandb(env_cfg=env_cfg, train_cfg=train_cfg, args=args)
+
     # Build the environment using the MuJoCo backend
     env = task_registry.make_env_mujoco(
         args.task, env_cfg, device=args.device, headless=args.headless
@@ -87,7 +95,9 @@ def setup():
 
 
 def train(train_cfg, policy_runner):
+    wandb_helper = wandb_singleton.WandbSingleton()
     policy_runner.learn()
+    wandb_helper.close_wandb()
 
 
 if __name__ == "__main__":
