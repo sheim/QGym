@@ -196,4 +196,3 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
         experiment_name = "mini_cheetah"
         max_iterations = 500
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 32

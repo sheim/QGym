@@ -321,7 +321,6 @@ class LanderRunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 24
         max_iterations = 500
         run_name = "lander"
         experiment_name = "Humanoid"

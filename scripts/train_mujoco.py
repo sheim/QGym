@@ -30,6 +30,9 @@ def get_mujoco_args():
         "--max_iterations", type=int, default=None, help="Override max_iterations"
     )
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument(
+        "--batch_size", type=int, default=None, help="Override batch_size from cfg"
+    )
     parser.add_argument("--headless", action="store_true", default=False)
     parser.add_argument("--disable_wandb", action="store_true", default=True)
     return parser.parse_args()
@@ -48,6 +51,8 @@ def setup():
         env_cfg.env.num_envs = args.num_envs
     if args.max_iterations is not None:
         train_cfg.runner.max_iterations = args.max_iterations
+    if args.batch_size is not None:
+        train_cfg.algorithm.batch_size = args.batch_size
     if args.seed is not None:
         train_cfg.seed = args.seed
         env_cfg.seed = args.seed

@@ -170,4 +170,3 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         experiment_name = "mini_cheetah_ref"
         max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 20  # deprecate

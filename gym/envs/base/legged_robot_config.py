@@ -316,7 +316,6 @@ class LeggedRobotRunnerCfg(BaseConfig):
     class runner:
         policy_class_name = "ActorCritic"
         algorithm_class_name = "PPO2"
-        num_steps_per_env = 24  # deprecate
         max_iterations = 1500
         save_interval = 50
         run_name = ""

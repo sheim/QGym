@@ -10,7 +10,7 @@ class BaseRunner:
         self.env = env
         self.setup_reward_functions()
         self.parse_train_cfg(train_cfg)
-        self.num_steps_per_env = self.cfg["num_steps_per_env"]
+        self.num_steps_per_env = self.cfg.get("num_steps_per_env", 1)
         self.save_interval = self.cfg["save_interval"]
         self.num_learning_iterations = self.cfg["max_iterations"]
         self.tot_timesteps = 0
