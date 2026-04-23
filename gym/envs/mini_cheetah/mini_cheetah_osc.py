@@ -1,4 +1,5 @@
 import torch
+import os
 from isaacgym.torch_utils import torch_rand_float
 
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
@@ -198,6 +199,11 @@ class MiniCheetahOsc(MiniCheetah):
                 torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
                 < 0.9
             ).unsqueeze(1)
+
+            # debug distribution of commands
+            if not os.path.isfile("commands.pt"):
+                torch.save(self.commands, "commands.pt")
+                print("saved commands.pt")
 
         if self.cfg.osc.randomize_osc_params:
             self._resample_osc_params(env_ids)
