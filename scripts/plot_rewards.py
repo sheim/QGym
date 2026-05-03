@@ -1,44 +1,62 @@
-#!/usr/bin/env python3
-# scripts/plot_rewards.py
-
 import numpy as np
 import matplotlib.pyplot as plt
 
+data = np.load("reward_logs.npz", allow_pickle=True)
 
-def moving_avg(x: np.ndarray, k: int) -> np.ndarray:
-    if k is None or k <= 1:
-        return x
-    k = int(k)
-    pad = k // 2
-    xp = np.pad(x, (pad, pad), mode="edge")
-    return np.convolve(xp, np.ones(k, dtype=np.float32) / k, mode="valid")
+reward_names = data["reward_names"]
+total_reward = data["total_reward"]
 
+height_command = data["height_command"] if "height_command" in data else None
+switch_height = data["switch_height"] if "switch_height" in data else None
 
-def main(npz_path="reward_logs.npz", out_path="reward_curves.png", smooth=25):
-    d = np.load(npz_path, allow_pickle=True)
+steps = np.arange(len(total_reward))
 
-    names = [str(x) for x in d["reward_names"].tolist()]
-    total = d["total_reward"]  # (steps,)
-    t = np.arange(total.shape[0])
+fig, ax1 = plt.subplots(figsize=(14, 8))
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(t, moving_avg(total, smooth), label="total_reward", linewidth=2)
+# reward plots
+ax1.plot(steps, total_reward, label="total_reward", linewidth=2)
 
-    for name in names:
-        if name in d:
-            plt.plot(t, moving_avg(d[name], smooth), label=name)
+for name in reward_names:
+    name = str(name)
+    if name in data:
+        ax1.plot(steps, data[name], label=name, alpha=0.9)
 
-    plt.title("Rewards vs Step (env 0 only)")
-    plt.xlabel("step")
-    plt.ylabel("reward")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=300)
-    plt.close()
+ax1.set_xlabel("Step")
+ax1.set_ylabel("Reward")
+ax1.set_title("Rewards, Height Command, and Switch Height")
+ax1.grid(True)
 
-    print(f"Saved reward plot to {out_path}")
+# second axis for height signals
+ax2 = ax1.twinx()
 
+if height_command is not None:
+    ax2.plot(
+        steps,
+        height_command,
+        linestyle="--",
+        linewidth=2,
+        label="height_command",
+    )
 
-if __name__ == "__main__":
-    main()
+if switch_height is not None:
+    ax2.plot(
+        steps,
+        switch_height,
+        linestyle=":",
+        linewidth=2,
+        label="switch_height",
+    )
+
+ax2.set_ylabel("Height / Switch")
+
+# combined legend
+lines1, labels1 = ax1.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
+
+plt.tight_layout()
+
+# save figure
+plt.savefig("reward_plot.png", dpi=300)
+
+print("Saved reward_plot.png")
