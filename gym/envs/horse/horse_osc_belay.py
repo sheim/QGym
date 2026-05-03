@@ -152,21 +152,30 @@ class HorseOscBelay(HorseOsc):
         )
 
     def _update_belay_force_buffer(self):
-        # update the per-env belay force vector
         self.belay_force_vec.zero_()
 
-        # current position of belay attachment body
-        body_pos = self.rb_states[self.base_body_ids, 0:3]  # (num_envs, 3)
-
-        # vector from body to fixed anchor
-        direction = self.belay_anchor_pos - body_pos
-
-        # normalize safely
-        norm = torch.norm(direction, dim=1, keepdim=True).clamp(min=1e-6)
-        unit_direction = direction / norm
-
         active = self.belay_enabled.float()
-        force_mag = active * self.belay_force_scale * self.belay_force  # (num_envs,)
+        force_mag = active * self.belay_force_scale * self.belay_force  # (N,)
+
+        if self.cfg.belay.mode == "vertical":
+            unit_direction = torch.zeros((self.num_envs, 3), device=self.device)
+            unit_direction[:, 2] = 1.0
+
+        elif self.cfg.belay.mode == "horizontal":
+            body_pos = self.rb_states[self.base_body_ids, 0:3]
+            direction = self.belay_anchor_pos - body_pos
+            direction[:, 2] = 0.0
+            norm = torch.norm(direction, dim=1, keepdim=True).clamp(min=1e-6)
+            unit_direction = direction / norm
+
+        elif self.cfg.belay.mode == "anchor":
+            body_pos = self.rb_states[self.base_body_ids, 0:3]
+            direction = self.belay_anchor_pos - body_pos
+            norm = torch.norm(direction, dim=1, keepdim=True).clamp(min=1e-6)
+            unit_direction = direction / norm
+
+        else:
+            raise ValueError(f"Unknown belay mode: {self.cfg.belay.mode}")
 
         self.belay_force_vec[:] = unit_direction * force_mag.unsqueeze(1)
 
@@ -219,54 +228,74 @@ class HorseOscBelay(HorseOsc):
             f"force_vec={self.belay_force_vec[env_id].detach().cpu().numpy()}"
         )
 
-    def draw_belay_debug(self, force_scale=0.002):
+    def draw_belay_debug(self, force_scale=0.01):
         if self.viewer is None:
             return
 
         self.gym.clear_lines(self.viewer)
-
-        # make sure rigid body states are current
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
-        # sim rigid body id for "front_base"
-        front_base_pos = self.rb_states[self.base_body_ids, 0:3]
+        body_pos = self.rb_states[self.base_body_ids, 0:3]
 
-        anchor_pos = self.belay_anchor_pos
+        active = self.belay_enabled.float()
+        force_mag = active * self.belay_force_scale * self.belay_force
 
-        force_end = front_base_pos + force_scale * self.belay_force_vec
+        mode = self.cfg.belay.mode
+
+        if mode == "vertical":
+            unit_direction = torch.zeros((self.num_envs, 3), device=self.device)
+            unit_direction[:, 2] = 1.0
+
+        elif mode == "horizontal":
+            direction = self.belay_anchor_pos - body_pos
+            direction[:, 2] = 0.0
+            norm = torch.norm(direction, dim=1, keepdim=True).clamp(min=1e-6)
+            unit_direction = direction / norm
+
+        elif mode == "anchor":
+            direction = self.belay_anchor_pos - body_pos
+            norm = torch.norm(direction, dim=1, keepdim=True).clamp(min=1e-6)
+            unit_direction = direction / norm
+
+        else:
+            raise ValueError(f"Unknown belay mode: {mode}")
+
+        # Red: intended belay direction scaled by force magnitude
+        red_end = body_pos + force_scale * force_mag.unsqueeze(1) * unit_direction
+
+        # Green: actual applied force vector
+        green_end = body_pos + force_scale * self.belay_force_vec
 
         red = [1.0, 0.0, 0.0]
         green = [0.0, 1.0, 0.0]
 
         for i in range(self.num_envs):
-            # red tether line: front_base -> anchor
             self.gym.add_lines(
                 self.viewer,
                 self.envs[i],
                 1,
                 [
-                    front_base_pos[i, 0].item(),
-                    front_base_pos[i, 1].item(),
-                    front_base_pos[i, 2].item(),
-                    anchor_pos[i, 0].item(),
-                    anchor_pos[i, 1].item(),
-                    anchor_pos[i, 2].item(),
+                    body_pos[i, 0].item(),
+                    body_pos[i, 1].item(),
+                    body_pos[i, 2].item(),
+                    red_end[i, 0].item(),
+                    red_end[i, 1].item(),
+                    red_end[i, 2].item(),
                 ],
                 red,
             )
 
-            # green force vector: front_base -> front_base + scaled force
             self.gym.add_lines(
                 self.viewer,
                 self.envs[i],
                 1,
                 [
-                    front_base_pos[i, 0].item(),
-                    front_base_pos[i, 1].item(),
-                    front_base_pos[i, 2].item(),
-                    force_end[i, 0].item(),
-                    force_end[i, 1].item(),
-                    force_end[i, 2].item(),
+                    body_pos[i, 0].item(),
+                    body_pos[i, 1].item(),
+                    body_pos[i, 2].item(),
+                    green_end[i, 0].item(),
+                    green_end[i, 1].item(),
+                    green_end[i, 2].item(),
                 ],
                 green,
             )

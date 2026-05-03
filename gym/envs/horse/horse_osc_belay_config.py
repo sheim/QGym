@@ -14,6 +14,7 @@ class HorseOscBelayCfg(HorseOscCfg):
         start_enabled = True
         debug_print = True
         anchor_height = 2.0
+        mode = "vertical"  # "anchor", "vertical", "horizontal"
 
     class perturbations:
         enabled = False

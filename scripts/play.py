@@ -389,7 +389,7 @@ def play(env, runner, train_cfg):
             tracker.update()
 
             if not headless and hasattr(env, "draw_belay_debug"):
-                env.draw_belay_debug(force_scale=0.002)
+                env.draw_belay_debug()
 
             if actual_steps < num_steps:
                 log_data["step"][actual_steps] = actual_steps

@@ -262,9 +262,7 @@ class HorseOsc(Horse):
             self._resample_osc_params(env_ids)
 
         height_min, height_max = self.cfg.commands.ranges.height
-        self.commands[env_ids, 3] = torch_rand_float(
-            height_min, height_max, (len(env_ids), 1), device=self.device
-        ).squeeze(1)
+        self.commands[env_ids, 3] = 1.0
 
     def _resample_osc_params(self, env_ids):
         if len(env_ids) > 0:
