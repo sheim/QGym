@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from isaacgym.torch_utils import torch_rand_float
 
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
@@ -129,31 +128,6 @@ class MiniCheetahOsc(MiniCheetah):
         self.osc_omega = torch.clamp_min(self.osc_omega, 0.1)
         self.osc_coupling = torch.clamp_min(self.osc_coupling, 0)
 
-    def _process_rigid_body_props(self, props, env_id):
-        if env_id == 0:
-            # * init buffers for the domain rand changes
-            self.mass = torch.zeros(self.num_envs, 1, device=self.device)
-            self.com = torch.zeros(self.num_envs, 3, device=self.device)
-
-        # * randomize mass
-        if self.cfg.domain_rand.randomize_base_mass:
-            lower = self.cfg.domain_rand.lower_mass_offset
-            upper = self.cfg.domain_rand.upper_mass_offset
-            # self.mass_
-            props[0].mass += np.random.uniform(lower, upper)
-            self.mass[env_id] = props[0].mass
-            # * randomize com position
-            lower = self.cfg.domain_rand.lower_z_offset
-            upper = self.cfg.domain_rand.upper_z_offset
-            props[0].com.z += np.random.uniform(lower, upper)
-            self.com[env_id, 2] = props[0].com.z
-
-            lower = self.cfg.domain_rand.lower_x_offset
-            upper = self.cfg.domain_rand.upper_x_offset
-            props[0].com.x += np.random.uniform(lower, upper)
-            self.com[env_id, 0] = props[0].com.x
-        return props
-
     def _post_decimation_step(self):
         """Update all states that are not handled in PhysX"""
         super()._post_decimation_step()
@@ -174,19 +148,13 @@ class MiniCheetahOsc(MiniCheetah):
         )
         grf = self._compute_grf()
         self.oscillators_vel = self.osc_omega - grf * local_feedback
-        # self.oscillators_vel *= torch_rand_float(0.9,
-        #                                          1.1,
-        #                                          self.oscillators_vel.shape,
-        #                                          self.device)
         self.oscillators_vel += (
             torch.randn(self.oscillators_vel.shape, device=self.device)
             * self.cfg.osc.process_noise_std
         )
 
         self.oscillators_vel *= 2 * torch.pi
-        self.oscillators += (
-            self.oscillators_vel * dt
-        )  # torch.clamp(self.oscillators_vel * dt, min=0)
+        self.oscillators += self.oscillators_vel * dt
         self.oscillators = torch.remainder(self.oscillators, 2 * torch.pi)
         self.oscillator_obs = torch.cat(
             (torch.cos(self.oscillators), torch.sin(self.oscillators)), dim=1
@@ -213,17 +181,6 @@ class MiniCheetahOsc(MiniCheetah):
         self.commands[env_ids, 0:1] += (
             torch.randn((len(env_ids), 1), device=self.device) * self.cfg.commands.var
         )
-
-        # possible_commands = torch.tensor(self.command_ranges["lin_vel_y"],
-        #                                  device=self.device)
-        # self.commands[env_ids, 1:2] = possible_commands[torch.randint(
-        #     0, len(possible_commands), (len(env_ids), 1),
-        #     device=self.device)]
-        # possible_commands = torch.tensor(self.command_ranges["yaw_vel"],
-        #                                  device=self.device)
-        # self.commands[env_ids, 0:1] = possible_commands[torch.randint(
-        #     0, len(possible_commands), (len(env_ids), 1),
-        #     device=self.device)]
 
         if 0 in self.cfg.commands.ranges.lin_vel_x:
             # * with 20% chance, reset to 0 commands except for forward

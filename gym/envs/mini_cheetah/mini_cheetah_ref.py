@@ -59,8 +59,7 @@ class MiniCheetahRef(MiniCheetah):
     def _reward_swing_grf(self):
         """Reward non-zero grf during swing (0 to pi)"""
         in_contact = torch.gt(
-            torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1),
-            50.0,
+            torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1), 50.0
         )
         ph_off = torch.lt(self.phase, torch.pi)
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
@@ -69,8 +68,7 @@ class MiniCheetahRef(MiniCheetah):
     def _reward_stance_grf(self):
         """Reward non-zero grf during stance (pi to 2pi)"""
         in_contact = torch.gt(
-            torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1),
-            50.0,
+            torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1), 50.0
         )
         ph_off = torch.gt(self.phase, torch.pi)  # should this be in swing?
         rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)

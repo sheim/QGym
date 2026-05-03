@@ -517,8 +517,9 @@ class LeggedRobot(BaseTask):
             dtype=torch.float,
             device=self.device,
         )
+        # add height as the 4th command
         self.commands = torch.zeros(
-            self.num_envs, 3, dtype=torch.float, device=self.device
+            self.num_envs, 4, dtype=torch.float, device=self.device
         )
         self.base_lin_vel = quat_rotate_inverse(
             self.base_quat, self.root_states[:, 7:10]
@@ -985,6 +986,31 @@ class LeggedRobot(BaseTask):
         return torch.exp(
             -torch.square(x / scale) / self.cfg.reward_settings.tracking_sigma
         )
+
+    def _process_rigid_body_props(self, props, env_id):
+        if env_id == 0:
+            # * init buffers for the domain rand changes
+            self.mass = torch.zeros(self.num_envs, 1, device=self.device)
+            self.com = torch.zeros(self.num_envs, 3, device=self.device)
+
+        # * randomize mass
+        if self.cfg.domain_rand.randomize_base_mass:
+            lower = self.cfg.domain_rand.lower_mass_offset
+            upper = self.cfg.domain_rand.upper_mass_offset
+            # self.mass_
+            props[0].mass += np.random.uniform(lower, upper)
+            self.mass[env_id] = props[0].mass
+            # * randomize com position
+            lower = self.cfg.domain_rand.lower_z_offset
+            upper = self.cfg.domain_rand.upper_z_offset
+            props[0].com.z += np.random.uniform(lower, upper)
+            self.com[env_id, 2] = props[0].com.z
+
+            lower = self.cfg.domain_rand.lower_x_offset
+            upper = self.cfg.domain_rand.upper_x_offset
+            props[0].com.x += np.random.uniform(lower, upper)
+            self.com[env_id, 0] = props[0].com.x
+        return props
 
     # ------------ reward functions----------------
 

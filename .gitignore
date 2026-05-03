@@ -16,6 +16,9 @@ gym/wandb
 *.npz
 user/wandb_config.json
 *trajectories/
+*.png
+scaling_analysis/
+recovery*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

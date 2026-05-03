@@ -1,0 +1,19 @@
+{
+  "method": "grid",
+  "metric": {
+    "name": "rewards/total_rewards",
+    "goal": "maximize"
+  },
+  "run_cap": 50,
+  "parameters": {
+    "train_cfg.runner.max_iterations": {
+        "values": [1000]
+    },
+    "env_cfg.belay.mass_kg": {
+        "values": [0, 20, 50, 100, 150, 200, 300, 400, 500]
+    },
+    "train_cfg.seed": {
+        "values": [1, 2, 3]
+    }
+  }
+}

@@ -300,6 +300,30 @@ def get_args(custom_parameters=None):
             "default": False,
             "help": "Use original config file for loaded policy.",
         },
+        {
+            "name": "--torque_scale",
+            "type": float,
+            "default": 1.0,
+            "help": "Torque scale for reduced strength perturbation.",
+        },
+        {
+            "name": "--latency_steps",
+            "type": int,
+            "default": 0,
+            "help": "Number of delayed target steps for latency perturbation.",
+        },
+        {
+            "name": "--max_steps",
+            "type": int,
+            "default": 2500,
+            "help": "Number of play steps before automatically saving and exiting.",
+        },
+        {
+            "name": "--results_dir",
+            "type": str,
+            "default": "recovery_sweep",
+            "help": "Directory to save recovery CSV results.",
+        },
     ]
     # * parse arguments
     args = gymutil.parse_arguments(

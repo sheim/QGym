@@ -15,6 +15,13 @@ class KeyboardInterface:
         env.gym.subscribe_viewer_keyboard_event(
             env.viewer, gymapi.KEY_SPACE, "space_shoot"
         )
+        env.gym.subscribe_viewer_keyboard_event(env.viewer, gymapi.KEY_UP, "height_up")
+        env.gym.subscribe_viewer_keyboard_event(
+            env.viewer, gymapi.KEY_DOWN, "height_down"
+        )
+        env.gym.subscribe_viewer_keyboard_event(
+            env.viewer, gymapi.KEY_B, "toggle_belay"
+        )
         env.gym.subscribe_viewer_mouse_event(
             env.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_shoot"
         )
@@ -24,10 +31,12 @@ class KeyboardInterface:
         print("WASD: forward, strafe left, backward, strafe right")
         print("QE: yaw left/right")
         print("R: reset environments")
+        print("Arrow Up/Down: stand up/lay down")
         print("ESC: quit")
         print("______________________________________________________________")
 
         env.commands[:] = 0.0
+        env.commands[:, 3] = 0.6
         env.cfg.commands.resampling_time = env.max_episode_length_s + 1
         self.max_vel_backward = -1.0
         self.max_vel_forward = 4.0
@@ -38,6 +47,10 @@ class KeyboardInterface:
 
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
+
+        self.min_height = -1000
+        self.max_height = 1.0
+        self.increment_height = 0.1
 
     def update(self, env):
         for evt in env.gym.query_viewer_action_events(env.viewer):
@@ -73,6 +86,16 @@ class KeyboardInterface:
                     env.commands[:, 2] + self.increment_yaw,
                     max=self.max_vel_yaw,
                 )
+            elif evt.action == "height_up":
+                env.commands[:, 3] = torch.clamp(
+                    env.commands[:, 3] + self.increment_height,
+                    max=self.max_height,
+                )
+            elif evt.action == "height_down":
+                env.commands[:, 3] = torch.clamp(
+                    env.commands[:, 3] - self.increment_height,
+                    min=self.min_height,
+                )
             elif evt.action == "QUIT":
                 env.exit = True
             elif evt.action == "RESET":
@@ -82,3 +105,7 @@ class KeyboardInterface:
                 evt.action == "space_shoot" or evt.action == "mouse_shoot"
             ) and evt.value > 0:
                 env.shoot()
+
+            elif evt.action == "toggle_belay" and evt.value > 0:
+                if hasattr(env, "toggle_belay"):
+                    env.toggle_belay()
