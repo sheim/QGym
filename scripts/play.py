@@ -6,8 +6,182 @@ from gym.utils import VisualizationRecorder
 # torch needs to be imported after isaacgym imports in local source
 import torch
 import numpy as np
+import os
+import csv
 
 BASE_HEIGHT_REF = 1.0
+
+
+# stability / success tracking
+class RecoveryTracker:
+    def __init__(self, env, output_file="recovery_results.csv"):  # noqa: F811
+        self.env = env
+        self.output_file = output_file
+
+        self.num_envs = env.num_envs
+        self.dt = env.dt
+
+        # success criteria settings
+        self.height_threshold = 0.8 * BASE_HEIGHT_REF
+        self.orientation_threshold = 0.6
+        self.required_stable_time = 0.4  # seconds
+        self.required_stable_steps = int(self.required_stable_time / self.dt)
+
+        # per-env tracking
+        self.stable_counter = torch.zeros(
+            self.num_envs, device=env.device, dtype=torch.long
+        )
+
+        self.success = torch.zeros(self.num_envs, device=env.device, dtype=torch.bool)
+
+        self.time_to_stand = torch.full(
+            (self.num_envs,),
+            -1.0,
+            device=env.device,
+            dtype=torch.float,
+        )
+
+        self.max_tilt = torch.zeros(
+            self.num_envs,
+            device=env.device,
+            dtype=torch.float,
+        )
+
+        self.fall = torch.zeros(
+            self.num_envs,
+            device=env.device,
+            dtype=torch.bool,
+        )
+
+        self.elapsed_time = 0.0
+
+        self._init_csv()
+
+    def _init_csv(self):
+        file_exists = os.path.isfile(self.output_file)
+
+        if not file_exists:
+            with open(self.output_file, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(
+                    [
+                        "torque_scale",
+                        "latency_steps",
+                        "env_id",
+                        "success",
+                        "time_to_stand",
+                        "max_tilt",
+                        "final_height",
+                        "fall",
+                    ]
+                )
+
+    def update(self):
+        # call once every control step during play loop
+
+        env = self.env
+
+        height = env.base_height.flatten()
+
+        tilt = torch.norm(env.projected_gravity[:, :2], dim=1)
+
+        grf = env._compute_grf(grf_norm=True)
+        contact = grf > env.cfg.osc.grf_threshold
+        feet_contact_count = contact.float().sum(dim=1)
+
+        # stable standing criteria
+        height_ok = height > self.height_threshold
+        orientation_ok = tilt < self.orientation_threshold
+        feet_ok = feet_contact_count >= 3
+
+        stable_now = height_ok & orientation_ok & feet_ok
+
+        # consecutive stable steps
+        self.stable_counter[stable_now] += 1
+        self.stable_counter[~stable_now] = 0
+
+        newly_successful = (self.stable_counter >= self.required_stable_steps) & (
+            ~self.success
+        )
+
+        self.success[newly_successful] = True
+        self.time_to_stand[newly_successful] = self.elapsed_time
+
+        # max tilt
+        self.max_tilt = torch.maximum(self.max_tilt, tilt)
+
+        # fall detection
+        if hasattr(env, "to_be_reset"):
+            self.fall |= env.to_be_reset.clone()
+
+        self.elapsed_time += self.dt
+
+    def save_results(self):
+        # call once at end of rollout
+        env = self.env
+
+        torque_scale = (
+            env.cfg.perturbations.torque_scale
+            if env.cfg.perturbations.reduced_torque_enabled
+            else 1.0
+        )
+
+        latency_steps = (
+            env.cfg.perturbations.latency_steps
+            if env.cfg.perturbations.latency_enabled
+            else 0
+        )
+
+        final_height = env.base_height.flatten().detach().cpu()
+        success = self.success.detach().cpu()
+        time_to_stand = self.time_to_stand.detach().cpu()
+        max_tilt = self.max_tilt.detach().cpu()
+        fall = self.fall.detach().cpu()
+
+        with open(self.output_file, "a", newline="") as f:
+            writer = csv.writer(f)
+
+            for i in range(self.num_envs):
+                writer.writerow(
+                    [
+                        float(torque_scale),
+                        int(latency_steps),
+                        int(i),
+                        int(success[i].item()),
+                        float(time_to_stand[i].item()),
+                        float(max_tilt[i].item()),
+                        float(final_height[i].item()),
+                        int(fall[i].item()),
+                    ]
+                )
+
+        print(f"Saved results to: {self.output_file}")
+
+
+def make_results_filename(env):
+    torque_scale = (
+        env.cfg.perturbations.torque_scale
+        if env.cfg.perturbations.reduced_torque_enabled
+        else 1.0
+    )
+
+    latency_steps = (
+        env.cfg.perturbations.latency_steps
+        if env.cfg.perturbations.latency_enabled
+        else 0
+    )
+
+    # 1.0 -> 1 and 0.5 stays 0.5
+    if float(torque_scale).is_integer():
+        torque_str = str(int(torque_scale))
+    else:
+        torque_str = str(torque_scale)
+
+    filename = (
+        f"recovery_results_" f"torque_{torque_str}_" f"latency_{int(latency_steps)}.csv"
+    )
+
+    return filename
 
 
 def get_reward_fns(env):
@@ -17,6 +191,7 @@ def get_reward_fns(env):
         "tracking_lin_vel",
         "swing_grf",
         "stance_grf",
+        "cursorial",
     ]
 
     out = {}
@@ -45,9 +220,19 @@ def setup(args):
     train_cfg.logging.enable_local_saving = False
     runner = task_registry.make_alg_runner(env, train_cfg)
     # runner.actor_cfg["disable_actions"] = True
-
+    env.set_belay(True)
     # * switch to evaluation mode (dropout for example)
     runner.switch_to_eval()
+
+    # enable perturbations
+    env.cfg.perturbations.enabled = True
+
+    env.cfg.perturbations.reduced_torque_enabled = True
+    env.cfg.perturbations.torque_scale = args.torque_scale
+
+    env.cfg.perturbations.latency_enabled = True
+    env.cfg.perturbations.latency_steps = args.latency_steps
+
     return env, runner, train_cfg
 
 
@@ -112,11 +297,23 @@ def play(env, runner, train_cfg):
 
     reward_log = {
         "reward_names": np.array(reward_names, dtype=object),
+        "height_command": np.zeros((num_steps,), dtype=np.float32),
+        "height_actual": np.zeros((num_steps,), dtype=np.float32),
+        "switch_height": np.zeros((num_steps,), dtype=np.float32),
         "total_reward": np.zeros((num_steps,), dtype=np.float32),
     }
 
     for name in reward_names:
         reward_log[name] = np.zeros((num_steps,), dtype=np.float32)
+
+    os.makedirs(args.results_dir, exist_ok=True)
+
+    results_file = os.path.join(
+        args.results_dir,
+        f"recovery_results_torque_{args.torque_scale:g}_latency_{args.latency_steps}.csv",
+    )
+
+    tracker = RecoveryTracker(env, output_file=results_file)
 
     obs_vars = [
         "base_height",
@@ -130,6 +327,15 @@ def play(env, runner, train_cfg):
     ]
 
     obs_log = create_obs_logging_dict(env, obs_vars, num_steps)
+
+    # height reward logging
+    height_rew = np.zeros((num_steps,), dtype=np.float32)
+    height_actual = np.zeros((num_steps,), dtype=np.float32)
+    height_target = np.zeros((num_steps,), dtype=np.float32)
+
+    # record init pos/height
+    OUT_DIR = "play_logs"
+    os.makedirs(OUT_DIR, exist_ok=True)
 
     # track actual number of simulation steps
     actual_steps = 0
@@ -149,24 +355,27 @@ def play(env, runner, train_cfg):
         interface = KeyboardInterface(env)
         env.commands[:, 3] = BASE_HEIGHT_REF
 
+    max_play_steps = getattr(args, "max_steps", 10 * int(env.max_episode_length))
+    headless = getattr(args, "headless", False)
+
     try:
-        for i in range(10 * int(env.max_episode_length)):
-            if COMMANDS_INTERFACE:
+        for i in range(max_play_steps):
+            if COMMANDS_INTERFACE and not headless:
                 interface.update(env)
-            if env.cfg.viewer.record:
+
+            if env.cfg.viewer.record and not headless:
                 recorder.update(i)
 
-            # print target/actual height (m)
             target_height = env.commands[0, 3].item()
             if (last_height_cmd is None) or (
                 abs(target_height - last_height_cmd) > 1e-6
             ):
                 actual_height = env.base_height[0].item()
-
                 print(
                     f"[HEIGHT] actual = {actual_height:.3f} m | "
                     f"target = {target_height:.3f} m | "
-                    f"error = {actual_height - target_height:.3f}"
+                    f"error = {actual_height - target_height:.3f} | "
+                    f"descend mode = {(env.commands[:, 3][0]) < 1.0}"
                 )
                 last_height_cmd = target_height
 
@@ -175,21 +384,33 @@ def play(env, runner, train_cfg):
                 runner.get_inference_actions(),
                 runner.actor_cfg["disable_actions"],
             )
-            env.step()
 
-            # log only actual simulation steps
+            env.step()
+            tracker.update()
+
+            if not headless and hasattr(env, "draw_belay_debug"):
+                env.draw_belay_debug(force_scale=0.002)
+
             if actual_steps < num_steps:
-                # log joints
                 log_data["step"][actual_steps] = actual_steps
                 log_data["target_pos"][:, actual_steps, :] = env.dof_pos_target
                 log_data["actual_pos"][:, actual_steps, :] = env.dof_pos
                 log_data["torque"][:, actual_steps, :] = env.torques
 
-                # log observations
                 log_obs_step(env, obs_log, obs_vars, actual_steps)
 
-                total = 0.0
+                r = env._reward_tracking_height()
+                height_rew[actual_steps] = r[0].item()
+                height_actual[actual_steps] = env.base_height[0].item()
+                height_target[actual_steps] = env.commands[0, 3].item()
 
+                reward_log["height_actual"][actual_steps] = env.base_height[0].item()
+                reward_log["height_command"][actual_steps] = env.commands[0, 3].item()
+                reward_log["switch_height"][actual_steps] = env._switch_height()[
+                    0
+                ].item()
+
+                total = 0.0
                 for name, fn in reward_fns.items():
                     r = fn()
                     r0 = r[0].item()
@@ -199,12 +420,17 @@ def play(env, runner, train_cfg):
                 reward_log["total_reward"][actual_steps] = total
                 actual_steps += 1
 
-            env.check_exit()  # user exit or viewer closed
+            if not headless:
+                env.check_exit()
+
+        print(f"\n[INFO] Finished fixed play run: {max_play_steps} steps")
 
     except KeyboardInterrupt:
         print("\n[INFO] Interrupted by user, saving logs...")
+
     except SystemExit:
         print("\n[INFO] Viewer closed, saving logs...")
+
     finally:
         if env.cfg.viewer.record:
             if hasattr(recorder, "close"):
@@ -217,6 +443,7 @@ def play(env, runner, train_cfg):
                 recorder.finish()
                 print("[RECORD] recorder.finish() called")
         # slice to actual steps before saving
+        """
         log_data_cpu = {
             k: (v.detach().cpu().numpy() if torch.is_tensor(v) else v)
             for k, v in log_data.items()
@@ -245,6 +472,10 @@ def play(env, runner, train_cfg):
             else:
                 reward_log_cpu[k] = v
         np.savez_compressed("reward_logs.npz", **reward_log_cpu)
+        """
+
+        # save recovery results
+        tracker.save_results()
 
 
 if __name__ == "__main__":

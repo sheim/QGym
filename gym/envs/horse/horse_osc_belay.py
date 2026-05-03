@@ -10,6 +10,7 @@ class HorseOscBelay(HorseOsc):
 
     def _init_buffers(self):
         super()._init_buffers()
+        self._init_perturbation_buffers()
         self._init_belay_buffers()
 
     def _init_belay_buffers(self):
@@ -21,7 +22,7 @@ class HorseOscBelay(HorseOsc):
             dtype=torch.bool,
         )
 
-        # one scalar upward force per env
+        # belay force per env
         self.belay_force = torch.full(
             (self.num_envs,),
             self.cfg.belay.mass_kg * 9.81,
@@ -36,8 +37,7 @@ class HorseOscBelay(HorseOsc):
             dtype=torch.float,
         )
 
-        # per-env generalized force vector
-        # [Fx, Fy, Fz] for each env
+        # per-env belay force vector [Fx, Fy, Fz]
         self.belay_force_vec = torch.zeros(
             (self.num_envs, 3),
             device=self.device,
@@ -85,23 +85,95 @@ class HorseOscBelay(HorseOsc):
 
         print("[BELAY] sim body ids:", self.base_body_ids[:5])
 
+        # rigid body state tensor: position is columns 0:3
+        rb_state_tensor = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        self.rb_states = gymtorch.wrap_tensor(rb_state_tensor).view(-1, 13)
+
+        # make sure rb_states are current before setting anchor
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+        # fixed overhead anchor point for each env
+        # starts above the initial front_base position
+        self.belay_anchor_pos = torch.zeros(
+            (self.num_envs, 3),
+            device=self.device,
+            dtype=torch.float,
+        )
+
+        initial_body_pos = self.rb_states[self.base_body_ids, 0:3]
+        self.belay_anchor_pos[:] = initial_body_pos
+
+        # vertical offset above the initial body position
+        self.belay_anchor_pos[:, 2] += self.cfg.belay.anchor_height
+
+        print("[BELAY] anchor pos:", self.belay_anchor_pos[:5])
+
+        self.pending_belay_anchor_reset = torch.zeros(
+            self.num_envs, device=self.device, dtype=torch.bool
+        )
+
+        max_latency = self.cfg.perturbations.latency_steps
+
+        self.action_delay_buffer = torch.zeros(
+            self.num_envs,
+            max_latency + 1,
+            self.num_dof,
+            device=self.device,
+            dtype=torch.float,
+        )
+
+    def _reset_system(self, env_ids):
+        super()._reset_system(env_ids)
+
+        self._reset_belay_anchor(env_ids)
+        self.pending_belay_anchor_reset[env_ids] = True
+
     def _post_physx_step(self):
         super()._post_physx_step()
+
+        pending_ids = torch.nonzero(self.pending_belay_anchor_reset).flatten()
+        if len(pending_ids) > 0:
+            self.gym.refresh_rigid_body_state_tensor(self.sim)
+            self._reset_belay_anchor(pending_ids)
+            self.pending_belay_anchor_reset[pending_ids] = False
+
         self._apply_belay_force()
         return None
 
+    def _reset_belay_anchor(self, env_ids):
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+        front_base_pos = self.rb_states[self.base_body_ids[env_ids], 0:3]
+
+        self.belay_anchor_pos[env_ids, 0] = front_base_pos[:, 0]
+        self.belay_anchor_pos[env_ids, 1] = front_base_pos[:, 1]
+        self.belay_anchor_pos[env_ids, 2] = (
+            front_base_pos[:, 2] + self.cfg.belay.anchor_height
+        )
+
     def _update_belay_force_buffer(self):
-        # update the per-env belay force vector.
+        # update the per-env belay force vector
         self.belay_force_vec.zero_()
 
-        active = self.belay_enabled.float()
-        scaled_force = active * self.belay_force_scale * self.belay_force
+        # current position of belay attachment body
+        body_pos = self.rb_states[self.base_body_ids, 0:3]  # (num_envs, 3)
 
-        # upward force only
-        self.belay_force_vec[:, 2] = scaled_force
+        # vector from body to fixed anchor
+        direction = self.belay_anchor_pos - body_pos
+
+        # normalize safely
+        norm = torch.norm(direction, dim=1, keepdim=True).clamp(min=1e-6)
+        unit_direction = direction / norm
+
+        active = self.belay_enabled.float()
+        force_mag = active * self.belay_force_scale * self.belay_force  # (num_envs,)
+
+        self.belay_force_vec[:] = unit_direction * force_mag.unsqueeze(1)
 
     def _apply_belay_force(self):
         # map per-env belay force vectors into rigid-body force tensor and apply them
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
         self.rb_forces.zero_()
         self.rb_torques.zero_()
 
@@ -146,3 +218,110 @@ class HorseOscBelay(HorseOsc):
             f"body_id={self.base_body_ids[env_id].item()} | "
             f"force_vec={self.belay_force_vec[env_id].detach().cpu().numpy()}"
         )
+
+    def draw_belay_debug(self, force_scale=0.002):
+        if self.viewer is None:
+            return
+
+        self.gym.clear_lines(self.viewer)
+
+        # make sure rigid body states are current
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+        # sim rigid body id for "front_base"
+        front_base_pos = self.rb_states[self.base_body_ids, 0:3]
+
+        anchor_pos = self.belay_anchor_pos
+
+        force_end = front_base_pos + force_scale * self.belay_force_vec
+
+        red = [1.0, 0.0, 0.0]
+        green = [0.0, 1.0, 0.0]
+
+        for i in range(self.num_envs):
+            # red tether line: front_base -> anchor
+            self.gym.add_lines(
+                self.viewer,
+                self.envs[i],
+                1,
+                [
+                    front_base_pos[i, 0].item(),
+                    front_base_pos[i, 1].item(),
+                    front_base_pos[i, 2].item(),
+                    anchor_pos[i, 0].item(),
+                    anchor_pos[i, 1].item(),
+                    anchor_pos[i, 2].item(),
+                ],
+                red,
+            )
+
+            # green force vector: front_base -> front_base + scaled force
+            self.gym.add_lines(
+                self.viewer,
+                self.envs[i],
+                1,
+                [
+                    front_base_pos[i, 0].item(),
+                    front_base_pos[i, 1].item(),
+                    front_base_pos[i, 2].item(),
+                    force_end[i, 0].item(),
+                    force_end[i, 1].item(),
+                    force_end[i, 2].item(),
+                ],
+                green,
+            )
+
+    def _compute_torques(self):
+        torques = super()._compute_torques()
+
+        if (
+            self.cfg.perturbations.enabled
+            and self.cfg.perturbations.reduced_torque_enabled
+        ):
+            torques = torques * self.cfg.perturbations.torque_scale
+
+        return torques
+
+    def _apply_target_latency(self):
+        if not (
+            self.cfg.perturbations.enabled and self.cfg.perturbations.latency_enabled
+        ):
+            return
+
+        delay = self.cfg.perturbations.latency_steps
+
+        # shift history buffer back
+        self.dof_pos_target_delay_buffer[:, 1:] = self.dof_pos_target_delay_buffer[
+            :, :-1
+        ].clone()
+
+        # newest target goes in front
+        self.dof_pos_target_delay_buffer[:, 0] = self.dof_pos_target.clone()
+
+        # apply delayed target
+        self.dof_pos_target = self.dof_pos_target_delay_buffer[:, delay]
+
+    def _pre_compute_torques(self):
+        super()._pre_compute_torques()
+
+        if self.cfg.perturbations.enabled:
+            if self.cfg.perturbations.latency_enabled:
+                self._apply_target_latency()
+
+    def _init_perturbation_buffers(self):
+        max_latency = self.cfg.perturbations.max_latency_steps
+
+        self.dof_pos_target_delay_buffer = torch.zeros(
+            self.num_envs,
+            max_latency + 1,
+            self.num_dof,
+            device=self.device,
+            dtype=torch.float,
+        )
+
+    def _pre_decimation_step(self):
+        super()._pre_decimation_step()
+
+        if self.cfg.perturbations.enabled:
+            if self.cfg.perturbations.latency_enabled:
+                self._apply_target_latency()
