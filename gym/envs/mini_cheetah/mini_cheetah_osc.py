@@ -183,27 +183,50 @@ class MiniCheetahOsc(MiniCheetah):
             torch.randn((len(env_ids), 1), device=self.device) * self.cfg.commands.var
         )
 
+        # set height command to BASE_HEIGHT_REF
+        self.commands[env_ids, 3] = self.command_ranges["height"]
+
         if 0 in self.cfg.commands.ranges.lin_vel_x:
-            # * with 20% chance, reset to 0 commands except for forward
-            self.commands[env_ids, 1:] *= (
+            # * with 20% chance, reset to 0 commands except for forward and height
+            self.commands[env_ids, 1:3] *= (
                 torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
                 < 0.8
             ).unsqueeze(1)
-            # * with 20% chance, reset to 0 commands except for rotation
+            # * with 20% chance, reset to 0 commands except for rotation and height
             self.commands[env_ids, :2] *= (
                 torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
                 < 0.8
             ).unsqueeze(1)
-            # * with 10% chance, reset to 0
-            self.commands[env_ids, :] *= (
+            # * with 10% chance, reset to 0 except for height
+            self.commands[env_ids, :3] *= (
                 torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(1)
                 < 0.9
             ).unsqueeze(1)
 
-            # debug distribution of commands
-            if not os.path.isfile("commands.pt"):
-                torch.save(self.commands, "commands.pt")
-                print("saved commands.pt")
+        # with 10% chance, reset all commands to 0 and randomize height
+        rand_float = torch_rand_float(
+            0, 1, (len(env_ids), 1), device=self.device
+        ).squeeze(1)
+        mask_9 = rand_float < 0.9
+        mask_1 = rand_float >= 0.9
+        self.commands[env_ids, :3] *= mask_9.unsqueeze(1)
+        random_mult = self.command_ranges["height"] * (
+            torch.mul(
+                mask_1,
+                torch_rand_float(0, 1, (len(env_ids), 1), device=self.device).squeeze(
+                    1
+                ),
+            )
+        )
+        self.commands[env_ids, 3] -= random_mult
+
+        # debug distribution of commands
+        if not os.path.isfile("commands.pt"):
+            torch.save(self.commands, "commands.pt")
+            torch.save(rand_float, "rand_float.pt")
+            torch.save(mask_9, "m9.pt")
+            torch.save(random_mult, "random_mult.pt")
+            print("saved commands.pt")
 
         if self.cfg.osc.randomize_osc_params:
             self._resample_osc_params(env_ids)

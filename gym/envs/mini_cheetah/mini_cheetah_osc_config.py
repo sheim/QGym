@@ -105,6 +105,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
             lin_vel_x = [-1.0, 0.0, 1.0, 3.0]  # min max [m/s]
             lin_vel_y = 1.0  # [-1., 0, 1.]  # max [m/s]
             yaw_vel = 3.0  # [-6., -3., 0., 3., 6.]    # max [rad/s]
+            height = BASE_HEIGHT_REF
 
     class push_robots(MiniCheetahCfg.push_robots):
         toggle = True
@@ -284,6 +285,6 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "FullSend"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 5  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
