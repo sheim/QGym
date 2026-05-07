@@ -1,5 +1,4 @@
 import torch
-import os
 from isaacgym.torch_utils import torch_rand_float
 
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
@@ -220,14 +219,6 @@ class MiniCheetahOsc(MiniCheetah):
         )
         self.commands[env_ids, 3] -= random_mult
 
-        # debug distribution of commands
-        if not os.path.isfile("commands.pt"):
-            torch.save(self.commands, "commands.pt")
-            torch.save(rand_float, "rand_float.pt")
-            torch.save(mask_9, "m9.pt")
-            torch.save(random_mult, "random_mult.pt")
-            print("saved commands.pt")
-
         if self.cfg.osc.randomize_osc_params:
             self._resample_osc_params(env_ids)
 
@@ -284,6 +275,18 @@ class MiniCheetahOsc(MiniCheetah):
         return -torch.mean(
             torch.square(self.dof_pos[:, 0:12:3] / self.scales["dof_pos"][0]), dim=1
         )
+
+    # override min base height, replaced by tracking_height
+    def _reward_min_base_height(self):
+        return 0
+
+    # somehow broken gives large rewards
+    def _reward_tracking_height(self):
+        """Reward using squared exponential error"""
+        height_error = (self.commands[:, 3:4] - self.base_height) / self.scales[
+            "base_height"
+        ]
+        return torch.sum(self._sqrdexp(height_error), dim=1)
 
     def _reward_swing_grf(self):
         # Reward non-zero grf during swing (0 to pi)

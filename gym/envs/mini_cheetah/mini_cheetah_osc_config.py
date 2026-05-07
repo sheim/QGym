@@ -238,12 +238,13 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             class weights:
                 tracking_lin_vel = 4.0
                 tracking_ang_vel = 2.0
+                tracking_height = 2.0
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.0
                 orientation = 1.0
                 torques = 5.0e-6
                 dof_vel = 0.0
-                min_base_height = 1.0
+                min_base_height = 1.0  # no effect
                 collision = 0
                 action_rate = 0.1  # -0.01
                 action_rate2 = 0.01  # -0.001
@@ -285,6 +286,6 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "FullSend"
-        max_iterations = 5  # number of policy updates
+        max_iterations = 500  # number of policy updates
         algorithm_class_name = "PPO2"
         num_steps_per_env = 32
