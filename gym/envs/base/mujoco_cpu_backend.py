@@ -96,6 +96,9 @@ class MuJocoCPUBackend(MuJocoBackendBase):
         qoff = self._qpos_offset
         voff = self._qvel_offset
         for i, d in enumerate(self._datas):
+            # cfrc_ext is only populated with constraint/contact forces by
+            # mj_rnePostConstraint; mj_step alone leaves it at zero.
+            mujoco.mj_rnePostConstraint(self._mjm, d)
             self._dof_pos_view[i] = torch.from_numpy(d.qpos[qoff:].copy())
             self._dof_vel_view[i] = torch.from_numpy(d.qvel[voff:].copy())
             self._contact_forces_t[i] = torch.from_numpy(d.cfrc_ext[:, 3:6].copy())
@@ -147,6 +150,7 @@ class MuJocoCPUBackend(MuJocoBackendBase):
         if self._viewer is None:
             if platform.system() == "Darwin":
                 import mujoco.viewer as _mjv
+
                 if _mjv._MJPYTHON is None:
                     raise RuntimeError(
                         "MuJoCo passive viewer on macOS requires mjpython.\n"

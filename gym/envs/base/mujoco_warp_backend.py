@@ -131,6 +131,9 @@ class MuJocoWarpBackend(MuJocoBackendBase):
                 self._qfrc_t.copy_(torques)
             mjw.forward(self._m, self._d)
             mjw.euler(self._m, self._d)
+            # cfrc_ext is only populated with constraint/contact forces by
+            # rne_postconstraint; forward+euler alone leave it at zero.
+            mjw.rne_postconstraint(self._m, self._d)
 
     # ── Reset ──────────────────────────────────────────────────────────────────
 
