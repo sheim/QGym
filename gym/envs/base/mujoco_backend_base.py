@@ -103,6 +103,7 @@ class MuJocoBackendBase(SimBackend):
             ground = spec.worldbody.add_geom()
             ground.type = mujoco.mjtGeom.mjGEOM_PLANE
             ground.size = [100, 100, 0.1]
+            ground.rgba = [0.25, 0.45, 0.30, 1.0]  # forest green, contrasts grey robot
             sf = getattr(terrain_cfg, "static_friction", 1.0)
             df = getattr(terrain_cfg, "dynamic_friction", 1.0)
             ground.friction = [sf, df, 0.0001]
@@ -110,9 +111,11 @@ class MuJocoBackendBase(SimBackend):
         mjm = spec.compile()
 
         # Viewer-friendly defaults
-        mjm.vis.rgba.fog[:] = [0.9, 0.9, 0.95, 1.0]
         mjm.vis.global_.azimuth = 150
         mjm.vis.global_.elevation = -20
+        mjm.vis.headlight.ambient[:] = [0.5, 0.5, 0.5]
+        mjm.vis.headlight.diffuse[:] = [0.7, 0.7, 0.7]
+        mjm.vis.headlight.specular[:] = [0.2, 0.2, 0.2]
 
         # Physics parameters from cfg
         sim_dt = getattr(cfg, "sim_dt", None)
