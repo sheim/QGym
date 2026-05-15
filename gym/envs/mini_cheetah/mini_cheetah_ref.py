@@ -1,6 +1,9 @@
 import torch
 import pandas as pd
-from isaacgym.torch_utils import torch_rand_float, to_torch
+
+
+from gym.utils.gym_math_wrappers import torch_rand_float
+from gym.utils.torch_quat import to_torch
 
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah

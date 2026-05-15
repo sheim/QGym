@@ -138,9 +138,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 0.0
-                swing_grf = 1.5
-                stance_grf = 1.5
+                reference_traj = 1.0
+                swing_grf = 0.0
+                stance_grf = 0.0
 
             class termination_weight:
                 termination = 0.15

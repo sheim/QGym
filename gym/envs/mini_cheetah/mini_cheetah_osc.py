@@ -1,10 +1,12 @@
 import torch
 import numpy as np
-from isaacgym.torch_utils import torch_rand_float
+
+try:
+    from isaacgym.torch_utils import torch_rand_float
+except ImportError:
+    from gym.utils.gym_math_wrappers import torch_rand_float
 
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
-
-from isaacgym import gymtorch
 
 MINI_CHEETAH_WEIGHT = 8.292 * 9.81  # Weight of mini cheetah in Newtons
 
@@ -274,11 +276,9 @@ class MiniCheetahOsc(MiniCheetah):
 
     def perturb_base_velocity(self, velocity_delta, env_ids=None):
         if env_ids is None:
-            env_ids = [range(self.num_envs)]
+            env_ids = range(self.num_envs)
         self.root_states[env_ids, 7:10] += velocity_delta
-        self.gym.set_actor_root_state_tensor(
-            self.sim, gymtorch.unwrap_tensor(self.root_states)
-        )
+        self._backend.set_all_root_states()
 
     def _compute_grf(self, grf_norm=True):
         grf = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
