@@ -43,8 +43,9 @@ class Pendulum(FixedRobot):
         self.dof_vel[env_ids] = grid[env_ids, 1].unsqueeze(-1)
 
     def _reward_theta(self):
-        theta_rwd = torch.cos(self.dof_pos[:, 0])  # no scaling
-        return self._sqrdexp(theta_rwd)
+        # 0 at UP (theta=0), 2 at DOWN (theta=pi); sqrdexp peaks at err=0
+        theta_err = 1.0 - torch.cos(self.dof_pos[:, 0])
+        return self._sqrdexp(theta_err)
 
     def _reward_omega(self):
         omega_rwd = torch.square(self.dof_vel[:, 0] / self.scales["dof_vel"])
