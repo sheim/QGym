@@ -100,7 +100,7 @@ class MuJocoBackendBase(SimBackend):
             freejoint = root_body.add_freejoint()
             freejoint.name = "root"
 
-        # Menagerie-style viewer defaults (apply regardless of ground plane)
+        # Menagerie-style viewer defaults
         spec.visual.global_.azimuth = 150
         spec.visual.global_.elevation = -20
         spec.visual.quality.shadowsize = 4096
@@ -108,21 +108,28 @@ class MuJocoBackendBase(SimBackend):
         spec.visual.headlight.diffuse = [0.6, 0.6, 0.6]
         spec.visual.headlight.specular = [0.0, 0.0, 0.0]
 
-        # Add ground plane if terrain config requests it
+        # Gradient skybox + directional light apply to all scenes
+        sky = spec.add_texture()
+        sky.name = "skybox"
+        sky.type = mujoco.mjtTexture.mjTEXTURE_SKYBOX
+        sky.builtin = mujoco.mjtBuiltin.mjBUILTIN_GRADIENT
+        sky.rgb1 = [0.3, 0.5, 0.7]
+        sky.rgb2 = [0.0, 0.0, 0.0]
+        sky.width = 512
+        sky.height = 3072
+
+        light = spec.worldbody.add_light()
+        light.type = mujoco.mjtLightType.mjLIGHT_DIRECTIONAL
+        light.pos = [0, 0, 1.5]
+        light.dir = [0, 0, -1]
+        light.castshadow = True
+
+        # Checker ground plane only when terrain config requests one
         terrain_cfg = getattr(cfg, "terrain", None)
         if (
             terrain_cfg is not None
             and getattr(terrain_cfg, "mesh_type", None) == "plane"
         ):
-            sky = spec.add_texture()
-            sky.name = "skybox"
-            sky.type = mujoco.mjtTexture.mjTEXTURE_SKYBOX
-            sky.builtin = mujoco.mjtBuiltin.mjBUILTIN_GRADIENT
-            sky.rgb1 = [0.3, 0.5, 0.7]
-            sky.rgb2 = [0.0, 0.0, 0.0]
-            sky.width = 512
-            sky.height = 3072
-
             gtex = spec.add_texture()
             gtex.name = "groundplane"
             gtex.type = mujoco.mjtTexture.mjTEXTURE_2D
@@ -140,12 +147,6 @@ class MuJocoBackendBase(SimBackend):
             gmat.texrepeat = [5, 5]
             gmat.texuniform = True
             gmat.reflectance = 0.2
-
-            light = spec.worldbody.add_light()
-            light.type = mujoco.mjtLightType.mjLIGHT_DIRECTIONAL
-            light.pos = [0, 0, 1.5]
-            light.dir = [0, 0, -1]
-            light.castshadow = True
 
             ground = spec.worldbody.add_geom()
             ground.type = mujoco.mjtGeom.mjGEOM_PLANE
