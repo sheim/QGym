@@ -5,6 +5,7 @@ plane, physics params), metadata extraction, and contact index building.
 Subclasses implement tensor allocation, step, reset, and rendering.
 """
 
+import os
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -90,7 +91,7 @@ class MuJocoBackendBase(SimBackend):
         # Cache URDF effort/velocity limits — MuJoCo drops these on import
         # (it expects them on actuators, but we have none).
         self._urdf_limits = self._parse_urdf_limits(asset_path)
-        spec = mujoco.MjSpec.from_file(asset_path)
+        spec = self._load_urdf_spec(asset_path)
         spec.compiler.balanceinertia = True
 
         # Add free joint for floating-base robots
@@ -99,28 +100,62 @@ class MuJocoBackendBase(SimBackend):
             freejoint = root_body.add_freejoint()
             freejoint.name = "root"
 
+        # Menagerie-style viewer defaults (apply regardless of ground plane)
+        spec.visual.global_.azimuth = 150
+        spec.visual.global_.elevation = -20
+        spec.visual.quality.shadowsize = 4096
+        spec.visual.headlight.ambient = [0.3, 0.3, 0.3]
+        spec.visual.headlight.diffuse = [0.6, 0.6, 0.6]
+        spec.visual.headlight.specular = [0.0, 0.0, 0.0]
+
         # Add ground plane if terrain config requests it
         terrain_cfg = getattr(cfg, "terrain", None)
         if (
             terrain_cfg is not None
             and getattr(terrain_cfg, "mesh_type", None) == "plane"
         ):
+            sky = spec.add_texture()
+            sky.name = "skybox"
+            sky.type = mujoco.mjtTexture.mjTEXTURE_SKYBOX
+            sky.builtin = mujoco.mjtBuiltin.mjBUILTIN_GRADIENT
+            sky.rgb1 = [0.3, 0.5, 0.7]
+            sky.rgb2 = [0.0, 0.0, 0.0]
+            sky.width = 512
+            sky.height = 3072
+
+            gtex = spec.add_texture()
+            gtex.name = "groundplane"
+            gtex.type = mujoco.mjtTexture.mjTEXTURE_2D
+            gtex.builtin = mujoco.mjtBuiltin.mjBUILTIN_CHECKER
+            gtex.mark = mujoco.mjtMark.mjMARK_EDGE
+            gtex.rgb1 = [0.2, 0.3, 0.4]
+            gtex.rgb2 = [0.1, 0.2, 0.3]
+            gtex.markrgb = [0.8, 0.8, 0.8]
+            gtex.width = 300
+            gtex.height = 300
+
+            gmat = spec.add_material()
+            gmat.name = "groundplane"
+            gmat.textures[mujoco.mjtTextureRole.mjTEXROLE_RGB] = "groundplane"
+            gmat.texrepeat = [5, 5]
+            gmat.texuniform = True
+            gmat.reflectance = 0.2
+
+            light = spec.worldbody.add_light()
+            light.type = mujoco.mjtLightType.mjLIGHT_DIRECTIONAL
+            light.pos = [0, 0, 1.5]
+            light.dir = [0, 0, -1]
+            light.castshadow = True
+
             ground = spec.worldbody.add_geom()
             ground.type = mujoco.mjtGeom.mjGEOM_PLANE
-            ground.size = [100, 100, 0.1]
-            ground.rgba = [0.25, 0.45, 0.30, 1.0]  # forest green, contrasts grey robot
+            ground.size = [0, 0, 0.05]
+            ground.material = "groundplane"
             sf = getattr(terrain_cfg, "static_friction", 1.0)
             df = getattr(terrain_cfg, "dynamic_friction", 1.0)
             ground.friction = [sf, df, 0.0001]
 
         mjm = spec.compile()
-
-        # Viewer-friendly defaults
-        mjm.vis.global_.azimuth = 150
-        mjm.vis.global_.elevation = -20
-        mjm.vis.headlight.ambient[:] = [0.5, 0.5, 0.5]
-        mjm.vis.headlight.diffuse[:] = [0.7, 0.7, 0.7]
-        mjm.vis.headlight.specular[:] = [0.2, 0.2, 0.2]
 
         # Physics parameters from cfg
         sim_dt = getattr(cfg, "sim_dt", None)
@@ -225,6 +260,39 @@ class MuJocoBackendBase(SimBackend):
                 effort[i] = eff
                 velocity[i] = vel
         return {"lower": lower, "upper": upper, "velocity": velocity, "effort": effort}
+
+    @staticmethod
+    def _load_urdf_spec(urdf_path: str) -> "mujoco.MjSpec":
+        """Load URDF as MjSpec, preserving <visual> meshes where MuJoCo supports them.
+
+        MuJoCo's URDF importer discards <visual> geoms during file parse unless
+        the URDF embeds <mujoco><compiler discardvisual="false"/></mujoco>. The
+        same embedded tag also leaves the spec mutable post-parse — without it,
+        later add_texture/add_material calls are silently pruned at compile.
+        We always inject the tag; for URDFs whose <visual> blocks reference
+        meshes MuJoCo can't read (.dae/.collada), we first strip those blocks
+        so the compile doesn't fail looking for a decoder.
+        """
+        root = ET.parse(urdf_path).getroot()
+        has_unsupported = any(
+            (m.get("filename") or "").lower().endswith((".dae", ".collada"))
+            for m in root.iter("mesh")
+        )
+        if has_unsupported:
+            for link in root.iter("link"):
+                for v in list(link.findall("visual")):
+                    link.remove(v)
+        mj = root.find("mujoco")
+        if mj is None:
+            mj = ET.SubElement(root, "mujoco")
+        comp = mj.find("compiler")
+        if comp is None:
+            comp = ET.SubElement(mj, "compiler")
+        comp.set("discardvisual", "false")
+        comp.set("strippath", "false")
+        spec = mujoco.MjSpec.from_string(ET.tostring(root, encoding="unicode"))
+        spec.modelfiledir = os.path.abspath(os.path.dirname(urdf_path))
+        return spec
 
     @staticmethod
     def _parse_urdf_limits(urdf_path: str) -> dict:
