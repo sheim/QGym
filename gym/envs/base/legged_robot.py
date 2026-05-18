@@ -137,8 +137,9 @@ class LeggedRobot(BaseTask):
 
     def _initialize_sim(self):
         """Creates simulation, terrain and environments."""
+        # axis idx still relevant with MJC?
         self.up_axis_idx = 2  # 2 for z, 1 for y -> adapt gravity accordingly
-        mesh_type = self.cfg.terrain.mesh_type
+        mesh_type = self.cfg.terrain.mesh_type  # deprecated?
         if mesh_type in ["heightfield", "trimesh"]:
             self.terrain = Terrain(self.cfg.terrain, self.num_envs)
 
@@ -926,7 +927,7 @@ class LeggedRobot(BaseTask):
 
     def _parse_cfg(self, cfg):
         super()._parse_cfg(cfg)
-        self.num_projs = self.cfg.env.num_projectiles
+        # self.num_projs = self.cfg.env.num_projectiles # deprecated
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
         self.cfg.push_interval = np.ceil(self.cfg.push_robots.interval_s / self.dt)
 

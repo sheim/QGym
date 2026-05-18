@@ -50,7 +50,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         fix_base_link = False
         self_collisions = 1
         flip_visual_attachments = False  # deprecated?
-        disable_gravity = True
+        disable_gravity = False
         disable_motors = False
 
     class reward_settings(MiniCheetahCfg.reward_settings):
@@ -71,7 +71,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     runner_class_name = "OnPolicyRunner"
 
     class actor(MiniCheetahRunnerCfg.actor):
-        frequency = 100
+        frequency = 50
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         layer_norm = [True, True, False]
@@ -89,7 +89,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         normalize_obs = False
 
         actions = ["dof_pos_target"]
-        disable_actions = True
+        disable_actions = False
 
         class noise:
             scale = 1.0
