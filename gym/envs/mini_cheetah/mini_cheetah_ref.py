@@ -33,7 +33,7 @@ class MiniCheetahRef(MiniCheetah):
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
         self.phase[env_ids] = torch_rand_float(
-            0, torch.pi, shape=self.phase[env_ids].shape, device=self.device
+            0, 2 * torch.pi, shape=self.phase[env_ids].shape, device=self.device
         )
 
     def _post_physx_step(self):

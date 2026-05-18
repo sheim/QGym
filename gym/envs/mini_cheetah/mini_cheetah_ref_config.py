@@ -26,7 +26,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
         gait_freq = 3.0
-        ctrl_frequency = 500
+        ctrl_frequency = 50
         desired_sim_frequency = 500
 
     class commands(MiniCheetahCfg.commands):
@@ -49,8 +49,8 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         collapse_fixed_joints = False
         fix_base_link = False
         self_collisions = 1
-        flip_visual_attachments = False
-        disable_gravity = False
+        flip_visual_attachments = False  # deprecated?
+        disable_gravity = True
         disable_motors = False
 
     class reward_settings(MiniCheetahCfg.reward_settings):
@@ -89,7 +89,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         normalize_obs = False
 
         actions = ["dof_pos_target"]
-        disable_actions = False
+        disable_actions = True
 
         class noise:
             scale = 1.0

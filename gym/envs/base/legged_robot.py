@@ -273,20 +273,22 @@ class LeggedRobot(BaseTask):
                 self.num_dof, dtype=torch.float, device=self.device
             )
 
-            for i in range(len(props)):
-                self.dof_pos_limits[i, 0] = props["lower"][i].item()
-                self.dof_pos_limits[i, 1] = props["upper"][i].item()
-                self.dof_vel_limits[i] = props["velocity"][i].item()
-                self.torque_limits[i] = props["effort"][i].item()
-                # * soft limits
-                m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
-                r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
-                self.dof_pos_limits[i, 0] = (
-                    m - 0.5 * r * self.cfg.reward_settings.soft_dof_pos_limit
-                )
-                self.dof_pos_limits[i, 1] = (
-                    m + 0.5 * r * self.cfg.reward_settings.soft_dof_pos_limit
-                )
+            # props is a dictionary, instead of being an nd array
+            self.dof_pos_limits[:, 0] = torch.from_numpy(props["lower"])
+            self.dof_pos_limits[:, 1] = torch.from_numpy(props["upper"])
+            self.dof_vel_limits = torch.from_numpy(props["velocity"])
+            self.torque_limits = torch.from_numpy(props["effort"])
+
+            # for i in range(len(props)):
+            # * soft limits
+            m = (self.dof_pos_limits[:, 0] + self.dof_pos_limits[:, 1]) / 2
+            r = self.dof_pos_limits[:, 1] - self.dof_pos_limits[:, 0]
+            self.dof_pos_limits[:, 0] = (
+                m - 0.5 * r * self.cfg.reward_settings.soft_dof_pos_limit
+            )
+            self.dof_pos_limits[:, 1] = (
+                m + 0.5 * r * self.cfg.reward_settings.soft_dof_pos_limit
+            )
         return props
 
     def _process_rigid_body_props(self, props, env_id):

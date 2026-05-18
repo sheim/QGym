@@ -209,6 +209,6 @@ class MuJocoBackendBase(SimBackend):
         limited = mjm.jnt_limited[jnt_start : mjm.njnt].astype(bool)
         lower = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 0], -1e6)
         upper = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 1], 1e6)
-        velocity = np.full(n, 1e6, dtype=np.float64)
-        effort = np.full(n, 1e6, dtype=np.float64)
+        velocity = np.full(n, 1e3, dtype=np.float64)
+        effort = np.full(n, 1e2, dtype=np.float64)
         return {"lower": lower, "upper": upper, "velocity": velocity, "effort": effort}

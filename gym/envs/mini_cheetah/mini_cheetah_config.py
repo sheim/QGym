@@ -99,7 +99,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
         flip_visual_attachments = False
         disable_gravity = False
         disable_motors = False
-        joint_damping = 0.1
+        joint_damping = 0.01
         rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
 
     class reward_settings(LeggedRobotCfg.reward_settings):
