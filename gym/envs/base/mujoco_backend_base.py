@@ -5,6 +5,8 @@ plane, physics params), metadata extraction, and contact index building.
 Subclasses implement tensor allocation, step, reset, and rendering.
 """
 
+import xml.etree.ElementTree as ET
+
 import numpy as np
 import torch
 import mujoco
@@ -85,6 +87,9 @@ class MuJocoBackendBase(SimBackend):
     def _load_model(self, cfg) -> mujoco.MjModel:
         """Load URDF, configure model (free joint, ground, physics), return MjModel."""
         asset_path = cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+        # Cache URDF effort/velocity limits — MuJoCo drops these on import
+        # (it expects them on actuators, but we have none).
+        self._urdf_limits = self._parse_urdf_limits(asset_path)
         spec = mujoco.MjSpec.from_file(asset_path)
         spec.compiler.balanceinertia = True
 
@@ -203,12 +208,41 @@ class MuJocoBackendBase(SimBackend):
 
         Keys match the IsaacGym interface: lower, upper, velocity, effort.
         Only includes actuated joints (skips free joint for floating-base).
+        Effort/velocity come from <limit> tags parsed out of the URDF —
+        MuJoCo's URDF importer discards those because it expects them on
+        actuators, which this backend does not create.
         """
         jnt_start = 1 if self._has_free_joint else 0
         n = mjm.njnt - jnt_start
         limited = mjm.jnt_limited[jnt_start : mjm.njnt].astype(bool)
         lower = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 0], -1e6)
         upper = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 1], 1e6)
-        velocity = np.full(n, 1e3, dtype=np.float64)
-        effort = np.full(n, 1e2, dtype=np.float64)
+        effort = np.full(n, 1e6, dtype=np.float64)
+        velocity = np.full(n, 1e6, dtype=np.float64)
+        for i, jname in enumerate(self._dof_names):
+            if jname in self._urdf_limits:
+                eff, vel = self._urdf_limits[jname]
+                effort[i] = eff
+                velocity[i] = vel
         return {"lower": lower, "upper": upper, "velocity": velocity, "effort": effort}
+
+    @staticmethod
+    def _parse_urdf_limits(urdf_path: str) -> dict:
+        """Read <joint><limit effort=... velocity=.../></joint> from URDF.
+
+        Returns {joint_name: (effort, velocity)}.  Joints without a <limit>
+        tag or without both attributes are absent — caller decides default.
+        """
+        out: dict = {}
+        root = ET.parse(urdf_path).getroot()
+        for joint in root.findall("joint"):
+            name = joint.get("name")
+            limit = joint.find("limit")
+            if name is None or limit is None:
+                continue
+            eff = limit.get("effort")
+            vel = limit.get("velocity")
+            if eff is None or vel is None:
+                continue
+            out[name] = (float(eff), float(vel))
+        return out
