@@ -613,3 +613,8 @@ It will be removed in Phase 4.
   in `dof_state` automatically.  Verified by `test_dof_state_view_consistent_*`.
 - **Phase 3 TODO markers:** Shim code (backend's `gym`/`sim` properties,
   `register_dof_state()`, etc.) is annotated `# TODO Phase 3: remove`.
+
+## Things to check
+
+- [ ] friction domain-randomization
+- [ ] mass domain-randomization
