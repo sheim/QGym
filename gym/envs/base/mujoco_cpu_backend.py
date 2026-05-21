@@ -32,6 +32,8 @@ class MuJocoCPUBackend(MuJocoBackendBase):
 
         # Viewer (created lazily on first render call)
         self._viewer = None
+        self._viewer_key_callback = None
+        self._viewer_overlay_fn = None  # called each render() before sync()
 
     # ── State tensors ──────────────────────────────────────────────────────────
 
@@ -157,6 +159,17 @@ class MuJocoCPUBackend(MuJocoBackendBase):
                         "Run with: .venv/bin/mjpython scripts/train_mujoco.py ...\n"
                         "Or use --headless to disable the viewer."
                     )
-            self._viewer = mujoco.viewer.launch_passive(self._mjm, self._datas[0])
+            # Indirect through a wrapper so callers can set _viewer_key_callback
+            # after the viewer is up (LeggedRobot.__init__ calls reset()→step()
+            # →_render() during construction, before any user interface installs).
+            def _key_dispatch(keycode, _self=self):
+                if _self._viewer_key_callback is not None:
+                    _self._viewer_key_callback(keycode)
+
+            self._viewer = mujoco.viewer.launch_passive(
+                self._mjm, self._datas[0], key_callback=_key_dispatch
+            )
         if self._viewer.is_running():
+            if self._viewer_overlay_fn is not None:
+                self._viewer_overlay_fn(self._viewer)
             self._viewer.sync()

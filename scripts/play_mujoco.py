@@ -41,12 +41,18 @@ def get_play_args():
         help="Model iteration index (default: latest)",
     )
     parser.add_argument("--headless", action="store_true", default=False)
+    parser.add_argument(
+        "--keyboard",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="keyboard teleop in the MuJoCo viewer (see "
+        "gym/utils/interfaces/MujocoKeyboardInterface.py for key bindings). "
+        "Use --no-keyboard to disable.",
+    )
     return parser.parse_args()
 
 
-def setup():
-    args = get_play_args()
-
+def setup(args):
     # Register tasks (imports the task classes).
     import gym.envs  # noqa: F401
 
@@ -102,6 +108,17 @@ def play(env, runner):
 
 
 if __name__ == "__main__":
+    args = get_play_args()
     with torch.no_grad():
-        env, runner = setup()
+        env, runner = setup(args)
+        if args.keyboard and hasattr(env, "commands") and not args.headless:
+            from gym.utils.interfaces.MujocoKeyboardInterface import (
+                MujocoKeyboardInterface,
+            )
+
+            MujocoKeyboardInterface(env)
+        if hasattr(env, "commands") and not args.headless:
+            from gym.utils.interfaces.CommandVisualizer import CommandVisualizer
+
+            CommandVisualizer(env)
         play(env, runner)
