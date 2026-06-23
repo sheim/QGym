@@ -66,9 +66,7 @@ class CommandVisualizer:
 
         base_pos = np.array(self.mjd.qpos[0:3], dtype=np.float64)
         qw, qx, qy, qz = (float(self.mjd.qpos[i]) for i in (3, 4, 5, 6))
-        yaw = np.arctan2(
-            2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz)
-        )
+        yaw = np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
         c, s = np.cos(yaw), np.sin(yaw)
         fwd_world = np.array([c, s, 0.0])
         left_world = np.array([-s, c, 0.0])
