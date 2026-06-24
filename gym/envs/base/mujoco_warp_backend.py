@@ -100,7 +100,7 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         with self._wp_ctx:
             self._m = mjw.put_model(mjm)
             mjd = mujoco.MjData(mjm)
-            self._d = mjw.put_data(mjm, mjd, nworld=num_envs) 
+            self._d = mjw.put_data(mjm, mjd, nworld=num_envs)
 
             # Zero-copy torch views
             self._qpos_t = wp.to_torch(self._d.qpos)
