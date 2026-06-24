@@ -100,8 +100,7 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         with self._wp_ctx:
             self._m = mjw.put_model(mjm)
             mjd = mujoco.MjData(mjm)
-            self._d = mjw.put_data(mjm, mjd, nworld=num_envs, njmax=90) # njmax hardcoded for mini_cheetah
-            self._m.opt.ccd_iterations = 50 # hardcoded for mini_cheetah
+            self._d = mjw.put_data(mjm, mjd, nworld=num_envs) 
 
             # Zero-copy torch views
             self._qpos_t = wp.to_torch(self._d.qpos)
