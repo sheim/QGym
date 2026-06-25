@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "mujoco>=3.6",
-    "torch>=2.0",
+    "torch",
     "tensordict",
     "numpy",
     "pygame",
@@ -12,15 +12,6 @@ dependencies = [
     "wandb",
     "pandas",
     "matplotlib",
-    "tensorboard>=2.20.0",
-    "torchvision>=0.26.0",
-    "torchaudio>=2.11.0",
-    "pytest<8.0",
-    "ruff>=0.15.9",
-    "pre-commit>=4.5.1",
-    "onnx>=1.22.0",
-    "onnxruntime>=1.27.0",
-    "optuna>=4.9.0",
 ]
 
 [project.optional-dependencies]

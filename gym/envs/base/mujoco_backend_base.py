@@ -15,8 +15,6 @@ import mujoco
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.sim_backend import SimBackend
 
-from gym.envs.mini_cheetah.mini_cheetah_config import MiniCheetahCfg
-
 # Quaternion convention helpers: MuJoCo [w,x,y,z] ↔ task-layer [x,y,z,w]
 WXYZ_TO_XYZW = [1, 2, 3, 0]
 XYZW_TO_WXYZ = [3, 0, 1, 2]
@@ -158,7 +156,18 @@ class MuJocoBackendBase(SimBackend):
             df = getattr(terrain_cfg, "dynamic_friction", 1.0)
             ground.friction = [sf, df, 0.0001]
 
-        # Hardcode njmax and opt.ccd_iterations for mini cheetah
+        # Check for manually set mjModel attributes
+        if hasattr(cfg, "mjspec_attributes"):
+            for name in dir(cfg.mjspec_attributes):
+                if not name.startswith("_"):
+                    setattr(spec, name, getattr(cfg.mjspec_attributes, name))
+
+        if hasattr(cfg, "mjspec_option_attributes"):
+            for name in dir(cfg.mjspec_option_attributes):
+                if not name.startswith("_"):
+                    setattr(spec.option, name, getattr(cfg.mjspec_option_attributes, name))
+
+
         if isinstance(cfg, MiniCheetahCfg):
             spec.njmax = 90
             spec.option.ccd_iterations = 50
