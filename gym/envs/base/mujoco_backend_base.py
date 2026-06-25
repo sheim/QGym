@@ -167,11 +167,6 @@ class MuJocoBackendBase(SimBackend):
                 if not name.startswith("_"):
                     setattr(spec.option, name, getattr(cfg.mjspec_option_attributes, name))
 
-
-        if isinstance(cfg, MiniCheetahCfg):
-            spec.njmax = 90
-            spec.option.ccd_iterations = 50
-
         mjm = spec.compile()
 
         # Physics parameters from cfg
