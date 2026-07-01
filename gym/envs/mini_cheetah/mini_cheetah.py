@@ -1,6 +1,9 @@
 import torch
 
 from gym.envs.base.legged_robot import LeggedRobot
+from learning.utils.logger.SaveStates import (
+    init_env_log_buffers,
+)
 
 
 class MiniCheetah(LeggedRobot):
@@ -8,6 +11,7 @@ class MiniCheetah(LeggedRobot):
         super().__init__(
             gym, sim, cfg, sim_params, sim_device, headless, backend=backend
         )
+        init_env_log_buffers(self, ["torques", "commands", "base_height"], 10)
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""
