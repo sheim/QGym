@@ -114,7 +114,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
         dof_vel = 4 * [2.0, 2.0, 4.0]
-        base_height = 0.3
+        base_height = 0.3 / 2
         dof_pos = 4 * [0.2, 0.3, 0.3]
         dof_pos_obs = dof_pos
         dof_pos_target = 4 * [0.2, 0.3, 0.3]
@@ -123,7 +123,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class mjspec_attributes:
         njmax = 90
-        
+
     class mjspec_option_attributes:
         ccd_iterations = 50
 
