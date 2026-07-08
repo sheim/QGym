@@ -137,7 +137,7 @@ class MuJocoWarpBackend(MuJocoBackendBase):
 
             self.root_states[...] = (
                 self._root_states_t
-            )  # this one line updates root_states
+            )  # fixes root_states from not being updated
 
     # ── Reset ──────────────────────────────────────────────────────────────────
 
