@@ -135,6 +135,10 @@ class MuJocoWarpBackend(MuJocoBackendBase):
             # rne_postconstraint; forward+euler alone leave it at zero.
             mjw.rne_postconstraint(self._m, self._d)
 
+            self.root_states[...] = (
+                self._root_states_t
+            )  # this one line updates root_states
+
     # ── Reset ──────────────────────────────────────────────────────────────────
 
     def reset_dof_state(self, env_ids: torch.Tensor) -> None:
