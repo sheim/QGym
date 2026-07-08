@@ -51,8 +51,8 @@ def save_histogram_from_dict(state_dict):
             plt.figure()
             plt.hist(data, bins=20)
             plt.ylabel("Occurrences")
-            plt.title(state[:-11] + " distribution")
-            plt.savefig(state[:-11] + ".png")
+            plt.title(state + " distribution")
+            plt.savefig(state + ".png")
             return
         else:
             for col in range(data.shape[1]):
@@ -68,7 +68,7 @@ def save_histogram_from_dict(state_dict):
                     + str(data.shape[1] - 1)
                     + " distribution"
                 )
-                plt.savefig(state + "_col_" + str(col) + ".png")
+                plt.savefig("logs/" + state + "_col_" + str(col) + ".png")
 
 
 def save_histogram_from_env(env, state_list):
@@ -81,5 +81,5 @@ def save_histogram_from_env(env, state_list):
         log_buffer = log_buffer[:num_rows]
         state_dict[state] = log_buffer
     save_histogram_from_dict(state_dict)
-    torch.save(state_dict, "saved_states.pt")
-    print("Saved states to saved_states.pt")
+    torch.save(state_dict, "logs/saved_states.pt")
+    print("Saved states to logs/saved_states.pt")
