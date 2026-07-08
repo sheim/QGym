@@ -128,18 +128,18 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 tracking_ang_vel = 2.0
                 lin_vel_z = 0.0
                 ang_vel_xy = 0.01
-                orientation = 1.0
+                orientation = 1.5
                 torques = 5.0e-6
                 dof_vel = 0.0
                 min_base_height = 1.0
                 collision = 0.0
                 action_rate = 0.1
                 action_rate2 = 0.1
-                stand_still = 0.0
+                stand_still = 2.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 4.0
+                reference_traj = 3.0
                 swing_grf = 1.5
                 stance_grf = 1.5
 
