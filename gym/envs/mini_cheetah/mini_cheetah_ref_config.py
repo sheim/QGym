@@ -43,8 +43,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
             + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
         )
-        # Mujoco merges "foot" with "shank", connected by rigid joint in URDF
-        foot_name = "shank"
+        foot_name = "foot"
         penalize_contacts_on = ["shank"]
         terminate_after_contacts_on = ["base", "thigh"]
         collapse_fixed_joints = False
@@ -135,7 +134,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 collision = 0.0
                 action_rate = 0.1
                 action_rate2 = 0.1
-                stand_still = 2.0
+                stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
