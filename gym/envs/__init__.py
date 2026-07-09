@@ -17,6 +17,7 @@ class_dict = {
     "HumanoidRunning": ".mit_humanoid.humanoid_running",
     "Pendulum": ".pendulum.pendulum",
     "Lander": ".mit_humanoid.lander",
+    "Go2": ".go2.go2",
 }
 
 config_dict = {
@@ -31,6 +32,7 @@ config_dict = {
     "PendulumSACCfg": ".pendulum.pendulum_SAC_config",
     "LanderCfg": ".mit_humanoid.lander_config",
     "PendulumPSDCfg": ".pendulum.pendulum_PSD_config",
+    "Go2Cfg": ".go2.go2_config",
 }
 
 runner_config_dict = {
@@ -45,6 +47,7 @@ runner_config_dict = {
     "PendulumSACRunnerCfg": ".pendulum.pendulum_SAC_config",
     "LanderRunnerCfg": ".mit_humanoid.lander_config",
     "PendulumPSDRunnerCfg": ".pendulum.pendulum_PSD_config",
+    "Go2RunnerCfg": ".go2.go2_config",
 }
 
 task_dict = {
@@ -75,6 +78,7 @@ task_dict = {
     "sac_pendulum": ["Pendulum", "PendulumSACCfg", "PendulumSACRunnerCfg"],
     "lander": ["Lander", "LanderCfg", "LanderRunnerCfg"],
     "psd_pendulum": ["Pendulum", "PendulumPSDCfg", "PendulumPSDRunnerCfg"],
+    "go2": ["Go2", "Go2Cfg", "Go2RunnerCfg"]
 }
 
 try:
