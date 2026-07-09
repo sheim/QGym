@@ -95,7 +95,6 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         mjm = self._load_model(cfg)
         self._configure_model(mjm, cfg, device)
         self._run_task_callbacks(mjm, task)
-        print(mjm.njmax)
 
         # Build Warp model and batched data inside the device scope
         with self._wp_ctx:
