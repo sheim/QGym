@@ -95,12 +95,13 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         mjm = self._load_model(cfg)
         self._configure_model(mjm, cfg, device)
         self._run_task_callbacks(mjm, task)
+        print(mjm.njmax)
 
         # Build Warp model and batched data inside the device scope
         with self._wp_ctx:
             self._m = mjw.put_model(mjm)
             mjd = mujoco.MjData(mjm)
-            self._d = mjw.put_data(mjm, mjd, nworld=num_envs)
+            self._d = mjw.put_data(mjm, mjd, nworld=num_envs, njmax=mjm.njmax)
 
             # Zero-copy torch views
             self._qpos_t = wp.to_torch(self._d.qpos)
