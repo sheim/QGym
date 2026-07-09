@@ -132,7 +132,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
             + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
         )
-        foot_name = "shank"
+        foot_name = "foot"
         penalize_contacts_on = ["thigh", "shank"]
         terminate_after_contacts_on = ["base"]
         collapse_fixed_joints = False
