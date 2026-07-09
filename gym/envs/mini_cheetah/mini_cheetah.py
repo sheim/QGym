@@ -1,9 +1,9 @@
 import torch
 
 from gym.envs.base.legged_robot import LeggedRobot
-from learning.utils.logger.SaveStates import (
-    init_env_log_buffers,
-)
+# from learning.utils.logger.SaveStates import (
+#     init_env_log_buffers,
+# )
 
 
 class MiniCheetah(LeggedRobot):
@@ -21,7 +21,7 @@ class MiniCheetah(LeggedRobot):
             "root_states",
             "torques",
         ]
-        init_env_log_buffers(self, self.states_to_log, num_timesteps=300)
+        # init_env_log_buffers(self, self.states_to_log, num_timesteps=300)
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""
@@ -59,7 +59,7 @@ class MiniCheetah(LeggedRobot):
     def _reward_tracking_ang_vel(self):
         """Tracking of angular velocity commands (yaw)"""
         ang_vel_error = torch.square(
-            (self.commands[:, 2] - self.base_ang_vel[:, 2]) / 5.0
+            (self.commands[:, 2] - self.base_ang_vel[:, 2]) / 2.5
         )
         return self._sqrdexp(ang_vel_error)
 
