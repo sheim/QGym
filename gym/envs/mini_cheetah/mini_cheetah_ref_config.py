@@ -25,8 +25,8 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         # * PD Drive parameters:
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
-        gait_freq = 3.0
-        ctrl_frequency = 50
+        gait_freq = 2.5
+        ctrl_frequency = 100
         desired_sim_frequency = 500
 
     class commands(MiniCheetahCfg.commands):
@@ -71,7 +71,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     runner_class_name = "OnPolicyRunner"
 
     class actor(MiniCheetahRunnerCfg.actor):
-        frequency = 50
+        frequency = 100
         hidden_dims = [256, 256, 128]
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         layer_norm = [True, True, False]
@@ -79,12 +79,15 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         smooth_exploration = False
         exploration_sample_freq = 16
         obs = [
+            "base_height",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
             "dof_pos_obs",
             "dof_vel",
             "phase_obs",
+            "dof_pos_target",
         ]
         normalize_obs = False
 
@@ -154,7 +157,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         max_gradient_steps = 50
 
         clip_param = 0.2
-        learning_rate = 1.0e-3
+        learning_rate = 1.0e-4
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
