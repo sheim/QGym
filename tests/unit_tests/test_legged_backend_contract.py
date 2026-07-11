@@ -166,7 +166,21 @@ class TestLeggedCrossBackend:
         return cpu, warp
 
     def test_trajectories_match(self, cpu_and_warp):
-        """CPU and Warp backends should produce near-identical states."""
+        """CPU and Warp backends should produce near-identical states.
+
+        Contact-rich floating-base rollouts are chaotic: float-level
+        implementation differences grow ~10x per 25 steps once contacts
+        engage (measured 2026-07-11: ~1e-6 through step 100, ~3e-2 by step
+        200).  A single flat tolerance either misses systematic modeling
+        bugs (too loose early) or trips on chaos (too tight late), so the
+        check is split:
+
+        - steps 1-100 (pre-chaos): 1e-4 — any real mismatch (wrong mass,
+          inertia, quaternion swizzle, missing contact) exceeds this
+          immediately; measured margin ~10x.
+        - steps 101-200: 0.2 — blow-up detector only; chaos alone reaches
+          ~5e-2 at step 200.
+        """
         cpu, warp = cpu_and_warp
         N = 4
 
@@ -186,9 +200,8 @@ class TestLeggedCrossBackend:
             pos_err = (cpu.dof_pos - warp.dof_pos.cpu()).abs().max().item()
             root_err = (cpu.root_states - warp.root_states.cpu()).abs().max().item()
 
-            # Floating-base with contacts accumulates float diffs faster
-            # than fixed-base pendulum; use looser tolerance
-            assert pos_err < 0.01, f"DOF pos diverged at step {step}: {pos_err:.2e}"
-            assert root_err < 0.01, (
+            tol = 1e-4 if step < 100 else 0.2
+            assert pos_err < tol, f"DOF pos diverged at step {step}: {pos_err:.2e}"
+            assert root_err < tol, (
                 f"Root states diverged at step {step}: {root_err:.2e}"
             )

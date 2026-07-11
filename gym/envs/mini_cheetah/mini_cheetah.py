@@ -45,7 +45,7 @@ class MiniCheetah(LeggedRobot):
     def _reward_tracking_ang_vel(self):
         """Tracking of angular velocity commands (yaw)"""
         ang_vel_error = torch.square(
-            (self.commands[:, 2] - self.base_ang_vel[:, 2]) / 5.0
+            (self.commands[:, 2] - self.base_ang_vel[:, 2]) / 2.5
         )
         return self._sqrdexp(ang_vel_error)
 

@@ -114,12 +114,27 @@ class MiniCheetahCfg(LeggedRobotCfg):
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
         dof_vel = 4 * [2.0, 2.0, 4.0]
-        base_height = 0.3
+        base_height = 0.3 / 2
         dof_pos = 4 * [0.2, 0.3, 0.3]
         dof_pos_obs = dof_pos
         dof_pos_target = 4 * [0.2, 0.3, 0.3]
         tau_ff = 4 * [18, 18, 28]
         commands = [3, 1, 3]
+
+    class mjspec_attributes:
+        # Constraint-row capacity per world.  With fusestatic disabled the
+        # warp runtime demands 160 at 4096 envs (measured 2026-07-11,
+        # "nefc overflow" warnings); 200 leaves headroom for gaits with
+        # more simultaneous contacts.  jt/port's original value was 90,
+        # tuned before fusestatic.
+        njmax = 200
+
+    class mjspec_option_attributes:
+        # Deliberate accuracy/throughput tradeoff (measured 2026-07-11,
+        # 4096 envs, RTX 4080): 50 → 13.2k steps/s with rare
+        # "ccd_iterations needs to be increased" warnings on isolated
+        # frames; 100 → 7.1k steps/s and still warns occasionally.
+        ccd_iterations = 50
 
 
 class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
