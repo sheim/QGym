@@ -66,7 +66,9 @@ class MujocoKeyboardInterface:
         elif keycode == KEY_COMMA:
             c[:, 1] = torch.clamp(c[:, 1] + self.increment_y, max=self.max_vel_sideways)
         elif keycode == KEY_PERIOD:
-            c[:, 1] = torch.clamp(c[:, 1] - self.increment_y, min=-self.max_vel_sideways)
+            c[:, 1] = torch.clamp(
+                c[:, 1] - self.increment_y, min=-self.max_vel_sideways
+            )
         elif keycode == KEY_LEFT:
             c[:, 2] = torch.clamp(c[:, 2] + self.increment_yaw, max=self.max_vel_yaw)
         elif keycode == KEY_RIGHT:
