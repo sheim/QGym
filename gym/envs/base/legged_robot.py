@@ -30,6 +30,10 @@ from gym.utils.terrain import Terrain
 from gym.utils import random_sample, quat_apply_yaw
 from gym.utils.helpers import class_to_dict
 
+from learning.utils.logger.SaveStates import (
+    init_env_log_buffers,
+)
+
 
 class LeggedRobot(BaseTask):
     def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
@@ -53,6 +57,11 @@ class LeggedRobot(BaseTask):
         self._init_buffers()
         self.init_done = True
         self.reset()
+
+        if cfg.plotting.plot_state_histograms:
+            init_env_log_buffers(
+                self, self.cfg.plotting.states_to_log, num_timesteps=500
+            )
 
     def step(self):
         self._reset_buffers()

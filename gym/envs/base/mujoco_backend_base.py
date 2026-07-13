@@ -92,12 +92,10 @@ class MuJocoBackendBase(SimBackend):
         # (it expects them on actuators, but we have none).
         self._urdf_limits = self._parse_urdf_limits(asset_path)
         spec = self._load_urdf_spec(asset_path)
-        spec.compiler.balanceinertia = True
+        spec.compiler.balanceinertia = cfg.asset.average_inertia_tensor_if_unphysical
+        spec.compiler.fusestatic = cfg.asset.collapse_fixed_joints
 
-        # Disable fusing links connected with rigid joints
-        spec.compiler.fusestatic = False
-
-        # Add free joint for floating-base robots
+        # Add free joint for floating-base robots+
         if not getattr(cfg.asset, "fix_base_link", True):
             root_body = spec.worldbody.first_body()
             freejoint = root_body.add_freejoint()
@@ -158,19 +156,6 @@ class MuJocoBackendBase(SimBackend):
             sf = getattr(terrain_cfg, "static_friction", 1.0)
             df = getattr(terrain_cfg, "dynamic_friction", 1.0)
             ground.friction = [sf, df, 0.0001]
-
-        # Check for manually set mjModel attributes
-        if hasattr(cfg, "mjspec_attributes"):
-            for name in dir(cfg.mjspec_attributes):
-                if not name.startswith("_"):
-                    setattr(spec, name, getattr(cfg.mjspec_attributes, name))
-
-        if hasattr(cfg, "mjspec_option_attributes"):
-            for name in dir(cfg.mjspec_option_attributes):
-                if not name.startswith("_"):
-                    setattr(
-                        spec.option, name, getattr(cfg.mjspec_option_attributes, name)
-                    )
 
         mjm = spec.compile()
 
