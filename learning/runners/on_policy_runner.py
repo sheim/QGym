@@ -7,10 +7,10 @@ from learning.utils import Logger
 from .BaseRunner import BaseRunner
 from learning.storage import DictStorage
 
-# from learning.utils.logger.SaveStates import (
-#     save_to_log_buffers,
-#     save_histogram_from_env,
-# )
+from learning.utils.logger.SaveStates import (
+    save_to_log_buffers,
+    save_histogram_from_env,
+)
 
 logger = Logger()
 storage = DictStorage()
@@ -138,13 +138,15 @@ class OnPolicyRunner(BaseRunner):
             logger.toc("runtime")
             logger.print_to_terminal()
 
-            # save_to_log_buffers(self.env, self.env.states_to_log)
+            if self.env.cfg.plotting.plot_state_histograms:
+                save_to_log_buffers(self.env, self.env.cfg.plotting.states_to_log)
 
             if self.it % self.save_interval == 0:
                 self.save()
         self.save()
 
-        # save_histogram_from_env(self.env, self.env.states_to_log)
+        if self.env.cfg.plotting.plot_state_histograms:
+            save_histogram_from_env(self.env, self.env.cfg.plotting.states_to_log)
 
     @torch.no_grad
     def burn_in_normalization(self, n_iterations=100):

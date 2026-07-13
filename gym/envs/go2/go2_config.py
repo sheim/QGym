@@ -118,11 +118,8 @@ class Go2Cfg(LeggedRobotCfg):
         tau_ff = 4 * [18, 18, 28]
         commands = [3, 1, 3]
 
-    class mjspec_attributes:
+    class mjmodel_settings:
         njmax = 130
-
-    class mjspec_option_attributes:
-        ccd_iterations = 50
 
 
 class Go2RunnerCfg(LeggedRobotRunnerCfg):
