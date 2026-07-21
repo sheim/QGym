@@ -182,6 +182,7 @@ class LeggedRobotCfg(BaseConfig):
         replace_cylinder_with_capsule = True
         # * Some .obj meshes must be flipped from y-up to z-up
         flip_visual_attachments = True
+        average_inertia_tensor_if_unphysical = True
 
         density = 0.001
         angular_damping = 0.0
@@ -224,6 +225,23 @@ class LeggedRobotCfg(BaseConfig):
         pos = [10, 0, 6]  # [m]
         lookat = [11.0, 5, 3.0]  # [m]
         record = False
+
+    class mjmodel_settings:
+        njmax = 90
+
+    class plotting:
+        # Plot state history during training for debugging
+        plot_state_histograms = False
+        states_to_log = [
+            "base_ang_vel",
+            "projected_gravity",
+            "commands",
+            "dof_pos_obs",
+            "dof_vel",
+            "dof_pos_target",
+            "root_states",
+            "torques",
+        ]
 
 
 class LeggedRobotRunnerCfg(BaseConfig):

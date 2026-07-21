@@ -159,6 +159,7 @@ class MuJocoCPUBackend(MuJocoBackendBase):
                         "Run with: .venv/bin/mjpython scripts/train_mujoco.py ...\n"
                         "Or use --headless to disable the viewer."
                     )
+
             # Indirect through a wrapper so callers can set _viewer_key_callback
             # after the viewer is up (LeggedRobot.__init__ calls reset()→step()
             # →_render() during construction, before any user interface installs).

@@ -3,10 +3,10 @@ from gym.envs.base.legged_robot_config import (
     LeggedRobotRunnerCfg,
 )
 
-BASE_HEIGHT_REF = 0.3
+BASE_HEIGHT_REF = 0.4
 
 
-class MiniCheetahCfg(LeggedRobotCfg):
+class Go2Cfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 12
@@ -17,9 +17,9 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class init_state(LeggedRobotCfg.init_state):
         default_joint_angles = {
-            "haa": 0.0,
-            "hfe": -0.785398,
-            "kfe": 1.596976,
+            "hip": 0.0,
+            "thigh": -0.785398,
+            "calf": 1.596976,
         }
 
         # * reset setup chooses how the initial conditions are chosen.
@@ -28,22 +28,22 @@ class MiniCheetahCfg(LeggedRobotCfg):
         reset_mode = "reset_to_range"
 
         # * default COM for basic initialization
-        pos = [0.0, 0.0, 0.35]  # x,y,z [m]
+        pos = [0.0, 0.0, 0.40]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
 
         # * initialization for random range setup
         dof_pos_range = {
-            "haa": [-0.01, 0.01],
-            "hfe": [-0.785398, -0.785398],
-            "kfe": [1.596976, 1.596976],
+            "hip": [-0.01, 0.01],
+            "thigh": [-0.785398, -0.785398],
+            "calf": [1.596976, 1.596976],
         }
-        dof_vel_range = {"haa": [0.0, 0.0], "hfe": [0.0, 0.0], "kfe": [0.0, 0.0]}
+        dof_vel_range = {"hip": [0.0, 0.0], "thigh": [0.0, 0.0], "calf": [0.0, 0.0]}
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.35, 0.35],  # z
+            [0.40, 0.40],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
@@ -59,8 +59,8 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class control(LeggedRobotCfg.control):
         # * PD Drive parameters:
-        stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
-        damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
+        stiffness = {"hip": 20.0, "thigh": 20.0, "calf": 20.0}
+        damping = {"hip": 0.5, "thigh": 0.5, "calf": 0.5}
         ctrl_frequency = 100
         desired_sim_frequency = 500
 
@@ -86,12 +86,9 @@ class MiniCheetahCfg(LeggedRobotCfg):
         added_mass_range = [-1.0, 1.0]
 
     class asset(LeggedRobotCfg.asset):
-        file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
-            + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
-        )
+        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "go2/urdf/go2.urdf"
         foot_name = "foot"
-        penalize_contacts_on = ["shank"]
+        penalize_contacts_on = ["calf"]
         terminate_after_contacts_on = ["base"]
         end_effector_names = ["foot"]
         collapse_fixed_joints = False
@@ -122,10 +119,10 @@ class MiniCheetahCfg(LeggedRobotCfg):
         commands = [3, 1, 3]
 
     class mjmodel_settings:
-        njmax = 90
+        njmax = 130
 
 
-class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
+class Go2RunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
@@ -196,6 +193,6 @@ class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
-        experiment_name = "mini_cheetah"
+        experiment_name = "go2"
         max_iterations = 500
         algorithm_class_name = "PPO2"

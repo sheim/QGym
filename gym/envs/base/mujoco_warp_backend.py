@@ -100,7 +100,9 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         with self._wp_ctx:
             self._m = mjw.put_model(mjm)
             mjd = mujoco.MjData(mjm)
-            self._d = mjw.put_data(mjm, mjd, nworld=num_envs)
+            self._d = mjw.put_data(
+                mjm, mjd, nworld=num_envs, njmax=cfg.mjmodel_settings.njmax
+            )
 
             # Zero-copy torch views
             self._qpos_t = wp.to_torch(self._d.qpos)
@@ -134,6 +136,8 @@ class MuJocoWarpBackend(MuJocoBackendBase):
             # cfrc_ext is only populated with constraint/contact forces by
             # rne_postconstraint; forward+euler alone leave it at zero.
             mjw.rne_postconstraint(self._m, self._d)
+
+            self.root_states[...] = self._root_states_t
 
     # ── Reset ──────────────────────────────────────────────────────────────────
 
