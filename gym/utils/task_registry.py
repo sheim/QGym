@@ -232,11 +232,17 @@ class TaskRegistry:
         return env
 
     def make_env_mujoco(
-        self, name: str, env_cfg, device: str = "cpu", headless: bool = True
+        self,
+        name: str,
+        env_cfg,
+        device: str = "cpu",
+        headless: bool = True,
+        backend: str = "mujoco",
     ):
-        """Instantiate a task using a MuJoCo backend (no IsaacGym required).
+        """Instantiate a task using a non-IsaacGym backend.
 
-        Selects MuJocoWarpBackend or MuJocoCPUBackend based on device.
+        ``backend="mujoco"`` selects MuJocoWarpBackend or MuJocoCPUBackend
+        based on device; ``backend="vsim"`` selects VSimBackend (CUDA-only).
         Passes the constructed backend as the ``backend`` kwarg to the task
         constructor so FixedRobot/LeggedRobot skips IsaacGymBackend.
         """
@@ -245,7 +251,7 @@ class TaskRegistry:
         else:
             raise ValueError(f"Task with name: {name} was not registered")
         set_seed(env_cfg.seed)
-        backend = select_backend(env_cfg, device)
+        backend = select_backend(env_cfg, device, backend)
         env = task_class(
             gym=None,
             sim=None,
@@ -273,12 +279,21 @@ class TaskRegistry:
         return runner
 
 
-def select_backend(cfg, device: str):
-    """Choose a physics backend based on platform and available packages.
+def select_backend(cfg, device: str, backend: str = "mujoco"):
+    """Choose a physics backend. Fail-fast: no silent fallbacks.
 
-    Priority: Mac → MuJocoCPUBackend; mujoco_warp available → MuJocoWarpBackend;
-    otherwise → MuJocoCPUBackend.
+    backend="mujoco": cuda → MuJocoWarpBackend, otherwise MuJocoCPUBackend.
+    backend="vsim":   VSimBackend (CUDA-only; vlearn must be installed and
+                      the process started with .env.vsim — see that file).
     """
+    if backend == "vsim":
+        if not device.startswith("cuda"):
+            raise RuntimeError(f"backend='vsim' is CUDA-only, got device={device!r}")
+        from gym.envs.base.vsim_backend import VSimBackend
+
+        return VSimBackend()
+    if backend != "mujoco":
+        raise ValueError(f"unknown backend {backend!r} (mujoco | vsim)")
     if device.startswith("cuda"):
         from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
 

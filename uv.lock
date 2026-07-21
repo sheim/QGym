@@ -1380,6 +1380,9 @@ dependencies = [
 gpu = [
     { name = "mujoco-warp" },
 ]
+vsim = [
+    { name = "vlearn" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1400,9 +1403,10 @@ requires-dist = [
     { name = "pygame" },
     { name = "tensordict" },
     { name = "torch" },
+    { name = "vlearn", marker = "extra == 'vsim'", path = "vendor/vlearn/vlearn-0.3.12-cp311-cp311-linux_x86_64.whl" },
     { name = "wandb" },
 ]
-provides-extras = ["gpu"]
+provides-extras = ["gpu", "vsim"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1643,6 +1647,18 @@ sdist = { url = "https://files.pythonhosted.org/packages/aa/92/58199fe10049f9703
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c6/59/7d02447a55b2e55755011a647479041bc92a82e143f96a8195cb33bd0a1c/virtualenv-21.2.0-py3-none-any.whl", hash = "sha256:1bd755b504931164a5a496d217c014d098426cddc79363ad66ac78125f9d908f", size = 5825084, upload-time = "2026-03-09T17:24:35.378Z" },
 ]
+
+[[package]]
+name = "vlearn"
+version = "0.3.12"
+source = { path = "vendor/vlearn/vlearn-0.3.12-cp311-cp311-linux_x86_64.whl" }
+wheels = [
+    { filename = "vlearn-0.3.12-cp311-cp311-linux_x86_64.whl", hash = "sha256:6815fb72efd469cf2aa509d2380de613c0c8b13e71120cd4c292e103124f444b" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=6.0" }]
+provides-extras = ["test"]
 
 [[package]]
 name = "wandb"

@@ -1,14 +1,25 @@
-# Q2 — MuJoCo RL Training
+# Q2 — MuJoCo / vsim RL Training
 
-RL training framework for legged robots using MuJoCo as the physics backend.
-Supports CPU (all platforms including macOS) and GPU-accelerated training via
-mujoco-warp on Linux with NVIDIA GPUs.
+RL training framework for legged robots. Physics backends:
+- **MuJoCo CPU** (all platforms incl. macOS) and **mujoco-warp** GPU (Linux+CUDA)
+- **vsim** (`--backend vsim`): closed-source licensed GPU engine, ~10× faster
+  than warp at 4096 envs. Self-contained under `vendor/vlearn/` (wheel +
+  license drop zone — see its README); needs system `libczmq4` and process
+  env from `.env.vsim`:
+
+```bash
+uv sync --extra vsim
+uv run --env-file .env.vsim scripts/train_mujoco.py --task mini_cheetah \
+    --backend vsim --device cuda:0 --num_envs 4096 --headless
+bash scripts/run_vsim_tests.sh        # vsim test suite (local-only)
+```
 
 ## Quick Start
 
 ### Setup
 
-Requires Python 3.11-3.13 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.11 (pinned — the vsim wheels are cp311; MuJoCo-only work
+also runs on 3.12/3.13) and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 cd Q2

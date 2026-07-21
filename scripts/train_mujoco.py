@@ -25,6 +25,14 @@ def get_mujoco_args():
         "--device", type=str, default="cpu", help="Torch device (cpu, cuda:0)"
     )
     parser.add_argument(
+        "--backend",
+        type=str,
+        default="mujoco",
+        choices=["mujoco", "vsim"],
+        help="Physics backend (vsim is CUDA-only; start via "
+        "`uv run --env-file .env.vsim ...`)",
+    )
+    parser.add_argument(
         "--num_envs", type=int, default=None, help="Override num_envs from cfg"
     )
     parser.add_argument(
@@ -80,7 +88,11 @@ def setup():
 
     # Build the environment using the MuJoCo backend
     env = task_registry.make_env_mujoco(
-        args.task, env_cfg, device=args.device, headless=args.headless
+        args.task,
+        env_cfg,
+        device=args.device,
+        headless=args.headless,
+        backend=args.backend,
     )
 
     from gym.utils import randomize_episode_counters

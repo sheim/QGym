@@ -85,3 +85,8 @@ venv.bak/
 # Smooth exploration
 gym/smooth_exploration/data*
 gym/smooth_exploration/figures*
+resources/robots/*/vsim/*.vsim
+vendor/vlearn/*.whl
+vendor/vlearn/License.key
+vendor/vlearn/TurboActivate.dat
+/License.key

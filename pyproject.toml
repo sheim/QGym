@@ -16,6 +16,10 @@ dependencies = [
 
 [project.optional-dependencies]
 gpu = ["mujoco-warp>=3.6"]
+# vsim backend: closed-source engine, local wheel from ../vlearn (cp311 only —
+# repo is pinned to 3.11 for this). Install with: uv sync --extra vsim
+# Requires system libczmq4 and a valid node-locked license (see README there).
+vsim = ["vlearn"]
 
 [dependency-groups]
 dev = [
@@ -24,6 +28,11 @@ dev = [
     "ruff>=0.15.9",
     "mujoco-warp>=3.6",
 ]
+
+[tool.uv.sources]
+# Vendored in-repo (gitignored — see vendor/vlearn/README.md for the drop-in
+# procedure on a new machine).
+vlearn = { path = "vendor/vlearn/vlearn-0.3.12-cp311-cp311-linux_x86_64.whl" }
 
 [build-system]
 requires = ["setuptools"]

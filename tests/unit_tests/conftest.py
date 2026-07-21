@@ -27,6 +27,44 @@ MINI_CHEETAH_URDF = os.path.join(
 )
 
 
+def vsim_guard():
+    """vsim tests are opt-in: CUDA + closed-source licensed engine.
+
+    Run via scripts/run_vsim_tests.sh (sets Q2_VSIM_TESTS, LD_LIBRARY_PATH,
+    VL_WORKING_DIRECTORY).
+    """
+    if os.environ.get("Q2_VSIM_TESTS") != "1":
+        pytest.skip("vsim tests are opt-in — run scripts/run_vsim_tests.sh")
+    pytest.importorskip("vlearn")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA not available")
+
+
+def _make_vsim_backend(cfg, num_envs: int):
+    from gym.envs.base.vsim_backend import VSimBackend
+
+    b = VSimBackend()
+    b.setup(cfg, num_envs=num_envs, device="cuda:0", task=None)
+    return b
+
+
+@pytest.fixture
+def vsim_backend():
+    """4-env pendulum on VSimBackend (opt-in; see vsim_guard)."""
+    vsim_guard()
+    b = _make_vsim_backend(_make_pendulum_cfg(), 4)
+    yield b
+    b.close()
+
+
+@pytest.fixture
+def vsim_backend_16():
+    vsim_guard()
+    b = _make_vsim_backend(_make_pendulum_cfg(), 16)
+    yield b
+    b.close()
+
+
 def _make_pendulum_cfg(sim_dt: float = 0.005) -> types.SimpleNamespace:
     """Minimal cfg-like object for the pendulum, no task registry needed."""
     asset = types.SimpleNamespace(
@@ -158,6 +196,24 @@ def _make_mini_cheetah_cfg(sim_dt: float = 0.002) -> types.SimpleNamespace:
     )
     sim = types.SimpleNamespace(gravity=[0.0, 0.0, -9.81])
     return types.SimpleNamespace(asset=asset, sim=sim, terrain=terrain, sim_dt=sim_dt)
+
+
+@pytest.fixture
+def legged_vsim_backend():
+    """4-env mini_cheetah on VSimBackend (opt-in; see vsim_guard)."""
+    vsim_guard()
+    from gym.envs.base.vsim_backend import VSimBackend
+
+    cfg = _make_mini_cheetah_cfg()
+    # Spawn ABOVE leg length: at qpos=0 the legs are fully extended, and a
+    # penetrating spawn gets a maxDepenetrationVelocity kick (10 m/s) that
+    # launches the robot ballistically.  Tasks reset to crouched poses before
+    # stepping; this raw fixture has no task, so it must spawn clear.
+    cfg.init_state = types.SimpleNamespace(pos=[0.0, 0.0, 0.5], rot=[0, 0, 0, 1])
+    b = VSimBackend()
+    b.setup(cfg, num_envs=4, device="cuda:0", task=None)
+    yield b
+    b.close()
 
 
 @pytest.fixture

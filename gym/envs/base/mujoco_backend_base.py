@@ -14,6 +14,7 @@ import mujoco
 
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.sim_backend import SimBackend
+from gym.envs.base.urdf_limits import parse_urdf_limits
 
 # Quaternion convention helpers: MuJoCo [w,x,y,z] ↔ task-layer [x,y,z,w]
 WXYZ_TO_XYZW = [1, 2, 3, 0]
@@ -313,21 +314,5 @@ class MuJocoBackendBase(SimBackend):
 
     @staticmethod
     def _parse_urdf_limits(urdf_path: str) -> dict:
-        """Read <joint><limit effort=... velocity=.../></joint> from URDF.
-
-        Returns {joint_name: (effort, velocity)}.  Joints without a <limit>
-        tag or without both attributes are absent — caller decides default.
-        """
-        out: dict = {}
-        root = ET.parse(urdf_path).getroot()
-        for joint in root.findall("joint"):
-            name = joint.get("name")
-            limit = joint.find("limit")
-            if name is None or limit is None:
-                continue
-            eff = limit.get("effort")
-            vel = limit.get("velocity")
-            if eff is None or vel is None:
-                continue
-            out[name] = (float(eff), float(vel))
-        return out
+        """Shared implementation lives in gym.envs.base.urdf_limits."""
+        return parse_urdf_limits(urdf_path)

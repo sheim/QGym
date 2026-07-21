@@ -42,6 +42,14 @@ def get_play_args():
     )
     parser.add_argument("--headless", action="store_true", default=False)
     parser.add_argument(
+        "--backend",
+        type=str,
+        default="mujoco",
+        choices=["mujoco", "vsim"],
+        help="Physics backend (vsim is CUDA-only; start via "
+        "`uv run --env-file .env.vsim ...`)",
+    )
+    parser.add_argument(
         "--keyboard",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -87,7 +95,11 @@ def setup(args):
     set_seed(env_cfg.seed)
 
     env = task_registry.make_env_mujoco(
-        args.task, env_cfg, device=args.device, headless=args.headless
+        args.task,
+        env_cfg,
+        device=args.device,
+        headless=args.headless,
+        backend=args.backend,
     )
 
     runner = task_registry.make_alg_runner(env, train_cfg)
@@ -109,6 +121,10 @@ def play(env, runner):
 
 if __name__ == "__main__":
     args = get_play_args()
+    if args.backend == "vsim" and args.keyboard and not args.headless:
+        raise SystemExit(
+            "--keyboard is MuJoCo-viewer-only; use --no-keyboard with --backend vsim"
+        )
     with torch.no_grad():
         env, runner = setup(args)
         if args.keyboard and hasattr(env, "commands") and not args.headless:
