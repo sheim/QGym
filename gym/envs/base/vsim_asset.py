@@ -79,11 +79,17 @@ def set_joint_dynamics(root: ET.Element, damping: float, armature) -> None:
         dyn.set("armature", str(arm))
 
 
-def strip_collisions(root: ET.Element) -> None:
-    """Fixed-base semantics: remove all collision geometry."""
-    for link in root.findall("link"):
-        for col in list(link.findall("collision")):
-            link.remove(col)
+def absolutize_mesh_paths(root: ET.Element, urdf_dir: str) -> None:
+    """Rewrite relative <mesh filename=...> refs to absolute paths.
+
+    The converter copies the URDF's relative refs verbatim, but the .vsim
+    lives in a sibling vsim/ directory, so they dangle at import time
+    ("Failed to resolve resource" warnings; visuals fall back to collision
+    shapes)."""
+    for mesh in root.iter("mesh"):
+        fn = mesh.get("filename")
+        if fn and not os.path.isabs(fn):
+            mesh.set("filename", os.path.abspath(os.path.join(urdf_dir, fn)))
 
 
 def verify_vsim_against_urdf(root: ET.Element, urdf_path: str) -> None:
@@ -122,14 +128,19 @@ def postprocess_vsim(
     joint_damping: float,
     rotor_inertia,
 ) -> ET.ElementTree:
-    """Pure-XML post-processing; separable from conversion for testing."""
+    """Pure-XML post-processing; separable from conversion for testing.
+
+    NB: collision geometry is deliberately KEPT for fixed-base robots
+    (vsim imports geometry from collision shapes — stripping them made the
+    pendulum invisible).  Contacts-disabled semantics hold anyway: fixed
+    robots get no ground plane, and adjacent-link pairs don't collide.
+    Validated by the pendulum energy/period tests."""
     root = tree.getroot()
     verify_vsim_against_urdf(root, urdf_path)
     inject_motors(root)
     inject_contact_sensors(root)
     set_joint_dynamics(root, joint_damping, rotor_inertia)
-    if fix_base_link:
-        strip_collisions(root)
+    absolutize_mesh_paths(root, os.path.dirname(os.path.abspath(urdf_path)))
     return tree
 
 

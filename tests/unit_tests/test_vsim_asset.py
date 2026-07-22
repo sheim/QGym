@@ -73,11 +73,28 @@ def test_postprocess_injects_motors_sensors_dynamics(urdf_path):
     assert root.find("./link/collision") is not None
 
 
-def test_postprocess_fixed_base_strips_collisions(urdf_path):
+def test_postprocess_keeps_collisions_for_fixed_base(urdf_path):
+    """vsim builds geometry from collision shapes — stripping them made the
+    pendulum invisible. Contacts-disabled semantics hold via no-plane +
+    adjacent-pair exclusion (validated by the pendulum physics tests)."""
     tree = postprocess_vsim(
         _tree(), urdf_path, fix_base_link=True, joint_damping=0.0, rotor_inertia=0.0
     )
-    assert tree.getroot().find("./link/collision") is None
+    assert tree.getroot().find("./link/collision") is not None
+
+
+def test_mesh_paths_absolutized(urdf_path, tmp_path):
+    tree = _tree()
+    geom = tree.getroot().find("./link/collision/geometry")
+    mesh = ET.SubElement(geom, "mesh", filename="meshes/part.dae")
+    postprocess_vsim(
+        tree, urdf_path, fix_base_link=False, joint_damping=0.0, rotor_inertia=0.0
+    )
+    import os
+
+    assert os.path.isabs(mesh.get("filename"))
+    assert mesh.get("filename").endswith("meshes/part.dae")
+    assert mesh.get("filename").startswith(str(tmp_path))  # anchored at URDF dir
 
 
 def test_per_dof_armature_list(urdf_path):

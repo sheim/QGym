@@ -133,7 +133,8 @@ if __name__ == "__main__":
             )
 
             MujocoKeyboardInterface(env)
-        if hasattr(env, "commands") and not args.headless:
+        if hasattr(env, "commands") and not args.headless and args.backend == "mujoco":
+            # CommandVisualizer draws into the MuJoCo passive viewer only.
             from gym.utils.interfaces.CommandVisualizer import CommandVisualizer
 
             CommandVisualizer(env)

@@ -56,6 +56,8 @@ class VSimBackend(SimBackend):
         self._has_free_joint: bool = False
         self._penalised_contact_indices = None
         self._termination_contact_indices = None
+        self._pending_camera = None
+        self._render_initialized = False
 
     # ── Metadata ──────────────────────────────────────────────────────────
 
@@ -127,6 +129,16 @@ class VSimBackend(SimBackend):
         self._device = device
         self._num_envs = num_envs
         headless = task.headless if task is not None else True
+
+        # Self-heal the engine's cache structure (vsim::Path::findCachePath
+        # requires a cache/ dir with its marker file under the working dir).
+        import os
+
+        workdir = os.environ.get("VL_WORKING_DIRECTORY", "vendor/vlearn")
+        os.makedirs(os.path.join(workdir, "cache", "tmp"), exist_ok=True)
+        marker = os.path.join(workdir, "cache", "donotremove.txt")
+        if not os.path.exists(marker):
+            open(marker, "w").close()
 
         knobs = getattr(cfg, "vsim_attributes", None)
         pairs_pe = getattr(knobs, "max_contact_pairs_per_env", 64)
@@ -240,6 +252,8 @@ class VSimBackend(SimBackend):
         self._allocate_tensors_and_commands()
         self._run_task_callbacks(vsim_path, cfg, task)
         self._refresh_state()
+        if not headless:
+            self._apply_camera()
 
     def _allocate_tensors_and_commands(self) -> None:
         """All buffers allocated once (graph captures need stable addresses)."""
@@ -452,14 +466,34 @@ class VSimBackend(SimBackend):
     # ── Rendering / lifecycle ─────────────────────────────────────────────
 
     def render(self, sync_frame_time: bool = True) -> None:
-        self._gym.get_render().render()
+        r = self._gym.get_render()
+        if not self._render_initialized:
+            # Vendor demos do this before their loops; the viewer starts
+            # paused otherwise.  capped_step syncs sim rate to the display.
+            r.capped_step = bool(sync_frame_time)
+            r.set_paused(False)
+            self._render_initialized = True
+        r.render()
 
     def set_camera(self, position, lookat) -> None:
+        """Stash-and-apply: BaseTask calls this BEFORE setup() (init order),
+        when the engine isn't up yet.  The camera is applied at the end of
+        setup() once the render exists."""
+        self._pending_camera = (list(position), list(lookat))
+        if self._gym is not None:
+            self._apply_camera()
+
+    def _apply_camera(self) -> None:
+        if self._pending_camera is None:
+            return
+        position, lookat = self._pending_camera
         v = self._v
-        eye = v.Vec3(*position)
         d = [lookat[i] - position[i] for i in range(3)]
         n = max(sum(x * x for x in d) ** 0.5, 1e-9)
-        self._gym.get_render().reset_camera(eye, v.Vec3(*(x / n for x in d)))
+        self._gym.get_render().reset_camera(
+            v.Vec3(*position), v.Vec3(*(x / n for x in d))
+        )
+        self._pending_camera = None
 
     def close(self) -> None:
         if self._v is not None:

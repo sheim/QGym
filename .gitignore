@@ -89,4 +89,6 @@ resources/robots/*/vsim/*.vsim
 vendor/vlearn/*.whl
 vendor/vlearn/License.key
 vendor/vlearn/TurboActivate.dat
-/License.key
+vendor/vlearn/cache/
+vendor/vlearn/shaders/
+vendor/vlearn/assets/
