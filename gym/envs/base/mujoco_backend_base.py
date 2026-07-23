@@ -230,10 +230,10 @@ class MuJocoBackendBase(SimBackend):
         ]
 
         # Contact index tensors
-        self._penalised_contact_indices = self._build_contact_indices(
+        self._penalised_contact_indices = self.build_contact_indices(
             getattr(cfg.asset, "penalize_contacts_on", []), device
         )
-        self._termination_contact_indices = self._build_contact_indices(
+        self._termination_contact_indices = self.build_contact_indices(
             getattr(cfg.asset, "terminate_after_contacts_on", []), device
         )
 
@@ -247,14 +247,6 @@ class MuJocoBackendBase(SimBackend):
             task._process_dof_props(self._make_dof_props(mjm), env_id=0)
 
     # ── Helpers ────────────────────────────────────────────────────────────────
-
-    def _build_contact_indices(self, name_patterns: list, device: str) -> torch.Tensor:
-        indices = []
-        for pattern in name_patterns:
-            for i, bname in enumerate(self._body_names):
-                if pattern in bname:
-                    indices.append(i)
-        return torch.tensor(indices, dtype=torch.long, device=device)
 
     def _make_dof_props(self, mjm: mujoco.MjModel) -> dict:
         """Build DOF-properties dict expected by task._process_dof_props.

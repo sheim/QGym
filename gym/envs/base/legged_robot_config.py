@@ -224,6 +224,11 @@ class LeggedRobotCfg(BaseConfig):
         pos = [10, 0, 6]  # [m]
         lookat = [11.0, 5, 3.0]  # [m]
         record = False
+        # MuJoCo passive viewer only: its side panels bind most letters to
+        # visualisation toggles, which collide with keyboard teleop (see
+        # gym/utils/interfaces/teleop_bindings.py).  Off by default;
+        # scripts/play_mujoco.py --viewer_ui turns them back on.
+        show_ui = False
 
 
 class LeggedRobotRunnerCfg(BaseConfig):

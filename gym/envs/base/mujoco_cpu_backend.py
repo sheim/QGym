@@ -32,6 +32,7 @@ class MuJocoCPUBackend(MuJocoBackendBase):
 
         # Viewer (created lazily on first render call)
         self._viewer = None
+        self._show_ui = False  # overridden from cfg.viewer.show_ui in setup()
         self._viewer_key_callback = None
         self._viewer_overlay_fn = None  # called each render() before sync()
 
@@ -70,6 +71,9 @@ class MuJocoCPUBackend(MuJocoBackendBase):
         mjm = self._load_model(cfg)
         self._configure_model(mjm, cfg, device)
         self._run_task_callbacks(mjm, task)
+
+        viewer_cfg = getattr(cfg, "viewer", None)
+        self._show_ui = bool(getattr(viewer_cfg, "show_ui", False))
 
         # Create one MjData per environment
         self._datas = [mujoco.MjData(mjm) for _ in range(num_envs)]
@@ -167,8 +171,16 @@ class MuJocoCPUBackend(MuJocoBackendBase):
                 if _self._viewer_key_callback is not None:
                     _self._viewer_key_callback(keycode)
 
+            # Side panels are hidden by default: their shortcuts bind most
+            # letters to visualisation toggles, which fire alongside keyboard
+            # teleop (see gym/utils/interfaces/teleop_bindings.py).
+            # cfg.viewer.show_ui / play_mujoco.py --viewer_ui restores them.
             self._viewer = mujoco.viewer.launch_passive(
-                self._mjm, self._datas[0], key_callback=_key_dispatch
+                self._mjm,
+                self._datas[0],
+                key_callback=_key_dispatch,
+                show_left_ui=self._show_ui,
+                show_right_ui=self._show_ui,
             )
         if self._viewer.is_running():
             if self._viewer_overlay_fn is not None:

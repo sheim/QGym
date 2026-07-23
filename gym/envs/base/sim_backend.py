@@ -168,5 +168,19 @@ class SimBackend(ABC):
     def set_camera(self, position, lookat) -> None:
         pass
 
+    def build_contact_indices(self, name_patterns: list, device: str) -> torch.Tensor:
+        """Body indices whose names contain any of ``name_patterns``.
+
+        Shared by every backend: cfg.asset.penalize_contacts_on /
+        terminate_after_contacts_on are substring matches over body_names.
+        """
+        indices = [
+            i
+            for pattern in name_patterns
+            for i, name in enumerate(self.body_names)
+            if pattern in name
+        ]
+        return torch.tensor(indices, dtype=torch.long, device=device)
+
     def close(self) -> None:
         pass

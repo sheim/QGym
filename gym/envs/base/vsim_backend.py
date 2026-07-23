@@ -24,6 +24,7 @@ Runtime env: LD_LIBRARY_PATH=<site-packages>/vlearn/lib and
 VL_WORKING_DIRECTORY=<dir with License.key> (see scripts/run_vsim_tests.sh).
 """
 
+import os
 import xml.etree.ElementTree as ET
 
 import torch
@@ -58,6 +59,8 @@ class VSimBackend(SimBackend):
         self._termination_contact_indices = None
         self._pending_camera = None
         self._render_initialized = False
+        self._render_hooks = []  # each called with the render, per frame
+        self._window_closed = False
 
     # ── Metadata ──────────────────────────────────────────────────────────
 
@@ -132,8 +135,6 @@ class VSimBackend(SimBackend):
 
         # Self-heal the engine's cache structure (vsim::Path::findCachePath
         # requires a cache/ dir with its marker file under the working dir).
-        import os
-
         workdir = os.environ.get("VL_WORKING_DIRECTORY", "thirdparty/vlearn")
         os.makedirs(os.path.join(workdir, "cache", "tmp"), exist_ok=True)
         marker = os.path.join(workdir, "cache", "donotremove.txt")
@@ -186,8 +187,8 @@ class VSimBackend(SimBackend):
             art_def.get_force_sensor_def(i).max_num_transform_handles = 8
 
         init = getattr(cfg, "init_state", None)
-        pos = list(getattr(init, "pos", [0.0, 0.0, 0.0])) if init else [0.0, 0.0, 0.0]
-        rot = list(getattr(init, "rot", [0, 0, 0, 1])) if init else [0, 0, 0, 1]
+        pos = list(getattr(init, "pos", [0.0, 0.0, 0.0]))
+        rot = list(getattr(init, "rot", [0, 0, 0, 1]))
         self._art_h = env_def.create_articulation(
             art_def_h, v.Transform(v.Quat(*rot), v.Vec3(*pos))
         )
@@ -242,15 +243,15 @@ class VSimBackend(SimBackend):
             device=device,
         )
 
-        self._penalised_contact_indices = self._build_contact_indices(
+        self._penalised_contact_indices = self.build_contact_indices(
             getattr(cfg.asset, "penalize_contacts_on", []), device
         )
-        self._termination_contact_indices = self._build_contact_indices(
+        self._termination_contact_indices = self.build_contact_indices(
             getattr(cfg.asset, "terminate_after_contacts_on", []), device
         )
 
         self._allocate_tensors_and_commands()
-        self._run_task_callbacks(vsim_path, cfg, task)
+        self._run_task_callbacks(xroot, cfg, task)
         self._refresh_state()
         if not headless:
             self._apply_camera()
@@ -317,22 +318,24 @@ class VSimBackend(SimBackend):
         self._mask = torch.zeros(N, dtype=torch.bool, device=dev)
         self._jp_set = torch.zeros(N, nd, device=dev)
         self._jv_set = torch.zeros(N, nd, device=dev)
-        jp_set_cmd = grp.create_joint_state_command(
-            v.wrap_gpu_buffer(self._jp_set),
-            self._art_h,
-            (0, nd),
-            masks_buffer=v.wrap_gpu_buffer(self._mask),
-        )
-        jv_set_cmd = grp.create_joint_state_command(
-            v.wrap_gpu_buffer(self._jv_set),
-            self._art_h,
-            (0, nd),
-            masks_buffer=v.wrap_gpu_buffer(self._mask),
-        )
-        self._jp_set_arr = gym.create_gpu_array([jp_set_cmd])
-        self._jv_set_arr = gym.create_gpu_array([jv_set_cmd])
-
-        if self._has_free_joint:
+        if not self._has_free_joint:
+            # Fixed base: joints are committed directly.
+            jp_set_cmd = grp.create_joint_state_command(
+                v.wrap_gpu_buffer(self._jp_set),
+                self._art_h,
+                (0, nd),
+                masks_buffer=v.wrap_gpu_buffer(self._mask),
+            )
+            jv_set_cmd = grp.create_joint_state_command(
+                v.wrap_gpu_buffer(self._jv_set),
+                self._art_h,
+                (0, nd),
+                masks_buffer=v.wrap_gpu_buffer(self._mask),
+            )
+            self._jp_set_arr = gym.create_gpu_array([jp_set_cmd])
+            self._jv_set_arr = gym.create_gpu_array([jv_set_cmd])
+        else:
+            # Floating base: one kinematic-state command carries root + joints.
             self._root_tf_set = torch.zeros(N, 1, 7, device=dev)
             self._root_vel_set = torch.zeros(N, 1, 6, device=dev)
             aks_set = grp.create_articulation_kinematic_state_command(
@@ -354,18 +357,18 @@ class VSimBackend(SimBackend):
         )
         self._motor_arr = gym.create_gpu_array([mot])
 
-    def _run_task_callbacks(self, vsim_path: str, cfg, task) -> None:
-        if task is not None:
-            task.num_dof = self._num_dof
-        if task is not None and hasattr(task, "_get_env_origins"):
+    def _run_task_callbacks(self, xroot, cfg, task) -> None:
+        if task is None:
+            return
+        task.num_dof = self._num_dof
+        if hasattr(task, "_get_env_origins"):
             task._get_env_origins()
-        if task is not None and hasattr(task, "_process_dof_props"):
-            task._process_dof_props(self._make_dof_props(vsim_path, cfg), env_id=0)
+        if hasattr(task, "_process_dof_props"):
+            task._process_dof_props(self._make_dof_props(xroot, cfg), env_id=0)
 
-    def _make_dof_props(self, vsim_path: str, cfg) -> dict:
+    def _make_dof_props(self, root, cfg) -> dict:
         """lower/upper from the .vsim XML (lower>upper == unlimited),
         effort/velocity re-parsed from the source URDF."""
-        root = ET.parse(vsim_path).getroot()
         limits = {}
         for j in root.findall("joint"):
             if j.get("type") == "fixed":
@@ -388,14 +391,6 @@ class VSimBackend(SimBackend):
             if name in urdf_ev:
                 effort[i], velocity[i] = urdf_ev[name]
         return {"lower": lower, "upper": upper, "velocity": velocity, "effort": effort}
-
-    def _build_contact_indices(self, name_patterns: list, device: str) -> torch.Tensor:
-        indices = []
-        for pattern in name_patterns:
-            for i, bname in enumerate(self._body_names):
-                if pattern in bname:
-                    indices.append(i)
-        return torch.tensor(indices, dtype=torch.long, device=device)
 
     # ── Per-step ──────────────────────────────────────────────────────────
 
@@ -465,6 +460,39 @@ class VSimBackend(SimBackend):
 
     # ── Rendering / lifecycle ─────────────────────────────────────────────
 
+    def add_render_hook(self, fn) -> None:
+        """Register a callable(render) invoked once per rendered frame."""
+        self._render_hooks.append(fn)
+
+    # ── Debug line drawing ────────────────────────────────────────────────
+    # vsim has no arrow/capsule debug geoms — only polylines — so callers
+    # build shapes from point lists.  Engine types (Vec3, UserLine) stay
+    # inside the backend; callers pass plain (x, y, z) tuples.
+
+    def create_debug_line(self, points, color=(1.0, 1.0, 1.0), width: float = 2.0):
+        v, r = self._v, self._gym.get_render()
+        line = r.create_user_line(
+            [v.Vec3(*p) for p in points], v.Vec3(*color), line_width=width
+        )
+        r.register_line_shape(line)
+        return line
+
+    def update_debug_line(self, line, points, visible: bool = True) -> None:
+        line.set_visible(visible)
+        if visible and points:
+            line.set_points([self._v.Vec3(*p) for p in points])
+
+    @property
+    def escape_key(self):
+        """UserKey.Escape — lets interfaces poll specials without importing
+        vlearn themselves (see VsimKeyboardInterface)."""
+        return self._v.UserKey.Escape
+
+    @property
+    def window_closed(self) -> bool:
+        """True once the user closes the viewer window (render() reports it)."""
+        return self._window_closed
+
     def render(self, sync_frame_time: bool = True) -> None:
         r = self._gym.get_render()
         if not self._render_initialized:
@@ -473,7 +501,12 @@ class VSimBackend(SimBackend):
             r.capped_step = bool(sync_frame_time)
             r.set_paused(False)
             self._render_initialized = True
-        r.render()
+        # Per-frame hooks (vlearn input is polled, not event-driven — see
+        # VsimKeyboardInterface; the command visualiser also redraws here).
+        # They run before render() so a change lands on the same frame.
+        for hook in self._render_hooks:
+            hook(r)
+        self._window_closed = bool(r.render())
 
     def set_camera(self, position, lookat) -> None:
         """Stash-and-apply: BaseTask calls this BEFORE setup() (init order),

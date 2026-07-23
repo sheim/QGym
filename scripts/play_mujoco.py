@@ -50,6 +50,14 @@ def get_play_args():
         "`uv run --env-file .env.vsim ...`)",
     )
     parser.add_argument(
+        "--viewer_ui",
+        action="store_true",
+        default=False,
+        help="show the MuJoCo viewer's side panels (hidden by default: their "
+        "shortcuts bind most letters to visualisation toggles, which fire "
+        "alongside keyboard teleop)",
+    )
+    parser.add_argument(
         "--keyboard",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -75,6 +83,8 @@ def setup(args):
         env_cfg.push_robots.toggle = False
     if hasattr(env_cfg, "init_state") and hasattr(env_cfg.init_state, "reset_mode"):
         env_cfg.init_state.reset_mode = "reset_to_range"
+    if hasattr(env_cfg, "viewer"):
+        env_cfg.viewer.show_ui = args.viewer_ui
 
     if args.seed is not None:
         env_cfg.seed = args.seed
@@ -121,21 +131,33 @@ def play(env, runner):
 
 if __name__ == "__main__":
     args = get_play_args()
-    if args.backend == "vsim" and args.keyboard and not args.headless:
-        raise SystemExit(
-            "--keyboard is MuJoCo-viewer-only; use --no-keyboard with --backend vsim"
-        )
     with torch.no_grad():
         env, runner = setup(args)
         if args.keyboard and hasattr(env, "commands") and not args.headless:
-            from gym.utils.interfaces.MujocoKeyboardInterface import (
-                MujocoKeyboardInterface,
-            )
+            # Each viewer has its own input model: MuJoCo dispatches key
+            # events via a callback, vlearn polls key state per frame.
+            if args.backend == "vsim":
+                from gym.utils.interfaces.VsimKeyboardInterface import (
+                    VsimKeyboardInterface,
+                )
 
-            MujocoKeyboardInterface(env)
-        if hasattr(env, "commands") and not args.headless and args.backend == "mujoco":
-            # CommandVisualizer draws into the MuJoCo passive viewer only.
-            from gym.utils.interfaces.CommandVisualizer import CommandVisualizer
+                VsimKeyboardInterface(env)
+            else:
+                from gym.utils.interfaces.MujocoKeyboardInterface import (
+                    MujocoKeyboardInterface,
+                )
 
-            CommandVisualizer(env)
+                MujocoKeyboardInterface(env)
+        if hasattr(env, "commands") and not args.headless:
+            # Same indicators, different drawing primitives per viewer.
+            if args.backend == "vsim":
+                from gym.utils.interfaces.VsimCommandVisualizer import (
+                    VsimCommandVisualizer,
+                )
+
+                VsimCommandVisualizer(env)
+            else:
+                from gym.utils.interfaces.CommandVisualizer import CommandVisualizer
+
+                CommandVisualizer(env)
         play(env, runner)
