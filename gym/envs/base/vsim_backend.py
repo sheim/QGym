@@ -134,7 +134,7 @@ class VSimBackend(SimBackend):
         # requires a cache/ dir with its marker file under the working dir).
         import os
 
-        workdir = os.environ.get("VL_WORKING_DIRECTORY", "vendor/vlearn")
+        workdir = os.environ.get("VL_WORKING_DIRECTORY", "thirdparty/vlearn")
         os.makedirs(os.path.join(workdir, "cache", "tmp"), exist_ok=True)
         marker = os.path.join(workdir, "cache", "donotremove.txt")
         if not os.path.exists(marker):

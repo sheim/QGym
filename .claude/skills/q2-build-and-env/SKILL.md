@@ -18,7 +18,7 @@ That is the whole install. Facts behind it (verified 2026-07-12):
   **3.11** by `.python-version` (2026-07-12; the vsim/vlearn wheels are cp311
   only — full suite revalidated identical on 3.11). Ruff targets py311.
 - **vsim backend extra**: fully self-contained in-repo since 2026-07-21 —
-  `uv sync --extra vsim` installs the `vlearn` wheel from `vendor/vlearn/`
+  `uv sync --extra vsim` installs the `vlearn` wheel from `thirdparty/vlearn/`
   (gitignored drop zone; see its README for the new-machine procedure).
   Needs system `libczmq4`; every vsim process must start via
   `uv run --env-file .env.vsim` (LD_LIBRARY_PATH is read by the loader at

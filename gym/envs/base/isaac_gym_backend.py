@@ -90,6 +90,10 @@ class IsaacGymBackend(SimBackend):
     def sim(self):
         return self._sim
 
+    @property
+    def viewer(self):
+        return self._viewer
+
     # ── World building ──────────────────────────────────────────────────────
 
     def setup(self, cfg, num_envs: int, device: str, task=None) -> None:

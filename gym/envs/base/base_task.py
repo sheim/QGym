@@ -40,6 +40,12 @@ class BaseTask(TaskSkeleton):
     def sim(self):
         return self._backend.sim
 
+    @property
+    def viewer(self):
+        # Consumed by KeyboardInterface / VisualizationRecorder (IsaacGym
+        # viewer only; None on other backends).
+        return self._backend.viewer
+
     # ── Rendering ────────────────────────────────────────────────────────────
 
     def _render(self, sync_frame_time: bool = True) -> None:

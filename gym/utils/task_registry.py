@@ -187,6 +187,20 @@ class TaskRegistry:
             train_cfg.algorithm.lam = set_discount_from_horizon(dt, hrzn)
 
     def update_sim_cfg(self, args):
+        # IsaacGym-only path (constructs gymapi.SimParams).  Merge the full
+        # SimCfg defaults UNDER whatever was already computed (dt): the port
+        # left self.sim_cfg starting as {} with only "dt" ever written, so
+        # parse_sim_config received no up_axis/gravity/physx and IsaacGym
+        # fell back to its Y-up, (0,-9.81,0)-gravity defaults while assets
+        # and the ground plane are Z-up — gravity pulled robots sideways.
+        # Lazy import: sim_config lives in gym.envs.base (circular at module
+        # load time, fine here).
+        from gym.envs.base.sim_config import SimCfg
+
+        merged = class_to_dict(SimCfg)
+        merged.update(self.sim_cfg)
+        self.sim_cfg = merged
+
         self.sim["sim_device"] = args.sim_device
         self.sim["sim_device_id"] = args.sim_device_id
         self.sim["graphics_device_id"] = args.graphics_device_id

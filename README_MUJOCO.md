@@ -3,7 +3,7 @@
 RL training framework for legged robots. Physics backends:
 - **MuJoCo CPU** (all platforms incl. macOS) and **mujoco-warp** GPU (Linux+CUDA)
 - **vsim** (`--backend vsim`): closed-source licensed GPU engine, ~10× faster
-  than warp at 4096 envs. Self-contained under `vendor/vlearn/` (wheel +
+  than warp at 4096 envs. Self-contained under `thirdparty/vlearn/` (wheel +
   license drop zone — see its README); needs system `libczmq4` and process
   env from `.env.vsim`:
 

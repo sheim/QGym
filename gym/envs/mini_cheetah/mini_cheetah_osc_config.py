@@ -263,24 +263,8 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
             class termination_weight:
                 termination = 0.15
 
-    class algorithm:
-        # training params
-        value_loss_coef = 1.0
-        use_clipped_value_loss = True
-        clip_param = 0.2
-        entropy_coef = 0.01
-        num_learning_epochs = 4
-        # mini batch size = num_envs*nsteps/nminibatches
-        num_mini_batches = 8
-        max_gradient_steps = 32
-        learning_rate = 1.0e-4
-        schedule = "adaptive"  # can be adaptive, fixed
-        discount_horizon = 1.0
-        GAE_bootstrap_horizon = 2.0
-        desired_kl = 0.01
-        max_grad_norm = 1.0
-        lr_range = [1e-5, 5e-3]
-        lr_ratio = 1.5
+    class algorithm(MiniCheetahRunnerCfg.algorithm):
+        pass
 
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""

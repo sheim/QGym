@@ -156,9 +156,11 @@ class SimBackend(ABC):
         """The PyTorch device string ('cpu', 'cuda:0', …)."""
 
     # IsaacGym shims — non-IsaacGym backends leave these as None.
-    # BaseTask.gym / BaseTask.sim forward here for LeggedRobot compatibility.
+    # BaseTask.gym / .sim / .viewer forward here for legacy compatibility
+    # (viewer is consumed by KeyboardInterface / VisualizationRecorder).
     gym = None
     sim = None
+    viewer = None
 
     def render(self, sync_frame_time: bool = True) -> None:
         pass

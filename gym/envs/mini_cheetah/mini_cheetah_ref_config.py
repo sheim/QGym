@@ -153,7 +153,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 2 * 4096  # use all the data
+        batch_size = 4096  # use all the data
         max_gradient_steps = 50
 
         clip_param = 0.2

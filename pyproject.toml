@@ -30,9 +30,9 @@ dev = [
 ]
 
 [tool.uv.sources]
-# Vendored in-repo (gitignored — see vendor/vlearn/README.md for the drop-in
+# Vendored in-repo (gitignored — see thirdparty/vlearn/README.md for the drop-in
 # procedure on a new machine).
-vlearn = { path = "vendor/vlearn/vlearn-0.3.12-cp311-cp311-linux_x86_64.whl" }
+vlearn = { path = "thirdparty/vlearn/vlearn-0.3.12-cp311-cp311-linux_x86_64.whl" }
 
 [build-system]
 requires = ["setuptools"]

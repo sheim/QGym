@@ -86,9 +86,9 @@ venv.bak/
 gym/smooth_exploration/data*
 gym/smooth_exploration/figures*
 resources/robots/*/vsim/*.vsim
-vendor/vlearn/*.whl
-vendor/vlearn/License.key
-vendor/vlearn/TurboActivate.dat
-vendor/vlearn/cache/
-vendor/vlearn/shaders/
-vendor/vlearn/assets/
+thirdparty/vlearn/*.whl
+thirdparty/vlearn/License.key
+thirdparty/vlearn/TurboActivate.dat
+thirdparty/vlearn/cache/
+thirdparty/vlearn/shaders/
+thirdparty/vlearn/assets/

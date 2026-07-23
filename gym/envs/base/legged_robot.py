@@ -143,6 +143,9 @@ class LeggedRobot(BaseTask):
         if mesh_type in ["heightfield", "trimesh"]:
             self.terrain = Terrain(self.cfg.terrain, self.num_envs)
 
+        # Projectiles are deprecated (IsaacGym-only); cfg default is None → 0.
+        self.num_projs = self.cfg.env.num_projectiles or 0
+
         if isinstance(self._backend, IsaacGymBackend):
             # IsaacGym path — existing code unchanged
             if mesh_type == "plane":
@@ -183,7 +186,6 @@ class LeggedRobot(BaseTask):
             self.base_init_state = to_torch(base_init_state_list, device=self.device)
             self.envs = []
             self.actor_handles = []
-            self.num_projs = 0
 
     def _resample_commands(self, env_ids):
         """Randommly select commands of some environments
