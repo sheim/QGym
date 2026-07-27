@@ -9,8 +9,10 @@ a backend that refreshes assembled tensors only inside its property getters
 passes them while the task trains on frozen observations.
 
 This test steps a full mini_cheetah env and asserts the task's *cached*
-root_states / rigid-body states actually update.  Regression for the warp
-root_states staleness bug (jt/port e604532 / 2326b71).
+root_states / rigid-body states / dof_state actually update.  Regression for
+the warp root_states staleness bug (jt/port e604532 / 2326b71) and the sibling
+warp dof_state torch.stack-copy staleness (pendulum _reward_equilibrium pegged
+at 1.0 on GPU; found 2026-07-24).
 """
 
 import pytest
@@ -71,6 +73,20 @@ def _step_and_check_liveness(env):
     assert not torch.allclose(before_rbs, env._rigid_body_state), (
         "task-cached rigid-body states did not change after stepping — the "
         "backend is refreshing rigid_body_states only in the property getter"
+    )
+
+    # dof_state liveness: the task caches self.dof_state once (legged_robot /
+    # fixed_robot _init_buffers) with dof_pos/dof_vel taken separately.  warp
+    # returned a per-call torch.stack copy, so the cached dof_state froze at the
+    # init zeros — latent for mini_cheetah (rewards read dof_pos/dof_vel) but
+    # fatal for pendulum's _reward_equilibrium, which reads dof_state directly
+    # and saw a fabricated ~zero error (equilibrium pegged at 1.0 on GPU).
+    ds = env.dof_state.view(env.num_envs, env.num_dof, 2)
+    assert torch.allclose(ds[..., 0], env.dof_pos) and torch.allclose(
+        ds[..., 1], env.dof_vel
+    ), (
+        "task-cached dof_state does not track live dof_pos/dof_vel — the "
+        "backend is returning a stale dof_state copy (warp torch.stack scar)"
     )
 
     # Cached reference must be the backend's own tensor, updated in place

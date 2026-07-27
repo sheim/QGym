@@ -1,3 +1,6 @@
+import json
+import os
+
 import wandb
 
 from .EpisodicLogs import EpisodicLogs
@@ -10,7 +13,12 @@ class Logger:
         self.initialized = False
 
     def initialize(
-        self, num_envs=1, episode_dt=0.1, total_iterations=100, device="cpu"
+        self,
+        num_envs=1,
+        episode_dt=0.1,
+        total_iterations=100,
+        device="cpu",
+        log_dir=None,
     ):
         self.device = device
 
@@ -25,6 +33,9 @@ class Logger:
         self.num_envs = num_envs
         self.step_counter = 0
         self.algorithm_logs = {}
+        # Optional local per-iteration vitals sink (independent of wandb) —
+        # one JSON object per line at <log_dir>/vitals.jsonl.
+        self.log_dir = log_dir
         self.initialized = True
 
     def register_category(self, category, target, attribute_list):
@@ -44,7 +55,41 @@ class Logger:
         self.iteration_counter += 1
         if wandb.run is not None:
             self.log_to_wandb()
+        if self.log_dir is not None:
+            self.log_to_file()
         return None
+
+    @staticmethod
+    def _to_scalar(val):
+        # action_std / entropy come through as (grad-carrying) tensors, possibly
+        # per-action; detach and reduce anything multi-element to its mean.
+        # No try/except (fail-fast).
+        if hasattr(val, "detach"):
+            val = val.detach()
+        if hasattr(val, "numel") and val.numel() != 1:
+            return float(val.float().mean())
+        return float(val)
+
+    def collect_vitals(self):
+        """Flat {metric: scalar} snapshot of this iteration (shared by the
+        wandb and file sinks)."""
+        record = {"iteration": self.iteration_counter}
+        for key, val in self.reward_logs.get_average_rewards().items():
+            record[f"rewards/{key}"] = self._to_scalar(val)
+        for category in self.iteration_logs.logs.keys():
+            for key, val in self.iteration_logs.get_all_logs(category).items():
+                record[f"{category}/{key}"] = self._to_scalar(val)
+        record["episode_time"] = float(self.reward_logs.get_average_time())
+        record["steps_per_s"] = float(self.estimate_steps_per_second())
+        record["t_iteration"] = float(self.timer.get_time("iteration"))
+        record["t_collection"] = float(self.timer.get_time("collection"))
+        record["t_learning"] = float(self.timer.get_time("learning"))
+        return record
+
+    def log_to_file(self):
+        os.makedirs(self.log_dir, exist_ok=True)
+        with open(os.path.join(self.log_dir, "vitals.jsonl"), "a") as f:
+            f.write(json.dumps(self.collect_vitals()) + "\n")
 
     def estimate_ETA(self, times=["runtime"], mode="total"):
         if mode == "total":

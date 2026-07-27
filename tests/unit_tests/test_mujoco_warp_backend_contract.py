@@ -166,11 +166,23 @@ class TestReset:
         )
         assert torch.allclose(b.dof_pos[2:], pos_after[2:], atol=1e-5)
 
-    def test_dof_state_view_consistent_with_dof_pos(self, mujoco_warp_backend):
+    def test_dof_state_consistent_after_sync(self, mujoco_warp_backend):
+        # On warp, qpos/qvel live in SEPARATE Warp arrays, so dof_state cannot
+        # share storage with dof_pos (as it does on cpu/vsim); it is an
+        # assembled buffer refreshed at sync points (step / reset).  The task
+        # caches dof_state once and reads it after steps, so the contract is
+        # "dof_state reflects dof_pos/dof_vel after a sync", verified here via
+        # reset_dof_state (which syncs without advancing physics).  A per-call
+        # torch.stack copy passed a naive read-consistency check but left the
+        # task's cached reference frozen at the init zeros — the pendulum
+        # _reward_equilibrium staleness bug (2026-07-24, see
+        # test_task_state_liveness).  Refreshing in the getter is fenced off
+        # (the root_states-scar anti-pattern): getters stay plain returns.
         b = mujoco_warp_backend
         b.dof_pos[:] = 2.71
+        b.dof_vel[:] = 0.0
+        b.reset_dof_state(torch.arange(b._num_envs, device=b.device))
         assert torch.allclose(
-            b.dof_state[:, 0],
-            torch.full((4,), 2.71, device=b.device),
-            atol=1e-5,
+            b.dof_state[:, 0], torch.full_like(b.dof_state[:, 0], 2.71), atol=1e-5
         )
+        assert torch.allclose(b.dof_state[:, 1], torch.zeros_like(b.dof_state[:, 1]))

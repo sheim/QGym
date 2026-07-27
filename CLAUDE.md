@@ -48,6 +48,21 @@ still stand: **all pre-fix GPU training results/checkpoints are untrustworthy**,
 branches without this fix still have the bug. Details:
 `.claude/skills/q2-phase4-parity-campaign/SKILL.md` Phase 0.
 
+**Sibling staleness — FIXED 2026-07-24 (branch `vsim`).** Same family, different
+tensor: warp's `dof_state` getter returned a per-call `torch.stack([dof_pos,
+dof_vel])` **copy**, but the task caches `self.dof_state` once at init
+(`fixed_robot`/`legged_robot._init_buffers`), so on GPU that cached reference
+froze at the init zeros. Latent for mini_cheetah (its rewards read
+`dof_pos`/`dof_vel`, which stayed live) but **fatal for the pendulum**:
+`_reward_equilibrium` reads `dof_state` directly, so `abs(dof_state)≈0` →
+`sqrdexp(0)=1.0`, pegging equilibrium at its max on GPU. This faked the pendulum
+GPU training reward (**~1.16 fake vs ~0.23 real**; the historical "+1.5" GPU
+pendulum mark carries this asterisk). Fixed by making warp maintain an assembled
+`_dof_state_t` refreshed in `_sync_assembled_states()` and returning a live view
+(mirrors the root_states fix); `test_task_state_liveness.py` now also asserts
+`dof_state` tracks `dof_pos`/`dof_vel`. CPU and vsim expose `dof_state` as a real
+view and were never affected.
+
 ## Skills index (`.claude/skills/`)
 
 | Skill | Load when |

@@ -573,6 +573,16 @@ Then 3g → 3h → 3i sequentially.  3j scaffolded early, finalized after 3i.
 | Determinism | Same seed → identical trajectory on `MuJocoCPUBackend` |
 | Performance | Wall-clock per iteration, GPU utilisation; target ≥ IsaacGym throughput |
 
+**Pendulum physics-fidelity — ✅ DONE 2026-07-24 (branch `vsim`).** An analytic
+energy-pump + LQR swing-up controller (`scripts/pendulum_fidelity.py`) drives the
+pendulum identically on every backend over the deterministic `reset_to_uniform`
+grid, so any cross-engine divergence is pure physics. Result (1024 envs): CPU,
+warp, and vsim all **100% catch, mean 1.08 s**; angular-divergence RMS vs CPU is
+9e-7 rad (warp, float noise) and 5e-4 rad (vsim, genuine cross-solver, negligible
+and non-growing under the stabilizing LQR). Interactive plots:
+`notebooks/pendulum_fidelity.py` (marimo). The IsaacGym leg stays the separate
+checkpoint-portability check below. See `q2-phase4-parity-campaign` Phase 2b.
+
 ### IsaacGym removal
 
 Once all checks pass:

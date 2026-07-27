@@ -44,6 +44,7 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         self._cvel_t: torch.Tensor = None  # [N, nbody, 6]
         self._root_states_t: torch.Tensor = None  # [N, 13]
         self._rigid_body_states_t: torch.Tensor = None  # [N, nbody, 13]
+        self._dof_state_t: torch.Tensor = None  # [N, num_dof, 2]
 
     # ── State tensors ──────────────────────────────────────────────────────────
 
@@ -57,12 +58,15 @@ class MuJocoWarpBackend(MuJocoBackendBase):
 
     @property
     def dof_state(self) -> torch.Tensor:
-        # Per-call copy (qpos/qvel live in separate Warp arrays, so an
-        # interleaved view is impossible).  Read-only convenience — resets
-        # must go through the dof_pos / dof_vel zero-copy views.
-        return torch.stack([self.dof_pos, self.dof_vel], dim=-1).view(
-            self._num_envs * self._num_dof, 2
-        )
+        # Live view into an assembled buffer refreshed every step/reset by
+        # _sync_assembled_states.  qpos/qvel live in separate Warp arrays so a
+        # true zero-copy interleaved view is impossible — but the task caches
+        # this reference once at init (fixed_robot._init_buffers), so returning
+        # a per-call torch.stack copy left self.dof_state frozen at the init
+        # zeros, and any reward/obs reading dof_state directly (e.g. pendulum's
+        # _reward_equilibrium) saw a fabricated near-zero error.  Resets still
+        # write through the dof_pos / dof_vel zero-copy views.
+        return self._dof_state_t.view(self._num_envs * self._num_dof, 2)
 
     @property
     def root_states(self) -> torch.Tensor:
@@ -79,6 +83,8 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         task layer caches root_states / rigid_body_states once at init, so
         a lazy getter-side refresh leaves training on frozen observations.
         """
+        self._dof_state_t[:, :, 0] = self.dof_pos
+        self._dof_state_t[:, :, 1] = self.dof_vel
         if self._has_free_joint:
             rs = self._root_states_t
             rs[:, :3] = self._qpos_t[:, :3]
@@ -137,6 +143,9 @@ class MuJocoWarpBackend(MuJocoBackendBase):
         nb = mjm.nbody
         self._rigid_body_states_t = torch.zeros(num_envs, nb, 13, device=device)
         self._rigid_body_states_t[:, :, 6] = 1.0
+        # Assembled [N, num_dof, 2] dof_state buffer — qpos/qvel are separate
+        # Warp arrays, so this is the only way dof_state can stay a live view.
+        self._dof_state_t = torch.zeros(num_envs, self._num_dof, 2, device=device)
 
         # Tensors must be valid immediately after setup() (tasks cache them
         # during _init_buffers, before the first step).

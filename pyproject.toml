@@ -27,6 +27,7 @@ dev = [
     "pytest",
     "ruff>=0.15.9",
     "mujoco-warp>=3.6",
+    "marimo>=0.9",
 ]
 
 [tool.uv.sources]
@@ -81,6 +82,7 @@ exclude = [
     "venv",
     "__init__.py",
     "logs/",
+    "notebooks/",
 ]
 
 line-length = 88

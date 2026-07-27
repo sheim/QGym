@@ -190,7 +190,11 @@ class OnPolicyRunner(BaseRunner):
         if dt is None:
             dt = self.env.dt
         logger.initialize(
-            self.env.num_envs, dt, self.cfg["max_iterations"], self.device
+            self.env.num_envs,
+            dt,
+            self.cfg["max_iterations"],
+            self.device,
+            log_dir=self.log_dir,
         )
 
         logger.register_rewards(list(self.critic_cfg["reward"]["weights"].keys()))

@@ -42,6 +42,12 @@ def get_mujoco_args():
     parser.add_argument(
         "--batch_size", type=int, default=None, help="Override batch_size from cfg"
     )
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default=None,
+        help="Override experiment_name (log dir is logs/<experiment_name>/...)",
+    )
     parser.add_argument("--headless", action="store_true", default=False)
     # wandb
     parser.add_argument("--disable_wandb", action="store_true", default=False)
@@ -73,6 +79,9 @@ def setup():
 
         env_cfg.seed = random.randint(0, 10000)
         train_cfg.seed = env_cfg.seed
+
+    if args.experiment_name is not None:
+        train_cfg.runner.experiment_name = args.experiment_name
 
     train_cfg.runner.device = args.device
 
