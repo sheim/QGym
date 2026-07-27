@@ -76,16 +76,23 @@ class MuJocoWarpBackend(MuJocoBackendBase):
     def rigid_body_states(self) -> torch.Tensor:
         return self._rigid_body_states_t.view(self._num_envs * self._num_bodies, 13)
 
-    def _sync_assembled_states(self) -> None:
+    def _sync_assembled_states(self, sync_root: bool = True) -> None:
         """Refresh the assembled scratch tensors from the zero-copy views.
 
         Must be called whenever the sim state changes (step, resets): the
         task layer caches root_states / rigid_body_states once at init, so
         a lazy getter-side refresh leaves training on frozen observations.
+
+        ``sync_root=False`` skips rebuilding root_states from qpos.  During a
+        reset the task writes the desired root_states into the assembled buffer
+        FIRST and commits it to qpos only in reset_root_state; reset_dof_state
+        runs in between, so rebuilding root_states from the not-yet-committed
+        qpos there would clobber the pending write (floating base spawned at the
+        stale height — found 2026-07-27 via the mini_cheetah drop probe).
         """
         self._dof_state_t[:, :, 0] = self.dof_pos
         self._dof_state_t[:, :, 1] = self.dof_vel
-        if self._has_free_joint:
+        if self._has_free_joint and sync_root:
             rs = self._root_states_t
             rs[:, :3] = self._qpos_t[:, :3]
             rs[:, 3:7] = self._qpos_t[:, 3:7][:, WXYZ_TO_XYZW]
@@ -176,7 +183,9 @@ class MuJocoWarpBackend(MuJocoBackendBase):
 
         with self._wp_ctx:
             mjw.forward(self._m, self._d)
-        self._sync_assembled_states()
+        # Preserve the task's pending root_states write — reset_root_state
+        # commits it to qpos immediately after and does the full sync.
+        self._sync_assembled_states(sync_root=False)
 
     def reset_root_state(self, env_ids: torch.Tensor) -> None:
         if not self._has_free_joint:

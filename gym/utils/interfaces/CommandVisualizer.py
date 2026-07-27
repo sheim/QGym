@@ -48,14 +48,18 @@ class CommandVisualizer:
         arc_segments_per_rad=12,
     ):
         self.env = env
-        self.mjd = env._backend._datas[0]
         self.scale = scale
         self.height_offset = height_offset
         self.shaft_radius = shaft_radius
         self.yaw_radius = yaw_radius
         self.yaw_arc_scale = yaw_arc_scale
         self.arc_segments_per_rad = arc_segments_per_rad
-        env._backend._viewer_overlay_fn = self._draw
+        # Only the CPU MuJoCo backend has an interactive passive viewer (and the
+        # overlay hook).  warp is headless-only (render() is a no-op, no _datas);
+        # attaching there would crash, so no-op instead — play on --device cpu to
+        # actually see anything.
+        if hasattr(env._backend, "_viewer_overlay_fn"):
+            env._backend._viewer_overlay_fn = self._draw
 
     def _draw(self, viewer):
         viewer.user_scn.ngeom = 0
@@ -64,8 +68,11 @@ class CommandVisualizer:
         vy = float(cmd[1]) if cmd.shape[0] > 1 else 0.0
         yaw_rate = float(cmd[2]) if cmd.shape[0] > 2 else 0.0
 
-        base_pos = np.array(self.mjd.qpos[0:3], dtype=np.float64)
-        qw, qx, qy, qz = (float(self.mjd.qpos[i]) for i in (3, 4, 5, 6))
+        # Canonical (backend-agnostic) base pose: root_states is [pos(3),
+        # quat xyzw(4), ...], scalar-last (task-layer convention).
+        root = self.env.root_states[0].detach().cpu().numpy()
+        base_pos = root[0:3].astype(np.float64)
+        qx, qy, qz, qw = (float(root[i]) for i in (3, 4, 5, 6))
         yaw = np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
         c, s = np.cos(yaw), np.sin(yaw)
         fwd_world = np.array([c, s, 0.0])

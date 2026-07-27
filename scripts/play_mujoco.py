@@ -133,6 +133,17 @@ if __name__ == "__main__":
     args = get_play_args()
     with torch.no_grad():
         env, runner = setup(args)
+        # The MuJoCo warp (GPU) backend is headless-only: render() is a no-op and
+        # it has no passive viewer, so nothing draws.  Point the user at cpu.
+        if (
+            args.backend == "mujoco"
+            and not args.headless
+            and not hasattr(env._backend, "_viewer_overlay_fn")
+        ):
+            print(
+                "WARNING: the MuJoCo warp (GPU) backend has no interactive viewer "
+                "— nothing will render. Use --device cpu for playback."
+            )
         if args.keyboard and hasattr(env, "commands") and not args.headless:
             # Each viewer has its own input model: MuJoCo dispatches key
             # events via a callback, vlearn polls key state per frame.

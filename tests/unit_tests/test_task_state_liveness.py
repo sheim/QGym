@@ -97,6 +97,54 @@ def _step_and_check_liveness(env):
     )
 
 
+def _build_env_reset_to_basic(device: str, base_z: float):
+    pytest.importorskip("mujoco")
+    if device.startswith("cuda"):
+        pytest.importorskip("mujoco_warp")
+        if not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+
+    import gym.envs  # noqa: F401  — registers tasks
+
+    env_cfg, train_cfg = task_registry.get_cfgs("mini_cheetah")
+    env_cfg.env.num_envs = 4
+    env_cfg.env.episode_length_s = 50
+    env_cfg.push_robots.toggle = False
+    env_cfg.init_state.reset_mode = "reset_to_basic"
+    env_cfg.init_state.pos = [0.0, 0.0, base_z]
+    env_cfg.seed = 0
+    train_cfg.seed = 0
+    task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
+    return task_registry.make_env_mujoco(
+        "mini_cheetah", env_cfg, device=device, headless=True
+    )
+
+
+def _assert_base_spawns_at_configured_height(device: str):
+    # Regression for the warp floating-base reset mis-placement (2026-07-27):
+    # reset_dof_state's sync rebuilt root_states from the not-yet-committed
+    # qpos, clobbering the task's pending root_states write, so reset_root_state
+    # committed the STALE height (base spawned near the ground instead of the
+    # configured pos).  The task writes root_states then commits via
+    # reset_root_state; the committed base z must equal the configured height.
+    base_z = 0.42
+    env = _build_env_reset_to_basic(device, base_z)
+    z = env.root_states[:, 2]
+    assert torch.allclose(z, torch.full_like(z, base_z), atol=2e-2), (
+        f"floating base spawned at z={z.tolist()} on {device}, expected "
+        f"~{base_z} — reset_dof_state's sync is clobbering the pending "
+        "root_states write before reset_root_state commits it"
+    )
+
+
+def test_floating_base_reset_placement_cpu():
+    _assert_base_spawns_at_configured_height("cpu")
+
+
+def test_floating_base_reset_placement_warp():
+    _assert_base_spawns_at_configured_height("cuda:0")
+
+
 def test_task_state_liveness_cpu():
     env = _build_env(device="cpu")
     _step_and_check_liveness(env)

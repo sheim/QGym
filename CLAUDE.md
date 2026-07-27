@@ -63,6 +63,22 @@ pendulum mark carries this asterisk). Fixed by making warp maintain an assembled
 `dof_state` tracks `dof_pos`/`dof_vel`. CPU and vsim expose `dof_state` as a real
 view and were never affected.
 
+**Warp floating-base reset mis-placement — FIXED 2026-07-27 (branch `vsim`).** A
+*consequence* of the root_states fix above. During a legged reset the task writes
+the desired `root_states` into warp's assembled buffer, then commits it to qpos
+in `reset_root_state` — but `reset_dof_state` runs in between and its
+`_sync_assembled_states()` rebuilt `root_states` from the **not-yet-committed
+qpos**, clobbering the pending write; `reset_root_state` then committed the stale
+height. Net effect: **every warp legged reset spawned the floating base at the
+wrong height** (near the ground, not `cfg.init_state.pos`) — so prior warp legged
+training/results (mini_cheetah incl. the campaign's post-root_states numbers) ran
+on a broken reset distribution and need re-validation. Fixed: `reset_dof_state`
+now calls `_sync_assembled_states(sync_root=False)` (preserves the pending
+root_states write; `step()`/`reset_root_state` still full-sync). Regression:
+`test_task_state_liveness.py::test_floating_base_reset_placement_{cpu,warp}`.
+Found via the mini_cheetah drop fidelity probe (`scripts/mini_cheetah_fidelity.py`):
+warp's base started at z=0.008 instead of 0.5.
+
 ## Skills index (`.claude/skills/`)
 
 | Skill | Load when |
