@@ -16,6 +16,7 @@ except ImportError:
 import torch
 
 from gym import LEGGED_GYM_ROOT_DIR
+from gym.envs.base.robot_layout import RobotLayout
 from gym.envs.base.sim_backend import SimBackend
 
 
@@ -151,9 +152,8 @@ class IsaacGymBackend(SimBackend):
         )
 
         body_names = self._gym.get_asset_rigid_body_names(robot_asset)
-        self._dof_names = self._gym.get_asset_dof_names(robot_asset)
-        self._body_names = body_names
-        self._num_bodies = len(body_names)
+        dof_names = self._gym.get_asset_dof_names(robot_asset)
+        self.configure_robot_layout(cfg, dof_names, body_names)
 
         penalized_contact_names = []
         for name in cfg.asset.penalize_contacts_on:
@@ -276,6 +276,28 @@ class IsaacGymBackend(SimBackend):
         )
 
     # ── Metadata properties ─────────────────────────────────────────────────
+
+    def configure_robot_layout(self, cfg, dof_names, body_names) -> None:
+        """Bind the canonical layout to IsaacGym's legacy native-order tensors.
+
+        IsaacGym has no gather/scatter permutation layer. Its native order must
+        therefore already equal the canonical task-facing order.
+        """
+        layout = RobotLayout.from_cfg(cfg)
+        layout.validate_native(dof_names, body_names)
+        if (
+            tuple(dof_names) != layout.dof_names
+            or tuple(body_names) != layout.body_names
+        ):
+            raise ValueError(
+                "IsaacGym native order differs from the canonical robot layout; "
+                "this legacy backend does not implement native/canonical mapping"
+            )
+        self._robot_layout = layout
+        self._dof_names = list(layout.dof_names)
+        self._body_names = list(layout.body_names)
+        self._num_dof = len(self._dof_names)
+        self._num_bodies = len(self._body_names)
 
     @property
     def num_dof(self) -> int:

@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 
 import torch
 
+from gym.envs.base.robot_layout import RobotLayout
+
 
 class SimBackend(ABC):
     """Abstract physics backend interface.
@@ -54,9 +56,15 @@ class SimBackend(ABC):
     def body_names(self) -> list: ...
 
     @property
-    def robot_layout(self):
+    def robot_layout(self) -> RobotLayout:
         """Canonical task-facing robot layout, valid after setup()."""
-        return getattr(self, "_robot_layout", None)
+        try:
+            return self._robot_layout
+        except AttributeError as exc:
+            raise RuntimeError(
+                f"{type(self).__name__}.robot_layout accessed before the backend "
+                "configured its canonical robot layout"
+            ) from exc
 
     @abstractmethod
     def find_body_index(self, name: str) -> int:

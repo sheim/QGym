@@ -691,7 +691,8 @@ Add a `RobotLayout` (name TBD) resolved once during backend setup. It defines:
 - exact named semantic groups such as feet, individual legs, arms, and end
   effectors; group names are asset-defined and do not assume every robot has
   `RF/LF/RH/LH`;
-- a layout version stored with checkpoints.
+- a layout version that identifies the canonical interface in configuration
+  and tests.
 
 For mini-cheetah, freeze the existing URDF/legacy policy order as layout v1:
 `RF, LF, RH, LH`, with joints ordered `haa, hfe, kfe` within each leg. Keep the
@@ -739,14 +740,12 @@ shape and ordering as sufficient.
 - Humanoid tasks: follow up by replacing leg/arm splits and individual semantic
   joint numbers with named groups. This is required before claiming the
   interface is general beyond mini-cheetah.
-- `TaskSkeleton` and runner action/observation plumbing remain unchanged:
-  canonical ordering makes their positional tensor interface safe.
-- Save the layout version, ordered DOF/actuator names, and ordered
-  observation/action fields in every new checkpoint. Metadata-free checkpoints
-  emit a legacy-layout warning and are assumed to use the current layout.
-  Pre-Gate-0 CPU/Warp mini-cheetah checkpoints use layout v1; pre-Gate-0 vsim
-  checkpoints used reverse native order and must be regenerated or migrated.
-  Loading a checkpoint with known mismatched metadata fails clearly.
+- `TaskSkeleton` and the learning runners remain unaware of robot layouts:
+  canonical ordering makes their positional tensor interface safe without
+  coupling checkpoint I/O to asset metadata.
+- Pre-Gate-0 CPU/Warp mini-cheetah checkpoints use layout v1. Pre-Gate-0 vsim
+  checkpoints used reverse native order and must be regenerated or migrated;
+  checkpoint loading does not attempt to infer or repair that ordering.
 
 ##### Implementation checklist
 
@@ -758,7 +757,6 @@ shape and ordering as sufficient.
 - [x] Make all public backend metadata and tensors canonical and robot-only.
 - [x] Refactor mini-cheetah semantic rewards and actuator selection to named
       groups.
-- [x] Add checkpoint layout metadata and mismatch validation.
 - [x] Confirm no task or reward reads a backend-native index.
 
 ##### Meaningful tests
@@ -778,10 +776,6 @@ Keep this suite small and diagnostic:
 4. **Task permutation invariance:** feed identical canonical joint/contact
    states through `mini_cheetah_ref` using two different native permutations;
    observations, reference targets, swing/stance masks, and rewards must match.
-5. **Checkpoint compatibility:** layout v1 loads with the same observation and
-   action meanings on MuJoCo and vsim; a changed/missing name or reordered
-   unversioned layout fails with a useful error.
-
 Run the engine-independent tests normally, then the real backend routing tests:
 
 ```bash
@@ -804,7 +798,7 @@ bash scripts/run_vsim_tests.sh
 
 **Implemented and checked 2026-07-28.** The canonical mini-cheetah interface is
 `RF, LF, RH, LH` for DOFs and feet on all three backends; MuJoCo's `world` body
-is no longer public. The engine-independent suite passes (`199 passed`) and the
+is no longer public. The engine-independent suite passes (`198 passed`) and the
 licensed vsim suite passes (`62 passed`). MuJoCo Warp-specific routing,
 liveness, reset, and physics checks pass (`52 passed`).
 

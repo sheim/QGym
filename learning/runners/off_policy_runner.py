@@ -277,11 +277,10 @@ class OffPolicyRunner(BaseRunner):
             "log_alpha_optimizer_state_dict": self.alg.log_alpha_optimizer.state_dict(),
             "iter": self.it,
         }
-        torch.save(self.add_interface_metadata(save_dict), path)
+        torch.save(save_dict, path)
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path, weights_only=True)
-        self.validate_interface_metadata(loaded_dict)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
         self.alg.critic_1.load_state_dict(loaded_dict["critic_1_state_dict"])
         self.alg.critic_2.load_state_dict(loaded_dict["critic_2_state_dict"])

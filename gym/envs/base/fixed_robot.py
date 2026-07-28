@@ -10,7 +10,6 @@ import torch
 
 from gym.envs.base.base_task import BaseTask
 from gym.envs.base.isaac_gym_backend import IsaacGymBackend
-from gym.envs.base.robot_layout import RobotLayout
 from gym.utils import random_sample
 
 
@@ -100,15 +99,7 @@ class FixedRobot(BaseTask):
         self.dof_names = self._backend.dof_names
         self.penalised_contact_indices = self._backend.penalised_contact_indices
         self.termination_contact_indices = self._backend.termination_contact_indices
-        self.robot_layout = self._backend.robot_layout or RobotLayout.from_cfg(self.cfg)
-        self.robot_layout.validate_native(self.dof_names, self._backend.body_names)
-        if self._backend.robot_layout is None and (
-            list(self.robot_layout.dof_names) != list(self.dof_names)
-            or list(self.robot_layout.body_names) != list(self._backend.body_names)
-        ):
-            raise ValueError(
-                "backend without canonical mapping exposes a different robot order"
-            )
+        self.robot_layout = self._backend.robot_layout
 
         actuated_names = list(self.robot_layout.actuated_dof_names)
         unknown = sorted(set(actuated_names) - set(self.dof_names))

@@ -88,7 +88,6 @@ class VSimBackend(SimBackend):
         self._native_body_names: list = []
         self._num_native_bodies: int = 0
         self._num_sensors: int = 0
-        self._robot_layout: RobotLayout = None
         self._has_free_joint: bool = False
         self._penalised_contact_indices = None
         self._termination_contact_indices = None

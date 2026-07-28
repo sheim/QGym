@@ -46,8 +46,6 @@ class MuJocoBackendBase(SimBackend):
         self._canonical_to_native_dof_np: np.ndarray = None
         self._native_to_canonical_dof_np: np.ndarray = None
         self._canonical_to_native_body_np: np.ndarray = None
-        self._robot_layout: RobotLayout = None
-
         # Floating-base offsets (0 for fixed-base)
         self._has_free_joint: bool = False
         self._qpos_offset: int = 0

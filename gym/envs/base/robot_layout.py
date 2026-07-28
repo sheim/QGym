@@ -197,11 +197,3 @@ class RobotLayout:
         if group_name not in self.body_groups:
             raise KeyError(f"unknown body group {group_name!r}")
         return self.body_indices(self.body_groups[group_name])
-
-    def to_metadata(self) -> dict:
-        return {
-            "version": self.version,
-            "dof_names": list(self.dof_names),
-            "actuated_dof_names": list(self.actuated_dof_names),
-            "body_names": list(self.body_names),
-        }

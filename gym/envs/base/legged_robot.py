@@ -26,7 +26,6 @@ import torch
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.base_task import BaseTask
 from gym.envs.base.isaac_gym_backend import IsaacGymBackend
-from gym.envs.base.robot_layout import RobotLayout
 from gym.utils.terrain import Terrain
 from gym.utils import random_sample, quat_apply_yaw
 from gym.utils.helpers import class_to_dict
@@ -185,15 +184,7 @@ class LeggedRobot(BaseTask):
             self.envs = []
             self.actor_handles = []
 
-        self.robot_layout = self._backend.robot_layout or RobotLayout.from_cfg(self.cfg)
-        self.robot_layout.validate_native(self.dof_names, self._backend.body_names)
-        if self._backend.robot_layout is None and (
-            list(self.robot_layout.dof_names) != list(self.dof_names)
-            or list(self.robot_layout.body_names) != list(self._backend.body_names)
-        ):
-            raise ValueError(
-                "backend without canonical mapping exposes a different robot order"
-            )
+        self.robot_layout = self._backend.robot_layout
         self.actuated_dof_names = list(self.robot_layout.actuated_dof_names)
         self.actuated_dof_indices = torch.tensor(
             self.robot_layout.dof_indices(self.actuated_dof_names),
@@ -766,6 +757,9 @@ class LeggedRobot(BaseTask):
 
         body_names = self.gym.get_asset_rigid_body_names(robot_asset)
         self.dof_names = self.gym.get_asset_dof_names(robot_asset)
+        self._backend.configure_robot_layout(self.cfg, self.dof_names, body_names)
+        self.dof_names = self._backend.dof_names
+        body_names = self._backend.body_names
         self.num_bodies = len(body_names)
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
         penalized_contact_names = []

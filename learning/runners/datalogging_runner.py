@@ -176,21 +176,22 @@ class DataLoggingRunner(BaseRunner):
     def save(self):
         os.makedirs(self.log_dir, exist_ok=True)
         path = os.path.join(self.log_dir, "model_{}.pt".format(self.it))
-        checkpoint = {
-            "actor_state_dict": self.alg.actor.state_dict(),
-            "critic_state_dict": self.alg.critic.state_dict(),
-            "optimizer_state_dict": self.alg.optimizer.state_dict(),
-            "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
-            "iter": self.it,
-        }
-        torch.save(self.add_interface_metadata(checkpoint), path)
+        torch.save(
+            {
+                "actor_state_dict": self.alg.actor.state_dict(),
+                "critic_state_dict": self.alg.critic.state_dict(),
+                "optimizer_state_dict": self.alg.optimizer.state_dict(),
+                "critic_optimizer_state_dict": self.alg.critic_optimizer.state_dict(),
+                "iter": self.it,
+            },
+            path,
+        )
         path_data = os.path.join(self.log_dir, "data_{}".format(self.it))
         torch.save(storage.data.cpu(), path_data + ".pt")
         export_to_numpy(storage.data, path_data + ".npz")
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path, weights_only=True)
-        self.validate_interface_metadata(loaded_dict)
         self.alg.actor.load_state_dict(loaded_dict["actor_state_dict"])
         self.alg.critic.load_state_dict(loaded_dict["critic_state_dict"])
         if load_optimizer:
