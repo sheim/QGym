@@ -19,6 +19,24 @@ holds the machine-local pieces, all gitignored:
   for the viewer (copied from the vlearn SDK repo root). Headless runs work
   without them.
 
-On a new machine: drop in the wheel and `License.key`,
-`uv sync --extra vsim`, then run any vsim command once with internet to
-node-lock the activation (all lookup paths are wired in `.env.vsim`).
+On a new machine, drop in the wheel, `License.key`, and `TurboActivate.dat`,
+then install and activate:
+
+```bash
+# From the repository root:
+uv sync --extra vsim
+
+# The native SDK's first activation must start in the license directory.
+cd thirdparty/vlearn
+LD_LIBRARY_PATH=../../.venv/lib/python3.11/site-packages/vlearn/lib \
+VL_WORKING_DIRECTORY="$PWD" \
+VL_TURBO_ACTIVATE_PATH="$PWD/TurboActivate.dat" \
+VL_LICENSE_KEY_PATH="$PWD/License.key" \
+../../.venv/bin/python -c \
+  'import vlearn as v; v.create_gym(with_render=False, with_window=False); v.delete_gym(); print("vsim activated")'
+cd ../..
+```
+
+The first activation needs internet access and writes a node-locked activation
+record outside the repository. After it succeeds, normal commands should run
+from the repository root with `uv run --env-file .env.vsim ...`.

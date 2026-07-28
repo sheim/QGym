@@ -1,4 +1,5 @@
 import torch
+import warnings
 from learning.algorithms import *  # noqa: F403
 from learning.modules import Actor, Critic, SmoothActor
 from learning.utils import remove_zero_weighted_rewards
@@ -96,6 +97,41 @@ class BaseRunner:
 
     def get_action_size(self, action_list):
         return self.env.get_states(action_list)[0].shape[0]
+
+    def interface_metadata(self) -> dict:
+        layout = getattr(self.env, "robot_layout", None)
+        return {
+            "robot_layout": layout.to_metadata() if layout is not None else None,
+            "actor_observations": list(self.actor_cfg["obs"]),
+            "actor_actions": list(self.actor_cfg["actions"]),
+            "critic_observations": list(self.critic_cfg["obs"]),
+        }
+
+    def add_interface_metadata(self, checkpoint: dict) -> dict:
+        checkpoint["interface_metadata"] = self.interface_metadata()
+        return checkpoint
+
+    def validate_interface_metadata(self, checkpoint: dict) -> None:
+        saved = checkpoint.get("interface_metadata")
+        if saved is None:
+            warnings.warn(
+                "checkpoint has no interface metadata; treating it as a legacy "
+                "checkpoint in the current robot/action order",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return
+        expected = self.interface_metadata()
+        if saved != expected:
+            differing = [key for key in expected if saved.get(key) != expected[key]]
+            details = "\n".join(
+                f"  {key}: checkpoint={saved.get(key)!r}, current={expected[key]!r}"
+                for key in differing
+            )
+            raise ValueError(
+                "checkpoint interface does not match the current environment:\n"
+                f"{details}"
+            )
 
     def get_rewards(self, reward_weights, modifier=1, mask=None):
         rewards_dict = {}

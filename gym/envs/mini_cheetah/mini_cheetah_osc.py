@@ -303,12 +303,6 @@ class MiniCheetahOsc(MiniCheetah):
         error = self._sqrdexp(self.base_ang_vel[:, :2] / self.scales["base_ang_vel"][0])
         return torch.sum(error, dim=1)
 
-    def _reward_cursorial(self):
-        # penalize the abad joints being away from 0
-        return -torch.mean(
-            torch.square(self.dof_pos[:, 0:12:3] / self.scales["dof_pos"][0]), dim=1
-        )
-
     def _reward_swing_grf(self):
         # Reward non-zero grf during swing (0 to pi)
         rew = self.get_swing_grf(self.cfg.osc.osc_bool, self.cfg.osc.grf_bool)

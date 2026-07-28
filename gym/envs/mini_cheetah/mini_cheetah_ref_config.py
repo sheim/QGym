@@ -1,6 +1,7 @@
 from gym.envs.mini_cheetah.mini_cheetah_config import (
     MiniCheetahCfg,
     MiniCheetahRunnerCfg,
+    MINI_CHEETAH_LEG_GROUPS,
 )
 
 BASE_HEIGHT_REF = 0.33
@@ -26,6 +27,13 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         stiffness = {"haa": 20.0, "hfe": 20.0, "kfe": 20.0}
         damping = {"haa": 0.5, "hfe": 0.5, "kfe": 0.5}
         gait_freq = 2.5
+        reference_leg_groups = MINI_CHEETAH_LEG_GROUPS
+        gait_phase_offsets = {
+            "rf_leg": 0.0,
+            "lf_leg": 0.5,
+            "rh_leg": 0.5,
+            "lh_leg": 0.0,
+        }
         ctrl_frequency = 100
         desired_sim_frequency = 500
 

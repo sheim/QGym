@@ -7,11 +7,11 @@ Convention sheet (all spike-verified 2026-07-12, see q2-backend-integration):
   misleading).  Constants VEL_ANG / VEL_LIN below are the only place this
   knowledge lives.
 - Contact forces come from per-link `flags="contact"` force sensors injected
-  by vsim_asset; sensor buffers are [force(3), torque(3)], world frame,
-  +z ≈ m·g reaction on a resting body.
+    by vsim_asset; sensor buffers are [force(3), torque(3)], world frame,
+    +z ≈ m·g reaction on a resting body.
 - Motors are injected gear=1.0 per movable joint → set_motor_forces takes
-  raw Nm.  Torques arrive in DOF order; a name-derived permutation maps them
-  to motor order.
+  raw Nm. Torques arrive in canonical DOF order; `MotorDef.dof_index` maps
+  them to native motor order.
 - World is Z-up (create_gym up_axis); the default plane is Y-up and must be
   rotated.  Terrain friction is NOT yet applied to the plane (default
   material) — tracked in q2-backend-integration.
@@ -29,6 +29,7 @@ import xml.etree.ElementTree as ET
 
 import torch
 
+from gym.envs.base.robot_layout import RobotLayout
 from gym.envs.base.sim_backend import SimBackend
 from gym.envs.base.urdf_limits import parse_urdf_limits
 from gym.envs.base.vsim_asset import ensure_vsim_asset
@@ -40,6 +41,35 @@ import numpy as np
 VEL_ANG = slice(0, 3)
 VEL_LIN = slice(3, 6)
 UNLIMITED = 1.0e6
+
+
+def _motor_sources(
+    native_to_canonical_dof: list[int], motor_native_dofs: list[int]
+) -> list[int]:
+    expected = list(range(len(native_to_canonical_dof)))
+    if sorted(motor_native_dofs) != expected:
+        raise RuntimeError(
+            f"motors do not map one-to-one onto articulation DOFs: {motor_native_dofs}"
+        )
+    return [native_to_canonical_dof[dof_index] for dof_index in motor_native_dofs]
+
+
+def _canonical_body_sensor_indices(
+    canonical_to_native_body: list[int], sensor_native_links: list[int]
+) -> list[int]:
+    if len(set(sensor_native_links)) != len(sensor_native_links):
+        raise RuntimeError(
+            f"multiple contact sensors target the same link: {sensor_native_links}"
+        )
+    missing = sorted(set(canonical_to_native_body) - set(sensor_native_links))
+    if missing:
+        raise RuntimeError(
+            "every canonical body must have exactly one contact sensor: "
+            f"sensor native links={sensor_native_links}, missing native links={missing}"
+        )
+    return [
+        sensor_native_links.index(link_index) for link_index in canonical_to_native_body
+    ]
 
 
 class VSimBackend(SimBackend):
@@ -54,6 +84,11 @@ class VSimBackend(SimBackend):
         self._num_bodies: int = 0
         self._dof_names: list = []
         self._body_names: list = []
+        self._native_dof_names: list = []
+        self._native_body_names: list = []
+        self._num_native_bodies: int = 0
+        self._num_sensors: int = 0
+        self._robot_layout: RobotLayout = None
         self._has_free_joint: bool = False
         self._penalised_contact_indices = None
         self._termination_contact_indices = None
@@ -217,28 +252,63 @@ class VSimBackend(SimBackend):
             gravity = [0.0, 0.0, 0.0]
         self._gym.set_gravity(v.Vec3(*gravity))
 
-        # Metadata
-        self._num_dof = art_def.get_num_joint_dof_defs()
-        self._dof_names = art_def.get_joint_dof_def_names()
-        self._body_names = art_def.get_link_def_names()
-        self._num_bodies = art_def.get_num_link_defs()
+        # Native engine metadata and stable task-facing layout.
+        self._native_dof_names = art_def.get_joint_dof_def_names()
+        self._native_body_names = art_def.get_link_def_names()
+        self._robot_layout = RobotLayout.from_cfg(cfg)
+        self._robot_layout.validate_native(
+            self._native_dof_names, self._native_body_names
+        )
+        self._dof_names = list(self._robot_layout.dof_names)
+        self._body_names = list(self._robot_layout.body_names)
+        self._num_dof = len(self._dof_names)
+        self._num_bodies = len(self._body_names)
+        self._num_native_bodies = len(self._native_body_names)
+
+        canonical_to_native_dof = self._robot_layout.canonical_to_native_dof(
+            self._native_dof_names
+        )
+        native_to_canonical_dof = self._robot_layout.native_to_canonical_dof(
+            self._native_dof_names
+        )
+        canonical_to_native_body = self._robot_layout.canonical_to_native_body(
+            self._native_body_names
+        )
+        self._canonical_to_native_dof = torch.tensor(
+            canonical_to_native_dof, dtype=torch.long, device=device
+        )
+        self._native_to_canonical_dof = torch.tensor(
+            native_to_canonical_dof, dtype=torch.long, device=device
+        )
+        self._canonical_to_native_body = torch.tensor(
+            canonical_to_native_body, dtype=torch.long, device=device
+        )
+
         n_motors = art_def.get_num_motor_defs()
         if n_motors != self._num_dof:
             raise RuntimeError(
                 f"motor/dof mismatch: {n_motors} motors vs {self._num_dof} dofs "
                 f"(asset post-processing should inject one motor per movable joint)"
             )
-        motor_joints = [
-            art_def.get_motor_def(i).name.removesuffix("_motor")
-            for i in range(n_motors)
+        motor_native_dofs = [
+            art_def.get_motor_def(i).dof_index for i in range(n_motors)
         ]
-        if sorted(motor_joints) != sorted(self._dof_names):
-            raise RuntimeError(
-                f"motor joints {motor_joints} != dof names {self._dof_names}"
-            )
-        # motor i is driven by the torque of dof index _motor_src[i]
+        # Motor i is driven by its documented native DOF, converted to the
+        # canonical task-facing torque slot.
         self._motor_src = torch.tensor(
-            [self._dof_names.index(j) for j in motor_joints],
+            _motor_sources(native_to_canonical_dof, motor_native_dofs),
+            dtype=torch.long,
+            device=device,
+        )
+
+        self._num_sensors = art_def.get_num_force_sensor_defs()
+        sensor_native_links = [
+            art_def.get_force_sensor_def(i).link_index for i in range(self._num_sensors)
+        ]
+        self._canonical_body_to_sensor = torch.tensor(
+            _canonical_body_sensor_indices(
+                canonical_to_native_body, sensor_native_links
+            ),
             dtype=torch.long,
             device=device,
         )
@@ -259,7 +329,9 @@ class VSimBackend(SimBackend):
     def _allocate_tensors_and_commands(self) -> None:
         """All buffers allocated once (graph captures need stable addresses)."""
         v, grp, gym = self._v, self._grp, self._gym
-        N, nd, L = self._num_envs, self._num_dof, self._num_bodies
+        N, nd = self._num_envs, self._num_dof
+        L = self._num_bodies
+        native_L = self._num_native_bodies
         dev = self._device
 
         # Contract tensors
@@ -288,24 +360,23 @@ class VSimBackend(SimBackend):
         )
         self._aks_get_arr = gym.create_gpu_array([aks_get])
 
-        self._link_tf = torch.zeros(N, L, 7, device=dev)
-        self._link_vel = torch.zeros(N, L, 6, device=dev)
+        self._link_tf = torch.zeros(N, native_L, 7, device=dev)
+        self._link_vel = torch.zeros(N, native_L, 6, device=dev)
         lt = grp.create_link_transform_command(
-            v.wrap_gpu_buffer(self._link_tf), self._art_h, (0, L)
+            v.wrap_gpu_buffer(self._link_tf), self._art_h, (0, native_L)
         )
         lv = grp.create_link_velocity_command(
-            v.wrap_gpu_buffer(self._link_vel), self._art_h, (0, L)
+            v.wrap_gpu_buffer(self._link_vel), self._art_h, (0, native_L)
         )
         self._lt_arr = gym.create_gpu_array([lt])
         self._lv_arr = gym.create_gpu_array([lv])
 
-        # Per-link contact force sensors: one big buffer, slice per sensor
-        # (dim-0 slices are contiguous).  Sensor order == link order (the
-        # asset post-processor injects them in link order).
+        # Per-link contact force sensors: one big buffer, slice per sensor.
+        # Sensor order is independent of native link and canonical body order.
         art = self._art_instance
-        self._sensor_big = torch.zeros(L, N, 6, device=dev)
+        self._sensor_big = torch.zeros(self._num_sensors, N, 6, device=dev)
         cmds = []
-        for i in range(L):
+        for i in range(self._num_sensors):
             cmds.append(
                 grp.create_force_sensor_command(
                     v.wrap_gpu_buffer(self._sensor_big[i]),
@@ -351,9 +422,11 @@ class VSimBackend(SimBackend):
             self._aks_set_arr = gym.create_gpu_array([aks_set])
 
         # Motor buffer
-        self._motor_buf = torch.zeros(N, nd, device=dev)
+        self._motor_buf = torch.zeros(N, len(self._motor_src), device=dev)
         mot = grp.create_motor_control_command(
-            v.wrap_gpu_buffer(self._motor_buf), self._art_h, (0, nd)
+            v.wrap_gpu_buffer(self._motor_buf),
+            self._art_h,
+            (0, len(self._motor_src)),
         )
         self._motor_arr = gym.create_gpu_array([mot])
 
@@ -411,8 +484,12 @@ class VSimBackend(SimBackend):
 
     def _sync_assembled_states(self) -> None:
         """Refresh contract tensors in place (all tensors live after step)."""
-        self._dof_pos_view.copy_(self._jp_get)
-        self._dof_vel_view.copy_(self._jv_get)
+        self._dof_pos_view.copy_(
+            self._jp_get.index_select(1, self._canonical_to_native_dof)
+        )
+        self._dof_vel_view.copy_(
+            self._jv_get.index_select(1, self._canonical_to_native_dof)
+        )
         rs = self._root_states_t
         rtf = self._root_tf_get[:, 0]
         rvl = self._root_vel_get[:, 0]
@@ -421,20 +498,27 @@ class VSimBackend(SimBackend):
         rs[:, 7:10] = rvl[:, VEL_LIN]
         rs[:, 10:13] = rvl[:, VEL_ANG]
         rbs = self._rigid_body_states_t
-        rbs[..., 0:3] = self._link_tf[..., 4:7]
-        rbs[..., 3:7] = self._link_tf[..., 0:4]
-        rbs[..., 7:10] = self._link_vel[..., VEL_LIN]
-        rbs[..., 10:13] = self._link_vel[..., VEL_ANG]
+        link_tf = self._link_tf.index_select(1, self._canonical_to_native_body)
+        link_vel = self._link_vel.index_select(1, self._canonical_to_native_body)
+        rbs[..., 0:3] = link_tf[..., 4:7]
+        rbs[..., 3:7] = link_tf[..., 0:4]
+        rbs[..., 7:10] = link_vel[..., VEL_LIN]
+        rbs[..., 10:13] = link_vel[..., VEL_ANG]
         # sensor buffers are [force, torque]; big buffer is [L, N, 6]
-        self._contact_forces_t.copy_(self._sensor_big[:, :, 0:3].permute(1, 0, 2))
+        sensor_forces = self._sensor_big.index_select(0, self._canonical_body_to_sensor)
+        self._contact_forces_t.copy_(sensor_forces[:, :, 0:3].permute(1, 0, 2))
 
     # ── Resets (write-then-commit; task wrote desired values into views) ──
 
     def _commit_state(self, env_ids: torch.Tensor) -> None:
         self._mask.zero_()
         self._mask[env_ids] = True
-        self._jp_set.copy_(self._dof_pos_view)
-        self._jv_set.copy_(self._dof_vel_view)
+        self._jp_set.copy_(
+            self._dof_pos_view.index_select(1, self._native_to_canonical_dof)
+        )
+        self._jv_set.copy_(
+            self._dof_vel_view.index_select(1, self._native_to_canonical_dof)
+        )
         if self._has_free_joint:
             rs = self._root_states_t
             self._root_tf_set[:, 0, 0:4] = rs[:, 3:7]

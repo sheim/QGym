@@ -10,18 +10,9 @@ from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
 
 
 class MiniCheetahRef(MiniCheetah):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
-        csv_path = cfg.init_state.ref_traj.format(
-            LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR
-        )
-        self.leg_ref = 3 * to_torch(pd.read_csv(csv_path).to_numpy(), device=sim_device)
-        self.omega = 2 * torch.pi * cfg.control.gait_freq
-        super().__init__(
-            gym, sim, cfg, sim_params, sim_device, headless, backend=backend
-        )
-
     def _init_buffers(self):
         super()._init_buffers()
+        self._init_reference_trajectory_buffers()
         self._switch = torch.zeros(self.num_envs, 1, device=self.device)
         self.phase = torch.zeros(
             self.num_envs, 1, dtype=torch.float, device=self.device
@@ -29,6 +20,49 @@ class MiniCheetahRef(MiniCheetah):
         self.phase_obs = torch.zeros(
             self.num_envs, 2, dtype=torch.float, device=self.device
         )
+
+    def _init_reference_trajectory_buffers(self):
+        csv_path = self.cfg.init_state.ref_traj.format(
+            LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR
+        )
+        self.leg_ref = 3 * to_torch(
+            pd.read_csv(csv_path).to_numpy(),
+            device=self.device,
+        )
+        self.omega = 2 * torch.pi * self.cfg.control.gait_freq
+        leg_groups = list(self.cfg.control.reference_leg_groups)
+        phase_offsets = self.cfg.control.gait_phase_offsets
+        if set(leg_groups) != set(phase_offsets):
+            raise ValueError(
+                "reference_leg_groups and gait_phase_offsets must have the same keys"
+            )
+        self._reference_leg_indices = []
+        for group_name in leg_groups:
+            actuator_indices = [
+                self.actuated_dof_names.index(name)
+                for name in self.robot_layout.dof_groups[group_name]
+            ]
+            if len(actuator_indices) != self.leg_ref.shape[1]:
+                raise ValueError(
+                    f"reference group {group_name!r} has {len(actuator_indices)} "
+                    f"DOFs, trajectory has {self.leg_ref.shape[1]} columns"
+                )
+            self._reference_leg_indices.append(
+                torch.tensor(actuator_indices, dtype=torch.long, device=self.device)
+            )
+        self._gait_phase_offsets = (
+            2
+            * torch.pi
+            * torch.tensor(
+                [phase_offsets[name] for name in leg_groups],
+                dtype=torch.float,
+                device=self.device,
+            )
+        )
+        # if len(self.feet_indices) != len(self._reference_leg_indices):
+        #     raise ValueError(
+        #         "feet body group and reference leg groups must have the same length"
+        #     )
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
@@ -79,8 +113,8 @@ class MiniCheetahRef(MiniCheetah):
             torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1),
             50.0,
         )
-        ph_off = torch.lt(self.phase, torch.pi)
-        rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
+        swing = self._leg_phases() < torch.pi
+        rew = in_contact * swing
         return -torch.sum(rew.float(), dim=1) * (1 - self._switch)
 
     def _reward_stance_grf(self):
@@ -89,8 +123,8 @@ class MiniCheetahRef(MiniCheetah):
             torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1),
             50.0,
         )
-        ph_off = torch.gt(self.phase, torch.pi)  # should this be in swing?
-        rew = in_contact * torch.cat((ph_off, ~ph_off, ~ph_off, ph_off), dim=1)
+        stance = self._leg_phases() > torch.pi
+        rew = in_contact * stance
 
         return torch.sum(rew.float(), dim=1) * (1 - self._switch)
 
@@ -105,19 +139,21 @@ class MiniCheetahRef(MiniCheetah):
 
     def _get_ref(self):
         leg_frame = torch.zeros_like(self.torques)
-        # offset by half cycle (trot)
-        ph_off = torch.fmod(self.phase + torch.pi, 2 * torch.pi)
-        phd_idx = (
-            torch.round(self.phase * (self.leg_ref.size(dim=0) / (2 * torch.pi) - 1))
-        ).long()
-        pho_idx = (
-            torch.round(ph_off * (self.leg_ref.size(dim=0) / (2 * torch.pi) - 1))
-        ).long()
-        leg_frame[:, 0:3] += self.leg_ref[phd_idx.squeeze(), :]
-        leg_frame[:, 3:6] += self.leg_ref[pho_idx.squeeze(), :]
-        leg_frame[:, 6:9] += self.leg_ref[pho_idx.squeeze(), :]
-        leg_frame[:, 9:12] += self.leg_ref[phd_idx.squeeze(), :]
+        phases = self._leg_phases()
+        num_trajectory_samples = self.leg_ref.size(dim=0)
+        trajectory_samples_per_radian = num_trajectory_samples / (2 * torch.pi)
+        for leg_index, actuator_indices in enumerate(self._reference_leg_indices):
+            sample_indices = (
+                torch.round(phases[:, leg_index] * trajectory_samples_per_radian).long()
+                % num_trajectory_samples
+            )
+            leg_frame[:, actuator_indices] = self.leg_ref[sample_indices]
         return leg_frame
+
+    def _leg_phases(self):
+        return torch.remainder(
+            self.phase + self._gait_phase_offsets.unsqueeze(0), 2 * torch.pi
+        )
 
     def _reward_stand_still(self):
         """Penalize motion at zero commands"""

@@ -1,57 +1,142 @@
 # Q2 — MuJoCo / vsim RL Training
 
 RL training framework for legged robots. Physics backends:
-- **MuJoCo CPU** (all platforms incl. macOS) and **mujoco-warp** GPU (Linux+CUDA)
-- **vsim** (`--backend vsim`): closed-source licensed GPU engine, ~10× faster
-  than warp at 4096 envs. Self-contained under `thirdparty/vlearn/` (wheel +
-  license drop zone — see its README); needs system `libczmq4` and process
-  env from `.env.vsim`:
 
-```bash
-uv sync --extra vsim
-uv run --env-file .env.vsim scripts/train_mujoco.py --task mini_cheetah \
-    --backend vsim --device cuda:0 --num_envs 4096 --headless
-bash scripts/run_vsim_tests.sh        # vsim test suite (local-only)
-```
+- **MuJoCo CPU** — all platforms, including macOS
+- **MuJoCo Warp** — NVIDIA GPU on Linux
+- **vsim** — licensed NVIDIA GPU backend (`--backend vsim`)
 
 ## Quick Start
 
-### Setup
+### Fresh setup
 
-Requires Python 3.11 (pinned — the vsim wheels are cp311; MuJoCo-only work
-also runs on 3.12/3.13) and [uv](https://docs.astral.sh/uv/).
+The repository uses [uv](https://docs.astral.sh/uv/) exclusively for Python
+and dependency management. Do not use `pip install`, `requirements.txt`, or
+`setup.py`.
+
+Install uv on Linux or macOS:
 
 ```bash
-cd Q2
-uv sync          # installs all dependencies, creates .venv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+exec "$SHELL" -l
+uv --version
 ```
 
-On Linux with an NVIDIA GPU, also install the GPU backend:
+If uv is already installed, update it first:
 
 ```bash
-uv pip install mujoco-warp
+uv self update
+```
+
+`uv self update` works for uv's standalone installer. If uv was installed by
+Homebrew or another package manager, update it through that package manager
+instead.
+
+Clone the repository and create the Python 3.11 environment:
+
+```bash
+git clone git@github.com:LampLighterLab/QGym.git
+cd QGym
+uv python install 3.11
+uv venv --python 3.11
+uv sync --frozen
+```
+
+Python 3.11 is used because the optional vsim wheel is built for CPython 3.11.
+MuJoCo-only development supports Python 3.11–3.13, but 3.11 is the common,
+tested setup.
+
+`--frozen` is intentional for a MuJoCo-only clone. The universal lockfile also
+records the optional, gitignored vsim wheel; asking uv to re-resolve or validate
+that local source fails until the licensed wheel has been supplied. Use
+`--frozen` with `uv sync` and `uv run` when vsim is not installed.
+
+Verify the installation:
+
+```bash
+uv run --frozen python -c "import mujoco, torch; print(mujoco.__version__, torch.__version__)"
+uv run --frozen python -m pytest tests/unit_tests/ -q
+```
+
+Do not run `pytest tests/`: the legacy integration tests require IsaacGym and
+its separate Python 3.8 environment.
+
+### Linux GPU setup
+
+First verify that the NVIDIA driver is visible:
+
+```bash
+nvidia-smi
+```
+
+Then install the declared GPU extra and verify CUDA:
+
+```bash
+uv sync --frozen --extra gpu
+uv run --frozen python -c "import torch, mujoco_warp; print(torch.cuda.is_available())"
+```
+
+The final command must print `True`. MuJoCo Warp cannot work around a missing
+or inaccessible NVIDIA driver. GPU training is headless:
+
+```bash
+uv run --frozen scripts/train_mujoco.py --task mini_cheetah --device cuda:0 \
+    --num_envs 4096 --headless
+```
+
+### Optional vsim setup
+
+vsim is a closed-source, node-locked backend. It additionally requires Linux,
+an NVIDIA GPU, the system `libczmq4` package, and vendor files that cannot be
+committed to this repository.
+
+Place these files under `thirdparty/vlearn/` as described in
+[`thirdparty/vlearn/README.md`](thirdparty/vlearn/README.md):
+
+- `vlearn-0.3.12-cp311-cp311-linux_x86_64.whl`
+- `License.key`
+- `TurboActivate.dat`
+
+Then run:
+
+```bash
+uv sync --locked --extra vsim
+
+# One-time node activation (internet required):
+cd thirdparty/vlearn
+LD_LIBRARY_PATH=../../.venv/lib/python3.11/site-packages/vlearn/lib \
+VL_WORKING_DIRECTORY="$PWD" \
+VL_TURBO_ACTIVATE_PATH="$PWD/TurboActivate.dat" \
+VL_LICENSE_KEY_PATH="$PWD/License.key" \
+../../.venv/bin/python -c \
+  'import vlearn as v; v.create_gym(with_render=False, with_window=False); v.delete_gym(); print("vsim activated")'
+cd ../..
+
+uv run --env-file .env.vsim scripts/train_mujoco.py --task mini_cheetah \
+    --backend vsim --device cuda:0 --num_envs 4096 --headless
+bash scripts/run_vsim_tests.sh
 ```
 
 ### Train
 
 ```bash
 # Pendulum (fixed-base, 1 DOF) — with GUI viewer
-uv run scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256
+uv run --frozen scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256
 
 # Mini Cheetah (floating-base, 12 DOFs) — with GUI viewer
-uv run scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
+uv run --frozen scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
 
 # Headless (no viewer window)
-uv run scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256 --headless
+uv run --frozen scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256 --headless
 
 # GPU training (Linux only, requires mujoco-warp)
-uv run scripts/train_mujoco.py --task mini_cheetah --device cuda:0 --num_envs 4096 --headless
+uv run --frozen scripts/train_mujoco.py --task mini_cheetah --device cuda:0 --num_envs 4096 --headless
 ```
 
 ### Test
 
 ```bash
-uv run python -m pytest tests/unit_tests/ -v
+uv run --frozen python -m pytest tests/unit_tests/ -v
 ```
 
 ## Notes
@@ -122,7 +207,7 @@ does not ship. The fix is to create the venv using Homebrew's Python instead:
 ```bash
 brew install python@3.13   # if not already installed
 uv venv --python /opt/homebrew/opt/python@3.13/bin/python3.13
-uv sync
+uv sync --frozen
 .venv/bin/mjpython scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
 ```
 
@@ -134,7 +219,7 @@ Same as macOS. Use `--device cpu`.
 
 ### Linux (GPU)
 
-Requires `mujoco-warp` (`uv pip install mujoco-warp`).
+Requires the NVIDIA driver and the `gpu` extra (`uv sync --frozen --extra gpu`).
 Use `--device cuda:0` for GPU-accelerated vectorized physics.
 Typically 10-15x faster than CPU for large `--num_envs` (4096+).
 

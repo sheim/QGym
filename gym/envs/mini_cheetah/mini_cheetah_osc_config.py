@@ -257,7 +257,6 @@ class MiniCheetahOscRunnerCfg(MiniCheetahRunnerCfg):
                 stance_velocity = 0.0
                 coupled_grf = 0.0  # 8.
                 enc_pace = 0.0
-                cursorial = 0.25
                 standing_torques = 0.0  # 1.e-5
 
             class termination_weight:

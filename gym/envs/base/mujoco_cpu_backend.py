@@ -84,14 +84,18 @@ class MuJocoCPUBackend(MuJocoBackendBase):
         self._dof_vel_view = self._dof_state_t[..., 1]
         self._root_states_t = torch.zeros(num_envs, 13, device=device)
         self._root_states_t[:, 6] = 1.0  # identity quaternion (scalar-last, w=1)
-        self._rigid_body_states_t = torch.zeros(num_envs, mjm.nbody, 13, device=device)
+        self._rigid_body_states_t = torch.zeros(
+            num_envs, self._num_bodies, 13, device=device
+        )
         self._rigid_body_states_t[:, :, 6] = 1.0
-        self._contact_forces_t = torch.zeros(num_envs, mjm.nbody, 3, device=device)
+        self._contact_forces_t = torch.zeros(
+            num_envs, self._num_bodies, 3, device=device
+        )
 
     # ── Per-step ───────────────────────────────────────────────────────────────
 
     def step(self, torques: torch.Tensor) -> None:
-        torques_np = torques.cpu().numpy()
+        torques_np = torques.cpu().numpy()[:, self._native_to_canonical_dof_np]
         off = self._qvel_offset
         for i, d in enumerate(self._datas):
             d.qfrc_applied[off:] = torques_np[i]
@@ -101,20 +105,24 @@ class MuJocoCPUBackend(MuJocoBackendBase):
     def _sync_state_from_mujoco(self) -> None:
         qoff = self._qpos_offset
         voff = self._qvel_offset
+        dof_order = self._canonical_to_native_dof_np
+        body_order = self._canonical_to_native_body_np
         for i, d in enumerate(self._datas):
             # cfrc_ext is only populated with constraint/contact forces by
             # mj_rnePostConstraint; mj_step alone leaves it at zero.
             mujoco.mj_rnePostConstraint(self._mjm, d)
-            self._dof_pos_view[i] = torch.from_numpy(d.qpos[qoff:].copy())
-            self._dof_vel_view[i] = torch.from_numpy(d.qvel[voff:].copy())
-            self._contact_forces_t[i] = torch.from_numpy(d.cfrc_ext[:, 3:6].copy())
+            self._dof_pos_view[i] = torch.from_numpy(d.qpos[qoff:][dof_order].copy())
+            self._dof_vel_view[i] = torch.from_numpy(d.qvel[voff:][dof_order].copy())
+            self._contact_forces_t[i] = torch.from_numpy(
+                d.cfrc_ext[body_order, 3:6].copy()
+            )
             # Rigid body states
             rbs = self._rigid_body_states_t[i]
-            rbs[:, 0:3] = torch.from_numpy(d.xpos.copy())
-            mj_quat = torch.from_numpy(d.xquat.copy())
+            rbs[:, 0:3] = torch.from_numpy(d.xpos[body_order].copy())
+            mj_quat = torch.from_numpy(d.xquat[body_order].copy())
             rbs[:, 3:7] = mj_quat[:, WXYZ_TO_XYZW]
-            rbs[:, 7:10] = torch.from_numpy(d.cvel[:, 3:6].copy())
-            rbs[:, 10:13] = torch.from_numpy(d.cvel[:, 0:3].copy())
+            rbs[:, 7:10] = torch.from_numpy(d.cvel[body_order, 3:6].copy())
+            rbs[:, 10:13] = torch.from_numpy(d.cvel[body_order, 0:3].copy())
         if self._has_free_joint:
             for i, d in enumerate(self._datas):
                 self._root_states_t[i, :3] = torch.from_numpy(d.qpos[:3].copy())
@@ -129,8 +137,12 @@ class MuJocoCPUBackend(MuJocoBackendBase):
         qoff = self._qpos_offset
         voff = self._qvel_offset
         for i in env_ids.tolist():
-            self._datas[i].qpos[qoff:] = self._dof_pos_view[i].cpu().numpy()
-            self._datas[i].qvel[voff:] = self._dof_vel_view[i].cpu().numpy()
+            self._datas[i].qpos[qoff:] = (
+                self._dof_pos_view[i].cpu().numpy()[self._native_to_canonical_dof_np]
+            )
+            self._datas[i].qvel[voff:] = (
+                self._dof_vel_view[i].cpu().numpy()[self._native_to_canonical_dof_np]
+            )
             mujoco.mj_forward(self._mjm, self._datas[i])
 
     def reset_root_state(self, env_ids: torch.Tensor) -> None:

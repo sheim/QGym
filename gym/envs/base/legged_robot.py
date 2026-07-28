@@ -26,6 +26,7 @@ import torch
 from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.base_task import BaseTask
 from gym.envs.base.isaac_gym_backend import IsaacGymBackend
+from gym.envs.base.robot_layout import RobotLayout
 from gym.utils.terrain import Terrain
 from gym.utils import random_sample, quat_apply_yaw
 from gym.utils.helpers import class_to_dict
@@ -83,7 +84,12 @@ class LeggedRobot(BaseTask):
             self.torques[:] = 0.0
 
     def _step_physx_sim(self):
-        self._backend.step(self.torques)
+        if self.num_actuators == self.num_dof:
+            self._backend.step(self.torques)
+            return
+        torques_full_dof = torch.zeros(self.num_envs, self.num_dof, device=self.device)
+        torques_full_dof[:, self.actuated_dof_indices] = self.torques
+        self._backend.step(torques_full_dof)
 
     def _post_physx_step(self):
         # backend.step() already refreshed all tensors; compute derived quantities.
@@ -169,14 +175,6 @@ class LeggedRobot(BaseTask):
             self.penalised_contact_indices = self._backend.penalised_contact_indices
             self.termination_contact_indices = self._backend.termination_contact_indices
 
-            # Task-level state that _create_envs normally sets up
-            body_names = self._backend.body_names
-            feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
-            self.feet_indices = torch.tensor(
-                [self._backend.find_body_index(n) for n in feet_names],
-                dtype=torch.long,
-                device=self.device,
-            )
             base_init_state_list = (
                 self.cfg.init_state.pos
                 + self.cfg.init_state.rot
@@ -186,6 +184,33 @@ class LeggedRobot(BaseTask):
             self.base_init_state = to_torch(base_init_state_list, device=self.device)
             self.envs = []
             self.actor_handles = []
+
+        self.robot_layout = self._backend.robot_layout or RobotLayout.from_cfg(self.cfg)
+        self.robot_layout.validate_native(self.dof_names, self._backend.body_names)
+        if self._backend.robot_layout is None and (
+            list(self.robot_layout.dof_names) != list(self.dof_names)
+            or list(self.robot_layout.body_names) != list(self._backend.body_names)
+        ):
+            raise ValueError(
+                "backend without canonical mapping exposes a different robot order"
+            )
+        self.actuated_dof_names = list(self.robot_layout.actuated_dof_names)
+        self.actuated_dof_indices = torch.tensor(
+            self.robot_layout.dof_indices(self.actuated_dof_names),
+            dtype=torch.long,
+            device=self.device,
+        )
+        self.feet_indices = torch.tensor(
+            self.robot_layout.body_group_indices("feet"),
+            dtype=torch.long,
+            device=self.device,
+        )
+        if len(self.actuated_dof_names) != self.num_actuators:
+            raise ValueError(
+                f"cfg.env.num_actuators={self.num_actuators}, but layout defines "
+                f"{len(self.actuated_dof_names)} actuated DOFs: "
+                f"{self.actuated_dof_names}"
+            )
 
     def _resample_commands(self, env_ids):
         """Randommly select commands of some environments
@@ -304,12 +329,17 @@ class LeggedRobot(BaseTask):
         return props
 
     def _compute_torques(self):
+        pos = self.dof_pos.index_select(1, self.actuated_dof_indices)
+        vel = self.dof_vel.index_select(1, self.actuated_dof_indices)
+        default_pos = self.default_dof_pos.index_select(1, self.actuated_dof_indices)
         torques = (
-            self.p_gains * (self.dof_pos_target + self.default_dof_pos - self.dof_pos)
-            + self.d_gains * (self.dof_vel_target - self.dof_vel)
+            self.p_gains * (self.dof_pos_target + default_pos - pos)
+            + self.d_gains * (self.dof_vel_target - vel)
             + self.tau_ff
         )
-        torques = torch.clip(torques, -self.torque_limits, self.torque_limits)
+        torques = torch.clip(
+            torques, -self.actuated_torque_limits, self.actuated_torque_limits
+        )
         return torques.view(self.torques.shape)
 
     def _reset_system(self, env_ids):
@@ -558,7 +588,7 @@ class LeggedRobot(BaseTask):
             self.height_points = self._init_height_points()
         self.measured_heights = 0
 
-        # * joint positions offsets and PD gains
+        # Joint position offsets in canonical full-DOF order.
         self.default_dof_pos = torch.zeros(
             self.num_dof, dtype=torch.float, device=self.device
         )
@@ -578,21 +608,24 @@ class LeggedRobot(BaseTask):
                     + "setting to zero"
                 )
 
-            found = False
-            for dof_name in self.cfg.control.stiffness.keys():
-                if dof_name in name:
-                    self.p_gains[:, i] = self.cfg.control.stiffness[dof_name]
-                    self.d_gains[:, i] = self.cfg.control.damping[dof_name]
-                    found = True
-            if not found:
-                self.p_gains[i] = 0.0
-                self.d_gains[i] = 0.0
-                if self.cfg.control.control_type in ["P", "V"]:
-                    print(
-                        f"PD gain of joint {name} were not defined, "
-                        + "setting them to zero"
-                    )
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
+        for actuator_index, name in enumerate(self.actuated_dof_names):
+            matching_gains = [
+                gain_name
+                for gain_name in self.cfg.control.stiffness
+                if gain_name in name
+            ]
+            if len(matching_gains) != 1:
+                raise ValueError(
+                    f"expected exactly one PD gain match for {name!r}, "
+                    f"got {matching_gains}"
+                )
+            gain_name = matching_gains[0]
+            self.p_gains[:, actuator_index] = self.cfg.control.stiffness[gain_name]
+            self.d_gains[:, actuator_index] = self.cfg.control.damping[gain_name]
+        self.actuated_torque_limits = self.torque_limits.index_select(
+            0, self.actuated_dof_indices
+        )
 
         # * check that init range highs and lows are consistent
         # * and repopulate to match
@@ -1091,7 +1124,7 @@ class LeggedRobot(BaseTask):
     def _reward_torque_limits(self):
         """penalize torques too close to the limit"""
         limit = self.cfg.reward_settings.soft_torque_limit
-        error = self.torques.abs() - self.torque_limits * limit
+        error = self.torques.abs() - self.actuated_torque_limits * limit
         return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)
 
     def _reward_tracking_lin_vel(self):

@@ -10,6 +10,7 @@ import torch
 
 from gym.envs.base.base_task import BaseTask
 from gym.envs.base.isaac_gym_backend import IsaacGymBackend
+from gym.envs.base.robot_layout import RobotLayout
 from gym.utils import random_sample
 
 
@@ -63,11 +64,7 @@ class FixedRobot(BaseTask):
         # Map actuated-only torques onto the full DOF space, then hand off to
         # the backend (which owns all gym/sim API calls).
         torques_full_dof = torch.zeros(self.num_envs, self.num_dof, device=self.device)
-        next_actuated_idx = 0
-        for dof_idx in range(self.num_dof):
-            if self.cfg.control.actuated_joints_mask[dof_idx]:
-                torques_full_dof[:, dof_idx] = self.torques[:, next_actuated_idx]
-                next_actuated_idx += 1
+        torques_full_dof[:, self.actuated_dof_indices] = self.torques
         self._backend.step(torques_full_dof)
 
     def _post_physx_step(self):
@@ -103,6 +100,34 @@ class FixedRobot(BaseTask):
         self.dof_names = self._backend.dof_names
         self.penalised_contact_indices = self._backend.penalised_contact_indices
         self.termination_contact_indices = self._backend.termination_contact_indices
+        self.robot_layout = self._backend.robot_layout or RobotLayout.from_cfg(self.cfg)
+        self.robot_layout.validate_native(self.dof_names, self._backend.body_names)
+        if self._backend.robot_layout is None and (
+            list(self.robot_layout.dof_names) != list(self.dof_names)
+            or list(self.robot_layout.body_names) != list(self._backend.body_names)
+        ):
+            raise ValueError(
+                "backend without canonical mapping exposes a different robot order"
+            )
+
+        actuated_names = list(self.robot_layout.actuated_dof_names)
+        unknown = sorted(set(actuated_names) - set(self.dof_names))
+        if unknown:
+            raise ValueError(f"unknown actuated_joint_names: {unknown}")
+        if len(actuated_names) != self.num_actuators:
+            raise ValueError(
+                f"cfg.env.num_actuators={self.num_actuators}, but control defines "
+                f"{len(actuated_names)} actuated joints: {actuated_names}"
+            )
+        self.actuated_dof_names = actuated_names
+        self.actuated_dof_indices = torch.tensor(
+            [self.dof_names.index(name) for name in actuated_names],
+            dtype=torch.long,
+            device=self.device,
+        )
+        self.torque_limits = self.full_dof_torque_limits.index_select(
+            0, self.actuated_dof_indices
+        )
 
     # ------------- Callbacks (called by backend during setup) --------------
 
@@ -119,17 +144,14 @@ class FixedRobot(BaseTask):
             self.dof_vel_limits = torch.zeros(
                 self.num_dof, dtype=torch.float, device=self.device
             )
-            self.torque_limits = torch.zeros(
-                self.num_actuators, dtype=torch.float, device=self.device
+            self.full_dof_torque_limits = torch.zeros(
+                self.num_dof, dtype=torch.float, device=self.device
             )
             for i in range(self.num_dof):
                 self.dof_pos_limits[i, 0] = props["lower"][i].item()
                 self.dof_pos_limits[i, 1] = props["upper"][i].item()
                 self.dof_vel_limits[i] = props["velocity"][i].item()
-                try:
-                    self.torque_limits[i] = props["effort"][i].item()
-                except Exception:
-                    print("WARNING: your system has unactuated joints")
+                self.full_dof_torque_limits[i] = props["effort"][i].item()
                 # soft limits
                 m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
                 r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
@@ -149,7 +171,7 @@ class FixedRobot(BaseTask):
         """Bind live tensor views from the backend, then set up RL buffers."""
         n_envs = self.num_envs
 
-        # Live views into the backend's physics state (zero-copy on GPU).
+        # Live canonical tensors owned and updated in place by the backend.
         self.root_states = self._backend.root_states
         self.dof_state = self._backend.dof_state
         self.dof_pos = self._backend.dof_pos  # [num_envs, num_dof]
@@ -197,7 +219,6 @@ class FixedRobot(BaseTask):
         self.default_act_pos = torch.zeros(
             self.num_actuators, dtype=torch.float, device=self.device
         )
-        actuated_idx = []
         for i in range(self.num_dof):
             name = self.dof_names[i]
             angles = self.cfg.init_state.default_joint_angles
@@ -213,27 +234,25 @@ class FixedRobot(BaseTask):
                     + "setting to zero"
                 )
 
-            found = False
-            for dof_name in self.cfg.control.stiffness.keys():
-                if dof_name in name:
-                    self.p_gains[i] = self.cfg.control.stiffness[dof_name]
-                    self.d_gains[i] = self.cfg.control.damping[dof_name]
-                    self.default_act_pos[i] = angles[dof_name]
-                    found = True
-                    actuated_idx.append(i)
-            if not found:
-                try:
-                    self.p_gains[i] = 0.0
-                    self.d_gains[i] = 0.0
-                    print("This should not happen anymore")
-                    if self.cfg.control.control_type in ["P", "V"]:
-                        print(f"PD gain of joint {name} not defined, set to zero")
-                except Exception:
-                    pass
-
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
+        for actuator_index, name in enumerate(self.actuated_dof_names):
+            matching_gains = [
+                gain_name
+                for gain_name in self.cfg.control.stiffness
+                if gain_name in name
+            ]
+            if len(matching_gains) != 1:
+                raise ValueError(
+                    f"expected exactly one PD gain match for {name!r}, "
+                    f"got {matching_gains}"
+                )
+            gain_name = matching_gains[0]
+            self.p_gains[actuator_index] = self.cfg.control.stiffness[gain_name]
+            self.d_gains[actuator_index] = self.cfg.control.damping[gain_name]
+            dof_index = self.dof_names.index(name)
+            self.default_act_pos[actuator_index] = self.default_dof_pos[0, dof_index]
         self.default_act_pos = self.default_act_pos.unsqueeze(0)
-        self.act_idx = to_torch(actuated_idx, dtype=torch.long, device=self.device)
+        self.act_idx = self.actuated_dof_indices
         self.initialize_ranges_for_initial_conditions()
 
     def initialize_ranges_for_initial_conditions(self):
@@ -351,23 +370,12 @@ class FixedRobot(BaseTask):
         return -torch.mean(error.clip(min=0.0, max=1.0), dim=1)
 
     def _compute_torques(self):
-        actuated_dof_pos = torch.zeros(
-            self.num_envs, self.num_actuators, device=self.device
-        )
-        actuated_dof_vel = torch.zeros(
-            self.num_envs, self.num_actuators, device=self.device
-        )
-        idx = 0
-        for dof_idx in range(self.num_dof):
-            if self.cfg.control.actuated_joints_mask[dof_idx]:
-                actuated_dof_pos[:, idx] = self.dof_pos[:, dof_idx]
-                actuated_dof_vel[:, idx] = self.dof_vel[:, dof_idx]
-                idx += 1
+        pos = self.dof_pos.index_select(1, self.actuated_dof_indices)
+        vel = self.dof_vel.index_select(1, self.actuated_dof_indices)
 
         torques = (
-            self.p_gains
-            * (self.dof_pos_target + self.default_act_pos - actuated_dof_pos)
-            + self.d_gains * (self.dof_vel_target - actuated_dof_vel)
+            self.p_gains * (self.dof_pos_target + self.default_act_pos - pos)
+            + self.d_gains * (self.dof_vel_target - vel)
             + self.tau_ff
         )
         torques = torch.clip(torques, -self.torque_limits, self.torque_limits)

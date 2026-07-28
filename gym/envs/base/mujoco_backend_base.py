@@ -13,6 +13,7 @@ import torch
 import mujoco
 
 from gym import LEGGED_GYM_ROOT_DIR
+from gym.envs.base.robot_layout import RobotLayout
 from gym.envs.base.sim_backend import SimBackend
 from gym.envs.base.urdf_limits import parse_urdf_limits
 
@@ -37,6 +38,15 @@ class MuJocoBackendBase(SimBackend):
         self._num_bodies: int = 0
         self._dof_names: list = []
         self._body_names: list = []
+        self._native_dof_names: list = []
+        self._native_body_names: list = []
+        self._canonical_to_native_dof: torch.Tensor = None
+        self._native_to_canonical_dof: torch.Tensor = None
+        self._canonical_to_native_body: torch.Tensor = None
+        self._canonical_to_native_dof_np: np.ndarray = None
+        self._native_to_canonical_dof_np: np.ndarray = None
+        self._canonical_to_native_body_np: np.ndarray = None
+        self._robot_layout: RobotLayout = None
 
         # Floating-base offsets (0 for fixed-base)
         self._has_free_joint: bool = False
@@ -207,27 +217,92 @@ class MuJocoBackendBase(SimBackend):
             self._qvel_offset = 0
             self._num_dof = mjm.nv
 
-        # Apply damping/armature to actuated DOFs only
-        mjm.dof_damping[self._qvel_offset :] = cfg.asset.joint_damping
-        mjm.dof_armature[self._qvel_offset :] = getattr(cfg.asset, "rotor_inertia", 0.0)
-
         # Contacts: disable for fixed-base (no ground), keep for floating-base
         if not self._has_free_joint:
             mjm.geom_contype[:] = 0
             mjm.geom_conaffinity[:] = 0
 
-        # Extract metadata
-        self._body_names = [
+        # Extract native metadata, then build the stable task-facing layout.
+        self._native_body_names = [
             mujoco.mj_id2name(mjm, mujoco.mjtObj.mjOBJ_BODY, i) or f"body_{i}"
             for i in range(mjm.nbody)
         ]
-        self._num_bodies = mjm.nbody
 
         jnt_start = 1 if self._has_free_joint else 0
-        self._dof_names = [
+        self._native_dof_names = [
             mujoco.mj_id2name(mjm, mujoco.mjtObj.mjOBJ_JOINT, i) or f"joint_{i}"
             for i in range(jnt_start, mjm.njnt)
         ]
+        scalar_joint_types = {
+            mujoco.mjtJoint.mjJNT_HINGE,
+            mujoco.mjtJoint.mjJNT_SLIDE,
+        }
+        robot_joint_types = set(mjm.jnt_type[jnt_start:].tolist())
+        if (
+            len(self._native_dof_names) != self._num_dof
+            or not robot_joint_types <= scalar_joint_types
+        ):
+            raise ValueError(
+                "only scalar hinge/slide robot joints are currently supported: "
+                f"{len(self._native_dof_names)} joints for {self._num_dof} DOFs, "
+                f"joint types={sorted(robot_joint_types)}"
+            )
+
+        self._robot_layout = RobotLayout.from_cfg(cfg)
+        world_name = self._native_body_names[0]
+        self._robot_layout.validate_native(
+            self._native_dof_names,
+            self._native_body_names,
+            allowed_extra_body_names=[world_name],
+        )
+        self._dof_names = list(self._robot_layout.dof_names)
+        self._body_names = list(self._robot_layout.body_names)
+        self._num_dof = len(self._dof_names)
+        self._num_bodies = len(self._body_names)
+
+        canonical_to_native_dof = self._robot_layout.canonical_to_native_dof(
+            self._native_dof_names
+        )
+        native_to_canonical_dof = self._robot_layout.native_to_canonical_dof(
+            self._native_dof_names
+        )
+        canonical_to_native_body = self._robot_layout.canonical_to_native_body(
+            self._native_body_names
+        )
+        self._canonical_to_native_dof_np = np.asarray(
+            canonical_to_native_dof, dtype=np.int64
+        )
+        self._native_to_canonical_dof_np = np.asarray(
+            native_to_canonical_dof, dtype=np.int64
+        )
+        self._canonical_to_native_body_np = np.asarray(
+            canonical_to_native_body, dtype=np.int64
+        )
+        self._canonical_to_native_dof = torch.tensor(
+            canonical_to_native_dof, dtype=torch.long, device=device
+        )
+        self._native_to_canonical_dof = torch.tensor(
+            native_to_canonical_dof, dtype=torch.long, device=device
+        )
+        self._canonical_to_native_body = torch.tensor(
+            canonical_to_native_body, dtype=torch.long, device=device
+        )
+
+        # Config vectors are canonical; MuJoCo model arrays are native.
+        damping = getattr(cfg.asset, "joint_damping", 0.0)
+        armature = getattr(cfg.asset, "rotor_inertia", 0.0)
+        if np.ndim(damping) == 0:
+            mjm.dof_damping[self._qvel_offset :] = damping
+        else:
+            mjm.dof_damping[self._qvel_offset :] = np.asarray(damping)[
+                self._native_to_canonical_dof_np
+            ]
+        if np.ndim(armature) == 0:
+            mjm.dof_armature[self._qvel_offset :] = armature
+        else:
+            mjm.dof_armature[self._qvel_offset :] = np.asarray(armature)[
+                self._native_to_canonical_dof_np
+            ]
 
         # Contact index tensors
         self._penalised_contact_indices = self.build_contact_indices(
@@ -260,15 +335,20 @@ class MuJocoBackendBase(SimBackend):
         jnt_start = 1 if self._has_free_joint else 0
         n = mjm.njnt - jnt_start
         limited = mjm.jnt_limited[jnt_start : mjm.njnt].astype(bool)
-        lower = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 0], -1e6)
-        upper = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 1], 1e6)
-        effort = np.full(n, 1e6, dtype=np.float64)
-        velocity = np.full(n, 1e6, dtype=np.float64)
-        for i, jname in enumerate(self._dof_names):
+        lower_native = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 0], -1e6)
+        upper_native = np.where(limited, mjm.jnt_range[jnt_start : mjm.njnt, 1], 1e6)
+        effort_native = np.full(n, 1e6, dtype=np.float64)
+        velocity_native = np.full(n, 1e6, dtype=np.float64)
+        for i, jname in enumerate(self._native_dof_names):
             if jname in self._urdf_limits:
                 eff, vel = self._urdf_limits[jname]
-                effort[i] = eff
-                velocity[i] = vel
+                effort_native[i] = eff
+                velocity_native[i] = vel
+        order = self._canonical_to_native_dof_np
+        lower = lower_native[order]
+        upper = upper_native[order]
+        effort = effort_native[order]
+        velocity = velocity_native[order]
         return {"lower": lower, "upper": upper, "velocity": velocity, "effort": effort}
 
     @staticmethod

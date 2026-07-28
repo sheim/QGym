@@ -5,6 +5,41 @@ from gym.envs.base.legged_robot_config import (
 
 BASE_HEIGHT_REF = 0.3
 
+MINI_CHEETAH_DOF_NAMES = [
+    "1_rf_haa",
+    "rf_hfe",
+    "rf_kfe",
+    "2_lf_haa",
+    "lf_hfe",
+    "lf_kfe",
+    "3_rh_haa",
+    "rh_hfe",
+    "rh_kfe",
+    "4_lh_haa",
+    "lh_hfe",
+    "lh_kfe",
+]
+MINI_CHEETAH_BODY_NAMES = [
+    "base",
+    "rf_hip",
+    "rf_thigh",
+    "rf_shank",
+    "rf_foot",
+    "lf_hip",
+    "lf_thigh",
+    "lf_shank",
+    "lf_foot",
+    "rh_hip",
+    "rh_thigh",
+    "rh_shank",
+    "rh_foot",
+    "lh_hip",
+    "lh_thigh",
+    "lh_shank",
+    "lh_foot",
+]
+MINI_CHEETAH_LEG_GROUPS = ["rf_leg", "lf_leg", "rh_leg", "lh_leg"]
+
 
 class MiniCheetahCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
@@ -101,6 +136,22 @@ class MiniCheetahCfg(LeggedRobotCfg):
         disable_motors = False
         joint_damping = 0.01
         rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
+
+        class robot_layout:
+            version = "mini_cheetah_v1"
+            dof_names = MINI_CHEETAH_DOF_NAMES
+            actuated_dof_names = MINI_CHEETAH_DOF_NAMES
+            body_names = MINI_CHEETAH_BODY_NAMES
+            dof_groups = {
+                "rf_leg": MINI_CHEETAH_DOF_NAMES[0:3],
+                "lf_leg": MINI_CHEETAH_DOF_NAMES[3:6],
+                "rh_leg": MINI_CHEETAH_DOF_NAMES[6:9],
+                "lh_leg": MINI_CHEETAH_DOF_NAMES[9:12],
+                "abad": MINI_CHEETAH_DOF_NAMES[0:12:3],
+            }
+            body_groups = {
+                "feet": ["rf_foot", "lf_foot", "rh_foot", "lh_foot"],
+            }
 
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9

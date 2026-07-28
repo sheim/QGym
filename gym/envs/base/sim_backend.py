@@ -53,6 +53,11 @@ class SimBackend(ABC):
     @abstractmethod
     def body_names(self) -> list: ...
 
+    @property
+    def robot_layout(self):
+        """Canonical task-facing robot layout, valid after setup()."""
+        return getattr(self, "_robot_layout", None)
+
     @abstractmethod
     def find_body_index(self, name: str) -> int:
         """Return the rigid-body index for the body with the given name."""

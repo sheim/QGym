@@ -32,7 +32,7 @@ class PendulumCfg(FixedRobotCfg):
         dof_vel_range = {"theta": [-5, 5]}
 
     class control(FixedRobotCfg.control):
-        actuated_joints_mask = [1]  # angle
+        actuated_joint_names = ["theta"]
         ctrl_frequency = 25
         desired_sim_frequency = 200
         stiffness = {"theta": 0.0}  # [N*m/rad]
