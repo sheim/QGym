@@ -7,14 +7,15 @@ Convention sheet (all spike-verified 2026-07-12, see q2-backend-integration):
   misleading).  Constants VEL_ANG / VEL_LIN below are the only place this
   knowledge lives.
 - Contact forces come from per-link `flags="contact"` force sensors injected
-    by vsim_asset; sensor buffers are [force(3), torque(3)], world frame,
-    +z ≈ m·g reaction on a resting body.
+    by vsim_asset; sensor buffers are [force(3), torque(3)] in sensor/link
+    axes despite requesting the environment frame, so refresh rotates them to
+    world axes (+z sums to m·g on a resting body).
 - Motors are injected gear=1.0 per movable joint → set_motor_forces takes
   raw Nm. Torques arrive in canonical DOF order; `MotorDef.dof_index` maps
   them to native motor order.
 - World is Z-up (create_gym up_axis); the default plane is Y-up and must be
-  rotated.  Terrain friction is NOT yet applied to the plane (default
-  material) — tracked in q2-backend-integration.
+  rotated. Plane tasks assign one explicit material to the robot and terrain
+  so the task friction/restitution config is not replaced by engine defaults.
 - create_gym/delete_gym is a process singleton; create→delete→create works,
   so close() must be called between backends in one process.
 - All assembled tensors are refreshed in step()/resets, never in getters
@@ -155,6 +156,38 @@ class VSimBackend(SimBackend):
     def contact_forces(self) -> torch.Tensor:
         return self._contact_forces_t
 
+    @staticmethod
+    def _set_contact_offsets(model_def, knobs) -> None:
+        contact_offset = getattr(knobs, "contact_offset", None)
+        rest_offset = getattr(knobs, "rest_offset", None)
+        if contact_offset is not None:
+            model_def.contact_offset = float(contact_offset)
+        if rest_offset is not None:
+            model_def.rest_offset = float(rest_offset)
+
+    def _create_contact_material(self, env_def, art_def_h, art_def, cfg):
+        """Create one explicit material shared by the robot and terrain."""
+        knobs = getattr(cfg, "vsim_attributes", None)
+        stiffness = getattr(knobs, "contact_stiffness", None)
+        terrain = getattr(cfg, "terrain", None)
+        if terrain is None and stiffness is None:
+            return None
+
+        material = self._v.RigidMaterial()
+        material.static_friction = float(getattr(terrain, "static_friction", 1.0))
+        material.dynamic_friction = float(getattr(terrain, "dynamic_friction", 1.0))
+        material.restitution = float(getattr(terrain, "restitution", 0.0))
+        if stiffness is not None:
+            material.restitution = -abs(float(stiffness))
+            material.damping = float(getattr(knobs, "contact_damping", 0.0))
+
+        handle = env_def.create_rigid_material(material)
+        for link_index in range(art_def.get_num_link_defs()):
+            env_def.assign_rigid_material_to_articulation_link(
+                art_def_h, handle, link_index
+            )
+        return handle
+
     # ── World building ────────────────────────────────────────────────────
 
     def setup(self, cfg, num_envs: int, device: str, task=None) -> None:
@@ -194,6 +227,9 @@ class VSimBackend(SimBackend):
             ),
             verbose=False,
         )
+        solver_iterations = getattr(knobs, "solver_iterations", None)
+        if solver_iterations is not None:
+            self._gym.set_num_solver_iterations(int(solver_iterations))
 
         vsim_path = ensure_vsim_asset(cfg, self._gym)
         fixed = bool(getattr(cfg.asset, "fix_base_link", True))
@@ -216,6 +252,10 @@ class VSimBackend(SimBackend):
         if art_def is None:
             raise RuntimeError(f"no articulation def found in {vsim_path}")
 
+        self._set_contact_offsets(art_def, knobs)
+        contact_material = self._create_contact_material(
+            env_def, art_def_h, art_def, cfg
+        )
         art_def.enable_control_type(v.ArticulationControlType.MOTOR, True)
         for i in range(art_def.get_num_force_sensor_defs()):
             art_def.get_force_sensor_def(i).max_num_transform_handles = 8
@@ -226,13 +266,35 @@ class VSimBackend(SimBackend):
         self._art_h = env_def.create_articulation(
             art_def_h, v.Transform(v.Quat(*rot), v.Vec3(*pos))
         )
+
+        terrain = getattr(cfg, "terrain", None)
+        has_plane = (
+            terrain is not None and getattr(terrain, "mesh_type", None) == "plane"
+        )
+        use_local_plane = has_plane and (
+            contact_material is not None
+            or getattr(knobs, "contact_offset", None) is not None
+            or getattr(knobs, "rest_offset", None) is not None
+        )
+        if use_local_plane:
+            plane_def_h = env_def.create_plane_def(
+                rigid_material_handle=contact_material
+            )
+            plane_def = env_def.get_rigid_body_def(plane_def_h)
+            self._set_contact_offsets(plane_def, knobs)
+            plane_rot = v.shortest_rotation(v.Vec3(0, 1, 0), v.Vec3(0, 0, 1))
+            env_def.create_rigid_body(
+                plane_def_h,
+                v.Transform(plane_rot, v.Vec3(0, 0, 0)),
+                name="ground",
+            )
+
         env_def.finalize()
         self._grp = self._gym.create_environment_group(env_def_h, [num_envs])
         # Articulation instance (sensor handles live on it, valid post-group)
         self._art_instance = env_def.get_articulation(self._art_h)
 
-        terrain = getattr(cfg, "terrain", None)
-        if terrain is not None and getattr(terrain, "mesh_type", None) == "plane":
+        if has_plane and not use_local_plane:
             plane_rot = v.shortest_rotation(v.Vec3(0, 1, 0), v.Vec3(0, 0, 1))
             self._gym.create_plane(v.Transform(plane_rot, v.Vec3(0, 0, 0)))
         self._gym.finalize()
@@ -380,6 +442,7 @@ class VSimBackend(SimBackend):
                 grp.create_force_sensor_command(
                     v.wrap_gpu_buffer(self._sensor_big[i]),
                     art.get_force_sensor_handle(i),
+                    frame_type=v.FrameType.ENVIRONMENT,
                 )
             )
         self._fs_arr = gym.create_gpu_array(cmds)
@@ -503,9 +566,21 @@ class VSimBackend(SimBackend):
         rbs[..., 3:7] = link_tf[..., 0:4]
         rbs[..., 7:10] = link_vel[..., VEL_LIN]
         rbs[..., 10:13] = link_vel[..., VEL_ANG]
-        # sensor buffers are [force, torque]; big buffer is [L, N, 6]
+        # Sensor buffers are [force, torque] in the attached sensor/link frame,
+        # even when the command requests ENVIRONMENT (verified against static
+        # weight). Rotate the canonical link-local forces into world axes to
+        # satisfy the SimBackend contact tensor contract.
         sensor_forces = self._sensor_big.index_select(0, self._canonical_body_to_sensor)
-        self._contact_forces_t.copy_(sensor_forces[:, :, 0:3].permute(1, 0, 2))
+        force_local = sensor_forces[:, :, 0:3].permute(1, 0, 2)
+        link_quat = link_tf[..., 0:4]
+        q_xyz = link_quat[..., 0:3]
+        twice_cross = 2.0 * torch.cross(q_xyz, force_local, dim=-1)
+        force_world = (
+            force_local
+            + link_quat[..., 3:4] * twice_cross
+            + torch.cross(q_xyz, twice_cross, dim=-1)
+        )
+        self._contact_forces_t.copy_(force_world)
 
     # ── Resets (write-then-commit; task wrote desired values into views) ──
 

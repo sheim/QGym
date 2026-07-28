@@ -612,37 +612,35 @@ was concentrated in contact (`1.32e-2 m` settled-height RMS and `8.34 N`
 GRF-time RMS versus CPU); its contact-free joint-trajectory RMS was `2.60e-2
 rad`.
 
-**Drop-discrepancy investigation (2026-07-27):** the probe originally inherited
-one implicit initialization step from `TaskSkeleton.reset()`, so it did not
-start from the requested state. The probe now restores the deterministic state
-immediately before recording. With that correction, CPU, Warp, and vsim agree
-to numerical precision before ground contact (vsim/CPU maximum error before
-`t=0.20 s`: `<4e-7 m` base height and `<1.1e-8 rad` joint position). At the
-500 Hz physics rate, vsim responds at `0.200 s`; MuJoCo responds at `0.202 s`.
-The URDF conversion preserves the foot spheres and transforms, but the contact
-configuration is not equivalent:
+**Contact-discrepancy investigation (updated 2026-07-28):** the probe originally
+inherited one implicit initialization step from `TaskSkeleton.reset()`, so it
+did not start from the requested state. The probe now restores the deterministic
+state immediately before recording. CPU, Warp, and vsim agree to numerical
+precision before ground contact (vsim/CPU maximum error before `t=0.20 s`:
+`<4e-7 m` base height and `<1.1e-8 rad` joint position).
 
-- MuJoCo uses Newton, up to 100 iterations, zero margin/gap, and compliant
-  `solref=[0.02, 1]` / default `solimp`.
-- vsim uses 8 solver iterations, its rigid/default material, and a plane with
-  `contact_offset=0.01`. No explicit rigid material is assigned, so the
-  configured terrain friction/restitution is not applied.
-- MuJoCo's three friction slots are sliding/torsional/rolling; the current
-  `[static_friction, dynamic_friction, 0.0001]` assignment therefore does not
-  represent separate static/dynamic friction.
-- vsim's link order is `base,LH,RH,LF,RF`, while injected force sensors retain
-  XML order `base,RF,LF,RH,LH`. The backend currently copies sensor slot `i`
-  into contact-body slot `i`, violating the contact tensor/body-name contract.
+The contact tensor routing and frame are now fixed. Vsim sensors are resolved
+through their native link indices into canonical body order. Although the
+sensor command requests the environment frame, the returned vector components
+are attached to the rotating sensor/link frame; the backend now rotates them
+into world axes. A settled mini-cheetah reports approximately its `81.3 N`
+weight along world `+z`, and the licensed regression suite checks this.
 
-At 500 Hz, MuJoCo's first total foot force is `192 N` and rises smoothly; vsim
-starts at `447 N`, spikes to `1,440 N` on the next substep, then briefly returns
-to zero. Raising vsim from 8 to 16 solver iterations removes the zero-force
-substep and lowers force RMS, but 32/64 iterations do not improve trajectory
-RMS. A diagnostic soft-contact material (`stiffness=5,000`, `damping=100`)
-roughly halves short-horizon height and force RMS, confirming contact
-compliance as the leading physics parameter. Before another RL run: fix the
-sensor/link permutation, apply explicit terrain/robot materials in both
-backends, then tune vsim soft contact against the drop curve.
+Plane tasks now explicitly assign the configured terrain material to both the
+Vsim robot and plane. MuJoCo's terrain mapping was also corrected: its three
+friction slots mean sliding/torsional/rolling, not static/dynamic/rolling, so
+the shared dynamic coefficient feeds MuJoCo's single Coulomb sliding
+coefficient. The current task has static = dynamic = `1.0`; only Vsim can
+represent them separately. Nonzero `terrain.restitution` still needs a
+deliberate MuJoCo mapping because MuJoCo rebound is primarily controlled by
+`solref`/`solimp`, not a rigid-material restitution field.
+
+The remaining impact difference is primarily contact formulation. MuJoCo uses
+a compliant constraint (`solref=[0.02, 1]`, default `solimp`) and Newton with
+up to 100 iterations. Vsim defaults to an eight-iteration rigid solve; its
+initial normal impulse is much sharper even though the longer-window impulse
+and settled pose are close. See the direct contact probes below for the
+measured bounds and the diagnostic Vsim compliance comparison.
 
 Final training metrics:
 
@@ -798,17 +796,23 @@ bash scripts/run_vsim_tests.sh
 
 **Implemented and checked 2026-07-28.** The canonical mini-cheetah interface is
 `RF, LF, RH, LH` for DOFs and feet on all three backends; MuJoCo's `world` body
-is no longer public. The engine-independent suite passes (`198 passed`) and the
+is no longer public. The engine-independent suite passes (`199 passed`) and the
 licensed vsim suite passes (`62 passed`). MuJoCo Warp-specific routing,
 liveness, reset, and physics checks pass (`52 passed`).
 
 The 0.5 s contact-free Gate 2 `step` probe improved vsim/CPU joint-trajectory
 RMS from the pre-fix `2.60e-2 rad` to `4.15e-5 rad`; CPU/Warp RMS is
-`9.10e-8 rad`. This closes the ordering/actuation part of Gate 0. A 0.6 s
-`drop` probe exposes identical DOF/foot labels across all outputs while the
-remaining vsim/CPU differences are contact-rich (`2.36e-2 m` settle-height RMS,
-`1.61e1 N` GRF-time RMS), so subsequent work can focus on material/contact
-semantics rather than permutations.
+`9.10e-8 rad`. This closes the ordering/actuation part of Gate 0. The fresh
+3.0 s, 32-environment `drop` probe exposes identical DOF/foot labels across all
+outputs. CPU/Warp remain close (`1.29e-5 m` base-height trajectory RMS,
+`7.92e-1 N` per-foot GRF-time RMS). Vsim contacts 10 ms earlier, settles at
+`0.2604 m` versus `0.2528 m`, and differs from CPU by `1.32e-2 m` in base-height
+trajectory RMS, `8.34 N` in per-foot GRF-time RMS, `4.39e-2 rad` in joint
+position RMS, and `5.01e-1 rad/s` in joint velocity RMS. The remaining
+large drop differences are contact-rich, so material/contact semantics remain
+important. Ordering and routing are no longer suspects; the finer direct
+non-contact probes in Gate 2 did identify a separate inertia-conditioning
+difference that should be resolved before another RL campaign.
 
 #### Gate 1 — state/reset regressions
 
@@ -831,7 +835,8 @@ green. A skipped Warp test does not close this gate on a GPU parity machine.
 behavior using identical deterministic initial conditions:
 
 - `drop`: floating base released from `z=0.5`, default pose held by PD. Compares
-  base height, quaternion, impact timing, and foot ground-reaction forces.
+  base height, quaternion, impact timing, foot ground-reaction forces, and
+  joint position/velocity phase portraits.
 - `step`: fixed base clear of the ground, then every joint receives a target
   step. Compares contact-free actuator, limb, and integration response.
 
@@ -857,8 +862,8 @@ uv run --env-file .env.vsim scripts/mini_cheetah_fidelity.py run --probe step \
 uv run scripts/mini_cheetah_fidelity.py compare logs/mc_fid/step_*.npz
 ```
 
-Visualize the drop trajectories, impact timing, per-foot forces, and aggregate
-divergence interactively:
+Visualize the drop trajectories, impact timing, per-foot forces, joint phase
+portraits, and aggregate divergence interactively:
 
 ```bash
 uv run marimo edit notebooks/mini_cheetah_drop_fidelity.py
@@ -870,6 +875,197 @@ is different, but `step` should remain close if torque mapping, joint ordering,
 PD gains, armature, damping, and timestep agree. Any large CPU/Warp difference,
 wrong initial base height, missing foot impulse, or large vsim `step` error is a
 backend bug and blocks RL comparison.
+
+##### Direct non-contact diagnostic probes
+
+Four backend-level probes bypass task PD control and run without gravity or
+contact. They use one environment per canonical joint (plus the default pose
+for kinematics):
+
+- `torque`: one 2 ms, one-hot `1 Nm` torque step; records the full
+  torque-to-joint-acceleration response matrix.
+- `damping`: one-hot `1 rad/s` initial joint velocity, then zero applied
+  torque for `0.25 s`; records passive joint decay.
+- `kinematics`: default pose plus a `0.2 rad` offset on each joint in turn;
+  compares every canonical body transform relative to the base.
+- `reaction`: floating base, constant one-hot `1 Nm` torque for `0.10 s`;
+  records joint motion and the equal-and-opposite base response.
+
+Rerun all four on this machine:
+
+```bash
+mkdir -p logs/mc_fid
+
+for PROBE in torque damping kinematics reaction; do
+  uv run scripts/mini_cheetah_fidelity.py run --probe "$PROBE" \
+    --backend mujoco --device cpu --out "logs/mc_fid/${PROBE}_cpu.npz"
+  uv run scripts/mini_cheetah_fidelity.py run --probe "$PROBE" \
+    --backend mujoco --device cuda:0 --out "logs/mc_fid/${PROBE}_warp.npz"
+  uv run --env-file .env.vsim scripts/mini_cheetah_fidelity.py run \
+    --probe "$PROBE" --backend vsim --device cuda:0 \
+    --out "logs/mc_fid/${PROBE}_vsim.npz"
+  uv run scripts/mini_cheetah_fidelity.py compare \
+    "logs/mc_fid/${PROBE}_cpu.npz" \
+    "logs/mc_fid/${PROBE}_warp.npz" \
+    "logs/mc_fid/${PROBE}_vsim.npz"
+done
+```
+
+**Result (2026-07-28):**
+
+| Probe | MuJoCo Warp vs CPU | vsim vs CPU | Interpretation |
+|---|---:|---:|---|
+| One-step torque | `6.52e-6 rad/s²` acceleration RMS | `1.67 rad/s²` (`4.36%`) acceleration RMS | Joint-space inertia differs |
+| Passive damping | `2.56e-8 rad/s` velocity-trajectory RMS | `2.03e-3 rad/s` velocity-trajectory RMS | Damping semantics are already close |
+| Forward kinematics | `8.03e-9 m`, `3.61e-8 rad` RMS | `8.39e-8 m`, `1.75e-7 rad` RMS | Joint axes, frames, and body transforms match |
+| Floating reaction | `3.71e-8 rad/s` base-angular-velocity RMS | `6.80e-2 rad/s` base-angular-velocity RMS; `1.13e-1 rad/s` joint-velocity RMS | Base/composite inertia is the dominant non-contact difference |
+
+The torque discrepancy is structured by joint type rather than ordering:
+vsim's direct acceleration differs from CPU by `+2.25%` to `+2.98%` on HAA,
+`-6.71%` to `-7.37%` on HFE, and less than `0.2%` on KFE. Masses, COM offsets,
+joint frames, and kinematics survive import; the source inertia tensors do not.
+
+The source URDF's base and all four thigh inertia tensors violate the rigid-body
+principal-moment triangle inequality. The backends make them valid
+differently:
+
+- MuJoCo has `spec.compiler.balanceinertia = True`. It replaces all three
+  principal moments of each invalid body with their mean: base
+  `[0.138652, 0.138652, 0.138652] kg·m²` and thighs
+  `[0.001498, 0.001498, 0.001498] kg·m²`.
+- vsim preserves two principal moments and raises the deficient one to the
+  triangle boundary: base `[0.362030, 0.319357, 0.042673] kg·m²` and thighs
+  `[0.002295286, 0.001790823, 0.000504463] kg·m²` (listed largest first).
+
+This explains both the HFE-localized fixed-base error and the much larger
+floating-base angular-response error. Before contact tuning or another RL
+campaign, replace the invalid source inertias with physically valid values, or
+choose one explicit conditioning rule and apply it identically before both
+engines import the asset. Then rerun these four probes; kinematics and damping
+should remain unchanged while torque and reaction should tighten.
+
+##### Direct contact diagnostic probes
+
+`impact` records the first second of a `z=0.5 m` drop at the 500 Hz physics
+rate, including world-frame force vectors, foot sphere clearance, rebound, and
+settled height. `slide` first settles the robot for one second, injects
+`1 m/s` into the floating base, and measures whole-system COM deceleration
+rather than base-only motion (the latter is contaminated by leg motion).
+
+The default Vsim run uses the rigid/LCP contact formulation with an explicit
+material carrying the task's nominal friction values. The last Vsim pair below
+is a diagnostic comparison only; soft spring-damper contact is not a proposed
+task default:
+
+```bash
+mkdir -p logs/mc_fid
+
+uv run scripts/mini_cheetah_fidelity.py run --probe impact \
+  --backend mujoco --device cpu --label mujoco-cpu \
+  --out logs/mc_fid/impact_cpu.npz
+uv run scripts/mini_cheetah_fidelity.py run --probe impact \
+  --backend mujoco --device cuda:0 --label mujoco-warp \
+  --out logs/mc_fid/impact_warp.npz
+uv run --env-file .env.vsim scripts/mini_cheetah_fidelity.py run \
+  --probe impact --backend vsim --device cuda:0 --label vsim-rigid \
+  --out logs/mc_fid/impact_vsim_rigid.npz
+uv run --env-file .env.vsim scripts/mini_cheetah_fidelity.py run \
+  --probe impact --backend vsim --device cuda:0 \
+  --vsim_contact_offset 0 --vsim_contact_stiffness 5000 \
+  --vsim_contact_damping 25 --label vsim-soft-5k-d25 \
+  --out logs/mc_fid/impact_vsim_soft.npz
+uv run scripts/mini_cheetah_fidelity.py compare \
+  logs/mc_fid/impact_cpu.npz logs/mc_fid/impact_warp.npz \
+  logs/mc_fid/impact_vsim_rigid.npz logs/mc_fid/impact_vsim_soft.npz
+
+uv run scripts/mini_cheetah_fidelity.py run --probe slide \
+  --backend mujoco --device cpu --label mujoco-cpu \
+  --out logs/mc_fid/slide_cpu.npz
+uv run scripts/mini_cheetah_fidelity.py run --probe slide \
+  --backend mujoco --device cuda:0 --label mujoco-warp \
+  --out logs/mc_fid/slide_warp.npz
+uv run --env-file .env.vsim scripts/mini_cheetah_fidelity.py run \
+  --probe slide --backend vsim --device cuda:0 --label vsim-rigid \
+  --out logs/mc_fid/slide_vsim_rigid.npz
+uv run --env-file .env.vsim scripts/mini_cheetah_fidelity.py run \
+  --probe slide --backend vsim --device cuda:0 \
+  --vsim_contact_offset 0 --vsim_contact_stiffness 5000 \
+  --vsim_contact_damping 25 --label vsim-soft-5k-d25 \
+  --out logs/mc_fid/slide_vsim_soft.npz
+uv run scripts/mini_cheetah_fidelity.py compare \
+  logs/mc_fid/slide_cpu.npz logs/mc_fid/slide_warp.npz \
+  logs/mc_fid/slide_vsim_rigid.npz logs/mc_fid/slide_vsim_soft.npz
+```
+
+**Result (2026-07-28):**
+
+| Impact model | First force | Peak total Fz | 100 ms impulse | Rebound vz | Settled base z |
+|---|---:|---:|---:|---:|---:|
+| MuJoCo CPU | `0.202 s` | `241.6 N` | `22.487 N·s` | `0.661 m/s` | `0.2480 m` |
+| MuJoCo Warp | `0.202 s` | `241.6 N` | `22.413 N·s` | `0.661 m/s` | `0.2480 m` |
+| Vsim rigid, friction `1.0` | `0.200 s` | `1361.8 N` | `25.962 N·s` | `0.483 m/s` | `0.2518 m` |
+| Vsim `5 kN/m`, `25 N·s/m`, offset `0` | `0.198 s` | `284.4 N` | `23.184 N·s` | `0.673 m/s` | `0.2497 m` |
+
+| Slide model | Half-speed time | First stop | COM stopping distance | Mean foot slip |
+|---|---:|---:|---:|---:|
+| MuJoCo CPU | `0.174 s` | `0.408 s` | `0.1807 m` | `0.0606 m` |
+| MuJoCo Warp | `0.174 s` | `0.408 s` | `0.1805 m` | `0.0606 m` |
+| Vsim rigid, friction `1.0` | `0.096 s` | `0.340 s` | `0.1367 m` | `0.0132 m` |
+| Vsim `5 kN/m`, `25 N·s/m`, offset `0`, friction `1.0` | `0.106 s` | `0.412 s` | `0.1645 m` | `0.0126 m` |
+
+Interpretation:
+
+- The `2–4 ms` onset difference is one or two physics samples. Vsim reports
+  the force generated during a step alongside post-step link transforms, so
+  the apparent positive foot clearance at onset is a timestamp/readback
+  detail as well as predictive candidate generation, not a ballistic-flight
+  discrepancy.
+- Eight-iteration rigid Vsim contact produces a one-sample `1.36 kN` spike and
+  one zero-force substep. Sixteen iterations removes the zero substep and
+  lowers the peak to `0.82 kN`, but higher iteration counts are non-monotonic
+  and do not materially improve the trajectory. Solver iterations are not the
+  primary tuning lever.
+- Over `300 ms`, total positive normal impulse is already close:
+  `41.27 N·s` for MuJoCo and `40.25 N·s` for rigid Vsim. The large peak
+  difference is therefore impulse concentration, not a sixfold momentum
+  mismatch.
+- Vsim soft contact is encoded by a negative material restitution value
+  (stiffness) plus damping. `5 kN/m`, `25 N·s/m`, and zero contact offset gives
+  the best tested impact compromise: peak `+18%`, 100 ms impulse `+3%`,
+  rebound `+2%`, and settled height within `2 mm` of MuJoCo.
+- Contact offset and compliance are coupled. With the default approximately
+  `10 mm` per-shape Vsim offset, soft contact begins about `16 mm` above the
+  geometric surface. Zero offset removes that early cushion; it should be
+  retained in any soft-contact candidate.
+- Friction must be checked after selecting the normal model. On rigid Vsim,
+  a diagnostic coefficient near `0.35` matches MuJoCo stopping distance, but
+  after adding the candidate compliance the common nominal coefficient `1.0`
+  matches stop time within `1%` and distance within `9%`. Foot slip remains
+  smaller in Vsim, reflecting different friction-cone/constraint and
+  articulated-foot behavior; coefficient equality cannot imply identical
+  trajectories across engines.
+
+For sim-to-sim validation, do not require force-sample lockstep or an identical
+instantaneous peak. Require instead:
+
+- ballistic position/joint agreement until contact and onset within two
+  500 Hz samples;
+- correct canonical body routing, world-frame force direction, and settled
+  vertical force near robot weight;
+- impact impulse and rebound within `10%`, settled height within `5 mm`, and no
+  missing/alternating contacts;
+- slide stopping time and COM distance within `15%`, with the residual foot
+  slip difference recorded;
+- comparable termination/contact-mask decisions at the task's `1 N` and
+  `50 N` thresholds.
+
+The soft diagnostic meets those bounds except that its early slide deceleration
+and foot slip still differ in shape. Keep this residual for later hardware
+calibration/domain randomization rather than overfitting one synthetic slide.
+The production default remains Vsim's rigid/LCP formulation. Soft-contact
+parameters remain available only as explicit fidelity-probe overrides; future
+sim-to-hardware work should calibrate the rigid model's material and solver
+parameters after the invalid URDF inertias above are repaired.
 
 #### Gate 3 — train and evaluate the 3×3 backend matrix
 

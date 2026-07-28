@@ -4,6 +4,7 @@ Uses the mini_cheetah URDF (12 actuated DOFs + free joint).
 Tests run against both MuJocoCPUBackend and MuJocoWarpBackend.
 """
 
+import numpy as np
 import pytest
 import torch
 
@@ -71,6 +72,18 @@ class TestLeggedQuaternion:
 
 
 class TestLeggedPhysics:
+    def test_ground_friction_uses_mujoco_slot_semantics(self, legged_cpu_backend):
+        """Ground friction is [sliding, torsional, rolling], not static/dynamic."""
+        import mujoco
+
+        model = legged_cpu_backend._mjm
+        plane_ids = np.flatnonzero(model.geom_type == mujoco.mjtGeom.mjGEOM_PLANE)
+        assert len(plane_ids) == 1
+        np.testing.assert_allclose(
+            model.geom_friction[plane_ids[0]],
+            [1.0, 0.005, 0.0001],
+        )
+
     def test_robot_above_ground(self, legged_cpu_backend):
         """Robot shouldn't fall through the ground plane."""
         b = legged_cpu_backend

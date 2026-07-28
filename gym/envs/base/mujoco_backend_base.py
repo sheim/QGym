@@ -164,9 +164,17 @@ class MuJocoBackendBase(SimBackend):
             ground.type = mujoco.mjtGeom.mjGEOM_PLANE
             ground.size = [0, 0, 0.05]
             ground.material = "groundplane"
-            sf = getattr(terrain_cfg, "static_friction", 1.0)
-            df = getattr(terrain_cfg, "dynamic_friction", 1.0)
-            ground.friction = [sf, df, 0.0001]
+            # MuJoCo has one Coulomb coefficient for both sticking and
+            # sliding; its three slots are sliding, torsional, and rolling
+            # friction, not static, dynamic, and rolling. Use the configured
+            # dynamic coefficient for the shared sliding coefficient. The
+            # task configs normally keep static and dynamic friction equal.
+            sliding = getattr(
+                terrain_cfg,
+                "dynamic_friction",
+                getattr(terrain_cfg, "static_friction", 1.0),
+            )
+            ground.friction = [sliding, 0.005, 0.0001]
 
         # Check for manually set mjModel attributes
         if hasattr(cfg, "mjspec_attributes"):
