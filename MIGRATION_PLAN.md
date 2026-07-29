@@ -606,15 +606,12 @@ drop probe. The fix preserves pending root state during DOF reset and is covered
 by `test_floating_base_reset_placement_{cpu,warp}`. All Warp legged checkpoints
 and curves produced before that fix must be discarded and regenerated.
 
-**Post-fix campaign result (2026-07-27, seed 7, 250 iterations):** all three
-backends completed the prescribed run without a crash or NaN, but the RL
-transfer gate failed. Gate 1 passed (26 CPU/Warp contract tests and 60 vsim
-tests). Gate 2 also passed: CPU and Warp were effectively identical in the
-contact-free step probe (joint-trajectory RMS `2.25e-7 rad`) and close in the
-drop probe (settled-height RMS `1.26e-5 m`). vsim's expected solver difference
-was concentrated in contact (`1.32e-2 m` settled-height RMS and `8.34 N`
-GRF-time RMS versus CPU); its contact-free joint-trajectory RMS was `2.60e-2
-rad`.
+**Post-fix campaign status (updated 2026-07-28):** Gates 1 and 2 pass. The
+contract suites pass, CPU and Warp are numerically equivalent, and the
+remaining Vsim physics differences are concentrated in contact and satisfy the
+coarse sim-to-sim bounds below. Gate 3 now passes training convergence and four
+of the six cross-engine directions, but remains open because the final
+Vsim-trained checkpoint collapses on MuJoCo CPU and Warp.
 
 **Contact-discrepancy investigation (updated 2026-07-28):** the probe originally
 inherited one implicit initialization step from `TaskSkeleton.reset()`, so it
@@ -649,35 +646,100 @@ solver iterations for Mini Cheetah. Its initial normal impulse is still sharper
 even though the integrated impulse, settled pose, and task contact decisions
 are reasonably close. See the direct contact probes below for measured bounds.
 
-Final training metrics:
+**Gate 3 controlled campaign (2026-07-28, seed 7):** the original benchmark
+used 256 CPU environments but 4096 GPU environments with a batch size of 4096.
+`OnPolicyRunner` derives `num_steps_per_env = batch_size // num_envs`, so that
+comparison collected 16-step CPU rollouts but only one step per Warp/Vsim
+environment. The resulting weak GPU policies were an inequivalent GAE/PPO
+experiment, not backend-parity evidence. The benchmark now enforces 256
+environments, batch size 4096, and therefore 16 temporal steps per update on
+all three backends.
+
+Two evaluation issues were also removed. Inference previously called
+`get_noisy_obs()`, making supposedly deterministic actions depend on each
+device's RNG stream. It now uses clean observations. `reset_to_basic` also
+retained random commands and gait phases; the evaluator now fixes the command
+to `[1, 0, 0]`, phase to zero, and refreshes all derived state after the exact
+system reset.
+
+With equal 16-step rollouts, all three policies learn the reference task:
 
 | Backend | Total reward | `reference_traj` | Episode time | Steps/s |
 |---|---:|---:|---:|---:|
-| CPU | 8.040 | 0.872 | 4.63 s | 5,690 |
-| Warp | 5.951 | -0.008 | 2.06 s | 74,046 |
-| vsim | 6.722 | 0.383 | 2.36 s | 304,597 |
+| CPU | 7.976 | 0.885 | 4.65 s | 5,294 |
+| Warp | 8.055 | 0.847 | 4.96 s | 13,599 |
+| Vsim | 7.739 | 1.025 | 4.81 s | 36,615 |
 
-Transfer evaluation (`reset_to_range`; each cell is mean reward / survival,
-train backend down, evaluation backend across):
+Final-checkpoint transfer at iteration 250 (`reset_to_range`; each cell is mean
+reward / survival, train backend down and evaluation backend across):
 
-| Train \ Eval | CPU | Warp | vsim |
+| Train \ Eval | CPU | Warp | Vsim |
 |---|---:|---:|---:|
-| CPU | 8.471 / 95.7% | 8.289 / 96.5% | 4.899 / 0.0% |
-| Warp | 5.278 / 15.6% | 5.045 / 12.5% | 4.226 / 0.0% |
-| vsim | 5.242 / 0.0% | 5.054 / 0.0% | 6.443 / 75.0% |
+| CPU | 8.144 / 90.6% | 7.852 / 88.7% | 7.192 / 72.7% |
+| Warp | 8.226 / 99.6% | 8.013 / 98.4% | 7.839 / 97.3% |
+| Vsim | 6.280 / 4.7% | 6.010 / 3.5% | 7.823 / 69.5% |
 
-The CPU policy transfers well to Warp, confirming useful CPU/Warp runtime
-compatibility. However, the Warp-trained policy is weak even in-domain, vsim
-cross-transfer collapses immediately in both directions, and deterministic
-closed-loop CPU/Warp DOF RMS is `0.265 rad` for the CPU policy (`0.531 rad` for
-the Warp policy). Warp also emitted three `opt.ccd_iterations ... needs to be
-increased` warnings while evaluating the vsim policy. Those failures block
-parity. The low-level probes are close, so the next investigation should focus
-on training-distribution differences, early termination/contact amplification,
-the CCD warning, and why Warp's `reference_traj` term falls from `0.582` to
-approximately zero. Evidence is saved under
-`logs/mc_fid`, `logs/mini_cheetah_ref_{cpu,warp,vsim}`, `logs/mc_rl_eval`, and
-`logs/mc_rl_sample`.
+The failure is late and asymmetric rather than a basic inability to transfer.
+At iteration 100, the Vsim policy scores `7.882 / 90.6%` on CPU, `7.672 /
+89.8%` on Warp, and `7.631 / 86.3%` on Vsim. By iteration 150 its CPU survival
+has fallen to `6.2%` in the checkpoint screen even though the in-domain
+training terms continue to improve. The CPU policy is not yet converged at
+iteration 100 (`18.0%` native survival), so reducing the common iteration
+budget would only move the failure to another row. This is evidence of late
+Vsim-specific policy exploitation and requires a training robustness measure
+or a predeclared validation/early-stopping rule; selecting checkpoint 100 after
+looking at target-backend performance would not close the gate honestly.
+
+The deterministic runtime check passes decisively. For all three final
+policies, full five-second CPU/Warp DOF-trajectory RMS is at most
+`1.92e-6 rad`. CPU/Vsim divergence begins after `0.04–0.06 s` from the standing
+contact state and is consistent with the contact-model difference rather than
+an ordering, observation, command, or device-RNG mismatch.
+
+Controlled evidence is under `logs/mini_cheetah_ref_cpu`,
+`logs/mini_cheetah_ref_{warp,vsim}_h16`, `logs/mc_rl_eval_h16`,
+`logs/mc_rl_eval_h16_i100`, and `logs/mc_rl_sample_h16`. Earlier campaign data
+is retained under `logs/archive` but is not parity evidence.
+
+**Large-batch follow-up (2026-07-28):** increasing the PPO batch to `2**15 =
+32768` while preserving the 16-step horizon required 2048 environments. This
+collects eight times as many transitions per iteration as the controlled
+baseline. Warp and Vsim were trained for 250 iterations; the corresponding CPU
+run was stopped after two iterations because each update took approximately
+`20.7 s` and the projected run time was 86 minutes. The matrix below therefore
+reuses the controlled CPU policy and changes only the two GPU-trained rows.
+
+| Backend | Total reward | `reference_traj` | Episode time | Steps/s |
+|---|---:|---:|---:|---:|
+| Warp, batch 32768 | 8.230 | 0.766 | 4.63 s | 55,632 |
+| Vsim, batch 32768 | 8.893 | 1.012 | 4.80 s | 184,910 |
+
+Final-checkpoint transfer:
+
+| Train \ Eval | CPU | Warp | Vsim |
+|---|---:|---:|---:|
+| CPU, baseline | 8.144 / 90.6% | 7.852 / 88.7% | 7.192 / 72.7% |
+| Warp, batch 32768 | 9.243 / 98.0% | 8.966 / 95.7% | 8.479 / 92.2% |
+| Vsim, batch 32768 | 7.863 / 8.6% | 7.684 / 9.4% | 9.805 / 96.9% |
+
+The larger batch improves Vsim's native final survival from `69.5%` to `96.9%`
+and delays specialization, but does not fix Vsim-to-MuJoCo transfer:
+
+| Vsim checkpoint | Batch 4096: CPU / Vsim survival | Batch 32768: CPU / Vsim survival |
+|---:|---:|---:|
+| 50 | 92.2% / 28.1% | 98.4% / 100.0% |
+| 100 | 90.6% / 84.4% | 82.8% / 98.4% |
+| 150 | 6.2% / 60.9% | 57.8% / 95.3% |
+| 200 | 10.9% / 93.8% | 20.3% / 100.0% |
+| 250 | 4.7% / 69.5% | 8.6% / 96.9% |
+
+Thus batch variance/sample diversity is part of the problem—the transfer
+window becomes much wider—but the converged Vsim objective still rewards a
+backend-specific strategy. Increasing the batch alone is not a gate-closing
+fix. One rare Warp `opt.ccd_iterations ... needs to be increased` warning also
+appeared during the 2048-environment training population. Large-batch artifacts
+are under `logs/mini_cheetah_ref_{warp,vsim}` runs dated `Jul28_22-25-17_` and
+`Jul28_22-29-16_`, plus `logs/mc_rl_eval_b32768`.
 
 #### Gate 0 — canonical robot layout and backend mappings
 
@@ -1064,14 +1126,19 @@ differences to validate or randomize against hardware before deployment.
 #### Gate 3 — train and evaluate the 3×3 backend matrix
 
 The campaign script trains one policy per backend with seed 7, then evaluates
-every trained policy on every backend:
+every trained policy on every backend. PPO rollout geometry is part of the
+controlled input: with the current batch size, 256 environments gives 16
+consecutive steps per environment on every backend.
 
 ```bash
-ITERS=250 SEED=7 GPU_ENVS=4096 CPU_ENVS=256 EVAL_ENVS=256 T_END=5.0 \
+ITERS=250 SEED=7 TRAIN_ENVS=256 BATCH_SIZE=4096 EVAL_ENVS=256 T_END=5.0 \
   bash scripts/run_mc_ref_benchmark.sh
 ```
 
-CPU training is the long pole and runs last. The script creates:
+Do not increase only the GPU environment count for this gate: 4096 environments
+with batch size 4096 changes the rollout horizon from 16 steps to one. Run
+scaling/throughput experiments separately. CPU training is the long pole and
+runs last. The script creates:
 
 | Artifact | Contents |
 |---|---|
@@ -1082,8 +1149,10 @@ CPU training is the long pole and runs last. The script creates:
 Inspect partial or complete results with:
 
 ```bash
+uv run marimo edit notebooks/mini_cheetah_gate3.py  # controlled Gate 3 report
 uv run marimo edit notebooks/mini_cheetah_ref.py
 # Read-only:
+uv run marimo run notebooks/mini_cheetah_gate3.py
 uv run marimo run notebooks/mini_cheetah_ref.py
 ```
 
@@ -1103,6 +1172,312 @@ uv run marimo run notebooks/mini_cheetah_ref.py
   contact-driven and consistent with the policy-free `drop`/`step` results.
 - Record final metrics and plots in the Phase 4 PR before marking this check
   complete. Only post-reset-fix checkpoints count as evidence.
+
+**Current result:** all training, CPU/Warp equivalence, CPU/Warp-to-Vsim
+transfer, and deterministic-trajectory checks pass. The final Vsim-to-MuJoCo
+transfer cells fail because of late-training model exploitation, so Gate 3 and
+overall mini-cheetah parity remain open.
+
+#### Native-backend policy tuning — hardware-oriented scorecard
+
+The next phase intentionally stops treating one policy as the optimum for both
+contact formulations. It will tune two explicit configurations:
+
+- `mini_cheetah_ref_mujoco_config.py`, trained and selected on MuJoCo Warp;
+- `mini_cheetah_ref_vsim_config.py`, trained and selected on VSim.
+
+Both must use the same evaluation protocol. Backend-specific training rewards
+may differ, but model selection must not use reward totals: those totals change
+when reward weights change and can hide noisy or actuator-saturating gaits.
+
+`scripts/eval_policy.py --command_profile hardware` now applies a balanced,
+fixed nine-case command suite: stand, two forward speeds, backward, left/right
+strafe, left/right yaw, and combined translation/yaw. The dedicated wrapper
+runs both a nominal basic-state evaluation and a randomized-initial-state
+robustness evaluation:
+
+```bash
+# MuJoCo-native policy (use cuda:0 for the Warp runtime used during training)
+bash scripts/eval_mc_ref_hardware.sh \
+  mujoco cuda:0 PATH/TO/MUJOCO/model_N.pt mujoco-candidate
+
+# VSim-native policy
+bash scripts/eval_mc_ref_hardware.sh \
+  vsim cuda:0 PATH/TO/VSIM/model_N.pt vsim-candidate
+```
+
+The default is 288 environments (32 per command), five seconds, seed zero, and
+a 0.5-second settling exclusion. Each run writes an NPZ with per-environment
+values and a human-readable `*.summary.json` with overall and per-command
+mean/median/p90 summaries.
+
+The scorecard deliberately keeps physical metrics separate instead of
+combining them into one arbitrary quality score:
+
+| Group | Primary metrics |
+|---|---|
+| Robustness | survival, episode duration, unsafe-body contact fraction, phase/direction-staggered velocity-impulse failure |
+| Command tracking | forward/lateral velocity RMSE, yaw-rate RMSE |
+| Body stability | tilt RMS, base-height mean/std/range/drift, vertical velocity/acceleration, roll/pitch rate |
+| Actuation | joint velocity/acceleration, position-target velocity/acceleration, torque RMS/rate/utilization, absolute mechanical power, minimum joint-limit margin, 500 Hz torque/velocity PSD and high-frequency power |
+| Gait/contact | gait-reference joint RMSE, touchdown RPD/trot classification, cycle consistency, body-weight-normalized per-leg GRF balance, foot slip, phase/contact agreement |
+
+The gait and disturbance metrics follow the evaluation ideas in
+[Zhang et al. (2024)](https://arxiv.org/abs/2402.08662):
+
+- analogous to Fig. 3, average vertical GRF is reported independently for
+  RF/LF/RH/LH and normalized by nominal robot weight; ideal balanced use is
+  centered at `0.25` per leg;
+- touchdown relative phase difference uses RF as reference. Ideal trot is
+  `(LF, RH, LH) = (π, π, 0)`, with circular cycle-to-cycle variation and the
+  paper's nearest-symmetric-gait/transition classification;
+- analogous to Table I, planar velocity impulses are spread over 36 directions
+  and 50 control steps spanning `0.5 s`, so the full default is 1,800 trials
+  per magnitude after five seconds at a `3 m/s` forward command.
+
+Run the full native disturbance sweep with:
+
+```bash
+bash scripts/eval_mc_ref_disturbance.sh \
+  mujoco cuda:0 PATH/TO/MUJOCO/model_N.pt mujoco-candidate
+bash scripts/eval_mc_ref_disturbance.sh \
+  vsim cuda:0 PATH/TO/VSIM/model_N.pt vsim-candidate
+```
+
+Torque and joint velocity are sampled after every 500 Hz PD/physics substep,
+not aliased from the 100 Hz policy rate. The artifact contains the mean
+per-joint PSD, spectral centroid, dominant frequency, gait-band fraction, and
+power above the configurable `10 Hz` diagnostic cutoff, including the worst
+single joint. The cutoff is not a hardware safety certification; finalize it
+from the motor, gearbox, driver, and low-level controller bandwidth.
+
+Provisional selection rules:
+
+- require complete nominal survival and at least 99% robustness survival before
+  comparing smoothness;
+- reject forbidden contacts, joint-limit crossings, or repeated torque
+  saturation;
+- compare command RMSE per command case, not just the population average;
+- among policies with comparable tracking, prefer lower base vertical
+  acceleration, target acceleration, torque rate/utilization, mechanical power,
+  and stance-foot slip;
+- treat peak contact force and binary phase-contact scores as diagnostic
+  within a backend. Their absolute values depend strongly on the contact
+  formulation and are not suitable for declaring MuJoCo or VSim “better.”
+
+Absolute smoothness limits should be finalized from the real motor/controller
+bandwidth, joint limits, and hardware logs. Until those exist, preserve the
+full Pareto table and do not trade a large increase in actuator or impact
+metrics for a small reward improvement.
+
+**Initial native baseline (2026-07-28):** the final batch-32768 Warp and VSim
+policies were evaluated with 288 environments per run. Both achieved 100%
+nominal and randomized-start survival on this moderate command suite, so
+survival alone cannot select between them.
+
+| Nominal metric | MuJoCo Warp policy on Warp | VSim policy on VSim |
+|---|---:|---:|
+| Forward / lateral RMSE | `0.184 / 0.142 m/s` | `0.148 / 0.082 m/s` |
+| Yaw-rate RMSE | `0.277 rad/s` | `0.364 rad/s` |
+| Base tilt RMS | `3.65 deg` | `4.06 deg` |
+| Vertical acceleration RMS | `7.36 m/s²` | `12.49 m/s²` |
+| Gait-reference joint RMSE | `0.256 rad` | `0.213 rad` |
+| Policy-target acceleration RMS | `5896 rad/s²` | `4429 rad/s²` |
+| Torque utilization RMS / saturation samples | `0.211 / 0.169%` | `0.187 / 0.227%` |
+| Absolute mechanical power | `134.5 W` | `128.2 W` |
+| Actual joint-limit margin, p10 | `14.6%` | `9.3%` |
+| Policy-target joint-limit margin, p10 | `-2.1%` | `0.6%` |
+| Unsafe-body contact fraction | `0%` | `0%` |
+| Foot slip / peak force (diagnostic) | `0.561 m/s / 143 N` | `0.195 m/s / 668 N` |
+
+The expanded gait-quality baseline adds:
+
+| Nominal metric | MuJoCo Warp policy on Warp | VSim policy on VSim |
+|---|---:|---:|
+| Base-height std / range | `11.8 / 46.6 mm` | `25.3 / 97.4 mm` |
+| Torque power above 10 Hz | `72.9%` | `55.8%` |
+| Joint-velocity power above 10 Hz | `51.1%` | `38.4%` |
+| Moving trials classified trot | `91.8%` | `68.4%` |
+| Trot RPD error / cycle variation | `0.719 / 0.800 rad` | `0.849 / 0.279 rad` |
+| Overall per-leg GRF CV | `0.178` | `0.320` |
+| 1 m/s per-leg GRF (RF/LF/RH/LH), body weight | `0.252 / 0.329 / 0.166 / 0.246` | `0.378 / 0.074 / 0.040 / 0.384` |
+
+Both PSDs peak near the commanded `2.5 Hz` gait frequency, but contain large
+higher-harmonic/contact energy. VSim's lower spectral ratios do not make its
+gait preferable: at `1 m/s` it relies primarily on the RF/LH diagonal pair,
+has only `20%` complete four-foot RF cycles, is not classified as trot, and
+has over twice MuJoCo's base-height variation.
+
+A preliminary Table-I-style screen used 360 trials per magnitude: all 36
+directions at ten times uniformly spread over the full `0.5 s` phase window.
+Use the full 1,800-trial wrapper for final config selection. The table reports
+post-impulse failure conditional on the environment surviving until its
+scheduled impulse. MuJoCo had `0%` pre-impulse failures; VSim had `8.3%`
+pre-impulse failures during the five-second settling period, which is reported
+separately instead of being attributed to the impulse.
+
+| Velocity impulse | MuJoCo post-impulse failure | VSim post-impulse failure |
+|---:|---:|---:|
+| `1.5 m/s` | `28.1%` | `34.5%` |
+| `2.0 m/s` | `40.0%` | `56.4%` |
+| `2.5 m/s` | `53.6%` | `70.3%` |
+| `3.0 m/s` | `64.2%` | `79.1%` |
+| `3.5 m/s` | `71.7%` | `83.9%` |
+
+The first tuning targets are therefore concrete:
+
+- add enough target/joint-limit pressure that commanded positions retain a
+  hardware margin rather than relying on the PD plant to remain in bounds;
+- reduce occasional torque saturation and high target acceleration without
+  giving up command tracking;
+- reduce VSim vertical base acceleration and improve yaw tracking;
+- improve MuJoCo lateral tracking and target smoothness.
+
+The large foot-force and contact-duty differences are consistent with the
+known compliant-versus-rigid contact formulations. They remain useful for
+within-backend candidate selection, but are not cross-backend ranking metrics.
+Baseline artifacts are under `logs/mc_ref_hardware/baseline_b32768/`.
+The plots and paper-style tables are in
+`notebooks/mini_cheetah_tuning.py`; disturbance artifacts are under
+`logs/mc_ref_disturbance/baseline_b32768_360/`.
+
+#### VSim deployment tuning
+
+Policy tuning now treats VSim as a standalone deployment target; MuJoCo is not
+part of the VSim checkpoint-selection loop. The first candidate is the
+separate `mini_cheetah_ref_vsim` task in
+`gym/envs/mini_cheetah/mini_cheetah_ref_vsim_config.py`.
+
+The first tuning hypothesis deliberately leaves VSim physics, the reference
+trajectory, PD gains, actor architecture, and 2.5 Hz gait frequency unchanged.
+It changes:
+
+- the command distribution to the deployment scorecard envelope
+  (`-0.5..1.5 m/s` forward, `±0.4 m/s` lateral, `±0.75 rad/s` yaw), with 60%
+  explicitly axis-aligned commands so pure strafe and yaw are trained rather
+  than left to extrapolation from almost-always-combined random commands;
+- PPO collection to `2**15` samples from 256 environments, giving 128 policy
+  steps or 3.2 reference gait cycles per rollout;
+- stronger reference/contact rewards to prevent an RF/LH-only gait;
+- moderate vertical-motion, action-rate/curvature, joint-speed, torque-limit,
+  soft position-target-limit, shank-contact, and stand-still terms;
+- lower initial action noise and entropy pressure;
+- a meaningful termination penalty.
+
+The first 200-iteration screen also exposed and fixed a task reward bug:
+Mini Cheetah pre-squared yaw error before passing it to `_sqrdexp`, which
+squared it again. The resulting fourth-power error supplied almost no yaw
+tracking gradient near the target. New training uses the intended squared
+exponential error. The VSim tuning config also uses a `1.0 rad/s` error scale
+instead of the inherited `2.5 rad/s` scale, which made the scorecard's
+`±0.75 rad/s` yaw commands too weakly distinguishable from zero yaw.
+The retained yaw tracking weight is `4.0`. A bounded iteration-400-to-500
+continuation at `10.0` did not solve turning and degraded the more important
+deployment metrics, so a larger scalar weight is not the next tuning lever.
+
+Legacy per-environment friction and mass randomization are explicitly disabled
+in this config because VSim currently uses a shared material and articulation
+definition. Add VSim-native domain randomization as a later robustness phase;
+do not assume the inherited flags provide it.
+
+Train the first full candidate with:
+
+```bash
+uv run --env-file .env.vsim scripts/train_mujoco.py \
+  --task mini_cheetah_ref_vsim \
+  --backend vsim \
+  --device cuda:0 \
+  --headless \
+  --disable_wandb
+```
+
+Resume a tuning run for another 100 iterations with:
+
+```bash
+uv run --env-file .env.vsim scripts/train_mujoco.py \
+  --task mini_cheetah_ref_vsim \
+  --backend vsim \
+  --device cuda:0 \
+  --max_iterations 100 \
+  --resume \
+  --load_run RUN_DIRECTORY \
+  --checkpoint 100 \
+  --headless \
+  --disable_wandb
+```
+
+On resume, `--max_iterations` is the number of additional iterations. The
+continued run is written to a new timestamped directory while loading model
+and optimizer state from the selected source run.
+
+Evaluate checkpoints only on VSim:
+
+```bash
+TASK=mini_cheetah_ref_vsim \
+OUT_DIR=logs/mc_ref_hardware/vsim_tune \
+bash scripts/eval_mc_ref_hardware.sh \
+  vsim cuda:0 PATH/TO/model_N.pt vsim-tune-N
+```
+
+For the first sweep, evaluate at least checkpoints 100, 200, 300, 400, and
+500. Select on the VSim scorecard Pareto front: survival and forbidden contact
+first; then 1 m/s trot classification, complete-cycle fraction, per-leg GRF
+balance, base-height steadiness, command RMSE, target joint-limit margin, and
+per-joint torque/velocity spectra. Reward total is not a selection metric.
+
+The initial curriculum screen produced the following native-VSim nominal
+scorecard. Values aggregate the stand, forward/backward, strafe, yaw, and
+combined command cells:
+
+| Checkpoint | Survival | vx / vy / yaw RMSE | Height std | Torque / velocity >10 Hz | Trot | GRF CV |
+|---|---:|---:|---:|---:|---:|---:|
+| 100 | 88.9% | 0.210 / 0.150 / 0.275 | 9.8 mm | 10.6% / 22.6% | 63.1% | 0.369 |
+| 200 | 89.2% | 0.116 / 0.103 / 0.303 | 10.3 mm | 10.5% / 19.6% | 82.0% | 0.283 |
+| 300 | 100% | 0.103 / 0.096 / 0.273 | 6.4 mm | 16.9% / 24.8% | 69.5% | 0.220 |
+| **400** | **100%** | **0.089 / 0.102 / 0.254** | **6.9 mm** | **20.6% / 24.5%** | **97.7%** | **0.133** |
+| 500, yaw weight 10 | 99.3% | 0.113 / 0.100 / 0.228 | 7.9 mm | 23.5% / 25.4% | 75.4% | 0.225 |
+
+Checkpoint 400 is the current Pareto candidate. Its robust scorecard also
+reached 100% survival, 99.6% trot classification, 7.1 mm height variation,
+and 0.138 GRF CV. At 1 m/s it reached 100% survival and trot classification
+with 0.077 m/s forward RMSE, 9.2 mm height variation, 14.9% torque and 18.6%
+joint-velocity energy above 10 Hz, and 0.082 GRF CV. Pure yaw remained the
+clear failure: `0.716 / 0.759 rad/s` left/right RMSE at checkpoint 400. The
+higher-weight continuation only changed these to `0.606 / 0.749 rad/s`, while
+breaking trot classification in both pure-yaw cells.
+
+These are curriculum checkpoints, not a clean ablation: the yaw reward fix,
+axis-aligned command sampler, and final reward settings were introduced during
+the sweep. Use
+`logs/mini_cheetah_ref_vsim_tune/Jul29_10-32-55_/model_400.pt` only as an
+interim behavior candidate.
+
+A fresh run from iteration zero with the checked-in config was started in
+`logs/mini_cheetah_ref_vsim_tune/Jul29_10-42-19_`. It completed iteration 142,
+but the RTX 5080 fell off its PCIe bus (`NVRM Xid 79`, followed by Xid 154
+requiring a node reboot) before the next checkpoint. This was a host
+GPU/PCIe/driver failure, not a divergent policy: the last recorded rollout had
+finite rewards, full episode duration, and no limit violations. The
+iteration-100 checkpoint is intact, finite, and contains actor, critic, and
+both optimizer states. Resume it for 400 additional iterations only after the
+host is considered stable:
+
+```bash
+uv run --env-file .env.vsim scripts/train_mujoco.py \
+  --task mini_cheetah_ref_vsim \
+  --backend vsim \
+  --device cuda:0 \
+  --max_iterations 400 \
+  --resume \
+  --load_run Jul29_10-42-19_ \
+  --checkpoint 100 \
+  --headless \
+  --disable_wandb
+```
+
+After the clean run, evaluate the saved checkpoints and then use a targeted
+yaw-command curriculum or gait-turning term; do not deploy the interim policy
+yet.
 
 ### IsaacGym removal
 

@@ -23,6 +23,7 @@ config_dict = {
     "CartpoleCfg": ".cartpole.cartpole_config",
     "MiniCheetahCfg": ".mini_cheetah.mini_cheetah_config",
     "MiniCheetahRefCfg": ".mini_cheetah.mini_cheetah_ref_config",
+    "MiniCheetahRefVSimCfg": ".mini_cheetah.mini_cheetah_ref_vsim_config",
     "MiniCheetahOscCfg": ".mini_cheetah.mini_cheetah_osc_config",
     "MiniCheetahSACCfg": ".mini_cheetah.mini_cheetah_SAC_config",
     "MITHumanoidCfg": ".mit_humanoid.mit_humanoid_config",
@@ -37,6 +38,7 @@ runner_config_dict = {
     "CartpoleRunnerCfg": ".cartpole.cartpole_config",
     "MiniCheetahRunnerCfg": ".mini_cheetah.mini_cheetah_config",
     "MiniCheetahRefRunnerCfg": ".mini_cheetah.mini_cheetah_ref_config",
+    "MiniCheetahRefVSimRunnerCfg": ".mini_cheetah.mini_cheetah_ref_vsim_config",
     "MiniCheetahOscRunnerCfg": ".mini_cheetah.mini_cheetah_osc_config",
     "MiniCheetahSACRunnerCfg": ".mini_cheetah.mini_cheetah_SAC_config",
     "MITHumanoidRunnerCfg": ".mit_humanoid.mit_humanoid_config",
@@ -55,6 +57,11 @@ task_dict = {
         "MiniCheetahRefCfg",
         "MiniCheetahRefRunnerCfg",
     ],
+    "mini_cheetah_ref_vsim": [
+        "MiniCheetahRef",
+        "MiniCheetahRefVSimCfg",
+        "MiniCheetahRefVSimRunnerCfg",
+    ],
     "mini_cheetah_osc": [
         "MiniCheetahOsc",
         "MiniCheetahOscCfg",
@@ -63,7 +70,7 @@ task_dict = {
     "sac_mini_cheetah": [
         "MiniCheetahRef",
         "MiniCheetahSACCfg",
-        "MiniCheetahSACRunnerCfg"
+        "MiniCheetahSACRunnerCfg",
     ],
     "humanoid": ["MIT_Humanoid", "MITHumanoidCfg", "MITHumanoidRunnerCfg"],
     "humanoid_running": [

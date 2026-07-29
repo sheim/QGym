@@ -29,6 +29,12 @@ def get_play_args():
     parser.add_argument("--num_envs", type=int, default=32)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default=None,
+        help="Checkpoint root under logs/ (default: task config value)",
+    )
+    parser.add_argument(
         "--load_run",
         type=str,
         default=None,
@@ -95,6 +101,8 @@ def setup(args):
 
     train_cfg.runner.device = args.device
     train_cfg.runner.resume = True
+    if args.experiment_name is not None:
+        train_cfg.runner.experiment_name = args.experiment_name
     if args.load_run is not None:
         train_cfg.runner.load_run = args.load_run
     train_cfg.runner.checkpoint = args.checkpoint

@@ -85,6 +85,26 @@ class MiniCheetahRef(MiniCheetah):
 
     def _resample_commands(self, env_ids):
         super()._resample_commands(env_ids)
+        axis_aligned_fraction = getattr(self.cfg.commands, "axis_aligned_fraction", 0.0)
+        if axis_aligned_fraction:
+            axis_aligned = (
+                torch.rand(len(env_ids), device=self.device) < axis_aligned_fraction
+            )
+            selected_ids = env_ids[axis_aligned]
+            selected_axes = torch.randint(
+                0,
+                3,
+                (len(selected_ids), 1),
+                device=self.device,
+            )
+            command_mask = torch.zeros(
+                len(selected_ids),
+                3,
+                dtype=self.commands.dtype,
+                device=self.device,
+            )
+            command_mask.scatter_(1, selected_axes, 1.0)
+            self.commands[selected_ids, :3] *= command_mask
         # * with 10% chance, reset to 0 commands
         rand_ids = torch_rand_float(
             0, 1, (len(env_ids), 1), device=self.device

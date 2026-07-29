@@ -48,6 +48,23 @@ def get_mujoco_args():
         default=None,
         help="Override experiment_name (log dir is logs/<experiment_name>/...)",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume optimizer and model state from an existing run.",
+    )
+    parser.add_argument(
+        "--load_run",
+        type=str,
+        default=None,
+        help="Run directory under logs/<experiment_name>/ (default: latest).",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=int,
+        default=None,
+        help="Checkpoint iteration to resume (default: latest).",
+    )
     parser.add_argument("--headless", action="store_true", default=False)
     # wandb
     parser.add_argument("--disable_wandb", action="store_true", default=False)
@@ -82,6 +99,12 @@ def setup():
 
     if args.experiment_name is not None:
         train_cfg.runner.experiment_name = args.experiment_name
+    if args.resume:
+        train_cfg.runner.resume = True
+    if args.load_run is not None:
+        train_cfg.runner.load_run = args.load_run
+    if args.checkpoint is not None:
+        train_cfg.runner.checkpoint = args.checkpoint
 
     train_cfg.runner.device = args.device
 

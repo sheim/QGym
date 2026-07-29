@@ -37,6 +37,7 @@ class LeggedRobot(BaseTask):
         self.sim_params = sim_params
         self.height_samples = None
         self.init_done = False
+        self._physics_step_observers = []
 
         if backend is None:
             backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
@@ -65,12 +66,21 @@ class LeggedRobot(BaseTask):
             self._post_compute_torques()
             self._step_physx_sim()
             self._post_physx_step()
+            for observer in self._physics_step_observers:
+                observer()
 
         self._post_decimation_step()
         self._check_terminations_and_timeouts()
 
         env_ids = self.to_be_reset.nonzero(as_tuple=False).flatten()
         self._reset_idx(env_ids)
+
+    def add_physics_step_observer(self, observer):
+        """Register opt-in evaluation instrumentation at the physics rate."""
+        self._physics_step_observers.append(observer)
+
+    def remove_physics_step_observer(self, observer):
+        self._physics_step_observers.remove(observer)
 
     def _pre_decimation_step(self):
         return None
@@ -1107,6 +1117,22 @@ class LeggedRobot(BaseTask):
         out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)
         return -torch.mean(out_of_limits, dim=1)
+
+    def _reward_dof_pos_target_limits(self):
+        """Penalize commanded positions outside the configured soft limits."""
+        limits = self.dof_pos_limits.index_select(0, self.actuated_dof_indices)
+        center = 0.5 * (limits[:, 0] + limits[:, 1])
+        full_range = limits[:, 1] - limits[:, 0]
+        soft_half_range = 0.5 * full_range * self.cfg.reward_settings.soft_dof_pos_limit
+        lower = center - soft_half_range
+        upper = center + soft_half_range
+        target = (
+            self.default_dof_pos.index_select(1, self.actuated_dof_indices)
+            + self.dof_pos_target
+        )
+        violation = (lower - target).clip(min=0.0)
+        violation += (target - upper).clip(min=0.0)
+        return -torch.mean(violation / full_range, dim=1)
 
     def _reward_dof_vel_limits(self):
         """Penalize dof velocities too close to the limit"""

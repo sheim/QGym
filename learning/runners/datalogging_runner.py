@@ -206,7 +206,7 @@ class DataLoggingRunner(BaseRunner):
         self.alg.critic.eval()
 
     def get_inference_actions(self):
-        obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
+        obs = self.get_obs(self.actor_cfg["obs"])
         return self.alg.actor.act_inference(obs)
 
     def export(self, path):

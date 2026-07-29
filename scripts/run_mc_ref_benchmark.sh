@@ -6,39 +6,81 @@
 #   * DOF samples      (reset_to_basic, identical IC -> cross-backend DOF RMS)
 # Inspect with notebooks/mini_cheetah_ref.py.
 #
-# vsim needs its env file; run this from the repo root.  cpu training is the
-# long pole (contact-rich, single-threaded) — it runs last; comment it out and
-# reuse a prior cpu run if you only want to refresh the GPU rows.
+# vsim needs its env file; run this from the repo root. CPU training is the
+# long pole (contact-rich, single-threaded) and runs last.
+#
+# PPO derives its temporal rollout horizon as batch_size / num_envs. Keep the
+# same environment count and batch size on every backend: changing only the GPU
+# environment count changes GAE from a temporal rollout into independent
+# one-step samples and is not a parity experiment.
 set -euo pipefail
 
 ITERS=${ITERS:-250}
 SEED=${SEED:-7}
-GPU_ENVS=${GPU_ENVS:-4096}
-CPU_ENVS=${CPU_ENVS:-256}
+TRAIN_ENVS=${TRAIN_ENVS:-256}
+BATCH_SIZE=${BATCH_SIZE:-4096}
 EVAL_ENVS=${EVAL_ENVS:-256}   # transfer matrix batch (cpu-eval is slow)
 T_END=${T_END:-5.0}
-VSIM="uv run --env-file .env.vsim"
-MJ="uv run"
+if (( BATCH_SIZE < TRAIN_ENVS || BATCH_SIZE % TRAIN_ENVS != 0 )); then
+  echo "BATCH_SIZE must be an integer multiple of TRAIN_ENVS"
+  exit 2
+fi
 
-train() {  # backend device envs exp  [--backend vsim]
-  local runner=$MJ; [ "${5:-}" = "vsim" ] && runner=$VSIM
-  $runner scripts/train_mujoco.py --task mini_cheetah_ref --device "$2" \
-    --num_envs "$3" --max_iterations "$ITERS" --seed "$SEED" --headless \
-    --disable_wandb --experiment_name "$4" ${5:+--backend vsim}
+train() {  # backend device envs experiment
+  local backend=$1
+  local device=$2
+  local envs=$3
+  local experiment=$4
+  local -a runner=(uv run)
+  local -a backend_args=()
+  if [[ "$backend" == "vsim" ]]; then
+    runner+=(--env-file .env.vsim)
+    backend_args=(--backend vsim)
+  fi
+  "${runner[@]}" scripts/train_mujoco.py \
+    --task mini_cheetah_ref \
+    --device "$device" \
+    --num_envs "$envs" \
+    --batch_size "$BATCH_SIZE" \
+    --max_iterations "$ITERS" \
+    --seed "$SEED" \
+    --headless \
+    --disable_wandb \
+    --experiment_name "$experiment" \
+    "${backend_args[@]}"
 }
 
-echo "== training =="
-train mujoco cuda:0 "$GPU_ENVS" mini_cheetah_ref_warp
-train vsim   cuda:0 "$GPU_ENVS" mini_cheetah_ref_vsim vsim
-train mujoco cpu    "$CPU_ENVS" mini_cheetah_ref_cpu
+echo "== training: $TRAIN_ENVS envs, $((BATCH_SIZE / TRAIN_ENVS)) steps/env =="
+train mujoco cuda:0 "$TRAIN_ENVS" mini_cheetah_ref_warp
+train vsim   cuda:0 "$TRAIN_ENVS" mini_cheetah_ref_vsim
+train mujoco cpu    "$TRAIN_ENVS" mini_cheetah_ref_cpu
 
 # eval one (train_label, eval_backend, eval_device, eval_label, mode, out, extra)
 eval_cell() {
-  local runner=$MJ; [ "$2" = "vsim" ] && runner=$VSIM
-  $runner scripts/eval_policy.py --task mini_cheetah_ref \
-    --ckpt "logs/mini_cheetah_ref_$1" --train_label "$1" \
-    --eval_backend "$2" --eval_device "$3" --eval_label "$4" \
-    --num_envs "$6" --t_end "$T_END" --reset_mode "$5" --out "$7" ${8:-}
+  local train_label=$1
+  local eval_backend=$2
+  local eval_device=$3
+  local eval_label=$4
+  local reset_mode=$5
+  local num_envs=$6
+  local output=$7
+  local -a extra=("${@:8}")
+  local -a runner=(uv run)
+  if [[ "$eval_backend" == "vsim" ]]; then
+    runner+=(--env-file .env.vsim)
+  fi
+  "${runner[@]}" scripts/eval_policy.py \
+    --task mini_cheetah_ref \
+    --ckpt "logs/mini_cheetah_ref_$train_label" \
+    --train_label "$train_label" \
+    --eval_backend "$eval_backend" \
+    --eval_device "$eval_device" \
+    --eval_label "$eval_label" \
+    --num_envs "$num_envs" \
+    --t_end "$T_END" \
+    --reset_mode "$reset_mode" \
+    --out "$output" \
+    "${extra[@]}"
 }
 
 echo "== transfer matrix (reset_to_range) =="

@@ -241,7 +241,10 @@ class OnPolicyRunner(BaseRunner):
         self.alg.critic.eval()
 
     def get_inference_actions(self):
-        obs = self.get_noisy_obs(self.actor_cfg["obs"], self.actor_cfg["noise"])
+        # Inference is deterministic: observation noise is a training-time
+        # augmentation, and device-specific RNG streams otherwise make the
+        # same checkpoint take different actions on CPU and GPU.
+        obs = self.get_obs(self.actor_cfg["obs"])
         return self.alg.actor.act_inference(obs)
 
     def export(self, path):
