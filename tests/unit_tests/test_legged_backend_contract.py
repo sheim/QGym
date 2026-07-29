@@ -84,6 +84,27 @@ class TestLeggedPhysics:
             [1.0, 0.005, 0.0001],
         )
 
+    def test_configured_friction_is_shared_by_robot_and_ground(self):
+        """Robot defaults must not override terrain coefficients below one."""
+        pytest.importorskip("mujoco")
+        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+        from tests.unit_tests.conftest import _make_mini_cheetah_cfg
+
+        cfg = _make_mini_cheetah_cfg()
+        cfg.terrain.static_friction = 0.4
+        cfg.terrain.dynamic_friction = 0.35
+        backend = MuJocoCPUBackend()
+        backend.setup(cfg, num_envs=1, device="cpu", task=None)
+        try:
+            np.testing.assert_allclose(
+                backend._mjm.geom_friction,
+                np.broadcast_to(
+                    [0.35, 0.005, 0.0001], backend._mjm.geom_friction.shape
+                ),
+            )
+        finally:
+            backend.close()
+
     def test_robot_above_ground(self, legged_cpu_backend):
         """Robot shouldn't fall through the ground plane."""
         b = legged_cpu_backend

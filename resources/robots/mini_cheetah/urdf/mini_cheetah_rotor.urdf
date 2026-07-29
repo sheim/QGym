@@ -36,7 +36,7 @@ Rotor dry friction:
         <!-- <mass value="3.3"/>  -->
         <mass value="3.96"/>        <!-- Rotor mass: 12 motors * 0.055 kg / motor -->
         <origin xyz="0.0 0.0 0.0"/>
-        <inertia ixx="0.011253" ixy="0" ixz="0" iyy="0.362030" iyz="0" izz="0.042673"/>
+        <inertia ixx="0.011253" ixy="0" ixz="0" iyy="0.036203" iyz="0" izz="0.042673"/>
     </inertial>
     <visual>
         <geometry><mesh filename="meshes/mini_vision_body.dae"/></geometry>
@@ -90,7 +90,7 @@ Rotor dry friction:
     <inertial>
         <mass value="0.634"/>
         <origin xyz="0.0 -0.016 -0.02"/>
-        <inertia ixx="0.001983" ixy="0.000245" ixz="0.000013" iyy="0.002103" iyz="0.0000015" izz="0.000408"/>
+        <inertia ixx="0.001990653" ixy="0.000213730" ixz="0.000012806" iyy="0.002095349" iyz="0.000001253" izz="0.000440192"/>
     </inertial>
     <visual>
         <geometry>
@@ -148,9 +148,9 @@ Rotor dry friction:
         <geometry><sphere radius="0.0202"/></geometry>
     </collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 0.024"/>
         <mass value="0.01"/>
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.00000163216" ixy="0" ixz="0" iyy="0.00000163216" iyz="0" izz="0.00000163216"/>
     </inertial>
 </link>
 
@@ -193,7 +193,7 @@ Rotor dry friction:
     <inertial>
         <mass value="0.634"/>
         <origin xyz="0.0 0.016 -0.02"/>
-        <inertia ixx="0.001983" ixy="0.000245" ixz="0.000013" iyy="0.002103" iyz="0.0000015" izz="0.000408"/>
+        <inertia ixx="0.001990653" ixy="0.000213730" ixz="0.000012806" iyy="0.002095349" iyz="0.000001253" izz="0.000440192"/>
     </inertial>
     <visual>
         <geometry>
@@ -249,9 +249,9 @@ Rotor dry friction:
         <geometry><sphere radius="0.0202"/></geometry>
     </collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 0.024"/>
         <mass value="0.01"/>
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.00000163216" ixy="0" ixz="0" iyy="0.00000163216" iyz="0" izz="0.00000163216"/>
     </inertial>
 </link>
 
@@ -296,7 +296,7 @@ Rotor dry friction:
     <inertial>
         <mass value="0.634"/>
         <origin xyz="0.0 -0.016 -0.02"/>
-        <inertia ixx="0.001983" ixy="0.000245" ixz="0.000013" iyy="0.002103" iyz="0.0000015" izz="0.000408"/>
+        <inertia ixx="0.001990653" ixy="0.000213730" ixz="0.000012806" iyy="0.002095349" iyz="0.000001253" izz="0.000440192"/>
     </inertial>
     <visual>
         <geometry>
@@ -354,9 +354,9 @@ Rotor dry friction:
         <geometry><sphere radius="0.0202"/></geometry>
     </collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 -0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 0.024"/>
         <mass value="0.01"/>
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.00000163216" ixy="0" ixz="0" iyy="0.00000163216" iyz="0" izz="0.00000163216"/>
     </inertial>
 </link>
 
@@ -399,7 +399,7 @@ Rotor dry friction:
     <inertial>
         <mass value="0.634"/>
         <origin xyz="0.0 0.016 -0.02"/>
-        <inertia ixx="0.001983" ixy="0.000245" ixz="0.000013" iyy="0.002103" iyz="0.0000015" izz="0.000408"/>
+        <inertia ixx="0.001990653" ixy="0.000213730" ixz="0.000012806" iyy="0.002095349" iyz="0.000001253" izz="0.000440192"/>
     </inertial>
     <visual>
         <geometry>
@@ -457,9 +457,9 @@ Rotor dry friction:
         <geometry><sphere radius="0.0202"/></geometry>
     </collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0.0"/>
+        <origin rpy="0 0 0" xyz="0 0 0.024"/>
         <mass value="0.01"/>
-        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        <inertia ixx="0.00000163216" ixy="0" ixz="0" iyy="0.00000163216" iyz="0" izz="0.00000163216"/>
     </inertial>
 </link>
 

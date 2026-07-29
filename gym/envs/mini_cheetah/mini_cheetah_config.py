@@ -187,6 +187,12 @@ class MiniCheetahCfg(LeggedRobotCfg):
         # frames; 100 → 7.1k steps/s and still warns occasionally.
         ccd_iterations = 50
 
+    class vsim_attributes:
+        # Sixteen rigid/LCP iterations substantially reduce the single-step
+        # impact spike and improve task contact-mask agreement. This is a
+        # general convergence setting; material properties remain unchanged.
+        solver_iterations = 16
+
 
 class MiniCheetahRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1

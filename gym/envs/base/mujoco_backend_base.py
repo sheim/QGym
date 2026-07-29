@@ -138,6 +138,7 @@ class MuJocoBackendBase(SimBackend):
 
         # Checker ground plane only when terrain config requests one
         terrain_cfg = getattr(cfg, "terrain", None)
+        terrain_sliding_friction = None
         if (
             terrain_cfg is not None
             and getattr(terrain_cfg, "mesh_type", None) == "plane"
@@ -169,12 +170,12 @@ class MuJocoBackendBase(SimBackend):
             # friction, not static, dynamic, and rolling. Use the configured
             # dynamic coefficient for the shared sliding coefficient. The
             # task configs normally keep static and dynamic friction equal.
-            sliding = getattr(
+            terrain_sliding_friction = getattr(
                 terrain_cfg,
                 "dynamic_friction",
                 getattr(terrain_cfg, "static_friction", 1.0),
             )
-            ground.friction = [sliding, 0.005, 0.0001]
+            ground.friction = [terrain_sliding_friction, 0.005, 0.0001]
 
         # Check for manually set mjModel attributes
         if hasattr(cfg, "mjspec_attributes"):
@@ -190,6 +191,13 @@ class MuJocoBackendBase(SimBackend):
                     )
 
         mjm = spec.compile()
+        if terrain_sliding_friction is not None:
+            # MuJoCo combines same-priority geom friction using the larger
+            # coefficient. URDF-imported robot geoms otherwise retain the
+            # default sliding coefficient of 1.0 and silently override a
+            # lower terrain value. Give robot and ground the same explicit
+            # material semantics, matching the VSim backend.
+            mjm.geom_friction[:] = [terrain_sliding_friction, 0.005, 0.0001]
 
         # Physics parameters from cfg
         sim_dt = getattr(cfg, "sim_dt", None)

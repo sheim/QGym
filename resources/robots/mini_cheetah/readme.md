@@ -21,3 +21,22 @@ This is the readme file for the available URDFs of the Minicheetah.
 
 ### The Simple URDF ```mini_cheetah_simple.urdf```
 - This is a work in progress, but the idea is similar to the Humanoid, we should have a URDF version of the MiniCheetah with a simple collision mesh.
+
+### Inertia corrections
+
+The
+[upstream MIT dynamics model](https://github.com/mit-biomimetics/Cheetah-Software/blob/master/common/include/Dynamics/MiniCheetah.h)
+gives the base inertia as
+`diag(0.011253, 0.036203, 0.042673) kg m^2`. The previous URDF value
+`iyy=0.362030` was a decimal-place typo and violated the principal-moment
+triangle inequality.
+
+The upstream CAD thigh tensor also violates that inequality slightly after
+rounding. Its principal moments were projected onto the nearest strictly
+physical tensor in Frobenius norm while preserving its principal axes. The
+same corrected tensors are used in the simple and rotor URDFs so physics
+engines do not silently condition them in different ways.
+
+The four `0.01 kg` foot links previously had zero inertia. They are modeled as
+uniform spheres matching their `0.0202 m` collision geometry, with their center
+of mass at the collision-sphere center.

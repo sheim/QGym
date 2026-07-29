@@ -87,6 +87,9 @@ def build_env(
     import gym.envs  # noqa: F401 — registers tasks
 
     env_cfg, train_cfg = task_registry.get_cfgs(TASK)
+    termination_contact_patterns = list(
+        getattr(env_cfg.asset, "terminate_after_contacts_on", [])
+    )
     env_cfg.env.num_envs = num_envs
     env_cfg.asset.fix_base_link = fixed_base
     env_cfg.asset.disable_gravity = disable_gravity
@@ -112,9 +115,16 @@ def build_env(
     set_seed(0)
 
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
-    return task_registry.make_env_mujoco(
+    env = task_registry.make_env_mujoco(
         TASK, env_cfg, device=device, headless=True, backend=backend
     )
+    # Fidelity trajectories must not reset on contact, but the drop probe still
+    # needs to evaluate the task's normal termination mask. Keep an independent
+    # index tensor built from the original task configuration.
+    env.probe_termination_contact_indices = env._backend.build_contact_indices(
+        termination_contact_patterns, env.device
+    )
+    return env
 
 
 def run_drop(env, n_steps):
@@ -127,6 +137,7 @@ def run_drop(env, n_steps):
     dof_pos = np.empty((n_steps, env.num_envs, env.num_dof), dtype=np.float32)
     dof_vel = np.empty((n_steps, env.num_envs, env.num_dof), dtype=np.float32)
     grf = np.empty((n_steps, env.num_envs, nfeet), dtype=np.float32)
+    termination_contact_mask = np.empty((n_steps, env.num_envs), dtype=np.bool_)
     with torch.no_grad():
         for k in range(n_steps):
             env.dof_pos_target[:] = 0.0  # hold default pose
@@ -139,6 +150,13 @@ def run_drop(env, n_steps):
             dof_vel[k] = env.dof_vel.detach().cpu().numpy()
             f = torch.norm(env.contact_forces[:, env.feet_indices, :], dim=-1)
             grf[k] = f.detach().cpu().numpy()
+            termination_forces = torch.norm(
+                env.contact_forces[:, env.probe_termination_contact_indices, :],
+                dim=-1,
+            )
+            termination_contact_mask[k] = (
+                torch.any(termination_forces > 1.0, dim=1).cpu().numpy()
+            )
     feet = env.feet_indices.detach().cpu().tolist()
     foot_names = [env._backend.body_names[i] for i in feet]
     return {
@@ -151,6 +169,8 @@ def run_drop(env, n_steps):
         "dof_vel": dof_vel,
         "dof_names": np.asarray(env.dof_names),
         "grf": grf,
+        "foot_contact_mask": grf > 50.0,
+        "termination_contact_mask": termination_contact_mask,
         "foot_names": np.asarray(foot_names),
         "grf_names": np.asarray(foot_names),
     }
@@ -716,12 +736,14 @@ def compare(args):
         sphere_center_z = result["foot_pos"][onset, ..., 2] + rotated_center[..., 2]
         clearance = sphere_center_z - FOOT_SPHERE_RADIUS
         settle_samples = max(1, int(round(0.1 / dt)))
+        com_z = result["system_com_pos"][..., 2].mean(axis=1).astype(np.float64)
+        com_vz = np.gradient(com_z, result["time"])
         return (
             float(result["time"][onset]),
             float(clearance.min()),
             float(force.max()),
             float(force[onset:impulse_end].sum() * dt),
-            float(result["base_lin_vel"][onset:rebound_end, ..., 2].max()),
+            float(com_vz[onset:rebound_end].max()),
             float(result["base_pos"][-settle_samples:, ..., 2].mean()),
         )
 
@@ -775,6 +797,39 @@ def compare(args):
             q = np.sqrt(np.mean((d["dof_pos"] - ref["dof_pos"]) ** 2))
             qd = np.sqrt(np.mean((d["dof_vel"] - ref["dof_vel"]) ** 2))
             print(f"{label:<16}{zr:>14.2e}{qr:>12.2e}{gr:>14.2e}{q:>14.2e}{qd:>15.2e}")
+
+        print(
+            f"\n{'engine':<16}{'foot onset':>13}{'foot duty':>12}"
+            f"{'mask F1':>13}{'termination':>14}"
+        )
+        print(f"{'':<16}{'[s]':>13}{'[%]':>12}{'[%]':>13}{'[% samples]':>14}")
+        ref_mask = aligned_grf(ref) > 50.0
+        for label, d in data.items():
+            foot_mask = aligned_grf(d) > 50.0
+            contact_samples = np.flatnonzero(np.any(foot_mask, axis=(1, 2)))
+            onset = int(contact_samples[0]) if len(contact_samples) else None
+            onset_time = (
+                (onset + 1) / float(d["ctrl_hz"]) if onset is not None else np.nan
+            )
+            foot_duty = float(foot_mask[onset:].mean()) if onset is not None else np.nan
+            true_positive = np.logical_and(foot_mask, ref_mask).sum()
+            false_positive = np.logical_and(foot_mask, ~ref_mask).sum()
+            false_negative = np.logical_and(~foot_mask, ref_mask).sum()
+            mask_f1 = (
+                2
+                * true_positive
+                / (2 * true_positive + false_positive + false_negative)
+            )
+            termination_fraction = (
+                float(d["termination_contact_mask"].mean())
+                if "termination_contact_mask" in d
+                else np.nan
+            )
+            print(
+                f"{label:<16}{onset_time:>13.4f}{100 * foot_duty:>12.1f}"
+                f"{100 * mask_f1:>13.1f}"
+                f"{100 * termination_fraction:>14.2f}"
+            )
     elif probe == "step":
         print(f"{'engine':<16}{'joint-traj RMS':>16}{'final-pos RMS':>15}")
         for label, d in data.items():
@@ -858,7 +913,7 @@ def compare(args):
     elif probe == "impact":
         print(
             f"{'engine':<16}{'impact':>10}{'onset gap':>13}{'peak Fz':>12}"
-            f"{'100ms impulse':>16}{'rebound vz':>14}{'settle z':>12}"
+            f"{'100ms impulse':>16}{'COM rebound':>14}{'settle z':>12}"
         )
         print(
             f"{'':<16}{'[s]':>10}{'[mm]':>13}{'[N]':>12}"
