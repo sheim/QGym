@@ -8,7 +8,7 @@ BASE_HEIGHT_REF = 0.33
 
 class MiniCheetahRefCfg(MiniCheetahCfg):
     class env(MiniCheetahCfg.env):
-        num_envs = 4096
+        num_envs = 2000
         num_actuators = 12
         episode_length_s = 5.0
 
