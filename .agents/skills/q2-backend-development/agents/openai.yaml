@@ -1,0 +1,4 @@
+interface:
+  display_name: "Q2 Backend Development"
+  short_description: "Develop Q2 physics backends safely"
+  default_prompt: "Use $q2-backend-development to change a Q2 physics backend without breaking its contracts."

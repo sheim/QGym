@@ -1,0 +1,4 @@
+interface:
+  display_name: "Q2 Train and Evaluate"
+  short_description: "Run and evaluate Q2 policies"
+  default_prompt: "Use $q2-train-and-evaluate to run a controlled Q2 training or evaluation workflow."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Q2 Testing and Debugging"
+  short_description: "Test and diagnose Q2 changes"
+  default_prompt: "Use $q2-testing-and-debugging to validate or diagnose a change in Q2."

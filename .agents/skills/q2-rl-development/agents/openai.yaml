@@ -1,0 +1,4 @@
+interface:
+  display_name: "Q2 RL Development"
+  short_description: "Design Q2 rewards and learning changes"
+  default_prompt: "Use $q2-rl-development to change Q2 rewards, observations, or learning code."

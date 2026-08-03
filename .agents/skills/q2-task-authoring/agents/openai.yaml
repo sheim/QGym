@@ -1,0 +1,4 @@
+interface:
+  display_name: "Q2 Task Authoring"
+  short_description: "Add and modify Q2 robot tasks"
+  default_prompt: "Use $q2-task-authoring to add or modify a robot task in Q2."

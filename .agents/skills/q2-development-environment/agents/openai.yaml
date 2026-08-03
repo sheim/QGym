@@ -1,0 +1,4 @@
+interface:
+  display_name: "Q2 Development Environment"
+  short_description: "Set up and verify Q2 development"
+  default_prompt: "Use $q2-development-environment to set up and verify this Q2 checkout."
