@@ -115,7 +115,7 @@ def build_env(
     set_seed(0)
 
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
-    env = task_registry.make_env_mujoco(
+    env = task_registry.make_env(
         TASK, env_cfg, device=device, headless=True, backend=backend
     )
     # Fidelity trajectories must not reset on contact, but the drop probe still

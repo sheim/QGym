@@ -29,9 +29,6 @@ class MiniCheetahSACCfg(MiniCheetahRefCfg):
     class push_robots(MiniCheetahRefCfg.push_robots):
         pass
 
-    class domain_rand(MiniCheetahRefCfg.domain_rand):
-        pass
-
     class asset(MiniCheetahRefCfg.asset):
         file = (
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/"

@@ -11,8 +11,8 @@ RL training framework for legged robots. Physics backends:
 ### Fresh setup
 
 The repository uses [uv](https://docs.astral.sh/uv/) exclusively for Python
-and dependency management. Do not use `pip install`, `requirements.txt`, or
-`setup.py`.
+and dependency management. `pyproject.toml` and `uv.lock` are the only package
+and environment sources of truth.
 
 Install uv on Linux or macOS:
 
@@ -58,8 +58,8 @@ uv run --frozen python -c "import mujoco, torch; print(mujoco.__version__, torch
 uv run --frozen python -m pytest tests/unit_tests/ -q
 ```
 
-Do not run `pytest tests/`: the legacy integration tests require IsaacGym and
-its separate Python 3.8 environment.
+Bare pytest targets the supported unit and MuJoCo CPU gate configured in
+`pyproject.toml`; Warp and VSim groups are selected explicitly.
 
 ### Linux GPU setup
 
@@ -175,9 +175,9 @@ uv run scripts/train_mujoco.py [OPTIONS]
 
 ```
 SimBackend (ABC)
-    ├── IsaacGymBackend     ← legacy, will be removed
     ├── MuJocoWarpBackend   ← GPU (Linux + CUDA)
-    └── MuJocoCPUBackend    ← CPU (all platforms)
+    ├── MuJocoCPUBackend    ← CPU (all platforms)
+    └── VSimBackend         ← optional licensed GPU backend
 
 BaseTask
     ├── FixedRobot          ← pendulum, cartpole
@@ -248,6 +248,6 @@ Q2/
 ├── resources/robots/                    ← URDF files
 ├── scripts/
 │   └── train_mujoco.py                  ← main training script
-├── tests/unit_tests/                    ← 147 unit tests
+├── tests/unit_tests/                    ← supported local test gate
 └── pyproject.toml
 ```

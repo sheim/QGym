@@ -40,11 +40,6 @@ class LeggedRobotCfg(BaseConfig):
         env_spacing = 3.0  # not used with heightfields/trimeshes
         episode_length_s = 20  # episode length in seconds
 
-        num_projectiles = None
-        projectile_density = 10  # [kg/m^3]
-        projectile_radius = 0.2  # [m]
-        projectile_speed = 25  # [m/s]
-
     class terrain:
         mesh_type = "plane"  # none, plane, heightfield or trimesh
         horizontal_scale = 0.1  # [m]
@@ -192,12 +187,6 @@ class LeggedRobotCfg(BaseConfig):
         thickness = 0.01
         rotor_inertia = 0.0
         joint_damping = 0.0
-
-    class domain_rand:
-        randomize_friction = False
-        friction_range = [0.5, 1.25]
-        randomize_base_mass = False
-        added_mass_range = [-1.0, 1.0]  # added to each link!
 
     class reward_settings:
         # * tracking reward = exp(-error^2/sigma)

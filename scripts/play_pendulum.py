@@ -80,7 +80,7 @@ def setup(args):
     task_registry.set_log_dir_name(train_cfg)
     set_seed(seed)
 
-    env = task_registry.make_env_mujoco(
+    env = task_registry.make_env(
         args.task, env_cfg, device=args.device, headless=not args.viewer
     )
     runner = task_registry.make_alg_runner(env, train_cfg)

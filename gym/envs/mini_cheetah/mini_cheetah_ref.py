@@ -70,8 +70,8 @@ class MiniCheetahRef(MiniCheetah):
             0, 2 * torch.pi, shape=self.phase[env_ids].shape, device=self.device
         )
 
-    def _post_physx_step(self):
-        super()._post_physx_step()
+    def _post_physics_step(self):
+        super()._post_physics_step()
         self.phase = (
             self.phase + self.dt * self.omega / self.cfg.control.decimation
         ).fmod(2 * torch.pi)

@@ -1,6 +1,6 @@
 """Minimal SimBackend implementation for unit tests.
 
-No IsaacGym, no MuJoCo, no Warp — just torch tensors with trivially-correct
+No physics engine — just torch tensors with trivially-correct
 physics (Euler integration of free-fall under gravity for a 1-DOF pendulum).
 This lets us test the SimBackend contract and downstream task logic without
 any physics-engine dependency.

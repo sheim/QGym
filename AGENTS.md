@@ -3,8 +3,7 @@
 This file applies to the entire repository. Q2 is a Python robotics and
 reinforcement-learning codebase descended from `legged_gym`/pkGym. Its active
 architecture separates task and learning logic from interchangeable physics
-backends: MuJoCo CPU, MuJoCo Warp, optional licensed VSim, and a legacy
-IsaacGym path that has not yet been removed.
+backends: MuJoCo CPU, MuJoCo Warp, and optional licensed VSim.
 
 ## Start Here
 
@@ -29,7 +28,7 @@ fixes should remain separately reviewable.
 ## Repository Map
 
 - `gym/envs/base/`: backend contract, canonical `RobotLayout`, task lifecycle,
-  common robot logic, MuJoCo CPU/Warp, VSim, and legacy IsaacGym adapters.
+  common robot logic, MuJoCo CPU/Warp, and VSim.
 - `gym/envs/<task>/`: concrete robot/task implementations and their nested
   environment and runner configs.
 - `gym/utils/task_registry.py`: task construction, config derivation, backend
@@ -38,8 +37,8 @@ fixes should remain separately reviewable.
   and logging. `PPO2` plus `OnPolicyRunner` is the main on-policy path; other
   runners and critics include legacy and research code.
 - `scripts/`: training, playback, deterministic evaluation, fidelity probes,
-  and campaign wrappers. `train_mujoco.py` is the normal non-IsaacGym entry
-  point; `train.py`, `play.py`, and `export_policy.py` are legacy paths.
+  and campaign wrappers. `train_mujoco.py` and `play_mujoco.py` are the public
+  entry points for every supported backend.
 - `tests/unit_tests/`: the local correctness gate, including backend contracts,
   physics invariants, state liveness, canonical routing, task behavior, and RL
   utilities.
@@ -52,9 +51,9 @@ fixes should remain separately reviewable.
 
 ## Environment
 
-Use uv to manage the checked-in `.venv` and lockfile. Do not install the modern
-environment from `requirements.txt` or `setup.py`; those describe the legacy
-IsaacGym stack.
+Use uv to manage the checked-in `.venv` and lockfile. `pyproject.toml` is the
+only dependency and package source of truth; do not add parallel pip setup or
+requirements files.
 
 ```bash
 uv sync --frozen

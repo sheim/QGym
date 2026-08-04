@@ -30,15 +30,13 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-try:
-    from isaacgym.torch_utils import quat_apply, normalize, torch_rand_float
-except ImportError:
-    import torch as _torch
+import torch
 
-    from gym.utils.torch_quat import quat_apply, normalize
+from gym.utils.torch_quat import normalize, quat_apply
 
-    def torch_rand_float(lower, upper, shape, device):
-        return (upper - lower) * _torch.rand(*shape, device=device) + lower
+
+def torch_rand_float(lower, upper, shape, device):
+    return (upper - lower) * torch.rand(*shape, device=device) + lower
 
 
 # @ torch.jit.script

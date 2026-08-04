@@ -340,7 +340,7 @@ class MuJocoBackendBase(SimBackend):
     def _make_dof_props(self, mjm: mujoco.MjModel) -> dict:
         """Build DOF-properties dict expected by task._process_dof_props.
 
-        Keys match the IsaacGym interface: lower, upper, velocity, effort.
+        Keys match the task callback contract: lower, upper, velocity, effort.
         Only includes actuated joints (skips free joint for floating-base).
         Effort/velocity come from <limit> tags parsed out of the URDF —
         MuJoCo's URDF importer discards those because it expects them on

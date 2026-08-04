@@ -1,2 +1,3 @@
-from .KeyboardInterface import KeyboardInterface
-from .GamepadInterface import GamepadInterface
+from .GamepadInterface import GamepadInterface as GamepadInterface
+
+__all__ = ["GamepadInterface"]

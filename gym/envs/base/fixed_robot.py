@@ -1,28 +1,17 @@
 import numpy as np
-
-try:
-    from isaacgym.torch_utils import get_axis_params, to_torch
-except ImportError:
-    from gym.utils.torch_quat import get_axis_params, to_torch
-
-
 import torch
 
 from gym.envs.base.base_task import BaseTask
-from gym.envs.base.isaac_gym_backend import IsaacGymBackend
 from gym.utils import random_sample
+from gym.utils.torch_quat import get_axis_params, to_torch
 
 
 class FixedRobot(BaseTask):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
+    def __init__(self, cfg, device, headless, backend):
         self.cfg = cfg
-        self.sim_params = sim_params
         self.init_done = False
 
-        if backend is None:
-            backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
-        # Use sim_device directly — backend.device isn't set until setup() runs.
-        super().__init__(backend, cfg, sim_device, headless)
+        super().__init__(backend, cfg, device, headless)
         self._parse_cfg(self.cfg)
 
         if not self.headless:
@@ -41,8 +30,8 @@ class FixedRobot(BaseTask):
             self._pre_compute_torques()
             self.torques = self._compute_torques()
             self._post_compute_torques()
-            self._step_physx_sim()
-            self._post_physx_step()
+            self._step_backend()
+            self._post_physics_step()
         self._post_decimation_step()
         self._check_terminations_and_timeouts()
 
@@ -59,14 +48,14 @@ class FixedRobot(BaseTask):
         if self.cfg.asset.disable_motors:
             self.torques[:] = 0.0
 
-    def _step_physx_sim(self):
+    def _step_backend(self):
         # Map actuated-only torques onto the full DOF space, then hand off to
         # the backend (which owns all gym/sim API calls).
         torques_full_dof = torch.zeros(self.num_envs, self.num_dof, device=self.device)
         torques_full_dof[:, self.actuated_dof_indices] = self.torques
         self._backend.step(torques_full_dof)
 
-    def _post_physx_step(self):
+    def _post_physics_step(self):
         # backend.step() refreshes all state tensors; nothing to do here.
         pass
 
@@ -122,10 +111,6 @@ class FixedRobot(BaseTask):
 
     # ------------- Callbacks (called by backend during setup) --------------
 
-    def _process_rigid_shape_props(self, props, env_id):
-        """Store / randomize rigid shape properties per env."""
-        return props
-
     def _process_dof_props(self, props, env_id):
         """Store joint limits from asset DOF properties."""
         if env_id == 0:
@@ -152,9 +137,6 @@ class FixedRobot(BaseTask):
                 self.dof_pos_limits[i, 1] = (
                     m + 0.5 * r * self.cfg.reward_settings.soft_dof_pos_limit
                 )
-        return props
-
-    def _process_rigid_body_props(self, props, env_id):
         return props
 
     # ----------------------------------------

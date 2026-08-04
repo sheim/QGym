@@ -112,17 +112,6 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         max_push_vel_xy = 0.05
         push_box_dims = [0.2, 0.2, 0.2]  # x,y,z [m]
 
-    class domain_rand(MiniCheetahCfg.domain_rand):
-        randomize_friction = True
-        friction_range = [0.4, 1.0]
-        randomize_base_mass = False
-        lower_mass_offset = -0.5  # kg
-        upper_mass_offset = 2.0
-        lower_z_offset = 0.0  # m
-        upper_z_offset = 0.2
-        lower_x_offset = 0.0
-        upper_x_offset = 0.0
-
     class asset(MiniCheetahCfg.asset):
         shank_length_diff = 0  # Units in cm
         # file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" \

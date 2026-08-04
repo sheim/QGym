@@ -1,21 +1,14 @@
 import torch
-import numpy as np
-
-try:
-    from isaacgym.torch_utils import torch_rand_float
-except ImportError:
-    from gym.utils.gym_math_wrappers import torch_rand_float
 
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
+from gym.utils.gym_math_wrappers import torch_rand_float
 
 MINI_CHEETAH_WEIGHT = 8.292 * 9.81  # Weight of mini cheetah in Newtons
 
 
 class MiniCheetahOsc(MiniCheetah):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
-        super().__init__(
-            gym, sim, cfg, sim_params, sim_device, headless, backend=backend
-        )
+    def __init__(self, cfg, device, headless, backend):
+        super().__init__(cfg, device, headless, backend)
         self.process_noise_std = self.cfg.osc.process_noise_std
 
     def _init_buffers(self):
@@ -136,40 +129,15 @@ class MiniCheetahOsc(MiniCheetah):
         self.osc_omega = torch.clamp_min(self.osc_omega, 0.1)
         self.osc_coupling = torch.clamp_min(self.osc_coupling, 0)
 
-    def _process_rigid_body_props(self, props, env_id):
-        if env_id == 0:
-            # * init buffers for the domain rand changes
-            self.mass = torch.zeros(self.num_envs, 1, device=self.device)
-            self.com = torch.zeros(self.num_envs, 3, device=self.device)
-
-        # * randomize mass
-        if self.cfg.domain_rand.randomize_base_mass:
-            lower = self.cfg.domain_rand.lower_mass_offset
-            upper = self.cfg.domain_rand.upper_mass_offset
-            # self.mass_
-            props[0].mass += np.random.uniform(lower, upper)
-            self.mass[env_id] = props[0].mass
-            # * randomize com position
-            lower = self.cfg.domain_rand.lower_z_offset
-            upper = self.cfg.domain_rand.upper_z_offset
-            props[0].com.z += np.random.uniform(lower, upper)
-            self.com[env_id, 2] = props[0].com.z
-
-            lower = self.cfg.domain_rand.lower_x_offset
-            upper = self.cfg.domain_rand.upper_x_offset
-            props[0].com.x += np.random.uniform(lower, upper)
-            self.com[env_id, 0] = props[0].com.x
-        return props
-
     def _post_decimation_step(self):
-        """Update all states that are not handled in PhysX"""
+        """Update oscillator-derived state once per control step."""
         super()._post_decimation_step()
         self.grf = self._compute_grf()
         self._update_cmd_switch()
         # self._step_oscillators()
 
-    def _post_physx_step(self):
-        super()._post_physx_step()
+    def _post_physics_step(self):
+        super()._post_physics_step()
         self._step_oscillators(self.dt / self.cfg.control.decimation)
         return None
 

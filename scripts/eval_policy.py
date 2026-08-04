@@ -136,7 +136,7 @@ def build(
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
     task_registry.set_log_dir_name(train_cfg, log_root=None)  # no run dir on disk
 
-    env = task_registry.make_env_mujoco(
+    env = task_registry.make_env(
         task, env_cfg, device=eval_device, headless=True, backend=eval_backend
     )
     runner = task_registry.make_alg_runner(env, train_cfg)

@@ -25,7 +25,7 @@ def _build_env():
     env_cfg.seed = 0
     train_cfg.seed = 0
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
-    return task_registry.make_env_mujoco(
+    return task_registry.make_env(
         "mini_cheetah", env_cfg, device="cuda:0", headless=True, backend="vsim"
     )
 

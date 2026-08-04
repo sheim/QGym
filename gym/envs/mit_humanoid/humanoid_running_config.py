@@ -130,13 +130,6 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         max_push_vel_xy = 0.5
         push_box_dims = [0.1, 0.2, 0.3]  # x,y,z [m]
 
-    class domain_rand(LeggedRobotCfg.domain_rand):
-        randomize_friction = False
-        friction_range = [0.5, 1.25]
-
-        randomize_base_mass = False
-        added_mass_range = [-1.0, 1.0]
-
     class asset(LeggedRobotCfg.asset):
         # file = ('{LEGGED_GYM_ROOT_DIR}/resources/robots/rom/urdf/'
         #         +'humanoid_fixed_arms_full.urdf')

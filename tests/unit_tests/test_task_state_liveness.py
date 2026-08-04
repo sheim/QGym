@@ -38,9 +38,7 @@ def _build_env(device: str):
     env_cfg.push_robots.toggle = False
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
 
-    return task_registry.make_env_mujoco(
-        "mini_cheetah", env_cfg, device=device, headless=True
-    )
+    return task_registry.make_env("mini_cheetah", env_cfg, device=device, headless=True)
 
 
 def _step_and_check_liveness(env):
@@ -111,9 +109,7 @@ def _build_env_reset_to_basic(device: str, base_z: float):
     env_cfg.seed = 0
     train_cfg.seed = 0
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
-    return task_registry.make_env_mujoco(
-        "mini_cheetah", env_cfg, device=device, headless=True
-    )
+    return task_registry.make_env("mini_cheetah", env_cfg, device=device, headless=True)
 
 
 def _assert_base_spawns_at_configured_height(device: str):

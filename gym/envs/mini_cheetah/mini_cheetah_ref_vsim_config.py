@@ -44,13 +44,6 @@ class MiniCheetahRefVSimCfg(MiniCheetahRefCfg):
     class push_robots(MiniCheetahRefCfg.push_robots):
         toggle = False
 
-    class domain_rand(MiniCheetahRefCfg.domain_rand):
-        # VSim currently creates one shared rigid material and articulation
-        # definition, so the legacy per-environment randomizers are not
-        # applied. Keep this explicit until VSim-native randomization exists.
-        randomize_friction = False
-        randomize_base_mass = False
-
     class reward_settings(MiniCheetahRefCfg.reward_settings):
         # Preserve 7.5% of each URDF joint range for commanded position
         # targets. Actual state limits remain the URDF limits.

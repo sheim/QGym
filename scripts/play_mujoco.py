@@ -6,9 +6,7 @@ Usage:
     uv run scripts/play_mujoco.py --task mini_cheetah --load_run May08_12-34-56_ \
                                   --checkpoint 1500
 
-Mirrors scripts/play.py but uses task_registry.make_env_mujoco() instead of
-the IsaacGym path.  KeyboardInterface and VisualizationRecorder are IsaacGym-
-specific and are not used here.
+Supports MuJoCo CPU/Warp and optional VSim checkpoints.
 """
 
 import argparse
@@ -112,7 +110,7 @@ def setup(args):
     task_registry.set_log_dir_name(train_cfg)
     set_seed(env_cfg.seed)
 
-    env = task_registry.make_env_mujoco(
+    env = task_registry.make_env(
         args.task,
         env_cfg,
         device=args.device,

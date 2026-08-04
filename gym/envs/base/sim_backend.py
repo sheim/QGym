@@ -9,7 +9,7 @@ class SimBackend(ABC):
     """Abstract physics backend interface.
 
     Separates physics-engine specifics from RL task logic, enabling multiple
-    backends (IsaacGym/PhysX, MuJocoWarp, plain MuJoCo for Mac/CI).
+    backends (MuJoCo Warp, plain MuJoCo for Mac/CI, and optional VSim).
 
     Lifecycle
     ---------
@@ -30,11 +30,8 @@ class SimBackend(ABC):
         simulator, and acquire state tensors.
 
         *task* is the owning FixedRobot/LeggedRobot instance.  Backends that
-        need per-environment property callbacks call
-        ``task._process_rigid_shape_props``, ``task._process_dof_props``, and
-        ``task._process_rigid_body_props`` during setup; those callbacks may
-        store results back on the task (e.g. joint limits).  Pass ``None`` if
-        no callbacks are needed (e.g. unit tests).
+        need task-specific joint limits call ``task._process_dof_props`` during
+        setup. Pass ``None`` if no callback is needed (e.g. unit tests).
         """
 
     # ── Metadata (valid after setup) ───────────────────────────────────────
@@ -167,13 +164,6 @@ class SimBackend(ABC):
     @abstractmethod
     def device(self) -> str:
         """The PyTorch device string ('cpu', 'cuda:0', …)."""
-
-    # IsaacGym shims — non-IsaacGym backends leave these as None.
-    # BaseTask.gym / .sim / .viewer forward here for legacy compatibility
-    # (viewer is consumed by KeyboardInterface / VisualizationRecorder).
-    gym = None
-    sim = None
-    viewer = None
 
     def render(self, sync_frame_time: bool = True) -> None:
         pass

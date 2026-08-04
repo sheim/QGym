@@ -26,9 +26,7 @@ def _build_env(device: str):
     train_cfg.seed = 0
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
 
-    return task_registry.make_env_mujoco(
-        "mini_cheetah", env_cfg, device=device, headless=True
-    )
+    return task_registry.make_env("mini_cheetah", env_cfg, device=device, headless=True)
 
 
 def _run_drop_and_detect(env) -> bool:

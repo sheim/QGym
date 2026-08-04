@@ -128,7 +128,7 @@ def build_env(backend, device, num_envs, t_end):
     set_seed(0)
 
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
-    return task_registry.make_env_mujoco(
+    return task_registry.make_env(
         "pendulum", env_cfg, device=device, headless=True, backend=backend
     )
 

@@ -1,5 +1,11 @@
 # IsaacGym → MuJoCo Warp Migration Plan
 
+> **Current status (2026-08-04):** the executable IsaacGym/PhysX backend,
+> compatibility branches, legacy CLI entry points, and legacy dependency files
+> have been removed. MuJoCo CPU/Warp and optional VSim are the supported
+> backends. Earlier sections remain as engineering history, not current setup
+> instructions.
+
 ## Goal
 
 Replace the IsaacGym/PhysX physics backend with MuJoCo Warp while keeping the
@@ -1502,13 +1508,19 @@ After the clean run, evaluate the saved checkpoints and then use a targeted
 yaw-command curriculum or gait-turning term; do not deploy the interim policy
 yet.
 
-### IsaacGym removal
+### IsaacGym removal — complete 2026-08-04
 
-Once all checks pass:
-1. Delete `gym/envs/base/isaac_gym_backend.py`
-2. Remove `try/except` guards around isaacgym imports (they become unconditional `pass` or are deleted)
-3. Remove isaacgym from `requirements.txt` / `pyproject.toml`
-4. Remove `gym/sim` shim properties from `BaseTask` (already done in Phase 3)
+- Deleted `gym/envs/base/isaac_gym_backend.py` and every executable import or
+  runtime branch for IsaacGym.
+- Removed the `gymutil` argument/simulator factory and the legacy
+  train/play/export/sweep entry points.
+- Removed the `gym`/`sim`/`viewer` task shims, projectiles, and the legacy
+  terrain generator.
+- Removed the legacy per-environment friction/mass randomization callbacks and
+  config fields; backend-neutral domain randomization remains a future feature.
+- Removed `requirements.txt` and `setup.py`; uv metadata is the only dependency
+  source of truth.
+- Renamed task construction to the backend-neutral `task_registry.make_env()`.
 
 ---
 
@@ -1525,24 +1537,14 @@ uv run scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
 uv run scripts/train_mujoco.py --task pendulum --device cuda:0 --num_envs 4096
 ```
 
-**IsaacGym legacy:** IsaacGym requires Python 3.8 and has its own venv.
-The IsaacGym backend continues to work when run from that venv (`scripts/train.py`).
-It will be removed in Phase 4.
-
 ## Notes and known gotchas
 
-- **isaacgym import order:** IsaacGym must be imported before PyTorch.  All
-  files that import isaacgym use `try/except ImportError` with the isaacgym
-  import placed before `import torch`.
 - **MuJoCo quaternion convention:** scalar-first `[qw, qx, qy, qz]` internally,
   converted to scalar-last `[qx, qy, qz, qw]` at the backend boundary.
-  The task layer always sees scalar-last (matching IsaacGym convention).
+  The task layer always sees scalar-last.
 - **`dof_state` view contract:** `dof_pos` and `dof_vel` must be views into
   `dof_state`, not copies.  Writing into `dof_pos[env_ids]` must be reflected
   in `dof_state` automatically.  Verified by `test_dof_state_view_consistent_*`.
-- **Phase 3 TODO markers:** Shim code (backend's `gym`/`sim` properties,
-  `register_dof_state()`, etc.) is annotated `# TODO Phase 3: remove`.
-
 ## Things to check
 
 - [ ] friction domain-randomization

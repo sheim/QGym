@@ -1,18 +1,13 @@
 import torch
 
-try:
-    from isaacgym.torch_utils import quat_rotate_inverse
-except ImportError:
-    from gym.utils.torch_quat import quat_rotate_inverse
 from gym.envs import LeggedRobot
+from gym.utils.torch_quat import quat_rotate_inverse
 
 
 class HumanoidRunning(LeggedRobot):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
+    def __init__(self, cfg, device, headless, backend):
         self.omega = 2 * torch.pi * cfg.control.gait_freq
-        super().__init__(
-            gym, sim, cfg, sim_params, sim_device, headless, backend=backend
-        )
+        super().__init__(cfg, device, headless, backend)
 
     def _init_buffers(self):
         super()._init_buffers()
@@ -101,9 +96,9 @@ class HumanoidRunning(LeggedRobot):
             (torch.numel(env_ids),), requires_grad=False, device=self.device
         )
 
-    def _post_physx_step(self):
-        """Update all states that are not handled in PhysX"""
-        super()._post_physx_step()
+    def _post_physics_step(self):
+        """Update phase state after each physics step."""
+        super()._post_physics_step()
         self.phase = (self.phase + self.dt * self.omega).fmod(2 * torch.pi)
 
     def _post_decimation_step(self):

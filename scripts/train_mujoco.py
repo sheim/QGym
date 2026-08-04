@@ -1,17 +1,16 @@
-"""Train a task using the MuJoCo backend (no IsaacGym required).
+"""Train a task using MuJoCo CPU/Warp or optional VSim.
 
 Usage:
     uv run scripts/train_mujoco.py --task pendulum [--device cpu] [--num_envs 256]
                                    [--max_iterations 200] [--headless]
 
-This script replaces the IsaacGym-specific setup in train.py with a
-backend-agnostic path that calls task_registry.make_env_mujoco().
+The selected backend is MuJoCo CPU/Warp or optional VSim.
 """
 
 import argparse
 
 from gym.utils.task_registry import task_registry
-from gym.utils.helpers import set_seed
+from gym.utils.helpers import randomize_episode_counters, set_seed
 from gym.utils.logging_and_saving import local_code_save_helper
 from gym.utils.logging_and_saving import wandb_singleton
 
@@ -119,15 +118,13 @@ def setup():
     wandb_helper.setup_wandb(env_cfg=env_cfg, train_cfg=train_cfg, args=args)
 
     # Build the environment using the MuJoCo backend
-    env = task_registry.make_env_mujoco(
+    env = task_registry.make_env(
         args.task,
         env_cfg,
         device=args.device,
         headless=args.headless,
         backend=args.backend,
     )
-
-    from gym.utils import randomize_episode_counters
 
     randomize_episode_counters(env)
 

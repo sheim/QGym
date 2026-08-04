@@ -1,56 +1,32 @@
-import os
 import numpy as np
-
-try:
-    from isaacgym.torch_utils import (
-        get_axis_params,
-        torch_rand_float,
-        quat_rotate_inverse,
-        to_torch,
-        quat_from_euler_xyz,
-    )
-    from isaacgym import gymtorch, gymapi
-except ImportError:
-    gymtorch = None
-    gymapi = None
-    from gym.utils.torch_quat import (
-        get_axis_params,
-        to_torch,
-        quat_rotate_inverse,
-        quat_from_euler_xyz,
-    )
-    from gym.utils.gym_math_wrappers import torch_rand_float
-
 import torch
 
-from gym import LEGGED_GYM_ROOT_DIR
 from gym.envs.base.base_task import BaseTask
-from gym.envs.base.isaac_gym_backend import IsaacGymBackend
-from gym.utils.terrain import Terrain
 from gym.utils import random_sample, quat_apply_yaw
+from gym.utils.gym_math_wrappers import torch_rand_float
 from gym.utils.helpers import class_to_dict
+from gym.utils.torch_quat import (
+    get_axis_params,
+    quat_from_euler_xyz,
+    quat_rotate_inverse,
+    to_torch,
+)
 
 
 class LeggedRobot(BaseTask):
-    def __init__(self, gym, sim, cfg, sim_params, sim_device, headless, backend=None):
+    def __init__(self, cfg, device, headless, backend):
         self.cfg = cfg
-        self.sim_params = sim_params
         self.height_samples = None
         self.init_done = False
         self._physics_step_observers = []
 
-        if backend is None:
-            backend = IsaacGymBackend(gym, sim, sim_params, sim_device, headless)
-        # Use sim_device directly — backend.device isn't set until setup() runs.
-        super().__init__(backend, cfg, sim_device, headless)
+        super().__init__(backend, cfg, device, headless)
         self._parse_cfg(self.cfg)
 
         if not self.headless:
             self._set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
 
         self._initialize_sim()
-        if isinstance(self._backend, IsaacGymBackend):
-            self.gym.prepare_sim(self.sim)
         self._init_buffers()
         self.init_done = True
         self.reset()
@@ -64,8 +40,8 @@ class LeggedRobot(BaseTask):
             self._pre_compute_torques()
             self.torques = self._compute_torques()
             self._post_compute_torques()
-            self._step_physx_sim()
-            self._post_physx_step()
+            self._step_backend()
+            self._post_physics_step()
             for observer in self._physics_step_observers:
                 observer()
 
@@ -92,7 +68,7 @@ class LeggedRobot(BaseTask):
         if self.cfg.asset.disable_motors:
             self.torques[:] = 0.0
 
-    def _step_physx_sim(self):
+    def _step_backend(self):
         if self.num_actuators == self.num_dof:
             self._backend.step(self.torques)
             return
@@ -100,7 +76,7 @@ class LeggedRobot(BaseTask):
         torques_full_dof[:, self.actuated_dof_indices] = self.torques
         self._backend.step(torques_full_dof)
 
-    def _post_physx_step(self):
+    def _post_physics_step(self):
         # backend.step() already refreshed all tensors; compute derived quantities.
         self.base_quat[:] = self.root_states[:, 3:7]
         self.base_lin_vel[:] = quat_rotate_inverse(
@@ -151,48 +127,29 @@ class LeggedRobot(BaseTask):
         self.episode_length_buf[env_ids] = 0
 
     def _initialize_sim(self):
-        """Creates simulation, terrain and environments."""
-        # axis idx still relevant with MJC?
-        self.up_axis_idx = 2  # 2 for z, 1 for y -> adapt gravity accordingly
-        mesh_type = self.cfg.terrain.mesh_type  # deprecated?
-        if mesh_type in ["heightfield", "trimesh"]:
-            self.terrain = Terrain(self.cfg.terrain, self.num_envs)
-
-        # Projectiles are deprecated (IsaacGym-only); cfg default is None → 0.
-        self.num_projs = self.cfg.env.num_projectiles or 0
-
-        if isinstance(self._backend, IsaacGymBackend):
-            # IsaacGym path — existing code unchanged
-            if mesh_type == "plane":
-                self._create_ground_plane()
-            elif mesh_type == "heightfield":
-                self._create_heightfield()
-            elif mesh_type == "trimesh":
-                self._create_trimesh()
-            elif mesh_type is not None:
-                raise ValueError(
-                    "Terrain mesh type not recognised. Allowed types are "
-                    + "[None, plane, heightfield, trimesh]"
-                )
-            self._create_envs()
-        else:
-            # MuJoCo backend path — backend.setup() handles everything
-            self._backend.setup(self.cfg, self.num_envs, self.device, task=self)
-            self.num_dof = self._backend.num_dof
-            self.num_bodies = self._backend.num_bodies
-            self.dof_names = self._backend.dof_names
-            self.penalised_contact_indices = self._backend.penalised_contact_indices
-            self.termination_contact_indices = self._backend.termination_contact_indices
-
-            base_init_state_list = (
-                self.cfg.init_state.pos
-                + self.cfg.init_state.rot
-                + self.cfg.init_state.lin_vel
-                + self.cfg.init_state.ang_vel
+        """Delegate flat-world construction to the selected backend."""
+        self.up_axis_idx = 2
+        mesh_type = self.cfg.terrain.mesh_type
+        if mesh_type not in (None, "plane"):
+            raise ValueError(
+                "supported backends currently require flat terrain "
+                f"(mesh_type None or 'plane'), got {mesh_type!r}"
             )
-            self.base_init_state = to_torch(base_init_state_list, device=self.device)
-            self.envs = []
-            self.actor_handles = []
+
+        self._backend.setup(self.cfg, self.num_envs, self.device, task=self)
+        self.num_dof = self._backend.num_dof
+        self.num_bodies = self._backend.num_bodies
+        self.dof_names = self._backend.dof_names
+        self.penalised_contact_indices = self._backend.penalised_contact_indices
+        self.termination_contact_indices = self._backend.termination_contact_indices
+
+        base_init_state_list = (
+            self.cfg.init_state.pos
+            + self.cfg.init_state.rot
+            + self.cfg.init_state.lin_vel
+            + self.cfg.init_state.ang_vel
+        )
+        self.base_init_state = to_torch(base_init_state_list, device=self.device)
 
         self.robot_layout = self._backend.robot_layout
         self.actuated_dof_names = list(self.robot_layout.actuated_dof_names)
@@ -246,38 +203,6 @@ class LeggedRobot(BaseTask):
         """Set camera position and direction"""
         self._backend.set_camera(position, lookat)
 
-    def _process_rigid_shape_props(self, props, env_id):
-        """Callback allowing to store/change/randomize the rigid shape
-            properties of each environment. Called During environment creation.
-            Base behavior: randomizes the friction of each environment
-
-        Args:
-            props (List[gymapi.RigidShapeProperties]):
-                Properties of each shape of the asset
-            env_id (int): Environment id
-
-        Returns:
-            [List[gymapi.RigidShapeProperties]]:
-                Modified rigid shape properties
-        """
-        if self.cfg.domain_rand.randomize_friction:
-            if env_id == 0:
-                # prepare friction randomization
-                friction_range = self.cfg.domain_rand.friction_range
-                num_buckets = 64
-                bucket_ids = torch.randint(0, num_buckets, (self.num_envs, 1))
-                friction_buckets = torch_rand_float(
-                    friction_range[0],
-                    friction_range[1],
-                    (num_buckets, 1),
-                    device="cpu",
-                )
-                self.friction_coeffs = friction_buckets[bucket_ids]
-
-            for s in range(len(props)):
-                props[s].friction = self.friction_coeffs[env_id]
-        return props
-
     def _process_dof_props(self, props, env_id):
         """Callback allowing to store/change/randomize the DOF properties of
             each environment. Called During environment creation.
@@ -323,12 +248,6 @@ class LeggedRobot(BaseTask):
             # )
         return props
 
-    def _process_rigid_body_props(self, props, env_id):
-        if self.cfg.domain_rand.randomize_base_mass:
-            rng = self.cfg.domain_rand.added_mass_range
-            props[0].mass += np.random.uniform(rng[0], rng[1])
-        return props
-
     def _compute_torques(self):
         pos = self.dof_pos.index_select(1, self.actuated_dof_indices)
         vel = self.dof_vel.index_select(1, self.actuated_dof_indices)
@@ -362,24 +281,8 @@ class LeggedRobot(BaseTask):
         else:
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
 
-        if isinstance(self._backend, IsaacGymBackend):
-            env_ids_int32 = env_ids.to(dtype=torch.int32)
-            self.gym.set_dof_state_tensor_indexed(
-                self.sim,
-                gymtorch.unwrap_tensor(self.dof_state),
-                gymtorch.unwrap_tensor(env_ids_int32),
-                len(env_ids_int32),
-            )
-            root_state = torch.cat((self.root_states, self.proj_root_state), dim=0)
-            self.gym.set_actor_root_state_tensor_indexed(
-                self.sim,
-                gymtorch.unwrap_tensor(root_state),
-                gymtorch.unwrap_tensor(env_ids_int32),
-                len(env_ids_int32),
-            )
-        else:
-            self._backend.reset_dof_state(env_ids)
-            self._backend.reset_root_state(env_ids)
+        self._backend.reset_dof_state(env_ids)
+        self._backend.reset_root_state(env_ids)
 
     # * implement reset methods
     def reset_to_basic(self, env_ids):
@@ -472,69 +375,18 @@ class LeggedRobot(BaseTask):
         vel_vec[:, 2] = 0  # no z velocity
         self.root_states[:, 7:10] += vel_vec
         self.root_states[:, 10:13] += torch.cross(r_vec, vel_vec, dim=1)
-        if isinstance(self._backend, IsaacGymBackend):
-            root_state = torch.cat((self.root_states, self.proj_root_state), dim=0)
-            self.gym.set_actor_root_state_tensor(
-                self.sim, gymtorch.unwrap_tensor(root_state)
-            )
-        else:
-            self._backend.set_all_root_states()
+        self._backend.set_all_root_states()
 
     # ----------------------------------------
     def _init_buffers(self):
-        """Initialize torch tensors which will contain simulation states and
-        processed quantities
-        """
-        if isinstance(self._backend, IsaacGymBackend):
-            # IsaacGym path — acquire tensors from GPU
-            actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
-            dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
-            net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
-            rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        """Bind backend state tensors and initialize processed quantities."""
+        self.root_states = self._backend.root_states
+        self.dof_state = self._backend.dof_state
+        self.dof_pos = self._backend.dof_pos
+        self.dof_vel = self._backend.dof_vel
+        self.contact_forces = self._backend.contact_forces
+        self._rigid_body_state = self._backend.rigid_body_states
 
-            self.gym.refresh_dof_state_tensor(self.sim)
-            self.gym.refresh_actor_root_state_tensor(self.sim)
-            self.gym.refresh_net_contact_force_tensor(self.sim)
-            self.gym.refresh_rigid_body_state_tensor(self.sim)
-
-            if self.num_projs:
-                self.root_states = gymtorch.wrap_tensor(actor_root_state)[
-                    : -self.num_projs, :
-                ]
-                self.proj_root_state = gymtorch.wrap_tensor(actor_root_state)[
-                    -self.num_projs :, :
-                ]
-                self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)[
-                    : -self.num_projs, :
-                ]
-                self.contact_forces = gymtorch.wrap_tensor(net_contact_forces)[
-                    : -self.num_projs, :
-                ].view(self.num_envs, -1, 3)
-            else:
-                self.root_states = gymtorch.wrap_tensor(actor_root_state)
-                self.proj_root_state = torch.empty(0, 13, device=self.device)
-                self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
-                self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(
-                    self.num_envs, -1, 3
-                )
-
-            self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
-            self._backend._num_dof = self.num_dof
-            self._backend.register_dof_state(self.dof_state, self.num_envs)
-
-            self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
-            self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
-        else:
-            # MuJoCo backend path — tensors come from backend properties
-            self.root_states = self._backend.root_states
-            self.proj_root_state = torch.empty(0, 13, device=self.device)
-            self.dof_state = self._backend.dof_state
-            self.dof_pos = self._backend.dof_pos
-            self.dof_vel = self._backend.dof_vel
-            self.contact_forces = self._backend.contact_forces
-            self._rigid_body_state = self._backend.rigid_body_states
-
-        # Rigid body state views (same for both backends)
         self.base_quat = self.root_states[:, 3:7]
         rbs = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)
         self._rigid_body_pos = rbs[..., 0:3]
@@ -662,311 +514,21 @@ class LeggedRobot(BaseTask):
             device=self.device,
         )
 
-    def _create_ground_plane(self):
-        """Adds a ground plane to the simulation, sets friction and
-        restitution based on the cfg.
-        """
-        plane_params = gymapi.PlaneParams()
-        plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
-        plane_params.static_friction = self.cfg.terrain.static_friction
-        plane_params.dynamic_friction = self.cfg.terrain.dynamic_friction
-        plane_params.restitution = self.cfg.terrain.restitution
-        self.gym.add_ground(self.sim, plane_params)
-
-    def _create_heightfield(self):
-        """Adds a heightfield terrain to the simulation, sets parameters
-        based on the cfg.
-        """
-        hf_params = gymapi.HeightFieldProperties()
-        hf_params.column_scale = self.terrain.horizontal_scale
-        hf_params.row_scale = self.terrain.horizontal_scale
-        hf_params.vertical_scale = self.terrain.vertical_scale
-        hf_params.nbRows = self.terrain.tot_cols
-        hf_params.nbColumns = self.terrain.tot_rows
-        hf_params.transform.p.x = -self.terrain.border_size
-        hf_params.transform.p.y = -self.terrain.border_size
-        hf_params.transform.p.z = 0.0
-        hf_params.static_friction = self.cfg.terrain.static_friction
-        hf_params.dynamic_friction = self.cfg.terrain.dynamic_friction
-        hf_params.restitution = self.cfg.terrain.restitution
-
-        self.gym.add_heightfield(self.sim, self.terrain.heightsamples, hf_params)
-        self.height_samples = (
-            torch.tensor(self.terrain.heightsamples)
-            .view(self.terrain.tot_rows, self.terrain.tot_cols)
-            .to(self.device)
-        )
-
-    def _create_trimesh(self):
-        """Adds a triangle mesh terrain to the simulation, sets parameters
-            based on the cfg.
-        #"""
-        tm_params = gymapi.TriangleMeshParams()
-        tm_params.nb_vertices = self.terrain.vertices.shape[0]
-        tm_params.nb_triangles = self.terrain.triangles.shape[0]
-
-        tm_params.transform.p.x = -self.terrain.cfg.border_size
-        tm_params.transform.p.y = -self.terrain.cfg.border_size
-        tm_params.transform.p.z = 0.0
-        tm_params.static_friction = self.cfg.terrain.static_friction
-        tm_params.dynamic_friction = self.cfg.terrain.dynamic_friction
-        tm_params.restitution = self.cfg.terrain.restitution
-        self.gym.add_triangle_mesh(
-            self.sim,
-            self.terrain.vertices.flatten(order="C"),
-            self.terrain.triangles.flatten(order="C"),
-            tm_params,
-        )
-        self.height_samples = (
-            torch.tensor(self.terrain.heightsamples)
-            .view(self.terrain.tot_rows, self.terrain.tot_cols)
-            .to(self.device)
-        )
-
-    def _create_envs(self):
-        """Creates environments:
-        1. loads the robot URDF/MJCF asset,
-        2. For each environment
-           2.1 creates the environment,
-           2.2 calls DOF and Rigid shape properties callbacks,
-           2.3 create actor with these properties and add them to the env
-        3. Store indices of different bodies of the robot
-        """
-        asset_path = self.cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
-        asset_root = os.path.dirname(asset_path)
-        asset_file = os.path.basename(asset_path)
-
-        asset_options = gymapi.AssetOptions()
-        asset_options.fix_base_link = self.cfg.asset.fix_base_link
-        asset_options.density = self.cfg.asset.density
-        asset_options.angular_damping = self.cfg.asset.angular_damping
-        asset_options.linear_damping = self.cfg.asset.linear_damping
-        asset_options.max_linear_velocity = self.cfg.asset.max_linear_velocity
-        asset_options.armature = self.cfg.asset.armature
-        asset_options.thickness = self.cfg.asset.thickness
-        asset_options.disable_gravity = self.cfg.asset.disable_gravity
-        asset_options.default_dof_drive_mode = self.cfg.asset.default_dof_drive_mode
-        asset_options.collapse_fixed_joints = self.cfg.asset.collapse_fixed_joints
-        asset_options.replace_cylinder_with_capsule = (
-            self.cfg.asset.replace_cylinder_with_capsule
-        )
-        asset_options.flip_visual_attachments = self.cfg.asset.flip_visual_attachments
-        asset_options.max_angular_velocity = self.cfg.asset.max_angular_velocity
-
-        robot_asset = self.gym.load_asset(
-            self.sim, asset_root, asset_file, asset_options
-        )
-        self.num_dof = self.gym.get_asset_dof_count(robot_asset)
-        self.num_bodies = self.gym.get_asset_rigid_body_count(robot_asset)
-
-        dof_props_asset = self.gym.get_asset_dof_properties(robot_asset)
-        dof_props_asset["armature"] = self.cfg.asset.rotor_inertia
-        dof_props_asset["damping"] = self.cfg.asset.joint_damping
-
-        rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
-
-        body_names = self.gym.get_asset_rigid_body_names(robot_asset)
-        self.dof_names = self.gym.get_asset_dof_names(robot_asset)
-        self._backend.configure_robot_layout(self.cfg, self.dof_names, body_names)
-        self.dof_names = self._backend.dof_names
-        body_names = self._backend.body_names
-        self.num_bodies = len(body_names)
-        feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
-        penalized_contact_names = []
-        for name in self.cfg.asset.penalize_contacts_on:
-            penalized_contact_names.extend([s for s in body_names if name in s])
-        termination_contact_names = []
-        for name in self.cfg.asset.terminate_after_contacts_on:
-            termination_contact_names.extend([s for s in body_names if name in s])
-
-        base_init_state_list = (
-            self.cfg.init_state.pos
-            + self.cfg.init_state.rot
-            + self.cfg.init_state.lin_vel
-            + self.cfg.init_state.ang_vel
-        )
-        self.base_init_state = to_torch(base_init_state_list, device=self.device)
-        start_pose = gymapi.Transform()
-        start_pose.p = gymapi.Vec3(*self.base_init_state[:3])
-
-        self._get_env_origins()
-        env_lower = gymapi.Vec3(0.0, 0.0, 0.0)
-        env_upper = gymapi.Vec3(0.0, 0.0, 0.0)
-        self.actor_handles = []
-        self.envs = []
-
-        for i in range(self.num_envs):
-            # * create env instance
-            env_handle = self.gym.create_env(
-                self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs))
-            )
-            pos = self.env_origins[i].clone()
-            pos[:2] += torch_rand_float(-1.0, 1.0, (2, 1), device=self.device).squeeze(
-                1
-            )
-            start_pose.p = gymapi.Vec3(*pos)
-
-            rigid_shape_props = self._process_rigid_shape_props(
-                rigid_shape_props_asset, i
-            )
-            self.gym.set_asset_rigid_shape_properties(robot_asset, rigid_shape_props)
-
-            name = self.cfg.asset.file
-            name = name.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
-            robot_handle = self.gym.create_actor(
-                env_handle,
-                robot_asset,
-                start_pose,
-                name,
-                i,
-                self.cfg.asset.self_collisions,
-                0,
-            )
-            dof_props = self._process_dof_props(dof_props_asset, i)
-            self.gym.set_actor_dof_properties(env_handle, robot_handle, dof_props)
-            body_props = self.gym.get_actor_rigid_body_properties(
-                env_handle, robot_handle
-            )
-            body_props = self._process_rigid_body_props(body_props, i)
-            self.gym.set_actor_rigid_body_properties(
-                env_handle, robot_handle, body_props, recomputeInertia=True
-            )
-            self.envs.append(env_handle)
-            self.actor_handles.append(robot_handle)
-        self.feet_indices = torch.zeros(
-            len(feet_names), dtype=torch.long, device=self.device
-        )
-
-        self.init_projectiles()
-
-        for i in range(len(feet_names)):
-            self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(
-                self.envs[0], self.actor_handles[0], feet_names[i]
-            )
-
-        self.penalised_contact_indices = torch.zeros(
-            len(penalized_contact_names), dtype=torch.long, device=self.device
-        )
-        for i in range(len(penalized_contact_names)):
-            self.penalised_contact_indices[i] = self.gym.find_actor_rigid_body_handle(
-                self.envs[0], self.actor_handles[0], penalized_contact_names[i]
-            )
-
-        self.termination_contact_indices = torch.zeros(
-            len(termination_contact_names),
-            dtype=torch.long,
-            device=self.device,
-        )
-        for i in range(len(termination_contact_names)):
-            self.termination_contact_indices[i] = self.gym.find_actor_rigid_body_handle(
-                self.envs[0],
-                self.actor_handles[0],
-                termination_contact_names[i],
-            )
-
-    def init_projectiles(self):
-        self.projectiles = []
-        self.projectile_idx = 0
-        spacing = 2.0
-        lower = gymapi.Vec3(-spacing, 0.0, -spacing)
-        upper = gymapi.Vec3(spacing, spacing, spacing)
-        self.proj_env = self.gym.create_env(self.sim, lower, upper, 4)
-        proj_asset_options = gymapi.AssetOptions()
-
-        proj_asset_options.density = self.cfg.env.projectile_density
-        proj_asset = self.gym.create_sphere(
-            self.sim, self.cfg.env.projectile_radius, proj_asset_options
-        )
-
-        self.projectiles = []
-        if self.num_projs:
-            for i in range(self.num_projs):
-                pose = gymapi.Transform()
-                pose.p = gymapi.Vec3(i * 0.5, 50.0, 1.0)
-                pose.r = gymapi.Quat(0, 0, 0, 1)
-                ahandle = self.gym.create_actor(
-                    self.proj_env,
-                    proj_asset,
-                    pose,
-                    "projectile" + str(i),
-                    -1,
-                    0,
-                )
-
-                # set each projectile to a different, random color
-                c = 0.5 + 0.5 * np.random.random(3)
-                self.gym.set_rigid_body_color(
-                    self.proj_env,
-                    ahandle,
-                    0,
-                    gymapi.MESH_VISUAL_AND_COLLISION,
-                    gymapi.Vec3(c[0], c[1], c[2]),
-                )
-
-                self.projectiles.append(ahandle)
-
-    def shoot(self):
-        print("Fired projectile")
-        cam_pose = self.gym.get_viewer_camera_transform(self.viewer, self.proj_env)
-        cam_fwd = cam_pose.r.rotate(gymapi.Vec3(0, 0, 1))
-
-        spawn = torch.tensor([cam_pose.p.x, cam_pose.p.y, cam_pose.p.z])
-        speed = self.cfg.env.projectile_speed
-        vel = torch.tensor([cam_fwd.x * speed, cam_fwd.y * speed, cam_fwd.z * speed])
-        angvel = 1.57 - 3.14 * torch.rand(3, dtype=torch.float32)
-
-        self.proj_root_state[self.projectile_idx, 0:3] = spawn
-        self.proj_root_state[self.projectile_idx, 7:10] = vel
-        self.proj_root_state[self.projectile_idx, 10:13] = angvel
-        root_state = torch.cat((self.root_states, self.proj_root_state), dim=0)
-        self.gym.set_actor_root_state_tensor(
-            self.sim, gymtorch.unwrap_tensor(root_state)
-        )
-        self.projectile_idx = (self.projectile_idx + 1) % len(self.projectiles)
-
     def _get_env_origins(self):
-        """Sets environment origins. On rough terrain the origins are defined
-        by the terrain platforms. Otherwise create a grid.
-        """
-        if self.cfg.terrain.mesh_type in ["heightfield", "trimesh"]:
-            self.custom_origins = True
-            self.env_origins = torch.zeros(self.num_envs, 3, device=self.device)
-            # * put robots at the origins defined by the terrain
-            max_init_level = self.cfg.terrain.num_rows - 1
-            self.terrain_levels = torch.randint(
-                0, max_init_level + 1, (self.num_envs,), device=self.device
-            )
-            self.terrain_types = torch.div(
-                torch.arange(self.num_envs, device=self.device),
-                (self.num_envs / self.cfg.terrain.num_cols),
-                rounding_mode="floor",
-            ).to(torch.long)
-            self.max_terrain_level = self.cfg.terrain.num_rows
-            self.terrain_origins = (
-                torch.from_numpy(self.terrain.env_origins)
-                .to(self.device)
-                .to(torch.float)
-            )
-            self.env_origins[:] = self.terrain_origins[
-                self.terrain_levels, self.terrain_types
-            ]
-        else:
-            self.custom_origins = False
-            self.env_origins = torch.zeros(self.num_envs, 3, device=self.device)
-            # * create a grid of robots
-            num_cols = np.floor(np.sqrt(self.num_envs))
-            num_rows = np.ceil(self.num_envs / num_cols)
-            xx, yy = torch.meshgrid(
-                torch.arange(num_rows), torch.arange(num_cols), indexing="ij"
-            )
-            spacing = self.cfg.env.env_spacing
-            self.env_origins[:, 0] = spacing * xx.flatten()[: self.num_envs]
-            self.env_origins[:, 1] = spacing * yy.flatten()[: self.num_envs]
-            self.env_origins[:, 2] = 0.0
+        """Create the flat-world grid used to offset parallel environments."""
+        self.custom_origins = False
+        self.env_origins = torch.zeros(self.num_envs, 3, device=self.device)
+        num_cols = np.floor(np.sqrt(self.num_envs))
+        num_rows = np.ceil(self.num_envs / num_cols)
+        xx, yy = torch.meshgrid(
+            torch.arange(num_rows), torch.arange(num_cols), indexing="ij"
+        )
+        spacing = self.cfg.env.env_spacing
+        self.env_origins[:, 0] = spacing * xx.flatten()[: self.num_envs]
+        self.env_origins[:, 1] = spacing * yy.flatten()[: self.num_envs]
 
     def _parse_cfg(self, cfg):
         super()._parse_cfg(cfg)
-        # self.num_projs = self.cfg.env.num_projectiles # deprecated
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
         self.cfg.push_interval = np.ceil(self.cfg.push_robots.interval_s / self.dt)
 

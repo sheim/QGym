@@ -36,12 +36,8 @@ def test_declared_task_runs_one_action_step_on_mujoco_cpu(task_name):
     # smoke test only exercises the deterministic task/backend contract.
     if hasattr(env_cfg, "push_robots"):
         env_cfg.push_robots.toggle = False
-    if hasattr(env_cfg, "domain_rand"):
-        env_cfg.domain_rand.randomize_friction = False
-        env_cfg.domain_rand.randomize_base_mass = False
-
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
-    env = task_registry.make_env_mujoco(
+    env = task_registry.make_env(
         task_name,
         env_cfg,
         device="cpu",

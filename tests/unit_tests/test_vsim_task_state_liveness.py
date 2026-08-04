@@ -28,7 +28,7 @@ def vsim_env():
     train_cfg.seed = 0
     env_cfg.push_robots.toggle = False
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
-    env = task_registry.make_env_mujoco(
+    env = task_registry.make_env(
         "mini_cheetah", env_cfg, device="cuda:0", headless=True, backend="vsim"
     )
     yield env

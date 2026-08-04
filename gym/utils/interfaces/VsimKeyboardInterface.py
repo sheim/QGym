@@ -1,7 +1,7 @@
 """Keyboard teleop for the vsim (vlearn) viewer.
 
 vlearn exposes POLLING input (`GymRender.is_key_down`) rather than the event
-callbacks MuJoCo and IsaacGym provide, so this interface remembers the
+callbacks MuJoCo provides, so this interface remembers the
 previous key state and acts on rising edges — giving the same discrete
 "1/5 of max per press" feel as the MuJoCo interface instead of ramping the
 command every frame a key is held.

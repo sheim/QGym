@@ -1,9 +1,4 @@
-"""Pure-torch quaternion utilities — no IsaacGym dependency.
-
-All functions use the scalar-last [x, y, z, w] convention, matching IsaacGym's
-torch_utils interface.  These are used as fallbacks when IsaacGym is not
-installed (e.g. MuJoCo-only environments).
-"""
+"""Pure-torch quaternion utilities in scalar-last [x, y, z, w] order."""
 
 import torch
 

@@ -1,13 +1,10 @@
-# Q2 — RL training for legged robots (IsaacGym → MuJoCo port)
+# Q2 — RL training for legged robots
 
 Lineage: RSL `legged_gym` → MIT Biomimetics `pkGym`/`QGym` → this repo.
-Branch **`port`** is the canonical migration branch (IsaacGym → MuJoCo backend swap).
-`main`/`dev` predate the port. `MIGRATION_PLAN.md` is the plan of record: phases 0–3
-complete, with **Phase 4 IsaacGym retirement active**. Cross-engine policy parity
-and IsaacGym checkpoint portability are historical evidence, not removal gates.
-`README_MUJOCO.md` is the
-user-facing doc; `README.md` is a legacy stub. Further physics backends
-(v-sim) are planned — new engines follow `q2-backend-integration`.
+The supported physics backends are MuJoCo CPU, MuJoCo Warp, and optional
+licensed VSim. The executable legacy simulator path has been removed;
+`MIGRATION_PLAN.md` retains its history. `README_MUJOCO.md` is the user-facing
+setup and CLI guide.
 
 ## Environment (uv only)
 
@@ -22,16 +19,14 @@ uv run --env-file .env.vsim scripts/train_mujoco.py --task mini_cheetah --backen
 bash scripts/run_vsim_tests.sh              # vsim suite (opt-in, local-only)
 ```
 
-Never use `pip install` / `requirements.txt` / `setup.py` — those are the legacy
-IsaacGym-era path. `scripts/train.py`, `scripts/play.py`, `scripts/export_policy.py`
-require IsaacGym (Python 3.8 venv, not present here) and will fail in this env.
+Use `pyproject.toml`, `uv.lock`, and the uv-managed `.venv` exclusively. Do not
+add parallel pip requirements or setup files.
 
 ## Non-negotiables
 
-- **No `try/except` in dev code — fail fast and obviously.** The only sanctioned
-  exceptions are the existing `ImportError` guards around `isaacgym` imports
-  (Phase 0 policy, removed in Phase 4). Never add a fallback that silently
-  degrades behavior.
+- **No broad `try/except` in development code — fail fast and obviously.**
+  Optional dependency boundaries may report a clear availability error, but
+  never add a fallback that silently degrades behavior.
 - Run `uv run ruff format . && uv run ruff check .` at the end of every session.
 - Never commit files > 100 KB (CI + pre-commit both enforce this).
 - `logs/`, `user/wandb_config.json`, `*.pt` are gitignored — never force-add them.
