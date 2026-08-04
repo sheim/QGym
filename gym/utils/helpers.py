@@ -206,7 +206,7 @@ def get_args(custom_parameters=None):
         {
             "name": "--task",
             "type": str,
-            "default": "lander",
+            "default": "mini_cheetah",
             "help": "Resume training or start testing from a checkpoint. "
             "Overrides config file if provided.",
         },
