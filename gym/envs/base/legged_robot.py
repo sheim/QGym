@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from gym.envs.base.base_task import BaseTask
-from gym.utils import random_sample, quat_apply_yaw
+from gym.utils import random_sample
 from gym.utils.gym_math_wrappers import torch_rand_float
 from gym.utils.helpers import class_to_dict
 from gym.utils.torch_quat import (
@@ -16,7 +16,6 @@ from gym.utils.torch_quat import (
 class LeggedRobot(BaseTask):
     def __init__(self, cfg, device, headless, backend):
         self.cfg = cfg
-        self.height_samples = None
         self.init_done = False
         self._physics_step_observers = []
 
@@ -89,9 +88,6 @@ class LeggedRobot(BaseTask):
     def _post_decimation_step(self):
         self.episode_length_buf += 1
         self.common_step_counter += 1
-
-        if self.cfg.terrain.measure_heights:
-            self.measured_heights = self._get_heights()
 
         self.projected_gravity[:] = quat_rotate_inverse(
             self.base_quat, self.gravity_vec
@@ -437,10 +433,6 @@ class LeggedRobot(BaseTask):
             self.num_envs, 1, dtype=torch.float, device=self.device
         )
 
-        if self.cfg.terrain.measure_heights:
-            self.height_points = self._init_height_points()
-        self.measured_heights = 0
-
         # Joint position offsets in canonical full-DOF order.
         self.default_dof_pos = torch.zeros(
             self.num_dof, dtype=torch.float, device=self.device
@@ -532,75 +524,6 @@ class LeggedRobot(BaseTask):
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
         self.cfg.push_interval = np.ceil(self.cfg.push_robots.interval_s / self.dt)
 
-    def _init_height_points(self):
-        """Returns points at which the height measurments are sampled
-            (in base frame)
-
-        Returns:
-            [torch.Tensor]: Tensor of shape
-                (num_envs, self.num_height_points, 3)
-        """
-        y = torch.tensor(self.cfg.terrain.measured_points_y, device=self.device)
-        x = torch.tensor(self.cfg.terrain.measured_points_x, device=self.device)
-        grid_x, grid_y = torch.meshgrid(x, y, indexing="ij")
-
-        self.num_height_points = grid_x.numel()
-        points = torch.zeros(
-            self.num_envs, self.num_height_points, 3, device=self.device
-        )
-        points[:, :, 0] = grid_x.flatten()
-        points[:, :, 1] = grid_y.flatten()
-        return points
-
-    def _get_heights(self, env_ids=None):
-        """Samples heights of the terrain at required points around each
-            robot. The points are offset by the base's position and rotated
-            by the base's yaw
-
-        Args:
-            env_ids (List[int], optional): Subset of environments for which to
-                return the heights. Defaults to None.
-
-        Raises:
-            NameError: [description]
-
-        Returns:
-            [type]: [description]
-        """
-        if self.cfg.terrain.mesh_type == "plane":
-            return torch.zeros(
-                self.num_envs, self.num_height_points, device=self.device
-            )
-        elif self.cfg.terrain.mesh_type == "none":
-            raise NameError("Can't measure height with terrain mesh type 'none'")
-
-        if env_ids:
-            points = quat_apply_yaw(
-                self.base_quat[env_ids].repeat(1, self.num_height_points),
-                (self.height_points[env_ids])
-                + (self.root_states[env_ids, :3]).unsqueeze(1),
-            )
-        else:
-            points = quat_apply_yaw(
-                self.base_quat.repeat(1, self.num_height_points),
-                self.height_points,
-            ) + (self.root_states[:, :3]).unsqueeze(1)
-
-        points += self.terrain.cfg.border_size
-        points = (points / self.terrain.cfg.horizontal_scale).long()
-        px = points[:, :, 0].view(-1)
-        py = points[:, :, 1].view(-1)
-        px = torch.clip(px, 0, self.height_samples.shape[0] - 2)
-        py = torch.clip(py, 0, self.height_samples.shape[1] - 2)
-
-        heights1 = self.height_samples[px, py]
-        heights2 = self.height_samples[px + 1, py]
-        heights3 = self.height_samples[px, py + 1]
-        heights = torch.min(heights1, heights2)
-        heights = torch.min(heights, heights3)
-
-        return heights.view(self.num_envs, -1) * self.terrain.cfg.vertical_scale
-
     def _sqrdexp(self, x, sigma=None):
         """shorthand helper for squared exponential"""
         if sigma is None:
@@ -624,10 +547,8 @@ class LeggedRobot(BaseTask):
 
     def _reward_base_height(self):
         """Penalize base height away from target"""
-        base_height = torch.mean(
-            self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1
-        )
-        return -torch.square(base_height - self.cfg.reward_settings.base_height_target)
+        target = self.cfg.reward_settings.base_height_target
+        return -torch.square(self.root_states[:, 2] - target)
 
     def _reward_torques(self):
         """Penalize torques"""

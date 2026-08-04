@@ -7,6 +7,40 @@ import gym.envs as envs
 from gym.utils.task_registry import task_registry
 
 
+UNSUPPORTED_TERRAIN_FIELDS = {
+    "border_size",
+    "curriculum",
+    "horizontal_scale",
+    "max_init_terrain_level",
+    "measure_heights",
+    "measured_points_x",
+    "measured_points_y",
+    "num_cols",
+    "num_rows",
+    "selected",
+    "slope_treshold",
+    "terrain_kwargs",
+    "terrain_length",
+    "terrain_proportions",
+    "terrain_width",
+    "vertical_scale",
+}
+LEGACY_ASSET_FIELDS = {
+    "angular_damping",
+    "armature",
+    "collapse_fixed_joints",
+    "default_dof_drive_mode",
+    "density",
+    "flip_visual_attachments",
+    "linear_damping",
+    "max_angular_velocity",
+    "max_linear_velocity",
+    "replace_cylinder_with_capsule",
+    "self_collisions",
+    "thickness",
+}
+
+
 def test_declared_tasks_register_with_declared_components():
     expected_names = set(envs.task_dict)
 
@@ -22,6 +56,18 @@ def test_declared_tasks_register_with_declared_components():
             task_registry.train_cfgs[task_name],
             getattr(envs, runner_config_name),
         )
+
+
+def test_declared_tasks_only_expose_supported_physics_config():
+    for task_name, registered_cfg in task_registry.env_cfgs.items():
+        cfg = type(registered_cfg)()
+        assert cfg.terrain.mesh_type in (None, "plane"), task_name
+
+        terrain_fields = UNSUPPORTED_TERRAIN_FIELDS.intersection(dir(cfg.terrain))
+        assert not terrain_fields, f"{task_name}: {sorted(terrain_fields)}"
+
+        asset_fields = LEGACY_ASSET_FIELDS.intersection(dir(cfg.asset))
+        assert not asset_fields, f"{task_name}: {sorted(asset_fields)}"
 
 
 @pytest.mark.parametrize("task_name", envs.task_dict)

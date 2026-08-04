@@ -123,9 +123,6 @@ class MiniCheetahCfg(LeggedRobotCfg):
         penalize_contacts_on = ["shank"]
         terminate_after_contacts_on = ["base"]
         end_effector_names = ["foot"]
-        collapse_fixed_joints = False
-        self_collisions = 1
-        flip_visual_attachments = False
         disable_gravity = False
         disable_motors = False
         joint_damping = 0.01

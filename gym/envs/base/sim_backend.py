@@ -153,7 +153,7 @@ class SimBackend(ABC):
         """
 
     def set_all_root_states(self) -> None:
-        """Commit root_states for all environments (used by push_robots).
+        """Commit root_states for all environments.
 
         Default no-op — fixed-base robots don't need this.
         """

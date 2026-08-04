@@ -7,8 +7,6 @@ dependencies = [
     "torch",
     "tensordict",
     "numpy",
-    "pygame",
-    "mss",
     "wandb",
     "pandas",
     "matplotlib",

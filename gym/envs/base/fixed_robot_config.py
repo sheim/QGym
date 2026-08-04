@@ -5,15 +5,12 @@ class FixedRobotCfg(BaseConfig):
     class env:
         num_envs = 4096
         num_actuators = 1
-        env_spacing = 4.0  # not used with heightfields/trimeshes
+        env_spacing = 4.0
         root_height = 2.0
         episode_length_s = 4  # episode length in seconds
 
     class terrain:
-        mesh_type = "none"
-        horizontal_scale = 0.1  # [m]
-        vertical_scale = 0.005  # [m]
-        border_size = 25  # [m]
+        mesh_type = None
         static_friction = 1.0
         dynamic_friction = 1.0
         restitution = 0.0
@@ -47,28 +44,7 @@ class FixedRobotCfg(BaseConfig):
         terminate_after_contacts_on = []
         disable_gravity = False
         disable_motors = False
-        # * merge bodies connected by fixed joints.
-        # * Specific fixed joints can be kept by adding
-        # * " <... dont_collapse="true">
-        collapse_fixed_joints = True
         fix_base_link = True  # fix the base of the robot
-        # * see GymDofDriveModeFlags
-        # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
-        default_dof_drive_mode = 3
-        self_collisions = 0  # 1 to disable, 0 to enable...bitwise filter
-        # * replace collision cylinders with capsules,
-        # * leads to faster/more stable simulation
-        replace_cylinder_with_capsule = True
-        # * Some .obj meshes must be flipped from y-up to z-up
-        flip_visual_attachments = True
-
-        density = 0.001
-        angular_damping = 0.0
-        linear_damping = 0.0
-        max_angular_velocity = 1000.0
-        max_linear_velocity = 1000.0
-        armature = 0.0
-        thickness = 0.01
         rotor_inertia = 0.0
         joint_damping = 0.0
 
@@ -92,7 +68,6 @@ class FixedRobotCfg(BaseConfig):
         ref_env = 0
         pos = [10, 0, 6]  # [m]
         lookat = [11.0, 5, 3.0]  # [m]
-        record = False
         # MuJoCo passive viewer only: its side panels bind most letters to
         # visualisation toggles, which collide with keyboard teleop (see
         # gym/utils/interfaces/teleop_bindings.py).  Off by default;

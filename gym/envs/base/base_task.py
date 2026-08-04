@@ -22,7 +22,6 @@ class BaseTask(TaskSkeleton):
 
         super().__init__(num_envs=cfg.env.num_envs, device=device)
 
-        self.enable_viewer_sync = True
         self.exit = False
 
     # ── Rendering ────────────────────────────────────────────────────────────

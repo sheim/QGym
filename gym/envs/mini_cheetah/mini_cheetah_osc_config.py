@@ -20,7 +20,6 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
     class terrain(MiniCheetahCfg.terrain):
         mesh_type = "plane"
-        # mesh_type = 'trimesh'  # none, plane, heightfield or trimesh
 
     class init_state(MiniCheetahCfg.init_state):
         timeout_reset_ratio = 0.75
@@ -124,10 +123,7 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
         foot_name = "foot"
         penalize_contacts_on = ["thigh", "shank"]
         terminate_after_contacts_on = ["base"]
-        collapse_fixed_joints = False
         fix_base_link = False
-        self_collisions = 1  # 1 to disable, 0 to enable...bitwise filter
-        flip_visual_attachments = False
         disable_gravity = False
         disable_motors = False  # all torques set to 0
 

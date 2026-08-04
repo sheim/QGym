@@ -17,9 +17,7 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         episode_length_s = 5  # 100
 
     class terrain(LeggedRobotCfg.terrain):
-        curriculum = False
         mesh_type = "plane"
-        measure_heights = False
 
     class init_state(LeggedRobotCfg.init_state):
         reset_mode = "reset_to_range"
@@ -159,15 +157,6 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         fix_base_link = False
         disable_gravity = False
         disable_motors = False
-
-        # (1: disable, 0: enable...bitwise filter)
-        self_collisions = 0
-        collapse_fixed_joints = False
-        flip_visual_attachments = False
-
-        # Check GymDofDriveModeFlags
-        # (0: none, 1: pos tgt, 2: vel target, 3: effort)
-        default_dof_drive_mode = 3
 
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9

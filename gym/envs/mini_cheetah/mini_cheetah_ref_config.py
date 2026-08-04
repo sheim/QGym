@@ -51,10 +51,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
         foot_name = "foot"
         penalize_contacts_on = ["shank"]
         terminate_after_contacts_on = ["base", "thigh"]
-        collapse_fixed_joints = False
         fix_base_link = False
-        self_collisions = 1
-        flip_visual_attachments = False  # deprecated?
         disable_gravity = False
         disable_motors = False
 

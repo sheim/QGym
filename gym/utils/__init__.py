@@ -28,7 +28,6 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-from .gym_math_wrappers import quat_apply_yaw as quat_apply_yaw
 from .gym_math_wrappers import random_sample as random_sample
 
-__all__ = ["quat_apply_yaw", "random_sample"]
+__all__ = ["random_sample"]

@@ -95,7 +95,6 @@ def build_env(
     env_cfg.asset.disable_gravity = disable_gravity
     if not with_ground:
         env_cfg.terrain.mesh_type = None
-        env_cfg.terrain.measure_heights = False
     for name, value in (terrain_properties or {}).items():
         if value is not None:
             setattr(env_cfg.terrain, name, value)

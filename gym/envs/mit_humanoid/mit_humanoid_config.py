@@ -143,12 +143,6 @@ class MITHumanoidCfg(LeggedRobotCfg):
         penalize_contacts_on = ["arm"]
         terminate_after_contacts_on = ["base"]
         end_effector_names = ["hand", "foot"]  # ??
-        flip_visual_attachments = False
-        self_collisions = 0  # 1 to disagble, 0 to enable...bitwise filter
-        collapse_fixed_joints = False
-        # * see GymDofDriveModeFlags
-        # * (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
-        default_dof_drive_mode = 3
         fix_base_link = False
         disable_gravity = False
         disable_motors = False

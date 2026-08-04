@@ -32,19 +32,9 @@
 
 import torch
 
-from gym.utils.torch_quat import normalize, quat_apply
-
 
 def torch_rand_float(lower, upper, shape, device):
     return (upper - lower) * torch.rand(*shape, device=device) + lower
-
-
-# @ torch.jit.script
-def quat_apply_yaw(quat, vec):
-    quat_yaw = quat.clone().view(-1, 4)
-    quat_yaw[:, :2] = 0.0
-    quat_yaw = normalize(quat_yaw)
-    return quat_apply(quat_yaw, vec)
 
 
 # @ torch.jit.script
