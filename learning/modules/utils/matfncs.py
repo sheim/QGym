@@ -12,7 +12,7 @@ def create_lower_diagonal(x, n, device):
 def create_PD_lower_diagonal(x, n, device):
     tril_indices = torch.tril_indices(row=n, col=n, offset=0)
     diag_indices = (tril_indices[0] == tril_indices[1]).nonzero(as_tuple=True)[0]
-    x[..., diag_indices] = F.softplus(x[..., diag_indices])
+    x[..., diag_indices] = torch.F.softplus(x[..., diag_indices])
     L = torch.zeros((*x.shape[:-1], n, n), device=device, requires_grad=False)
     rows, cols = tril_indices
     L[..., rows, cols] = x
