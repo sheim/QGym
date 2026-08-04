@@ -65,8 +65,8 @@ Create environment and runner config subclasses in the task package.
 
 Add all four mappings in `gym/envs/__init__.py`: `class_dict`, `config_dict`,
 `runner_config_dict`, and `task_dict`. Add the package to
-`[tool.setuptools].packages` in `pyproject.toml`. Then surface any guarded
-import failure and inspect the live registry:
+`[tool.setuptools].packages` in `pyproject.toml`. Imports are fail-fast; inspect
+the live registry after adding the declarations:
 
 ```bash
 uv run --frozen python -c "import gym.envs; from gym.utils.task_registry import task_registry; print(sorted(task_registry.task_classes))"

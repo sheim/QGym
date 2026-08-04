@@ -59,8 +59,8 @@ backend. Record what executed.
   before treating it as a hang.
 - `gymutil` or an IsaacGym object is `None`: an IsaacGym-only script/test ran
   in the modern environment.
-- Task missing from the registry: import its class and configs directly;
-  legacy registration guards can swallow `ImportError`.
+- Task registration fails: import `gym.envs`; the fail-fast traceback identifies
+  the broken declared class or config. Then run the registry manifest test.
 - State/reward frozen on Warp: inspect cached tensor identity and values across
   steps; assembled public tensors must refresh in `step()`, not getters.
 - Floating base resets at the wrong pose: verify DOF reset does not clobber a

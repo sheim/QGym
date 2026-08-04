@@ -125,8 +125,8 @@ quaternion conversion, or contact routing requires a focused regression test.
   Let `task_registry.convert_frequencies_to_params()` derive decimation,
   `ctrl_dt`, `sim_dt`, and horizon-based discounts.
 - Add a task to `class_dict`, `config_dict`, `runner_config_dict`, and
-  `task_dict` in `gym/envs/__init__.py`, then verify it appears in the live
-  registry. Existing import guards can make a broken task disappear silently.
+  `task_dict` in `gym/envs/__init__.py`. Task imports are fail-fast, and the
+  registry manifest test verifies that every declaration registers exactly.
 - Runner observation lists contain environment attribute names.
   `TaskSkeleton.get_state()` divides named quantities by their configured
   scale; action assignment multiplies them back. Every named scaled quantity

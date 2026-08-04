@@ -1,8 +1,7 @@
 import torch
 
-# from gym.envs.base.legged_robot import LeggedRobot
 from gym.envs.mit_humanoid.mit_humanoid import MIT_Humanoid
-from isaacgym.torch_utils import torch_rand_float
+from gym.utils.gym_math_wrappers import torch_rand_float
 
 
 class Lander(MIT_Humanoid):
