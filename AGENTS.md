@@ -74,8 +74,8 @@ uv run --frozen python -c "import torch, mujoco_warp; print(torch.cuda.is_availa
 VSim is optional, CUDA-only, licensed, and machine-local. Follow
 `thirdparty/vlearn/README.md`, install with `uv sync --locked --extra vsim`,
 and launch processes with `uv run --env-file .env.vsim ...`. Validate it with
-`bash scripts/run_vsim_tests.sh`; ordinary unit tests intentionally skip VSim
-unless explicitly enabled.
+`bash scripts/run_vsim_tests.sh`; the default test gate deselects VSim unless
+it is explicitly requested.
 
 On macOS, headless MuJoCo CPU works normally. The passive viewer must run
 under `mjpython` with a compatible dylib-bearing Python; use the recipe in
@@ -182,13 +182,14 @@ uv run --frozen python -m pytest -q
 ```
 
 `pyproject.toml` sets `testpaths = ["tests/unit_tests"]`, so bare pytest now
-targets the intended suite. Do not run all of `tests/`; legacy integration and
-regression suites still require IsaacGym and missing external artifacts.
+targets the intended CPU suite. MuJoCo Warp tests use the `warp` marker and
+licensed VSim tests use the `vsim` marker; request those groups explicitly.
 
 Additional evidence by change type:
 
 - Backend/state/reset/contact change: relevant contract, liveness, routing,
-  physics, and CPU/Warp comparison tests; run licensed VSim tests if touched.
+  physics, and CPU/Warp comparison tests. Run `uv run --frozen python -m pytest
+  -q -m warp` on CUDA and licensed VSim tests if touched.
 - New robot/task: registry proof, reward/observation shape tests, asset limit
   and inertia checks as relevant, then a tiny CPU smoke train.
 - Reward/algorithm/normalization change: focused math/unit tests plus a

@@ -13,6 +13,8 @@ import torch
 from gym.utils.task_registry import task_registry
 from tests.unit_tests.conftest import vsim_guard
 
+pytestmark = pytest.mark.vsim
+
 
 def _build_env():
     import gym.envs  # noqa: F401  — registers tasks

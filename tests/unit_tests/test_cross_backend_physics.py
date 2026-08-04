@@ -4,7 +4,7 @@ Both backends are initialised from identical initial conditions (same seed)
 and stepped in lockstep with zero torque.  The test asserts that dof_pos and
 dof_vel trajectories agree to within a tight tolerance at every step.
 
-Skipped if mujoco_warp is not installed or CUDA is not available.
+Run explicitly with ``pytest -m warp`` on a CUDA machine.
 """
 
 import math
@@ -14,6 +14,8 @@ import torch
 
 from gym import LEGGED_GYM_ROOT_DIR
 import os
+
+pytestmark = pytest.mark.warp
 
 PENDULUM_URDF = os.path.join(
     LEGGED_GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
@@ -47,10 +49,8 @@ def _random_ics(seed=42):
 
 @pytest.fixture
 def cpu_and_warp_backends():
-    pytest.importorskip("mujoco")
-    pytest.importorskip("mujoco_warp")
     if not torch.cuda.is_available():
-        pytest.skip("CUDA required for cross-backend comparison")
+        pytest.fail("Warp tests requested but CUDA is not available", pytrace=False)
 
     from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
     from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
@@ -63,7 +63,9 @@ def cpu_and_warp_backends():
     warp = MuJocoWarpBackend()
     warp.setup(cfg, num_envs=N_ENVS, device="cuda:0", task=None)
 
-    return cpu, warp
+    yield cpu, warp
+    cpu.close()
+    warp.close()
 
 
 def test_trajectories_match(cpu_and_warp_backends):

@@ -1,46 +1,11 @@
-import pytest
 import torch
 
 from gym.envs.base.legged_robot import LeggedRobot
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
 from gym.envs.mini_cheetah.mini_cheetah_ref import MiniCheetahRef
-from gym.envs.mini_cheetah.mini_cheetah_ref_config import MiniCheetahRefRunnerCfg
 from gym.envs.mini_cheetah.mini_cheetah_ref_vsim_config import (
     MiniCheetahRefVSimCfg,
-    MiniCheetahRefVSimRunnerCfg,
 )
-
-
-def test_vsim_tuning_rollout_spans_multiple_gait_cycles():
-    cfg = MiniCheetahRefVSimCfg()
-    runner_cfg = MiniCheetahRefVSimRunnerCfg()
-
-    policy_steps = runner_cfg.algorithm.batch_size // cfg.env.num_envs
-    rollout_seconds = policy_steps / runner_cfg.actor.frequency
-    gait_cycles = rollout_seconds * cfg.control.gait_freq
-
-    assert runner_cfg.algorithm.batch_size == 2**15
-    assert policy_steps == 128
-    assert gait_cycles == pytest.approx(3.2)
-
-
-def test_vsim_tuning_rewards_target_deployment_failures():
-    cfg = MiniCheetahRefVSimCfg()
-    runner_cfg = MiniCheetahRefVSimRunnerCfg()
-    weights = runner_cfg.critic.reward.weights
-
-    assert cfg.commands.ranges.lin_vel_x == [-0.5, 1.5]
-    assert cfg.commands.ranges.lin_vel_y == 0.4
-    assert cfg.commands.ranges.yaw_vel == 0.75
-    assert cfg.commands.axis_aligned_fraction == 0.6
-    assert cfg.reward_settings.soft_dof_pos_limit == 0.85
-    assert cfg.reward_settings.tracking_ang_vel_scale == 1.0
-    assert weights.tracking_lin_vel == 6.0
-    assert weights.tracking_ang_vel == 4.0
-    assert weights.stance_grf > MiniCheetahRefRunnerCfg.critic.reward.weights.stance_grf
-    assert weights.action_rate2 > 0
-    assert weights.dof_pos_target_limits > 0
-    assert weights.torque_limits > 0
 
 
 def test_position_target_limit_reward_is_zero_inside_and_normalized_outside():

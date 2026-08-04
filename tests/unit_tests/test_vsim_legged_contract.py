@@ -9,7 +9,10 @@ vertical contact force on a settled robot must carry its weight
 Opt-in: runs only under scripts/run_vsim_tests.sh (license + CUDA).
 """
 
+import pytest
 import torch
+
+pytestmark = pytest.mark.vsim
 
 MC_WEIGHT_N = 8.292 * 9.81
 

@@ -22,11 +22,9 @@ from gym.utils.task_registry import task_registry
 
 
 def _build_env(device: str):
-    pytest.importorskip("mujoco")
     if device.startswith("cuda"):
-        pytest.importorskip("mujoco_warp")
         if not torch.cuda.is_available():
-            pytest.skip("CUDA not available")
+            pytest.fail("Warp tests requested but CUDA is not available", pytrace=False)
 
     import gym.envs  # noqa: F401  — registers tasks
 
@@ -98,11 +96,9 @@ def _step_and_check_liveness(env):
 
 
 def _build_env_reset_to_basic(device: str, base_z: float):
-    pytest.importorskip("mujoco")
     if device.startswith("cuda"):
-        pytest.importorskip("mujoco_warp")
         if not torch.cuda.is_available():
-            pytest.skip("CUDA not available")
+            pytest.fail("Warp tests requested but CUDA is not available", pytrace=False)
 
     import gym.envs  # noqa: F401  — registers tasks
 
@@ -141,6 +137,7 @@ def test_floating_base_reset_placement_cpu():
     _assert_base_spawns_at_configured_height("cpu")
 
 
+@pytest.mark.warp
 def test_floating_base_reset_placement_warp():
     _assert_base_spawns_at_configured_height("cuda:0")
 
@@ -150,9 +147,7 @@ def test_task_state_liveness_cpu():
     _step_and_check_liveness(env)
 
 
+@pytest.mark.warp
 def test_task_state_liveness_warp():
-    pytest.importorskip("mujoco_warp")
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA not available")
     env = _build_env(device="cuda:0")
     _step_and_check_liveness(env)

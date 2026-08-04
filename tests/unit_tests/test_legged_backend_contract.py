@@ -157,6 +157,7 @@ class TestLeggedReset:
 # ── Warp backend (same tests) ─────────────────────────────────────────────────
 
 
+@pytest.mark.warp
 class TestLeggedWarpShapes:
     def test_num_dof(self, legged_warp_backend):
         assert legged_warp_backend.num_dof == 12
@@ -180,13 +181,12 @@ class TestLeggedWarpShapes:
 # ── Cross-backend comparison ──────────────────────────────────────────────────
 
 
+@pytest.mark.warp
 class TestLeggedCrossBackend:
     @pytest.fixture
     def cpu_and_warp(self):
-        pytest.importorskip("mujoco")
-        pytest.importorskip("mujoco_warp")
         if not torch.cuda.is_available():
-            pytest.skip("CUDA required for cross-backend comparison")
+            pytest.fail("Warp tests requested but CUDA is not available", pytrace=False)
 
         from tests.unit_tests.conftest import _make_mini_cheetah_cfg
         from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
@@ -197,7 +197,9 @@ class TestLeggedCrossBackend:
         cpu.setup(cfg, num_envs=4, device="cpu", task=None)
         warp = MuJocoWarpBackend()
         warp.setup(cfg, num_envs=4, device="cuda:0", task=None)
-        return cpu, warp
+        yield cpu, warp
+        cpu.close()
+        warp.close()
 
     def test_trajectories_match(self, cpu_and_warp):
         """CPU and Warp backends should produce near-identical states.

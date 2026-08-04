@@ -1,17 +1,14 @@
-"""Shared fixtures for unit tests.
+"""Shared fixtures for the portable and explicit backend test groups."""
 
-No IsaacGym dependency — these tests must run on any machine, including Mac
-CI without a GPU.  MuJoCo fixtures are skipped if mujoco is not installed.
-"""
-
+import os
 import types
+
 import pytest
 import torch
 
 from tests.unit_tests.mock_backend import MockBackend
 
 # Path to the pendulum URDF used by MuJoCo backend fixtures
-import os
 from gym import LEGGED_GYM_ROOT_DIR
 
 PENDULUM_URDF = os.path.join(
@@ -28,16 +25,22 @@ MINI_CHEETAH_URDF = os.path.join(
 
 
 def vsim_guard():
-    """vsim tests are opt-in: CUDA + closed-source licensed engine.
+    """Fail clearly when the explicitly requested VSim group cannot run.
 
     Run via scripts/run_vsim_tests.sh (sets Q2_VSIM_TESTS, LD_LIBRARY_PATH,
     VL_WORKING_DIRECTORY).
     """
     if os.environ.get("Q2_VSIM_TESTS") != "1":
-        pytest.skip("vsim tests are opt-in — run scripts/run_vsim_tests.sh")
-    pytest.importorskip("vlearn")
+        pytest.fail(
+            "VSim tests must be launched with scripts/run_vsim_tests.sh",
+            pytrace=False,
+        )
+    try:
+        __import__("vlearn")
+    except ImportError:
+        pytest.fail("VSim tests requested but vlearn is not installed", pytrace=False)
     if not torch.cuda.is_available():
-        pytest.skip("CUDA not available")
+        pytest.fail("VSim tests requested but CUDA is not available", pytrace=False)
 
 
 def _make_vsim_backend(cfg, num_envs: int):
@@ -79,99 +82,108 @@ def _make_pendulum_cfg(sim_dt: float = 0.005) -> types.SimpleNamespace:
     return types.SimpleNamespace(asset=asset, sim=sim, sim_dt=sim_dt)
 
 
-# ── Device parametrisation ───────────────────────────────────────────────────
-
-
-def _available_devices():
-    devices = ["cpu"]
-    if torch.cuda.is_available():
-        devices.append("cuda:0")
-    return devices
-
-
-@pytest.fixture(params=_available_devices())
-def device(request):
-    return request.param
-
-
 # ── MockBackend fixtures ─────────────────────────────────────────────────────
 
 
 @pytest.fixture
-def backend(device):
-    """4-env pendulum backend on the parametrised device."""
-    return MockBackend(num_envs=4, device=device)
-
-
-@pytest.fixture
-def backend_16(device):
-    """16-env pendulum backend — used for independence / reset tests."""
-    return MockBackend(num_envs=16, device=device)
+def mock_backend():
+    return MockBackend(num_envs=4, device="cpu")
 
 
 # ── MuJocoCPUBackend fixtures ────────────────────────────────────────────────
 
 
 @pytest.fixture
-def mujoco_cpu_backend(device):
-    """4-env pendulum on MuJocoCPUBackend (CPU only; skipped if mujoco absent)."""
-    mujoco = pytest.importorskip("mujoco")  # noqa: F841
+def mujoco_cpu_backend():
+    """Four-environment pendulum on the mandatory MuJoCo CPU backend."""
     from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
 
-    if device != "cpu":
-        pytest.skip("MuJocoCPUBackend only supports CPU")
-
     b = MuJocoCPUBackend()
-    b.setup(_make_pendulum_cfg(), num_envs=4, device=device, task=None)
-    return b
+    b.setup(_make_pendulum_cfg(), num_envs=4, device="cpu", task=None)
+    yield b
+    b.close()
 
 
 @pytest.fixture
-def mujoco_cpu_backend_16(device):
-    """16-env pendulum on MuJocoCPUBackend."""
-    pytest.importorskip("mujoco")
+def mujoco_cpu_backend_16():
     from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
 
-    if device != "cpu":
-        pytest.skip("MuJocoCPUBackend only supports CPU")
-
     b = MuJocoCPUBackend()
-    b.setup(_make_pendulum_cfg(), num_envs=16, device=device, task=None)
-    return b
+    b.setup(_make_pendulum_cfg(), num_envs=16, device="cpu", task=None)
+    yield b
+    b.close()
 
 
 # ── MuJocoWarpBackend fixtures ───────────────────────────────────────────────
 
 
 @pytest.fixture
-def mujoco_warp_backend(device):
-    """4-env pendulum on MuJocoWarpBackend (skipped if mujoco_warp absent)."""
-    pytest.importorskip("mujoco_warp")
+def mujoco_warp_backend():
+    """Four-environment pendulum on the explicitly requested CUDA backend."""
+    if not torch.cuda.is_available():
+        pytest.fail("Warp tests requested but CUDA is not available", pytrace=False)
+    try:
+        __import__("mujoco_warp")
+    except ImportError:
+        pytest.fail(
+            "Warp tests requested but mujoco-warp is not installed", pytrace=False
+        )
     from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
 
-    if not torch.cuda.is_available() and device == "cuda:0":
-        pytest.skip("CUDA not available")
-
     b = MuJocoWarpBackend()
-    # Warp defaults to cuda:0 when available; fall back to cpu
-    warp_device = device if torch.cuda.is_available() else "cpu"
-    b.setup(_make_pendulum_cfg(), num_envs=4, device=warp_device, task=None)
-    return b
+    b.setup(_make_pendulum_cfg(), num_envs=4, device="cuda:0", task=None)
+    yield b
+    b.close()
 
 
 @pytest.fixture
-def mujoco_warp_backend_16(device):
-    """16-env pendulum on MuJocoWarpBackend."""
-    pytest.importorskip("mujoco_warp")
+def mujoco_warp_backend_16():
+    if not torch.cuda.is_available():
+        pytest.fail("Warp tests requested but CUDA is not available", pytrace=False)
+    try:
+        __import__("mujoco_warp")
+    except ImportError:
+        pytest.fail(
+            "Warp tests requested but mujoco-warp is not installed", pytrace=False
+        )
     from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
 
-    if not torch.cuda.is_available() and device == "cuda:0":
-        pytest.skip("CUDA not available")
-
     b = MuJocoWarpBackend()
-    warp_device = device if torch.cuda.is_available() else "cpu"
-    b.setup(_make_pendulum_cfg(), num_envs=16, device=warp_device, task=None)
-    return b
+    b.setup(_make_pendulum_cfg(), num_envs=16, device="cuda:0", task=None)
+    yield b
+    b.close()
+
+
+PENDULUM_BACKENDS = [
+    pytest.param("mujoco_cpu_backend", id="mujoco-cpu"),
+    pytest.param(
+        "mujoco_warp_backend",
+        id="mujoco-warp",
+        marks=pytest.mark.warp,
+    ),
+    pytest.param("vsim_backend", id="vsim", marks=pytest.mark.vsim),
+]
+
+PENDULUM_BACKENDS_16 = [
+    pytest.param("mujoco_cpu_backend_16", id="mujoco-cpu"),
+    pytest.param(
+        "mujoco_warp_backend_16",
+        id="mujoco-warp",
+        marks=pytest.mark.warp,
+    ),
+    pytest.param("vsim_backend_16", id="vsim", marks=pytest.mark.vsim),
+]
+
+
+@pytest.fixture(params=PENDULUM_BACKENDS)
+def pendulum_backend(request):
+    """A real backend selected by the test execution group."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=PENDULUM_BACKENDS_16)
+def pendulum_backend_16(request):
+    return request.getfixturevalue(request.param)
 
 
 # ── Floating-base (mini_cheetah) fixtures ───────────────────────────────────
@@ -219,23 +231,28 @@ def legged_vsim_backend():
 @pytest.fixture
 def legged_cpu_backend():
     """4-env mini_cheetah on MuJocoCPUBackend (floating-base)."""
-    pytest.importorskip("mujoco")
     from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
 
     b = MuJocoCPUBackend()
     b.setup(_make_mini_cheetah_cfg(), num_envs=4, device="cpu", task=None)
-    return b
+    yield b
+    b.close()
 
 
 @pytest.fixture
 def legged_warp_backend():
     """4-env mini_cheetah on MuJocoWarpBackend (floating-base)."""
-    pytest.importorskip("mujoco_warp")
-    from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
-
     if not torch.cuda.is_available():
-        pytest.skip("CUDA required for MuJocoWarpBackend")
+        pytest.fail("Warp tests requested but CUDA is not available", pytrace=False)
+    try:
+        __import__("mujoco_warp")
+    except ImportError:
+        pytest.fail(
+            "Warp tests requested but mujoco-warp is not installed", pytrace=False
+        )
+    from gym.envs.base.mujoco_warp_backend import MuJocoWarpBackend
 
     b = MuJocoWarpBackend()
     b.setup(_make_mini_cheetah_cfg(), num_envs=4, device="cuda:0", task=None)
-    return b
+    yield b
+    b.close()

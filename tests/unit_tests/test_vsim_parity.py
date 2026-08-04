@@ -8,8 +8,7 @@ bounds are stated here and never silently widened:
    T = 2*pi*sqrt(I/(m*g*L)) — within 5% (integrator-agnostic to O(dt)).
 2. Damped-pendulum energy envelope vs MuJocoCPUBackend from IDENTICAL
    initial conditions — relative deviation < 20% while the reference
-   envelope is above 0.05 J (the late tail is dominated by tiny residuals
-   and is covered by the convergence test in test_vsim_physics.py).
+   envelope is above 0.05 J (the late tail is dominated by tiny residuals).
 
 Opt-in: runs only under scripts/run_vsim_tests.sh (license + CUDA).
 """
@@ -23,6 +22,8 @@ import torch
 
 from gym import LEGGED_GYM_ROOT_DIR
 from tests.unit_tests.conftest import vsim_guard
+
+pytestmark = pytest.mark.vsim
 
 PENDULUM_URDF = os.path.join(
     LEGGED_GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"

@@ -3,7 +3,9 @@
 Lineage: RSL `legged_gym` → MIT Biomimetics `pkGym`/`QGym` → this repo.
 Branch **`port`** is the canonical migration branch (IsaacGym → MuJoCo backend swap).
 `main`/`dev` predate the port. `MIGRATION_PLAN.md` is the plan of record: phases 0–3
-complete, **Phase 4 (validation + IsaacGym removal) open**. `README_MUJOCO.md` is the
+complete, with **Phase 4 IsaacGym retirement active**. Cross-engine policy parity
+and IsaacGym checkpoint portability are historical evidence, not removal gates.
+`README_MUJOCO.md` is the
 user-facing doc; `README.md` is a legacy stub. Further physics backends
 (v-sim) are planned — new engines follow `q2-backend-integration`.
 
@@ -11,7 +13,8 @@ user-facing doc; `README.md` is a legacy stub. Further physics backends
 
 ```bash
 uv sync                                     # creates .venv (Python 3.11 — pinned for vsim cp311 wheels)
-uv run python -m pytest tests/unit_tests/   # the real test suite (~30 s; vsim tests skip without opt-in)
+uv run --frozen python -m pytest -q         # mandatory pure + MuJoCo CPU gate
+uv run --frozen python -m pytest -q -m warp # MuJoCo Warp CUDA gate
 uv run scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256 --headless --disable_wandb
 uv run scripts/play_mujoco.py --task mini_cheetah        # plays latest checkpoint, keyboard teleop on
 # vsim backend (licensed GPU engine, ~10× warp throughput; needs .env.vsim):
@@ -32,9 +35,9 @@ require IsaacGym (Python 3.8 venv, not present here) and will fail in this env.
 - Run `uv run ruff format . && uv run ruff check .` at the end of every session.
 - Never commit files > 100 KB (CI + pre-commit both enforce this).
 - `logs/`, `user/wandb_config.json`, `*.pt` are gitignored — never force-add them.
-- Do not run bare `pytest` from the repo root: `tests/integration_tests/` builds
-  IsaacGym envs at session start and INTERNALERRORs on mere collection. Always
-  target `tests/unit_tests/` (or `gym learning`) explicitly.
+- Bare `pytest` targets the mandatory pure + MuJoCo CPU suite. Hardware groups
+  are explicit: use `-m warp` for MuJoCo Warp and `scripts/run_vsim_tests.sh`
+  for licensed VSim.
 
 ## Critical landmine — FIXED on this branch (2026-07-11)
 

@@ -567,7 +567,30 @@ Then 3g → 3h → 3i sequentially.  3j scaffolded early, finalized after 3i.
 
 **Goal:** Confirm correctness, benchmark performance, remove IsaacGym.
 
-### Validation checklist
+### Retirement scope decision — 2026-08-04
+
+IsaacGym removal no longer depends on IsaacGym checkpoint portability,
+IsaacGym throughput comparisons, cross-engine policy parity, rough terrain,
+or projectiles. Those results remain below as historical engineering evidence,
+not as removal gates. The supported engine families are MuJoCo (CPU and Warp
+execution modes) and optional licensed VSim, initially on flat ground.
+
+Domain randomization is intentionally deferred. Existing IsaacGym-specific
+friction and mass randomization code and configuration may be removed during
+retirement; a later feature will define one backend-neutral sampling contract
+and implement its effects deliberately for both engine families.
+
+The removal gates are now:
+
+1. A deterministic, skip-free default suite for pure and MuJoCo CPU behavior,
+   plus explicit passing Warp and VSim groups on capable machines.
+2. Explicit registration and construction of every supported task; broken
+   imports must fail rather than silently remove tasks from the registry.
+3. No executable Python import or runtime branch for IsaacGym.
+4. A clean frozen uv environment, package build, lint pass, task smoke tests,
+   and short supported-runner checks.
+
+### Historical validation checklist (superseded as removal gates)
 
 | Check | Method |
 |---|---|

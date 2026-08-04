@@ -29,9 +29,9 @@ def test_mini_cheetah_layout_v1_is_explicit():
     assert layout.body_group_indices("feet") == (4, 8, 12, 16)
 
 
-def test_backend_layout_is_non_optional(backend):
-    assert tuple(backend.dof_names) == backend.robot_layout.dof_names
-    assert tuple(backend.body_names) == backend.robot_layout.body_names
+def test_backend_layout_is_non_optional(mock_backend):
+    assert tuple(mock_backend.dof_names) == mock_backend.robot_layout.dof_names
+    assert tuple(mock_backend.body_names) == mock_backend.robot_layout.body_names
 
 
 def test_permuted_native_dof_round_trip():
@@ -98,6 +98,7 @@ def test_mujoco_named_torque_routing(legged_cpu_backend):
         )
 
 
+@pytest.mark.vsim
 def test_vsim_exposes_canonical_layout(legged_vsim_backend):
     backend = legged_vsim_backend
     assert backend.dof_names == MINI_CHEETAH_DOF_NAMES

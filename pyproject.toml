@@ -51,11 +51,14 @@ packages = ["gym", "gym.envs", "gym.envs.base", "gym.envs.mini_cheetah",
 # (unlike `python -m pytest`), and the test tree imports absolutely
 # (`from tests.unit_tests...`) — without this, bare `pytest` can't load conftest.
 pythonpath = ["."]
-# testpaths: bare `pytest` (no path) runs the real suite.  tests/ as a whole is
-# deliberately NOT the default: tests/integration_tests needs IsaacGym and its
-# own Python 3.8 venv (scripts/run_isaacgym.sh), and its session-start hook
-# builds every env, which aborts the run when isaacgym is absent.
 testpaths = ["tests/unit_tests"]
+# The default gate is deterministic and portable: pure tests plus MuJoCo CPU.
+# Hardware-specific tests are selected explicitly with `-m warp` or `-m vsim`.
+addopts = ["--strict-markers", "-m", "not warp and not vsim"]
+markers = [
+    "warp: requires MuJoCo Warp on CUDA",
+    "vsim: requires the licensed VSim backend on CUDA",
+]
 
 [tool.ruff]
 exclude = [

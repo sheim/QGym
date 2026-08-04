@@ -84,12 +84,12 @@ def _stable_energy(dof_pos: torch.Tensor, dof_vel: torch.Tensor) -> torch.Tensor
 
 @pytest.fixture
 def damped_backend():
-    pytest.importorskip("mujoco")
     from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
 
     b = MuJocoCPUBackend()
     b.setup(_make_cfg(), num_envs=N_ENVS, device="cpu", task=None)
-    return b
+    yield b
+    b.close()
 
 
 def _set_lower_half_ics(b, seed: int = 42):
@@ -106,8 +106,8 @@ def _set_lower_half_ics(b, seed: int = 42):
     b.reset_dof_state(torch.arange(N_ENVS))
 
 
-def test_energy_monotonically_decreases(damped_backend):
-    """Total mechanical energy must never increase under damped free motion."""
+def test_damped_motion_dissipates_energy_and_converges(damped_backend):
+    """Damped motion must lose energy and reach the stable equilibrium."""
     b = damped_backend
     _set_lower_half_ics(b)
 
@@ -124,16 +124,6 @@ def test_energy_monotonically_decreases(damped_backend):
             f"(max env energy: {energy.max():.4f} J)"
         )
         prev_energy = energy
-
-
-def test_all_envs_converge_to_bottom(damped_backend):
-    """All environments must reach near-zero energy (stable downward equilibrium)."""
-    b = damped_backend
-    _set_lower_half_ics(b)
-
-    torques = torch.zeros(N_ENVS, 1)
-    for _ in range(N_STEPS):
-        b.step(torques)
 
     final_energy = _stable_energy(b.dof_pos, b.dof_vel)
     max_residual = final_energy.max().item()
