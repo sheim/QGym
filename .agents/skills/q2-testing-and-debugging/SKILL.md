@@ -22,10 +22,16 @@ Iterate with a focused file/node or expression:
 ```bash
 uv run --frozen python -m pytest tests/unit_tests/test_task_state_liveness.py -q
 uv run --frozen python -m pytest -q -k 'routing or reset'
+uv run --frozen python -m pytest gym -q
+uv run --frozen python -m pytest learning -q
 ```
 
-Do not invoke all of `tests/`; legacy integration/regression suites require
-IsaacGym and external artifacts. Run licensed VSim tests separately:
+Put cross-cutting backend, task, and full-stack tests under the configured
+`tests/unit_tests/` path. Colocate small deterministic tests with implementations
+under `gym/` or `learning/` when they do not require simulator/full-stack setup
+and also serve as a concise usage example. Bare pytest does not collect these
+colocated tests; run the relevant source root explicitly. Run licensed VSim
+tests separately:
 
 ```bash
 bash scripts/run_vsim_tests.sh
@@ -57,8 +63,8 @@ backend. Record what executed.
   episodes before diagnosing the logger.
 - First Warp run is silent: inspect traceback/GPU activity for JIT compilation
   before treating it as a hang.
-- `gymutil` or an IsaacGym object is `None`: an IsaacGym-only script/test ran
-  in the modern environment.
+- Legacy-simulator guard failure: inspect the reported import/name and remove
+  the dependency rather than hiding it behind an optional import.
 - Task registration fails: import `gym.envs`; the fail-fast traceback identifies
   the broken declared class or config. Then run the registry manifest test.
 - State/reward frozen on Warp: inspect cached tensor identity and values across
@@ -72,8 +78,8 @@ backend. Record what executed.
 - Joint limits are huge: verify the URDF limit tags and Q2's explicit parser.
 - Reward optimizes the wrong posture: state what input makes each `_sqrdexp`
   argument zero and test that point.
-- Config change does nothing: find the actual consumer; many legacy IsaacGym
-  fields are not implemented by modern backends.
+- Config change does nothing: find the actual consumer. Remove stale fields
+  rather than preserving configuration that no supported backend implements.
 - CPU and Warp match but VSim differs only after contact: use policy-free
   step/drop/impact/slide probes before blaming observations or PPO.
 
@@ -92,5 +98,6 @@ backend. Record what executed.
 7. Update `MIGRATION_PLAN.md` if the finding invalidates or advances campaign
    evidence.
 
-Current GitHub CI follows a legacy install/test path. Treat the local modern
-suite as authoritative unless the workflows are updated and verified.
+GitHub CI runs the uv-managed portable suite. Local validation remains required
+for colocated tests, Ruff, packaging, smoke training, Warp, and licensed VSim
+evidence.

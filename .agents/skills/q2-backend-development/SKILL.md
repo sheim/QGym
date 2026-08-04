@@ -1,6 +1,6 @@
 ---
 name: q2-backend-development
-description: Implement, modify, or review Q2 physics backends and their task-facing state contract. Use for changes under gym/envs/base involving SimBackend, MuJoCo CPU or Warp, VSim, IsaacGym compatibility, RobotLayout, state tensors, reset ordering, quaternion conversion, contacts, asset import, backend selection, or a new physics engine.
+description: Implement, modify, or review Q2 physics backends and their task-facing state contract. Use for changes under gym/envs/base involving SimBackend, MuJoCo CPU or Warp, VSim, RobotLayout, state tensors, reset ordering, quaternion conversion, contacts, asset import, backend selection, or a new physics engine.
 ---
 
 # Q2 Backend Development

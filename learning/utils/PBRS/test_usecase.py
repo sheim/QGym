@@ -1,60 +1,35 @@
-from learning.utils import Logger
-from learning.utils import PotentialBasedRewardShaping
-
 import torch
 
+from learning.utils import PotentialBasedRewardShaping
 
-# let's create a simple dummy environment
-class MyTask:
+
+class ExampleTask:
+    """Minimal task showing the interface expected by PBRS."""
+
     def __init__(self):
-        super().__init__()
+        self.potentials = {"progress": 1.0, "stability": 2.0}
 
     def compute_reward(self, reward_weights):
-        reward = torch.zeros(1, device="cpu", dtype=torch.float)
-        for name, weight in reward_weights.items():
-            reward += weight * self._eval_reward(name)
-        return reward
-
-    def _eval_reward(self, name):
-        return eval("self._reward_" + name + "()")
-
-    def _reward_first(self):
-        return torch.ones(1)
-
-    def _reward_second(self):
-        return torch.ones(1)
+        reward = sum(
+            weight * self.potentials[name] for name, weight in reward_weights.items()
+        )
+        return torch.tensor([reward])
 
 
-def test_PBRS():
-    logger = Logger()
-    logger.initialize(num_envs=1, episode_dt=0.1, total_iterations=100, device="cpu")
-    self_env = MyTask()
-
-    # let's create a dummy critic_cfg with just the reward weights
-    critic_cfg = {"reward": {"weights": {"dummy": 1}}}
-    critic_cfg["reward"]["pbrs_weights"] = {"first": 1, "second": 2}
-
-    # and a dummy env
-
-    PBRS = PotentialBasedRewardShaping(
-        critic_cfg["reward"]["pbrs_weights"], device="cpu"
+def test_potential_based_reward_shaping_usecase():
+    task = ExampleTask()
+    shaping = PotentialBasedRewardShaping(
+        {"progress": 1.0, "stability": 2.0},
+        device="cpu",
     )
-    assert PBRS.get_reward_keys() == ["PBRS_first", "PBRS_second"]
+    shaping.set_discount(horizon=1.0, dt=0.1)
 
-    rewards_dict = {}
-    logger.register_rewards(PBRS.get_reward_keys())
+    assert shaping.get_reward_keys() == ["PBRS_progress", "PBRS_stability"]
 
-    # get new actions
+    shaping.pre_step(task)
+    task.potentials.update(progress=2.0, stability=3.0)
+    shaped_rewards = shaping.post_step(task, mask=torch.ones(1))
 
-    PBRS.pre_step(self_env)
-    assert PBRS.prestep_counter > PBRS.poststep_counter
-    # env step, get obs, rewards, dones etc.
-
-    dones = torch.zeros(1, dtype=torch.bool)
-
-    # handle standard rewards, and in addition...
-    rewards_dict.update(PBRS.post_step(self_env, dones))
-    assert PBRS.prestep_counter == PBRS.poststep_counter
-
-    logger.log_rewards(rewards_dict)
-    logger.finish_step(dones)
+    torch.testing.assert_close(shaped_rewards["PBRS_progress"], torch.tensor([0.8]))
+    torch.testing.assert_close(shaped_rewards["PBRS_stability"], torch.tensor([1.4]))
+    assert shaping.prestep_counter == shaping.poststep_counter == 1

@@ -64,13 +64,16 @@ Create environment and runner config subclasses in the task package.
 ## Register and package
 
 Add all four mappings in `gym/envs/__init__.py`: `class_dict`, `config_dict`,
-`runner_config_dict`, and `task_dict`. Add the package to
-`[tool.setuptools].packages` in `pyproject.toml`. Imports are fail-fast; inspect
-the live registry after adding the declarations:
+`runner_config_dict`, and `task_dict`. Update setuptools package/data discovery
+so the built wheel contains the task module and its required assets. Imports
+are fail-fast; inspect the live registry after adding the declarations:
 
 ```bash
 uv run --frozen python -c "import gym.envs; from gym.utils.task_registry import task_registry; print(sorted(task_registry.task_classes))"
 ```
+
+Do not treat an editable-tree import as packaging proof. Build the wheel and
+smoke-import the registered task from an isolated installation.
 
 ## Prove the task
 

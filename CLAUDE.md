@@ -1,97 +1,46 @@
-# Q2 — RL training for legged robots
+# Q2 Developer Entry Point
 
-Lineage: RSL `legged_gym` → MIT Biomimetics `pkGym`/`QGym` → this repo.
-The supported physics backends are MuJoCo CPU, MuJoCo Warp, and optional
-licensed VSim. The executable legacy simulator path has been removed;
-`MIGRATION_PLAN.md` retains its history. `README_MUJOCO.md` is the user-facing
-setup and CLI guide.
+Read `AGENTS.md` before changing this repository. It is the durable,
+repository-wide developer guide and source of current architecture, style,
+environment, and validation rules.
 
-## Environment (uv only)
+Q2 supports MuJoCo CPU, MuJoCo Warp, and optional licensed VSim. The executable
+IsaacGym path has been removed. `MIGRATION_PLAN.md` retains the migration and
+experiment history; its superseded sections are not current setup instructions.
+
+## Common commands
+
+Use the uv-managed `.venv` and locked dependency graph:
 
 ```bash
-uv sync                                     # creates .venv (Python 3.11 — pinned for vsim cp311 wheels)
-uv run --frozen python -m pytest -q         # mandatory pure + MuJoCo CPU gate
-uv run --frozen python -m pytest -q -m warp # MuJoCo Warp CUDA gate
-uv run scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256 --headless --disable_wandb
-uv run scripts/play_mujoco.py --task mini_cheetah        # plays latest checkpoint, keyboard teleop on
-# vsim backend (licensed GPU engine, ~10× warp throughput; needs .env.vsim):
-uv run --env-file .env.vsim scripts/train_mujoco.py --task mini_cheetah --backend vsim --device cuda:0 --num_envs 4096 --headless
-bash scripts/run_vsim_tests.sh              # vsim suite (opt-in, local-only)
+uv sync --frozen
+uv run --frozen python -m pytest -q
+uv run --frozen python -m pytest gym -q
+uv run --frozen python -m pytest learning -q
+uv run --frozen python -m pytest -q -m warp
+uv run --frozen ruff check .
 ```
 
-Use `pyproject.toml`, `uv.lock`, and the uv-managed `.venv` exclusively. Do not
-add parallel pip requirements or setup files.
+Use `README_MUJOCO.md` for setup, training, playback, and optional VSim
+commands. Cross-cutting backend, task, and full-stack tests belong under
+`tests/unit_tests/`. Small deterministic implementation tests may live beside
+their code under `gym/` or `learning/`, where they can also demonstrate local
+usage; collect those explicitly with `pytest gym` or `pytest learning`.
+Hardware-specific groups are selected explicitly.
 
-## Non-negotiables
+## Current repository skills
 
-- **No broad `try/except` in development code — fail fast and obviously.**
-  Optional dependency boundaries may report a clear availability error, but
-  never add a fallback that silently degrades behavior.
-- Run `uv run ruff format . && uv run ruff check .` at the end of every session.
-- Never commit files > 100 KB (CI + pre-commit both enforce this).
-- `logs/`, `user/wandb_config.json`, `*.pt` are gitignored — never force-add them.
-- Bare `pytest` targets the mandatory pure + MuJoCo CPU suite. Hardware groups
-  are explicit: use `-m warp` for MuJoCo Warp and `scripts/run_vsim_tests.sh`
-  for licensed VSim.
+Load procedural guidance from `.agents/skills/`:
 
-## Critical landmine — FIXED on this branch (2026-07-11)
-
-The warp backend used to refresh `root_states`/`rigid_body_states` only inside
-property getters, so GPU training ran on frozen base-state observations (and
-reported inflated rewards — mini_cheetah ~6.2 fake vs ~1.1 real at iteration 30).
-Fixed: `MuJocoWarpBackend._sync_assembled_states()` runs in `step()` and resets;
-regression test `tests/unit_tests/test_task_state_liveness.py`. Consequences that
-still stand: **all pre-fix GPU training results/checkpoints are untrustworthy**,
-`origin/jt/port` carries a now-redundant band-aid line to drop at merge, and
-branches without this fix still have the bug. Details:
-`.claude/skills/q2-phase4-parity-campaign/SKILL.md` Phase 0.
-
-**Sibling staleness — FIXED 2026-07-24 (branch `vsim`).** Same family, different
-tensor: warp's `dof_state` getter returned a per-call `torch.stack([dof_pos,
-dof_vel])` **copy**, but the task caches `self.dof_state` once at init
-(`fixed_robot`/`legged_robot._init_buffers`), so on GPU that cached reference
-froze at the init zeros. Latent for mini_cheetah (its rewards read
-`dof_pos`/`dof_vel`, which stayed live) but **fatal for the pendulum**:
-`_reward_equilibrium` reads `dof_state` directly, so `abs(dof_state)≈0` →
-`sqrdexp(0)=1.0`, pegging equilibrium at its max on GPU. This faked the pendulum
-GPU training reward (**~1.16 fake vs ~0.23 real**; the historical "+1.5" GPU
-pendulum mark carries this asterisk). Fixed by making warp maintain an assembled
-`_dof_state_t` refreshed in `_sync_assembled_states()` and returning a live view
-(mirrors the root_states fix); `test_task_state_liveness.py` now also asserts
-`dof_state` tracks `dof_pos`/`dof_vel`. CPU and vsim expose `dof_state` as a real
-view and were never affected.
-
-**Warp floating-base reset mis-placement — FIXED 2026-07-27 (branch `vsim`).** A
-*consequence* of the root_states fix above. During a legged reset the task writes
-the desired `root_states` into warp's assembled buffer, then commits it to qpos
-in `reset_root_state` — but `reset_dof_state` runs in between and its
-`_sync_assembled_states()` rebuilt `root_states` from the **not-yet-committed
-qpos**, clobbering the pending write; `reset_root_state` then committed the stale
-height. Net effect: **every warp legged reset spawned the floating base at the
-wrong height** (near the ground, not `cfg.init_state.pos`) — so prior warp legged
-training/results (mini_cheetah incl. the campaign's post-root_states numbers) ran
-on a broken reset distribution and need re-validation. Fixed: `reset_dof_state`
-now calls `_sync_assembled_states(sync_root=False)` (preserves the pending
-root_states write; `step()`/`reset_root_state` still full-sync). Regression:
-`test_task_state_liveness.py::test_floating_base_reset_placement_{cpu,warp}`.
-Found via the mini_cheetah drop fidelity probe (`scripts/mini_cheetah_fidelity.py`):
-warp's base started at z=0.008 instead of 0.5.
-
-## Skills index (`.claude/skills/`)
-
-| Skill | Load when |
+| Skill | Use for |
 |---|---|
-| `q2-architecture-contract` | touching `gym/envs/base/*`, backends, state tensors, resets |
-| `q2-build-and-env` | env setup, uv/python issues, macOS, GPU install |
-| `q2-run-and-train` | running training/play, logs, wandb, checkpoints, teleop |
-| `q2-config-system` | any config field question, adding/overriding config axes |
-| `q2-testing-and-validation` | running/adding tests, what counts as evidence, CI |
-| `q2-debugging-playbook` | any unexplained failure — check here before debugging |
-| `q2-failure-archaeology` | before re-investigating anything that smells historical |
-| `mujoco-backend-reference` | MuJoCo/mujoco-warp semantics as they apply here |
-| `legged-rl-reference` | rewards, observations, PPO/SAC knobs, oscillators |
-| `q2-task-authoring` | adding a robot or task end-to-end |
-| `q2-backend-integration` | integrating a NEW physics engine (v-sim, Newton, …) |
-| `q2-conventions-and-change-control` | style, branches, gates, docs of record |
-| `q2-phase4-parity-campaign` | the live campaign: warp parity → IsaacGym removal |
-| `q2-research-methodology` | turning a hunch into an accepted result here |
+| `q2-development-environment` | uv, Python, CUDA/Warp, macOS, or VSim setup |
+| `q2-backend-development` | backend contracts, state/reset, contacts, routing |
+| `q2-task-authoring` | robots, assets, configs, tasks, and registration |
+| `q2-rl-development` | observations, rewards, algorithms, and normalization |
+| `q2-train-and-evaluate` | training, resume, playback, and evaluation |
+| `q2-testing-and-debugging` | test selection, regressions, and diagnosis |
+
+The files under `.claude/skills/` are historical research snapshots. They are
+useful for archaeology but contain dated branch state, removed commands, and
+closed migration work; do not use them as current operating instructions.

@@ -39,9 +39,12 @@ fixes should remain separately reviewable.
 - `scripts/`: training, playback, deterministic evaluation, fidelity probes,
   and campaign wrappers. `train_mujoco.py` and `play_mujoco.py` are the public
   entry points for every supported backend.
-- `tests/unit_tests/`: the local correctness gate, including backend contracts,
-  physics invariants, state liveness, canonical routing, task behavior, and RL
-  utilities.
+- `tests/unit_tests/`: cross-cutting correctness gate, including backend
+  contracts, physics invariants, state liveness, canonical routing, task
+  behavior, and full-stack RL behavior.
+- Colocated `test_*.py` files under `gym/` and `learning/`: fast,
+  deterministic tests for small environment-agnostic implementations. Keep
+  these beside the code when they also provide a useful local usage example.
 - `resources/robots/`: URDFs, meshes, trajectories, and robot assets.
 - `notebooks/`: Marimo analysis/reporting; excluded from Ruff.
 - `thirdparty/vlearn/`: local-only licensed VSim wheel, license data, and SDK
@@ -178,11 +181,18 @@ gate before handoff:
 ```bash
 uv run --frozen python -m pytest tests/unit_tests/path_or_test.py -q
 uv run --frozen python -m pytest -q
+uv run --frozen python -m pytest gym -q
+uv run --frozen python -m pytest learning -q
 ```
 
-`pyproject.toml` sets `testpaths = ["tests/unit_tests"]`, so bare pytest now
-targets the intended CPU suite. MuJoCo Warp tests use the `warp` marker and
-licensed VSim tests use the `vsim` marker; request those groups explicitly.
+`pyproject.toml` sets `testpaths = ["tests/unit_tests"]`, so bare pytest targets
+the cross-cutting CPU suite. Explicit `pytest gym` and `pytest learning` runs
+also collect colocated implementation tests. Colocate a test only when it is
+small, deterministic, independent of simulator/full-stack setup, and useful as
+an example of the implementation's interface. Put backend fixtures,
+cross-package contracts, task construction, and integration behavior under
+`tests/unit_tests/`. MuJoCo Warp tests use the `warp` marker and licensed VSim
+tests use the `vsim` marker; request those groups explicitly.
 
 Additional evidence by change type:
 
@@ -197,9 +207,9 @@ Additional evidence by change type:
 - Physics or parity claim: a predicted invariant or fidelity probe, not only a
   viewer impression or final aggregate reward.
 
-Current GitHub CI still exercises the legacy dependency path and does not
-replace this local gate. Inspect `.github/workflows/` before relying on CI
-coverage.
+GitHub CI uses uv and runs the portable default suite. It does not currently
+run the explicit colocated suites, Ruff, build/install checks, smoke training,
+MuJoCo Warp, or licensed VSim; run the applicable local gates before handoff.
 
 ## Documentation and Skills
 
@@ -210,7 +220,8 @@ coverage.
 - Keep `AGENTS.md` limited to durable repository-wide rules.
 - Keep `.agents/skills/` procedural and source-linked. Avoid hard-coded branch
   heads, pass counts, performance numbers, or open/closed statuses that can be
-  discovered from current sources.
+  discovered from current sources. Treat `.claude/skills/` as historical
+  research snapshots, not current operating instructions.
 - Use git history for failure archaeology. Convert a historical lesson into a
   test or invariant instead of maintaining another volatile chronology.
 

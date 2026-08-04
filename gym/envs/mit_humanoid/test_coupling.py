@@ -1,5 +1,6 @@
 import torch
-from jacobian import _apply_coupling
+
+from gym.envs.mit_humanoid.mit_humanoid import MIT_Humanoid
 
 # random dataset generated from RS unit test for coupling
 q_joint = torch.tensor(
@@ -182,5 +183,19 @@ tau_act = torch.tensor(
 
 
 def test_coupling():
-    tau = _apply_coupling(q_joint, qd_joint, q_des, qd_des, kp_joint, kd_joint, tau_ff)
+    robot = MIT_Humanoid.__new__(MIT_Humanoid)
+    robot.J = torch.eye(len(q_joint))
+    robot.J[4, 3] = 1
+    robot.J[9, 8] = 1
+    robot.J_inv_T = torch.inverse(robot.J.T)
+
+    tau = robot._apply_coupling(
+        q_joint.unsqueeze(0),
+        qd_joint.unsqueeze(0),
+        q_des.unsqueeze(0),
+        qd_des.unsqueeze(0),
+        kp_joint.unsqueeze(0),
+        kd_joint.unsqueeze(0),
+        tau_ff.unsqueeze(0),
+    ).squeeze(0)
     assert torch.allclose(tau, tau_act, atol=1e-4)

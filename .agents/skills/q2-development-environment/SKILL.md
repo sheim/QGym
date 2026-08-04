@@ -7,7 +7,7 @@ description: Set up, repair, and verify Q2's uv-managed .venv across Linux CPU, 
 
 Read `AGENTS.md`, `.python-version`, `pyproject.toml`, `uv.lock`, and the
 relevant setup section of `README_MUJOCO.md` before changing dependencies.
-Treat `requirements.txt` and `setup.py` as the separate legacy IsaacGym stack.
+`pyproject.toml` and `uv.lock` are the only dependency sources of truth.
 
 ## Establish the target
 
@@ -18,8 +18,6 @@ Treat `requirements.txt` and `setup.py` as the separate legacy IsaacGym stack.
 - Use MuJoCo Warp only with a working NVIDIA driver and CUDA-visible PyTorch.
 - Use VSim only when the machine has the local wheel, system library, node
   license, and CUDA. Never replace a requested backend with another silently.
-- Keep IsaacGym commands in their Python 3.8 environment; do not merge that
-  dependency set into the modern uv environment.
 
 ## Create or update the environment
 
@@ -65,8 +63,9 @@ with `uv sync --locked --extra vsim`; start every process with
   logging, or committing secrets. License repair may require the vendor.
 - macOS viewer errors: use `mjpython` with the Homebrew-Python recipe in
   `README_MUJOCO.md`, or validate headless behavior.
-- CI mismatch: inspect `.github/workflows/` directly. The current workflow
-  still uses the legacy pip path and is not the modern local correctness gate.
+- CI mismatch: inspect `.github/workflows/` directly. CI runs the uv-managed
+  portable suite but does not cover Ruff, packaging, smoke training, Warp, or
+  licensed VSim.
 
 ## Change dependencies
 

@@ -581,10 +581,10 @@ or projectiles. Those results remain below as historical engineering evidence,
 not as removal gates. The supported engine families are MuJoCo (CPU and Warp
 execution modes) and optional licensed VSim, initially on flat ground.
 
-Domain randomization is intentionally deferred. Existing IsaacGym-specific
-friction and mass randomization code and configuration may be removed during
-retirement; a later feature will define one backend-neutral sampling contract
-and implement its effects deliberately for both engine families.
+Domain randomization is intentionally deferred. The IsaacGym-specific friction
+and mass randomization code and configuration were removed during retirement;
+a later feature will define one backend-neutral sampling contract and implement
+its effects deliberately for both engine families.
 
 The removal gates are now:
 
@@ -1518,6 +1518,11 @@ yet.
   terrain generator.
 - Removed the legacy per-environment friction/mass randomization callbacks and
   config fields; backend-neutral domain randomization remains a future feature.
+- Removed unsupported heightfield/trimesh configuration and sampling code, plus
+  simulator-specific asset settings that no supported backend consumed.
+- Kept backend/task/full-stack coverage under `tests/unit_tests/` while
+  preserving small deterministic implementation tests beside `gym/` and
+  `learning/` code as local usage examples.
 - Removed `requirements.txt` and `setup.py`; uv metadata is the only dependency
   source of truth.
 - Renamed task construction to the backend-neutral `task_registry.make_env()`.
@@ -1531,10 +1536,10 @@ The project targets **Python >= 3.11** with **mujoco >= 3.6** and
 development environment for all MuJoCo backends.
 
 ```bash
-uv sync                           # creates .venv with Python 3.11+
-uv run python -m pytest tests/    # run tests
-uv run scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
-uv run scripts/train_mujoco.py --task pendulum --device cuda:0 --num_envs 4096
+uv sync --frozen                  # creates/updates the locked .venv
+uv run --frozen python -m pytest -q
+uv run --frozen scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
+uv run --frozen scripts/train_mujoco.py --task pendulum --device cuda:0 --num_envs 4096
 ```
 
 ## Notes and known gotchas

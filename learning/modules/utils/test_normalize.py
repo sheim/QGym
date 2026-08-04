@@ -1,42 +1,34 @@
 import torch
-import random
+
 from learning.modules.utils.normalize import RunningMeanStd
 
 
 def test_update_moments():
-    num_items = random.randint(1, 10)
-    num_envs = 5
-    rms = RunningMeanStd(num_items)
-    rms.count = 10 * torch.ones(())
-    rms.running_mean = 0.95 * torch.ones(num_envs, num_items)
-    rms.running_var = 0.2 * torch.ones(num_envs, num_items)
-    batch_mean = 0.35 * torch.ones(num_envs, num_items)
-    batch_var = 0.1 * torch.ones(num_envs, num_items)
-    batch_count = num_envs
-    new_mean, new_var, tot_count = rms._update_mean_var_from_moments(
-        rms.running_mean,
-        rms.running_var,
-        rms.count,
+    rms = RunningMeanStd(num_items=3)
+    running_mean = 0.95 * torch.ones(3)
+    running_var = 0.2 * torch.ones(3)
+    batch_mean = 0.35 * torch.ones(3)
+    batch_var = 0.1 * torch.ones(3)
+
+    new_mean, new_var, total_count = rms._update_mean_var_from_moments(
+        running_mean,
+        running_var,
+        torch.tensor(10.0),
         batch_mean,
         batch_var,
-        batch_count,
+        batch_count=5,
     )
-    ex_new_mean = torch.ones(num_envs, num_items) * 0.75
-    ex_new_var = torch.ones(num_envs, num_items) * 3.7 / 14.0
-    assert torch.equal(new_mean, ex_new_mean), "Updated mean doesn't match expectations"
-    assert torch.equal(new_var, ex_new_var), "Updated var doesn't match expectations"
-    assert tot_count == 15, "Updated count doesn't match expectations"
+
+    torch.testing.assert_close(new_mean, 0.75 * torch.ones(3))
+    torch.testing.assert_close(new_var, (3.7 / 14.0) * torch.ones(3))
+    assert total_count == 15
 
 
-def test_normalize():
-    num_items = 2
-    num_envs = 2
-    rms = RunningMeanStd(num_items)
-    rms.training = True
-    normalized = rms(torch.ones(num_envs, num_items))
-    ex_normalized = (
-        (1.0 / 3.0) / (5.0 / 6.0 + rms.epsilon) ** (1.0 / 2.0)
+def test_forward_updates_statistics_and_normalizes_input():
+    rms = RunningMeanStd(num_items=2)
+    normalized = rms(torch.ones(2, 2))
+
+    expected = (
+        (1.0 / 3.0) / torch.sqrt(torch.tensor(5.0 / 6.0 + rms.epsilon))
     ) * torch.ones_like(normalized)
-    assert torch.all(
-        torch.isclose(normalized, ex_normalized, rtol=1e-05, atol=1e-08)
-    ).item(), "The normalized output doesn't match expectation"
+    torch.testing.assert_close(normalized, expected)

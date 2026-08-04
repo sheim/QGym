@@ -1,6 +1,11 @@
-import torch
 import numpy as np
-from simple_math import wrap_to_pi, torch_rand_sqrt_float, exp_avg_filter
+import torch
+
+from gym.utils.math.simple_math import (
+    exp_avg_filter,
+    torch_rand_sqrt_float,
+    wrap_to_pi,
+)
 
 
 def test_wrap_to_pi():
@@ -9,21 +14,24 @@ def test_wrap_to_pi():
     assert np.allclose(wrapped_angles, np.array([0, np.pi, 0, np.pi]))
 
 
-def test_torch_rand_sqrt_float():
-    lower = -1.0
-    upper = 1.0
-    shape = (10,)
-    device = torch.device("cpu")
-    samples = torch_rand_sqrt_float(lower, upper, shape, device)
-    assert samples.shape == shape
-    assert torch.all(samples >= lower)
-    assert torch.all(samples <= upper)
+def test_torch_rand_sqrt_float_stays_inside_requested_range():
+    torch.manual_seed(1)
+    samples = torch_rand_sqrt_float(
+        lower=-1.0,
+        upper=1.0,
+        shape=(10,),
+        device=torch.device("cpu"),
+    )
+
+    assert samples.shape == (10,)
+    assert torch.all(samples >= -1.0)
+    assert torch.all(samples <= 1.0)
 
 
 def test_exp_avg_filter():
-    x = torch.tensor(5.0)
-    avg = torch.tensor(1.0)
-    test_alpha = [0.0, 0.5, 1.0]
-    for alpha in test_alpha:
-        new_avg = exp_avg_filter(x, avg, alpha)
-        assert new_avg == alpha * x + (1 - alpha) * avg
+    value = torch.tensor(5.0)
+    average = torch.tensor(1.0)
+
+    for alpha in (0.0, 0.5, 1.0):
+        filtered = exp_avg_filter(value, average, alpha)
+        assert filtered == alpha * value + (1 - alpha) * average
