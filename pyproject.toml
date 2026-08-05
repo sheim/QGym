@@ -34,7 +34,7 @@ packages = ["gym", "gym.envs", "gym.envs.base", "gym.envs.mini_cheetah",
             "gym.envs.mit_humanoid", "gym.utils",
             "learning", "learning.algorithms", "learning.modules",
             "learning.runners", "learning.storage", "learning.utils",
-            "learning.utils.logger", "scripts"]
+            "learning.utils.logger", "scripts", "go2_deploy"]
 
 [tool.ruff]
 exclude = [

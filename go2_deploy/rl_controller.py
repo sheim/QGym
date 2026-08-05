@@ -1,19 +1,18 @@
-# import gym.envs
 from gym.utils.task_registry import task_registry
 from gym.utils.helpers import set_seed
-# from scripts.play_mujoco import setup
+import gym.envs  # noqa: F401
 
 import random
 
 
-# Helper function to load actor network from logs/go2/run_name
+# Helper function to load actor network from logs/go2/run_name (default: most recent)
 def setup_actor(run_name=None):
     env_cfg, train_cfg = task_registry.get_cfgs(name="go2")
 
     env_cfg.env.num_envs = 1
-    env_cfg.env.episode_length_s = 9999
+    env_cfg.env.episode_length_s = 99999
     if hasattr(env_cfg, "commands"):
-        env_cfg.commands.resampling_time = 9999
+        env_cfg.commands.resampling_time = 99999
     if hasattr(env_cfg, "push_robots"):
         env_cfg.push_robots.toggle = False
     if hasattr(env_cfg, "init_state") and hasattr(env_cfg.init_state, "reset_mode"):

@@ -18,16 +18,18 @@ def main():
         "<Verbosity>config</Verbosity>", "<Verbosity>none</Verbosity>"
     )
 
-    print("Starting up default controller")
     ChannelFactoryInitialize(
-        0, sys.argv[1]
-    )  # Name of robot network interface (terminal: `ifconfig`)
-    controller = MainController()
-    controller.start_unitree_clients()
+        0,
+        sys.argv[1],  # Name of robot network interface (terminal: `ifconfig`)
+    )
+    controller = MainController()  # noqa: F841
+    print(
+        "\nConnection successful! Keep the robot away from obstacles and "
+        + "always have access to the remote controller (Emergency stop = L2+B)\n"
+    )
 
-    print("receiving msgs for 300s")
-    time.sleep(300)
-    print("done")
+    while True:
+        time.sleep(1)
 
 
 if __name__ == "__main__":
