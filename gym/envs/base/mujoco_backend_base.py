@@ -190,6 +190,19 @@ class MuJocoBackendBase(SimBackend):
                         spec.option, name, getattr(cfg.mjspec_option_attributes, name)
                     )
 
+        # Check for manually set mjModel attributes
+        if hasattr(cfg, "mjspec_attributes"):
+            for name in dir(cfg.mjspec_attributes):
+                if not name.startswith("_"):
+                    setattr(spec, name, getattr(cfg.mjspec_attributes, name))
+
+        if hasattr(cfg, "mjspec_option_attributes"):
+            for name in dir(cfg.mjspec_option_attributes):
+                if not name.startswith("_"):
+                    setattr(
+                        spec.option, name, getattr(cfg.mjspec_option_attributes, name)
+                    )
+
         mjm = spec.compile()
         if terrain_sliding_friction is not None:
             # MuJoCo combines same-priority geom friction using the larger
