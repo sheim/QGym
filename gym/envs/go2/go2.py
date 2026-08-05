@@ -6,7 +6,7 @@ from gym.envs.base.legged_robot import LeggedRobot
 # )
 
 
-class MiniCheetah(LeggedRobot):
+class Go2(LeggedRobot):
     def __init__(self, cfg, device, headless, backend):
         super().__init__(cfg, device, headless, backend)
 
@@ -45,12 +45,9 @@ class MiniCheetah(LeggedRobot):
 
     def _reward_tracking_ang_vel(self):
         """Tracking of angular velocity commands (yaw)"""
-        scale = getattr(
-            self.cfg.reward_settings,
-            "tracking_ang_vel_scale",
-            2.5,
+        ang_vel_error = torch.square(
+            (self.commands[:, 2] - self.base_ang_vel[:, 2]) / 2.5
         )
-        ang_vel_error = (self.commands[:, 2] - self.base_ang_vel[:, 2]) / scale
         return self._sqrdexp(ang_vel_error)
 
     def _reward_dof_vel(self):
