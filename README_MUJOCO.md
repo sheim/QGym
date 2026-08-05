@@ -186,8 +186,161 @@ BaseTask
 ```
 
 Backend is selected automatically based on `--device`:
+
 - `cpu` → MuJocoCPUBackend (macOS always uses this)
 - `cuda:0` → MuJocoWarpBackend
+
+## Canonical Robot Layout
+
+Physics engines may compile a URDF's joints, links, motors, and sensors in
+different orders. `RobotLayout` gives tasks one stable, engine-independent
+order instead. Every supported backend validates its native model against the
+layout during setup and builds the permutations needed at the backend
+boundary. Tasks consequently always see:
+
+- `dof_names`, DOF state tensors, reset values, and input torques in canonical
+  full-DOF order;
+- `body_names`, rigid-body states, and contact forces in canonical robot-body
+  order, without a simulator world body; and
+- actions routed through the canonical `actuated_dof_names` subset.
+
+The layout also assigns exact names to semantic groups such as `feet`,
+`front_left_leg`, or `wheel_joints`. Tasks resolve these groups to tensor
+indices during initialization instead of relying on backend order, positional
+slices, or naming substrings. See
+[`gym/envs/base/robot_layout.py`](gym/envs/base/robot_layout.py) for the
+implementation and
+[`gym/envs/mini_cheetah/mini_cheetah_config.py`](gym/envs/mini_cheetah/mini_cheetah_config.py)
+for a complete example.
+
+### DOF and body groups
+
+`dof_groups` and `body_groups` are dictionaries from a task-level concept to
+an ordered list of exact canonical names:
+
+- A DOF group collects joints that a task operates on together, such as one
+  leg, all hip-abduction joints, an arm, or a set of wheels.
+- A body group collects links used together for state, contact, reward, or
+  termination logic, such as feet, hands, or other end effectors.
+
+Groups are labels over the canonical lists, not another engine-specific
+ordering. They do not need to cover every DOF or body, and groups may overlap.
+The member order is preserved and is therefore significant when, for example,
+matching a three-column reference trajectory to the hip, knee, and ankle of a
+leg.
+
+`RobotLayout` converts a group to indices in the canonical full-DOF or body
+tensor:
+
+```python
+left_leg = layout.dof_group_indices("left_leg")  # (0, 1, 2)
+feet = layout.body_group_indices("feet")         # (3, 6)
+
+left_leg_position = dof_pos[:, left_leg]
+foot_forces = contact_forces[:, feet, :]
+```
+
+Use `dof_group_indices()` for full-DOF tensors. If a task is indexing an
+action or another actuator-only tensor, translate the group's names through
+`actuated_dof_names` instead; the actuated subset may omit or reorder entries
+from the full DOF list.
+
+`LeggedRobot` specifically resolves `body_groups["feet"]` during
+initialization and stores it as `feet_indices`. Foot contact rewards, foot
+state, and evaluation metrics use those indices. Other group names have no
+automatic behavior: a concrete task chooses how to consume them. Likewise,
+body groups do not configure contact penalties or termination by themselves;
+`asset.penalize_contacts_on` and `asset.terminate_after_contacts_on` remain
+separate substring-matching settings.
+
+### Defining a layout for a new robot
+
+Place the robot URDF below `resources/robots/<robot>/`, using unique joint and
+link names. Use `LeggedRobotCfg` for a floating base with ground contacts, or
+`FixedRobotCfg` for a world-attached mechanism. Then define the policy-facing
+order and semantics in the task's environment config:
+
+```python
+class MyRobotCfg(LeggedRobotCfg):
+    class env(LeggedRobotCfg.env):
+        num_actuators = 6
+
+    class asset(LeggedRobotCfg.asset):
+        file = "{GYM_ROOT_DIR}/resources/robots/my_robot/my_robot.urdf"
+        penalize_contacts_on = ["lower_leg"]
+        terminate_after_contacts_on = ["base"]
+
+        class robot_layout:
+            version = "my_robot_v1"
+            dof_names = [
+                "left_hip",
+                "left_knee",
+                "left_ankle",
+                "right_hip",
+                "right_knee",
+                "right_ankle",
+            ]
+            actuated_dof_names = dof_names
+            body_names = [
+                "base",
+                "left_upper_leg",
+                "left_lower_leg",
+                "left_foot",
+                "right_upper_leg",
+                "right_lower_leg",
+                "right_foot",
+            ]
+            dof_groups = {
+                "left_leg": dof_names[0:3],
+                "right_leg": dof_names[3:6],
+            }
+            body_groups = {
+                "feet": ["left_foot", "right_foot"],
+            }
+```
+
+Follow these rules when defining it:
+
+1. `dof_names` must contain every non-fixed URDF joint exactly once, and
+   `body_names` must contain every URDF link exactly once. Their listed order
+   becomes the public tensor order and may differ from the URDF or engine
+   order.
+2. `actuated_dof_names` is an ordered subset of `dof_names`; its length must
+   equal `env.num_actuators`. Unactuated DOFs remain present in state and
+   full-DOF torque tensors. When an explicit `robot_layout` exists, declare
+   the actuated subset here rather than in `control.actuated_joint_names`.
+3. Define task semantics as groups of exact names. Groups may overlap, but
+   every member must exist in the corresponding canonical list. A
+   `LeggedRobot` needs a `feet` body group; a `FixedRobot` does not.
+4. Treat the canonical order as part of the policy/checkpoint interface. Keep
+   it stable across asset changes and update `version` when deliberately
+   changing its order or meaning.
+
+For a simple robot without an explicit layout, Q2 falls back to URDF
+declaration order, uses `control.actuated_joint_names` if supplied, and can
+derive `feet` by matching `asset.foot_name`. Prefer an explicit layout once
+ordering stability or named semantics matter.
+
+No backend-specific layout code should be added for a new robot. After adding
+the task class and configs, register all four declarations in
+[`gym/envs/__init__.py`](gym/envs/__init__.py): the task class, environment
+config, runner config, and public task name. Add focused tests that:
+
+- construct `RobotLayout.from_cfg()` and assert the canonical names and group
+  indices;
+- construct the task on MuJoCo CPU and assert the backend exposes that same
+  canonical layout; and
+- exercise any named actuator, reference-trajectory, end-effector, or contact
+  routing used by the task.
+
+Then run the normal gate and a short CPU smoke train before checking optional
+GPU backends:
+
+```bash
+uv run --frozen python -m pytest -q
+uv run --frozen scripts/train.py --task my_robot --backend mujoco \
+    --device cpu --num_envs 8 --max_iterations 2 --headless --disable_wandb
+```
 
 ## Platform Notes
 
@@ -233,6 +386,7 @@ Q2/
 │   ├── envs/
 │   │   ├── base/
 │   │   │   ├── sim_backend.py           ← abstract backend interface
+│   │   │   ├── robot_layout.py          ← canonical robot ordering and groups
 │   │   │   ├── mujoco_backend_base.py   ← shared MuJoCo setup logic
 │   │   │   ├── mujoco_cpu_backend.py    ← CPU backend (mj_step loop)
 │   │   │   ├── mujoco_warp_backend.py   ← GPU backend (mujoco_warp)
