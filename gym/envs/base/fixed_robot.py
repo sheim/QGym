@@ -259,10 +259,10 @@ class FixedRobot(BaseTask):
         self.env_origins[:, 2] = self.cfg.env.root_height
 
     def _reset_system(self, env_ids):
-        if hasattr(self, self.cfg.init_state.reset_mode):
-            eval(f"self.{self.cfg.init_state.reset_mode}(env_ids)")
-        else:
+        reset = getattr(self, self.cfg.init_state.reset_mode, None)
+        if reset is None:
             raise NameError(f"Unknown default setup: {self.cfg.init_state.reset_mode}")
+        reset(env_ids)
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self._backend.reset_dof_state(env_ids_int32)
 

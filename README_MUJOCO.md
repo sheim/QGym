@@ -80,7 +80,7 @@ The final command must print `True`. MuJoCo Warp cannot work around a missing
 or inaccessible NVIDIA driver. GPU training is headless:
 
 ```bash
-uv run --frozen scripts/train_mujoco.py --task mini_cheetah --device cuda:0 \
+uv run --frozen scripts/train.py --task mini_cheetah --device cuda:0 \
     --num_envs 4096 --headless
 ```
 
@@ -112,7 +112,7 @@ VL_LICENSE_KEY_PATH="$PWD/License.key" \
   'import vlearn as v; v.create_gym(with_render=False, with_window=False); v.delete_gym(); print("vsim activated")'
 cd ../..
 
-uv run --env-file .env.vsim scripts/train_mujoco.py --task mini_cheetah \
+uv run --env-file .env.vsim scripts/train.py --task mini_cheetah \
     --backend vsim --device cuda:0 --num_envs 4096 --headless
 bash scripts/run_vsim_tests.sh
 ```
@@ -121,16 +121,16 @@ bash scripts/run_vsim_tests.sh
 
 ```bash
 # Pendulum (fixed-base, 1 DOF) — with GUI viewer
-uv run --frozen scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256
+uv run --frozen scripts/train.py --task pendulum --device cpu --num_envs 256
 
 # Mini Cheetah (floating-base, 12 DOFs) — with GUI viewer
-uv run --frozen scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
+uv run --frozen scripts/train.py --task mini_cheetah --device cpu --num_envs 64
 
 # Headless (no viewer window)
-uv run --frozen scripts/train_mujoco.py --task pendulum --device cpu --num_envs 256 --headless
+uv run --frozen scripts/train.py --task pendulum --device cpu --num_envs 256 --headless
 
 # GPU training (Linux only, requires mujoco-warp)
-uv run --frozen scripts/train_mujoco.py --task mini_cheetah --device cuda:0 --num_envs 4096 --headless
+uv run --frozen scripts/train.py --task mini_cheetah --device cuda:0 --num_envs 4096 --headless
 ```
 
 ### Test
@@ -148,7 +148,7 @@ expected and not an error.
 ## CLI Reference
 
 ```
-uv run scripts/train_mujoco.py [OPTIONS]
+uv run scripts/train.py [OPTIONS]
 
   --task TEXT          Task name (required). See "Available Tasks" below.
   --device TEXT        "cpu" or "cuda:0" (default: cpu)
@@ -208,7 +208,7 @@ does not ship. The fix is to create the venv using Homebrew's Python instead:
 brew install python@3.13   # if not already installed
 uv venv --python /opt/homebrew/opt/python@3.13/bin/python3.13
 uv sync --frozen
-.venv/bin/mjpython scripts/train_mujoco.py --task mini_cheetah --device cpu --num_envs 64
+.venv/bin/mjpython scripts/train.py --task mini_cheetah --device cpu --num_envs 64
 ```
 
 Alternatively, use `--headless` to skip the viewer entirely (works with uv's default Python).
@@ -247,7 +247,7 @@ Q2/
 ├── learning/                            ← RL algorithms, runners, storage
 ├── resources/robots/                    ← URDF files
 ├── scripts/
-│   └── train_mujoco.py                  ← main training script
+│   └── train.py                         ← main training script
 ├── tests/unit_tests/                    ← supported local test gate
 └── pyproject.toml
 ```

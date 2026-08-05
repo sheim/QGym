@@ -1,6 +1,6 @@
 clear all; close all; clc
-% WARNING : The collision bodies between Matlab and and Isaac gym are
-% different, and the URDF should be validated in Isaac Gym.
+% MATLAB and simulator collision geometry may differ. Validate the URDF through
+% the same Q2 backend used for training or evaluation.
 
 % Define the path of the URDF, the number of DoFs, and the default config
 simple_urdf_name = "./mini_cheetah_simple.urdf"; % URDF path

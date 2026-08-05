@@ -4,10 +4,9 @@ from tensordict import TensorDict
 from learning.utils import Logger
 from .on_policy_runner import OnPolicyRunner
 from learning.storage import DictStorage
-from learning.algorithms import PPO2  # noqa F401
+from learning.algorithms import get_algorithm_class
 from learning.modules.actor import Actor
-from learning.modules.critic import Critic  # noqa F401
-from learning.modules.QRCritics import *  # noqa F401
+from learning.modules import get_critic_class
 
 logger = Logger()
 storage = DictStorage()
@@ -23,8 +22,8 @@ class MyRunner(OnPolicyRunner):
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])  # noqa: F841
         actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
         critic_class_name = self.critic_cfg["critic_class_name"]
-        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
-        alg_class = eval(self.cfg["algorithm_class_name"])
+        critic = get_critic_class(critic_class_name)(num_critic_obs, **self.critic_cfg)
+        alg_class = get_algorithm_class(self.cfg["algorithm_class_name"])
         self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def learn(self, states_to_log_dict=None):

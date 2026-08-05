@@ -1,10 +1,10 @@
-"""Play back a policy trained with the MuJoCo backend.
+"""Play back a policy trained with a supported Q2 physics backend.
 
 Usage:
-    uv run scripts/play_mujoco.py --task pendulum
-    uv run scripts/play_mujoco.py --task mini_cheetah --num_envs 8
-    uv run scripts/play_mujoco.py --task mini_cheetah --load_run May08_12-34-56_ \
-                                  --checkpoint 1500
+    uv run scripts/play.py --task pendulum
+    uv run scripts/play.py --task mini_cheetah --num_envs 8
+    uv run scripts/play.py --task mini_cheetah --load_run May08_12-34-56_ \
+                           --checkpoint 1500
 
 Supports MuJoCo CPU/Warp and optional VSim checkpoints.
 """
@@ -19,9 +19,7 @@ from gym.utils.task_registry import task_registry
 
 
 def get_play_args():
-    parser = argparse.ArgumentParser(
-        description="Play a policy trained with the MuJoCo backend"
-    )
+    parser = argparse.ArgumentParser(description="Play a policy trained with Q2")
     parser.add_argument("--task", type=str, required=True)
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--num_envs", type=int, default=32)

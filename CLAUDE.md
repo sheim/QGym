@@ -4,9 +4,8 @@ Read `AGENTS.md` before changing this repository. It is the durable,
 repository-wide developer guide and source of current architecture, style,
 environment, and validation rules.
 
-Q2 supports MuJoCo CPU, MuJoCo Warp, and optional licensed VSim. The executable
-IsaacGym path has been removed. `MIGRATION_PLAN.md` retains the migration and
-experiment history; its superseded sections are not current setup instructions.
+Q2 supports MuJoCo CPU, MuJoCo Warp, and optional licensed VSim. Use
+`MIGRATION_PLAN.md` for current backend parity evidence and planned work.
 
 ## Common commands
 
@@ -40,7 +39,3 @@ Load procedural guidance from `.agents/skills/`:
 | `q2-rl-development` | observations, rewards, algorithms, and normalization |
 | `q2-train-and-evaluate` | training, resume, playback, and evaluation |
 | `q2-testing-and-debugging` | test selection, regressions, and diagnosis |
-
-The files under `.claude/skills/` are historical research snapshots. They are
-useful for archaeology but contain dated branch state, removed commands, and
-closed migration work; do not use them as current operating instructions.

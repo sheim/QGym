@@ -7,8 +7,7 @@ description: Implement, modify, or review Q2 physics backends and their task-fac
 
 Read `AGENTS.md`, `gym/envs/base/sim_backend.py`,
 `gym/envs/base/robot_layout.py`, the affected backend, and its contract tests.
-Read the relevant current section of `MIGRATION_PLAN.md` for parity decisions;
-do not rely on dated branch/status summaries in `.claude/skills/`.
+Read the relevant current section of `MIGRATION_PLAN.md` for parity decisions.
 
 ## Preserve the public contract
 

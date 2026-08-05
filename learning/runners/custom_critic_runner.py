@@ -4,8 +4,8 @@ import torch
 from tensordict import TensorDict
 
 from gym import LEGGED_GYM_ROOT_DIR
-from learning.algorithms import *  # noqa: F403
-from learning.modules import Actor
+from learning.algorithms import get_algorithm_class
+from learning.modules import Actor, get_critic_class
 from learning.utils import Logger
 
 from .on_policy_runner import OnPolicyRunner
@@ -31,8 +31,8 @@ class CustomCriticRunner(OnPolicyRunner):
         num_critic_obs = self.get_obs_size(self.critic_cfg["obs"])  # noqa: F841
         critic_class_name = self.critic_cfg["critic_class_name"]
         actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
-        critic = eval(f"{critic_class_name}(num_critic_obs, **self.critic_cfg)")
-        alg_class = eval(self.cfg["algorithm_class_name"])
+        critic = get_critic_class(critic_class_name)(num_critic_obs, **self.critic_cfg)
+        alg_class = get_algorithm_class(self.cfg["algorithm_class_name"])
         self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def learn(self):

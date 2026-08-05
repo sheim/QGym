@@ -1,8 +1,8 @@
-"""Train a task using MuJoCo CPU/Warp or optional VSim.
+"""Train a task using a supported Q2 physics backend.
 
 Usage:
-    uv run scripts/train_mujoco.py --task pendulum [--device cpu] [--num_envs 256]
-                                   [--max_iterations 200] [--headless]
+    uv run scripts/train.py --task pendulum [--device cpu] [--num_envs 256]
+                            [--max_iterations 200] [--headless]
 
 The selected backend is MuJoCo CPU/Warp or optional VSim.
 """
@@ -15,8 +15,8 @@ from gym.utils.logging_and_saving import local_code_save_helper
 from gym.utils.logging_and_saving import wandb_singleton
 
 
-def get_mujoco_args():
-    parser = argparse.ArgumentParser(description="Train with MuJoCo backend")
+def get_train_args():
+    parser = argparse.ArgumentParser(description="Train a Q2 task")
     parser.add_argument(
         "--task", type=str, required=True, help="Task name (e.g. pendulum)"
     )
@@ -73,7 +73,7 @@ def get_mujoco_args():
 
 
 def setup():
-    args = get_mujoco_args()
+    args = get_train_args()
 
     # Register tasks (imports the task classes)
     import gym.envs  # noqa: F401 — triggers task registration
@@ -117,7 +117,7 @@ def setup():
     wandb_helper = wandb_singleton.WandbSingleton()
     wandb_helper.setup_wandb(env_cfg=env_cfg, train_cfg=train_cfg, args=args)
 
-    # Build the environment using the MuJoCo backend
+    # Build the environment using the selected backend.
     env = task_registry.make_env(
         args.task,
         env_cfg,

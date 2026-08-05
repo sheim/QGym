@@ -63,8 +63,6 @@ backend. Record what executed.
   episodes before diagnosing the logger.
 - First Warp run is silent: inspect traceback/GPU activity for JIT compilation
   before treating it as a hang.
-- Legacy-simulator guard failure: inspect the reported import/name and remove
-  the dependency rather than hiding it behind an optional import.
 - Task registration fails: import `gym.envs`; the fail-fast traceback identifies
   the broken declared class or config. Then run the registry manifest test.
 - State/reward frozen on Warp: inspect cached tensor identity and values across
@@ -98,6 +96,6 @@ backend. Record what executed.
 7. Update `MIGRATION_PLAN.md` if the finding invalidates or advances campaign
    evidence.
 
-GitHub CI runs the uv-managed portable suite. Local validation remains required
-for colocated tests, Ruff, packaging, smoke training, Warp, and licensed VSim
-evidence.
+GitHub CI runs the uv-managed portable and colocated suites, Ruff, and a package
+build. Local validation remains required for smoke training, Warp, and licensed
+VSim evidence.

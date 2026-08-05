@@ -34,3 +34,16 @@ jobs:
       - name: Run mandatory test gate
         run: |
           uv run --frozen python -m pytest -q
+
+      - name: Run colocated implementation tests
+        run: |
+          uv run --frozen python -m pytest gym -q
+          uv run --frozen python -m pytest learning -q
+
+      - name: Lint
+        run: |
+          uv run --frozen ruff check .
+
+      - name: Build package
+        run: |
+          uv build --no-sources

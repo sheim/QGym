@@ -5,6 +5,9 @@ import torch
 
 import gym.envs as envs
 from gym.utils.task_registry import task_registry
+from learning.algorithms import get_algorithm_class
+from learning.modules import get_critic_class
+from learning.runners import get_runner_class
 
 
 UNSUPPORTED_TERRAIN_FIELDS = {
@@ -56,6 +59,20 @@ def test_declared_tasks_register_with_declared_components():
             task_registry.train_cfgs[task_name],
             getattr(envs, runner_config_name),
         )
+
+
+def test_declared_learning_components_resolve_explicitly():
+    for task_name, registered_cfg in task_registry.train_cfgs.items():
+        cfg = type(registered_cfg)()
+
+        runner_name = cfg.runner_class_name
+        algorithm_name = cfg.runner.algorithm_class_name
+        assert get_runner_class(runner_name).__name__ == runner_name, task_name
+        assert get_algorithm_class(algorithm_name).__name__ == algorithm_name, task_name
+
+        if hasattr(cfg.critic, "critic_class_name"):
+            critic_name = cfg.critic.critic_class_name
+            assert get_critic_class(critic_name).__name__ == critic_name, task_name
 
 
 def test_declared_tasks_only_expose_supported_physics_config():

@@ -143,7 +143,7 @@ class LeggedRobotCfg(BaseConfig):
         # MuJoCo passive viewer only: its side panels bind most letters to
         # visualisation toggles, which collide with keyboard teleop (see
         # gym/utils/interfaces/teleop_bindings.py).  Off by default;
-        # scripts/play_mujoco.py --viewer_ui turns them back on.
+        # scripts/play.py --viewer_ui turns them back on.
         show_ui = False
 
 

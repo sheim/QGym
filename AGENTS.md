@@ -18,8 +18,7 @@ Before changing code:
    `README_MUJOCO.md` for user-facing setup and CLI guidance. Prefer current
    code and tests when either document has drifted.
 4. Load the relevant repository skill from `.agents/skills/` for specialized
-   workflows. The older `.claude/skills/` files remain useful historical
-   source material, but several contain dated snapshots.
+   workflows.
 
 Do not overwrite, revert, reformat, or incorporate unrelated user changes.
 Keep a change focused; research tuning, physics changes, refactors, and bug
@@ -37,8 +36,8 @@ fixes should remain separately reviewable.
   and logging. `PPO2` plus `OnPolicyRunner` is the main on-policy path; other
   runners and critics include legacy and research code.
 - `scripts/`: training, playback, deterministic evaluation, fidelity probes,
-  and campaign wrappers. `train_mujoco.py` and `play_mujoco.py` are the public
-  entry points for every supported backend.
+  and campaign wrappers. `train.py` and `play.py` are the public entry points
+  for every supported backend.
 - `tests/unit_tests/`: cross-cutting correctness gate, including backend
   contracts, physics invariants, state liveness, canonical routing, task
   behavior, and full-stack RL behavior.
@@ -207,9 +206,9 @@ Additional evidence by change type:
 - Physics or parity claim: a predicted invariant or fidelity probe, not only a
   viewer impression or final aggregate reward.
 
-GitHub CI uses uv and runs the portable default suite. It does not currently
-run the explicit colocated suites, Ruff, build/install checks, smoke training,
-MuJoCo Warp, or licensed VSim; run the applicable local gates before handoff.
+GitHub CI uses uv and runs the portable default suite, explicit colocated
+suites, Ruff, and a package build. It does not run smoke training, MuJoCo Warp,
+or licensed VSim; run those applicable local gates before handoff.
 
 ## Documentation and Skills
 
@@ -220,8 +219,7 @@ MuJoCo Warp, or licensed VSim; run the applicable local gates before handoff.
 - Keep `AGENTS.md` limited to durable repository-wide rules.
 - Keep `.agents/skills/` procedural and source-linked. Avoid hard-coded branch
   heads, pass counts, performance numbers, or open/closed statuses that can be
-  discovered from current sources. Treat `.claude/skills/` as historical
-  research snapshots, not current operating instructions.
+  discovered from current sources.
 - Use git history for failure archaeology. Convert a historical lesson into a
   test or invariant instead of maintaining another volatile chronology.
 

@@ -265,7 +265,7 @@ def _(campaign_paths, mo):
         _prefix = "uv run --env-file .env.vsim" if backend == "vsim" else "uv run"
         _parts = [
             _prefix,
-            "scripts/play_mujoco.py",
+            "scripts/play.py",
             "--task mini_cheetah_ref",
             f"--backend {backend}",
             f"--device {device}",

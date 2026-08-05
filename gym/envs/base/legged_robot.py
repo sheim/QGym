@@ -41,8 +41,6 @@ class LeggedRobot(BaseTask):
             self._post_compute_torques()
             self._step_backend()
             self._post_physics_step()
-            for observer in self._physics_step_observers:
-                observer()
 
         self._post_decimation_step()
         self._check_terminations_and_timeouts()
@@ -263,10 +261,11 @@ class LeggedRobot(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        if hasattr(self, self.cfg.init_state.reset_mode):
-            eval(f"self.{self.cfg.init_state.reset_mode}(env_ids)")
-        else:
+        # todo: move getattr to initialization (also in fixed robot)
+        reset = getattr(self, self.cfg.init_state.reset_mode, None)
+        if reset is None:
             raise NameError(f"Unknown default setup: {self.cfg.init_state.reset_mode}")
+        reset(env_ids)
 
         # * start base position shifted in X-Y plane
         if self.custom_origins:

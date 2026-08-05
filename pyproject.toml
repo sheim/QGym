@@ -37,12 +37,10 @@ vlearn = { path = "thirdparty/vlearn/vlearn-0.3.12-cp311-cp311-linux_x86_64.whl"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["gym", "gym.envs", "gym.envs.base", "gym.envs.mini_cheetah",
-            "gym.envs.mit_humanoid", "gym.utils",
-            "learning", "learning.algorithms", "learning.modules",
-            "learning.runners", "learning.storage", "learning.utils",
-            "learning.utils.logger"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gym*", "learning*"]
+namespaces = true
 
 [tool.pytest.ini_options]
 # pythonpath: the console-script `pytest` does NOT put the CWD on sys.path
@@ -84,6 +82,7 @@ exclude = [
     "__init__.py",
     "logs/",
     "notebooks/",
+    "thirdparty/vlearn/",
 ]
 
 line-length = 88

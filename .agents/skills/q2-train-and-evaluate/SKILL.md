@@ -5,7 +5,7 @@ description: Run, resume, inspect, play back, benchmark, and evaluate Q2 policie
 
 # Q2 Train and Evaluate
 
-Read `AGENTS.md`, `scripts/train_mujoco.py --help`, the selected task config,
+Read `AGENTS.md`, `scripts/train.py --help`, the selected task config,
 and the relevant evaluation script. Use current CLI help rather than a copied
 flag list; this workflow changes during active tuning.
 
@@ -27,13 +27,13 @@ horizon is the independent variable.
 Start with a CPU smoke run:
 
 ```bash
-uv run --frozen scripts/train_mujoco.py --task TASK --backend mujoco --device cpu --num_envs 8 --max_iterations 2 --headless --disable_wandb
+uv run --frozen scripts/train.py --task TASK --backend mujoco --device cpu --num_envs 8 --max_iterations 2 --headless --disable_wandb
 ```
 
 Use MuJoCo Warp only after CPU/unit correctness:
 
 ```bash
-uv run --frozen scripts/train_mujoco.py --task TASK --backend mujoco --device cuda:0 --headless
+uv run --frozen scripts/train.py --task TASK --backend mujoco --device cuda:0 --headless
 ```
 
 The first Warp run may compile kernels. Treat constraint-capacity warnings as
@@ -42,7 +42,7 @@ physics failures, not log noise.
 Run VSim only through its process environment:
 
 ```bash
-uv run --env-file .env.vsim scripts/train_mujoco.py --task TASK --backend vsim --device cuda:0 --headless
+uv run --env-file .env.vsim scripts/train.py --task TASK --backend vsim --device cuda:0 --headless
 ```
 
 Use `--disable_wandb` for local discriminators. Otherwise configure credentials
@@ -63,7 +63,7 @@ them.
 
 ## Play and evaluate
 
-- Use `scripts/play_mujoco.py` for interactive playback. MuJoCo Warp is
+- Use `scripts/play.py` for interactive playback. MuJoCo Warp is
   headless; use MuJoCo CPU for its passive viewer. VSim has its own viewer and
   keyboard integration.
 - Use `scripts/eval_policy.py` for deterministic, artifact-producing policy

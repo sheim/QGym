@@ -34,3 +34,27 @@ from .ppo import PPO
 from .ppo2 import PPO2
 from .SE import StateEstimator
 from .sac import SAC
+
+ALGORITHM_CLASSES = {
+    algorithm.__name__: algorithm for algorithm in (PPO, PPO2, StateEstimator, SAC)
+}
+
+
+def get_algorithm_class(name):
+    try:
+        return ALGORITHM_CLASSES[name]
+    except KeyError as error:
+        choices = ", ".join(sorted(ALGORITHM_CLASSES))
+        raise ValueError(
+            f"Unknown algorithm {name!r}; choose from: {choices}"
+        ) from error
+
+
+__all__ = [
+    "ALGORITHM_CLASSES",
+    "PPO",
+    "PPO2",
+    "SAC",
+    "StateEstimator",
+    "get_algorithm_class",
+]

@@ -30,10 +30,44 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-from .on_policy_runner import OnPolicyRunner
-from .my_runner import MyRunner
-from .old_policy_runner import OldPolicyRunner
-from .off_policy_runner import OffPolicyRunner
 from .custom_critic_runner import CustomCriticRunner
 from .datalogging_runner import DataLoggingRunner
+from .my_runner import MyRunner
+from .off_policy_runner import OffPolicyRunner
+from .old_policy_runner import OldPolicyRunner
+from .on_policy_runner import OnPolicyRunner
 from .psd_sac_runner import PSACRunner
+
+RUNNER_CLASSES = {
+    runner.__name__: runner
+    for runner in (
+        CustomCriticRunner,
+        DataLoggingRunner,
+        MyRunner,
+        OffPolicyRunner,
+        OldPolicyRunner,
+        OnPolicyRunner,
+        PSACRunner,
+    )
+}
+
+
+def get_runner_class(name):
+    try:
+        return RUNNER_CLASSES[name]
+    except KeyError as error:
+        choices = ", ".join(sorted(RUNNER_CLASSES))
+        raise ValueError(f"Unknown runner {name!r}; choose from: {choices}") from error
+
+
+__all__ = [
+    "CustomCriticRunner",
+    "DataLoggingRunner",
+    "MyRunner",
+    "OffPolicyRunner",
+    "OldPolicyRunner",
+    "OnPolicyRunner",
+    "PSACRunner",
+    "RUNNER_CLASSES",
+    "get_runner_class",
+]

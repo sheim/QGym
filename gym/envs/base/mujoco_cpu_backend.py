@@ -172,7 +172,7 @@ class MuJocoCPUBackend(MuJocoBackendBase):
                 if _mjv._MJPYTHON is None:
                     raise RuntimeError(
                         "MuJoCo passive viewer on macOS requires mjpython.\n"
-                        "Run with: .venv/bin/mjpython scripts/train_mujoco.py ...\n"
+                        "Run with: .venv/bin/mjpython scripts/train.py ...\n"
                         "Or use --headless to disable the viewer."
                     )
 
@@ -186,7 +186,7 @@ class MuJocoCPUBackend(MuJocoBackendBase):
             # Side panels are hidden by default: their shortcuts bind most
             # letters to visualisation toggles, which fire alongside keyboard
             # teleop (see gym/utils/interfaces/teleop_bindings.py).
-            # cfg.viewer.show_ui / play_mujoco.py --viewer_ui restores them.
+            # cfg.viewer.show_ui / play.py --viewer_ui restores them.
             self._viewer = mujoco.viewer.launch_passive(
                 self._mjm,
                 self._datas[0],

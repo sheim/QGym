@@ -1,5 +1,4 @@
 *.pt
-isaacgym/*
 *venv*
 logs/
 artifacts/

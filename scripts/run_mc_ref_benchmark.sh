@@ -37,7 +37,7 @@ train() {  # backend device envs experiment
     runner+=(--env-file .env.vsim)
     backend_args=(--backend vsim)
   fi
-  "${runner[@]}" scripts/train_mujoco.py \
+  "${runner[@]}" scripts/train.py \
     --task mini_cheetah_ref \
     --device "$device" \
     --num_envs "$envs" \

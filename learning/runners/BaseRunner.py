@@ -1,5 +1,5 @@
 import torch
-from learning.algorithms import *  # noqa: F403
+from learning.algorithms import get_algorithm_class
 from learning.modules import Actor, Critic, SmoothActor
 from learning.utils import remove_zero_weighted_rewards
 
@@ -36,7 +36,7 @@ class BaseRunner:
             actor = Actor(num_actor_obs, num_actions, **self.actor_cfg)
 
         critic = Critic(num_critic_obs, **self.critic_cfg)
-        alg_class = eval(self.cfg["algorithm_class_name"])
+        alg_class = get_algorithm_class(self.cfg["algorithm_class_name"])
         self.alg = alg_class(actor, critic, device=self.device, **self.alg_cfg)
 
     def parse_train_cfg(self, train_cfg):

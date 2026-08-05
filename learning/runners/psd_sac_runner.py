@@ -1,8 +1,7 @@
 from learning.utils import Logger
 
-from learning.runners import OffPolicyRunner
-from learning.modules import Critic, ChimeraActor  # noqa F401
-from learning.modules.QRCritics import *  # noqa F401
+from learning.modules import ChimeraActor, get_critic_class
+from learning.runners.off_policy_runner import OffPolicyRunner
 
 from learning.storage import ReplayBuffer
 from learning.algorithms import SAC
@@ -28,11 +27,11 @@ class PSACRunner(OffPolicyRunner):
         num_critic_in = self.get_obs_size(self.critic_cfg["obs"]) + num_actions  # noqa: F841
         actor = ChimeraActor(num_actor_obs, num_actions, **self.actor_cfg)
 
-        critic_class = self.critic_cfg["critic_class_name"]
-        critic_1 = eval(f"{critic_class}(num_critic_in, **self.critic_cfg)")
-        critic_2 = eval(f"{critic_class}(num_critic_in, **self.critic_cfg)")
-        target_critic_1 = eval(f"{critic_class}(num_critic_in, **self.critic_cfg)")
-        target_critic_2 = eval(f"{critic_class}(num_critic_in, **self.critic_cfg)")
+        critic_class = get_critic_class(self.critic_cfg["critic_class_name"])
+        critic_1 = critic_class(num_critic_in, **self.critic_cfg)
+        critic_2 = critic_class(num_critic_in, **self.critic_cfg)
+        target_critic_1 = critic_class(num_critic_in, **self.critic_cfg)
+        target_critic_2 = critic_class(num_critic_in, **self.critic_cfg)
 
         # critic_1 = Critic(num_critic_obs + num_actions, **self.critic_cfg)
         # critic_2 = Critic(num_critic_obs + num_actions, **self.critic_cfg)

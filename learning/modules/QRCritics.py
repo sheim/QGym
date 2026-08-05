@@ -716,7 +716,7 @@ class NN_wRiccati(nn.Module):
         critic_name = kwargs["critic_name"]
         device = kwargs["device"]
         self.has_latent = False if kwargs["latent_dim"] is None else True
-        self.critic = eval(f"{critic_name}(**kwargs).to(device)")
+        self.critic = get_custom_critic_class(critic_name)(**kwargs).to(device)
         self.QR_network = QR(**kwargs).to(device)
 
     def forward(self, x, return_all=False):
@@ -750,7 +750,7 @@ class NN_wQR(nn.Module):
         critic_name = kwargs["critic_name"]
         device = kwargs["device"]
         self.has_latent = False if kwargs["latent_dim"] is None else True
-        self.critic = eval(f"{critic_name}(**kwargs).to(device)")
+        self.critic = get_custom_critic_class(critic_name)(**kwargs).to(device)
         self.QR_network = QR(**kwargs).to(device)
 
     def forward(self, x, return_all=False):
@@ -776,8 +776,8 @@ class NN_wLinearLatent(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
         critic_name = kwargs["critic_name"]
-        device = kwargs["device"]  # noqa
-        self.critic = eval(f"{critic_name}(**kwargs).to(device)")
+        device = kwargs["device"]
+        self.critic = get_custom_critic_class(critic_name)(**kwargs).to(device)
 
     @property
     def value_offset(self):
@@ -803,3 +803,34 @@ class NN_wLinearLatent(nn.Module):
         u = u.view(-1, u.shape[-1])
         K, z_offset = least_squares_fit(z, u)
         return F.mse_loss(forward_affine(z, K, z_offset), target=u, reduction="mean")
+
+
+CUSTOM_CRITIC_CLASSES = {
+    critic.__name__: critic
+    for critic in (
+        Critic2,
+        OuterProduct,
+        OuterProductLatent,
+        CholeskyInput,
+        CholeskyLatent,
+        PDCholeskyInput,
+        PDCholeskyLatent,
+        SpectralLatent,
+        DenseSpectralLatent,
+        QR,
+        QPNet,
+        NN_wRiccati,
+        NN_wQR,
+        NN_wLinearLatent,
+    )
+}
+
+
+def get_custom_critic_class(name):
+    try:
+        return CUSTOM_CRITIC_CLASSES[name]
+    except KeyError as error:
+        choices = ", ".join(sorted(CUSTOM_CRITIC_CLASSES))
+        raise ValueError(
+            f"Unknown custom critic {name!r}; choose from: {choices}"
+        ) from error

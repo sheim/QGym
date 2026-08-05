@@ -89,7 +89,7 @@ uv run --frozen python -m pytest -q
    without W&B. Use the new task name:
 
 ```bash
-uv run --frozen scripts/train_mujoco.py --task TASK --backend mujoco --device cpu --num_envs 8 --max_iterations 2 --headless --disable_wandb
+uv run --frozen scripts/train.py --task TASK --backend mujoco --device cpu --num_envs 8 --max_iterations 2 --headless --disable_wandb
 ```
 
 4. Exercise Warp and VSim only after CPU correctness, with their real contract

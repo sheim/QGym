@@ -64,8 +64,8 @@ with `uv sync --locked --extra vsim`; start every process with
 - macOS viewer errors: use `mjpython` with the Homebrew-Python recipe in
   `README_MUJOCO.md`, or validate headless behavior.
 - CI mismatch: inspect `.github/workflows/` directly. CI runs the uv-managed
-  portable suite but does not cover Ruff, packaging, smoke training, Warp, or
-  licensed VSim.
+  portable and colocated suites, Ruff, and a package build, but does not cover
+  smoke training, Warp, or licensed VSim.
 
 ## Change dependencies
 

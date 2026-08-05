@@ -11,7 +11,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
     class env(MiniCheetahCfg.env):
         num_envs = 4096
         num_actuators = 12
-        episode_length_s = 5.0
+        episode_length_s = 10.0
 
     class terrain(MiniCheetahCfg.terrain):
         pass
@@ -91,7 +91,7 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
             "phase_obs",
             "dof_pos_target",
         ]
-        normalize_obs = False
+        normalize_obs = True
 
         actions = ["dof_pos_target"]
         disable_actions = False
@@ -143,9 +143,9 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                reference_traj = 3.0
-                swing_grf = 1.5
-                stance_grf = 1.5
+                reference_traj = 0.5
+                swing_grf = 0.5
+                stance_grf = 0.5
 
             class termination_weight:
                 termination = 0.15
@@ -173,5 +173,5 @@ class MiniCheetahRefRunnerCfg(MiniCheetahRunnerCfg):
     class runner(MiniCheetahRunnerCfg.runner):
         run_name = ""
         experiment_name = "mini_cheetah_ref"
-        max_iterations = 500  # number of policy updates
+        max_iterations = 1000  # number of policy updates
         algorithm_class_name = "PPO2"

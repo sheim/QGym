@@ -3,8 +3,7 @@
 <!-- Mini Cheetah "rotor" URDF -->
 
 <!-- 
-This URDF contains information for the MIT Mini Cheetah, suitable for use in
-IsaacGym
+This URDF contains information for the MIT Mini Cheetah.
 Rotor inertia approximations are included via the "armature" property 
 
 Rotor mass: 
@@ -21,10 +20,9 @@ Armature inertia:
     Knee:  9.33^2*63e-6 = 0.005484
 Rotor damping: 
     0.01 Nms
-Rotor dry friction: 
-    Not used - calculated in Robot-Software as q_dot*dryFriction, but IsaacGym
-    calculated dry friction from the applied normal force on the joint
-    0.2 Nm/s
+Rotor dry friction:
+    Not represented in this URDF. Robot-Software models it separately as
+    q_dot*dryFriction (0.2 Nm/s).
 -->
 
 <!-- Base -->

@@ -31,9 +31,65 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
 from .actor_critic import ActorCritic
-from .state_estimator import StateEstimatorNN
 from .actor import Actor
-from .critic import Critic
 from .chimera_actor import ChimeraActor
+from .critic import Critic
+from .QRCritics import (
+    CUSTOM_CRITIC_CLASSES,
+    CholeskyInput,
+    CholeskyLatent,
+    Critic2,
+    DenseSpectralLatent,
+    NN_wLinearLatent,
+    NN_wQR,
+    NN_wRiccati,
+    OuterProduct,
+    OuterProductLatent,
+    PDCholeskyInput,
+    PDCholeskyLatent,
+    QPNet,
+    QR,
+    SpectralLatent,
+    get_custom_critic_class,
+    init_weights,
+)
 from .smooth_actor import SmoothActor
-from .QRCritics import *
+from .state_estimator import StateEstimatorNN
+
+CRITIC_CLASSES = {"Critic": Critic, **CUSTOM_CRITIC_CLASSES}
+
+
+def get_critic_class(name):
+    try:
+        return CRITIC_CLASSES[name]
+    except KeyError as error:
+        choices = ", ".join(sorted(CRITIC_CLASSES))
+        raise ValueError(f"Unknown critic {name!r}; choose from: {choices}") from error
+
+
+__all__ = [
+    "Actor",
+    "ActorCritic",
+    "CRITIC_CLASSES",
+    "ChimeraActor",
+    "CholeskyInput",
+    "CholeskyLatent",
+    "Critic",
+    "Critic2",
+    "DenseSpectralLatent",
+    "NN_wLinearLatent",
+    "NN_wQR",
+    "NN_wRiccati",
+    "OuterProduct",
+    "OuterProductLatent",
+    "PDCholeskyInput",
+    "PDCholeskyLatent",
+    "QPNet",
+    "QR",
+    "SmoothActor",
+    "SpectralLatent",
+    "StateEstimatorNN",
+    "get_critic_class",
+    "get_custom_critic_class",
+    "init_weights",
+]
