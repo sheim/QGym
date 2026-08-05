@@ -1,6 +1,7 @@
 from unitree_sdk2py.core import channel
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize
 from main_controller import MainController
+from keyboard_handler import KeyboardHandler
 import sys
 
 import time
@@ -27,6 +28,8 @@ def main():
         "\nConnection successful! Keep the robot away from obstacles and "
         + "always have access to the remote controller (Emergency stop = L2+B)\n"
     )
+
+    keyboard_handler = KeyboardHandler(controller)  # noqa: F841
 
     while True:
         time.sleep(1)

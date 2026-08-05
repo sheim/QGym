@@ -6,8 +6,6 @@ from rl_controller import RLController
 from unitree_remote_controller import UnitreeRemoteController
 from deploy_config import DeployConfig
 from go2_deploy.utility import deploy_utility
-
-# from unitree_sdk2py.utils.thread import RecurrentThread
 from go2_deploy.utility.thread import RecurrentThread
 
 import torch
@@ -76,9 +74,7 @@ class MainController:
         self.action_count = 0
 
         # Unitree SDK pub/sub
-        self.lowcmd_thread = RecurrentThread(
-            interval=1 / self.cfg.ctrl_freq, target=self._control_loop
-        )
+        self._create_lowcmd_thread()
         self.emergency_lowcmd_thread = None
 
         self.lowcmd_publisher = ChannelPublisher("rt/lowcmd", LowCmd_)
@@ -130,25 +126,13 @@ class MainController:
         if t > self.last_terminal_output_time + 1.0:
             self._output_terminal_info(t)
 
-    def _output_terminal_info(self, current_time):
-        print(
-            "Observation freq = "
-            + f"{self.obs_count / (current_time - self.last_terminal_output_time):.5}"
-            + " Hz, "
-            + "custom policy control freq = "
-            + f"{self.action_count / (current_time - self.last_terminal_output_time):.5}"  # noqa: E501
-            + " Hz"
-        )
-        self.last_terminal_output_time = time.monotonic()
-        self.obs_count = 0
-        self.action_count = 0
-
     def _act(self):
         # act using lowcmd thread
         if self._state == State.CUSTOM_CTRL:
             return self.rl_controller.act(self.last_obs)
         else:
-            print("should not be using RL controller!")
+            print("Should not be using RL controller! This should not happen")
+            self.emergency_stop()
             return None
 
     # Safety features
@@ -172,9 +156,7 @@ class MainController:
         time.sleep(10)
         self.emergency_lowcmd_thread.Wait()
         self.emergency_lowcmd_thread = None
-        self.lowcmd_thread = RecurrentThread(
-            interval=1 / self.cfg.ctrl_freq, target=self._control_loop
-        )
+        self._create_lowcmd_thread()
         self.switch_to_recovery()
 
     # Check if robot is in unsafe condition, emergency stop if necessary
@@ -198,12 +180,10 @@ class MainController:
             while not self.lowcmd_thread.Wait():
                 print(
                     "\nWARNING: RL control loop did not stop during recovery, "
-                    + "press L2+B to manually stop. Trying again in 2s\n"
+                    + "press L2+B to manually stop. Trying again in 1s\n"
                 )
-                time.sleep(2)
-            self.lowcmd_thread = RecurrentThread(
-                interval=1 / self.cfg.ctrl_freq, target=self._control_loop
-            )
+                time.sleep(1)
+            self._create_lowcmd_thread()
 
         self.motion_switcher_client.SelectMode("mcf")
         mode = self.motion_switcher_client.CheckMode()[1]["name"]
@@ -244,3 +224,34 @@ class MainController:
             print("Failed to switch to sport mode, trying again in 5s")
             time.sleep(5)
             mode = self.motion_switcher_client.CheckMode()[1]["name"]
+
+    # Utility
+
+    def _create_lowcmd_thread(self):
+        self.lowcmd_thread = RecurrentThread(
+            interval=1 / self.cfg.ctrl_freq, target=self._control_loop
+        )
+
+    def _output_terminal_info(self, current_time):
+        print(
+            "\nObservation freq = "
+            + f"{self.obs_count / (current_time - self.last_terminal_output_time):.5}"
+            + " Hz, "
+            + "custom policy control freq = "
+            + f"{self.action_count / (current_time - self.last_terminal_output_time):.5}"  # noqa: E501
+            + " Hz"
+        )
+        print("Current mode: " + self._state.name)
+        print("\nTo switch modes: enter in terminal <key> and press enter")
+        print(
+            "(enter key pressed without input): emergency stop "
+            + "(or press L2+B on wireless controller)"
+        )
+        print("r: recovery (return to standing position)")
+        print("c: custom RL policy")
+        print(
+            "d: default controller (high level control with the wireless controller)\n"
+        )
+        self.last_terminal_output_time = time.monotonic()
+        self.obs_count = 0
+        self.action_count = 0
