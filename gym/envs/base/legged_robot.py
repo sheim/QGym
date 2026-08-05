@@ -17,7 +17,6 @@ class LeggedRobot(BaseTask):
     def __init__(self, cfg, device, headless, backend):
         self.cfg = cfg
         self.init_done = False
-        self._physics_step_observers = []
 
         super().__init__(backend, cfg, device, headless)
         self._parse_cfg(self.cfg)
@@ -47,13 +46,6 @@ class LeggedRobot(BaseTask):
 
         env_ids = self.to_be_reset.nonzero(as_tuple=False).flatten()
         self._reset_idx(env_ids)
-
-    def add_physics_step_observer(self, observer):
-        """Register opt-in evaluation instrumentation at the physics rate."""
-        self._physics_step_observers.append(observer)
-
-    def remove_physics_step_observer(self, observer):
-        self._physics_step_observers.remove(observer)
 
     def _pre_decimation_step(self):
         return None

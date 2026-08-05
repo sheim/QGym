@@ -79,8 +79,7 @@ class MiniCheetahRefVSimRunnerCfg(MiniCheetahRefRunnerCfg):
                 orientation = 1.5
                 min_base_height = 1.0
 
-                # Smooth, hardware-conscious actuation proxies. FFT metrics
-                # remain evaluation-only because they require a time window.
+                # Smooth, hardware-conscious actuation proxies.
                 torques = 2.0e-5
                 dof_vel = 0.02
                 action_rate = 0.20

@@ -195,12 +195,6 @@ def main():
         help="contact-force threshold in newtons for gait-quality metrics",
     )
     p.add_argument(
-        "--fft_high_frequency",
-        type=float,
-        default=10.0,
-        help="frequency cutoff in hertz for shaky torque/velocity power",
-    )
-    p.add_argument(
         "--velocity_impulse",
         type=float,
         default=0.0,
@@ -255,12 +249,6 @@ def main():
     if args.contact_threshold <= 0:
         raise ValueError("contact_threshold must be positive")
     control_frequency = float(env.cfg.control.ctrl_frequency)
-    physics_frequency = control_frequency * int(env.cfg.control.decimation)
-    if not 0 < args.fft_high_frequency < 0.5 * physics_frequency:
-        raise ValueError(
-            "fft_high_frequency must be between zero and the physics Nyquist "
-            f"frequency ({0.5 * physics_frequency:g} Hz)"
-        )
     robot_mass_kg = (
         None
         if is_pendulum
@@ -312,12 +300,9 @@ def main():
             ),
             contact_threshold=args.contact_threshold,
             num_steps=n_steps,
-            high_frequency_hz=args.fft_high_frequency,
             robot_mass_kg=robot_mass_kg,
         )
     )
-    if legged_accumulator is not None:
-        env.add_physics_step_observer(legged_accumulator.record_physics_step)
 
     per_term_sum = {t: torch.zeros(N, device=dev) for t in terms}
     base_z = np.empty((n_steps, N), dtype=np.float32)
@@ -422,7 +407,6 @@ def main():
     hardware_metrics = {}
     hardware_artifacts = {}
     if legged_accumulator is not None:
-        env.remove_physics_step_observer(legged_accumulator.record_physics_step)
         hardware_metrics = legged_accumulator.finalize(survived)
         hardware_artifacts = legged_accumulator.artifacts
         hardware_metrics["survival"] = survived.astype(np.float32)
@@ -511,9 +495,6 @@ def main():
         print(
             "gait quality     | "
             f"height std {1000 * _mean['base_height_std']:.1f} mm | "
-            f"torque HF {100 * _mean['torque_fft_high_frequency_ratio']:.2f}% | "
-            "velocity HF "
-            f"{100 * _mean['joint_velocity_fft_high_frequency_ratio']:.2f}% | "
             f"trot {100 * _mean['gait_trot_classified']:.1f}% | "
             f"RPD error {_mean['gait_rpd_trot_error']:.3f} rad | "
             f"GRF CV {_mean['grf_balance_cv']:.3f}"
@@ -556,7 +537,6 @@ def main():
                 "settling_time_s": args.settling_time,
                 "command_profile": args.command_profile,
                 "contact_threshold_n": args.contact_threshold,
-                "fft_high_frequency_hz": args.fft_high_frequency,
                 "robot_mass_kg": robot_mass_kg,
                 "velocity_impulse_m_per_s": args.velocity_impulse,
                 "impulse_start_time_s": args.impulse_start_time,

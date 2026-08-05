@@ -85,8 +85,8 @@ def _(artifact_root, disturbance_root, mo, native):
           `(LF, RH, LH) = (π, π, 0)` relative to RF;
         - Table I-style phase-staggered planar velocity-impulse failure rates.
 
-        It additionally measures base-height steadiness and 500 Hz torque/joint
-        velocity spectra for motor safety.
+        It additionally measures base-height steadiness and actuator/contact
+        behavior in physical units.
 
         **Loaded native artifacts:** {len(native)}/2
 
@@ -115,14 +115,6 @@ def _(mo, native, np):
         ("Survival", "survival", "", 100.0, ".1f"),
         ("Base-height std", "base_height_std", "mm", 1000.0, ".1f"),
         ("Base-height range", "base_height_range", "mm", 1000.0, ".1f"),
-        ("Torque power >10 Hz", "torque_fft_high_frequency_ratio", "%", 100.0, ".1f"),
-        (
-            "Joint-velocity power >10 Hz",
-            "joint_velocity_fft_high_frequency_ratio",
-            "%",
-            100.0,
-            ".1f",
-        ),
         ("Moving trials classified trot", "gait_trot_classified", "%", 100.0, ".1f"),
         ("Trot RPD error", "gait_rpd_trot_error", "rad", 1.0, ".3f"),
         ("GRF balance CV", "grf_balance_cv", "", 1.0, ".3f"),
@@ -142,91 +134,7 @@ def _(mo, native, np):
         """
         + "\n".join(_rows)
         + """
-
-        The FFT cutoff is a diagnostic, not yet a motor-certified limit.
-        Gait harmonics and contact impulses legitimately contribute broadband
-        power; tune against the full PSD and worst joint, then finalize limits
-        from actuator/controller data.
         """
-    )
-    return
-
-
-@app.cell
-def _(mo, native):
-    _first = next(iter(native.values()), None)
-    _joint_names = (
-        [str(_name) for _name in _first["actuated_dof_names"]]
-        if _first is not None
-        else []
-    )
-    spectrum_joint = mo.ui.dropdown(
-        options=_joint_names,
-        value=(_joint_names[0] if _joint_names else None),
-        label="Joint spectrum",
-    )
-    spectrum_joint
-    return (spectrum_joint,)
-
-
-@app.cell
-def _(backend_colors, mo, native, np, plt, spectrum_joint):
-    def _spectral_plot():
-        if not native or spectrum_joint.value is None:
-            return mo.md("_No spectral artifacts found._")
-        _fig, _axes = plt.subplots(
-            1,
-            2,
-            figsize=(14, 4.5),
-            constrained_layout=True,
-        )
-        for _backend, _cell in native.items():
-            _names = [str(_name) for _name in _cell["actuated_dof_names"]]
-            _joint = _names.index(spectrum_joint.value)
-            _frequency = _cell["fft_frequency_hz"]
-            for _ax, _key, _title, _unit in (
-                (_axes[0], "torque_psd_by_joint", "joint torque", "(N m)²/Hz"),
-                (
-                    _axes[1],
-                    "joint_velocity_psd_by_joint",
-                    "joint velocity",
-                    "(rad/s)²/Hz",
-                ),
-            ):
-                _ax.semilogy(
-                    _frequency[1:],
-                    np.maximum(_cell[_key][_joint, 1:], 1e-12),
-                    label=_backend,
-                    color=backend_colors[_backend],
-                    lw=1.4,
-                )
-                _ax.set(
-                    xlabel="frequency (Hz)",
-                    ylabel=f"PSD {_unit}",
-                    title=f"{spectrum_joint.value}: {_title}",
-                    xlim=(0, min(100, float(_frequency[-1]))),
-                )
-        for _ax in _axes:
-            _ax.axvline(2.5, color="#777777", ls=":", lw=1, label="gait 2.5 Hz")
-            _ax.axvline(10.0, color="#222222", ls="--", lw=1, label="HF cutoff")
-            _ax.grid(alpha=0.2)
-        _axes[0].legend(fontsize=8)
-        return _fig
-
-    mo.vstack(
-        [
-            mo.md(
-                """
-                ## Motor spectra at the 500 Hz PD/physics rate
-
-                PSDs use detrended, Hann-windowed signals after the 0.5-second
-                settling period. Scalar metrics include spectral centroid,
-                dominant frequency, fraction above 10 Hz, gait-band fraction,
-                and the worst single-joint high-frequency fraction.
-                """
-            ),
-            _spectral_plot(),
-        ]
     )
     return
 
@@ -483,8 +391,6 @@ def _(mo):
 
     - Require survival first, then check height steadiness; a crouched but
       steady gait is acceptable, an oscillating base is not.
-    - Use FFT ratios and full per-joint PSDs together. The 10 Hz split is a
-      comparison feature until motor/controller frequency limits are known.
     - Require the 1 m/s forward case to classify as trot with low RPD
       variation and four comparable GRF distributions.
     - Use the impulse failure curve as a hard robustness discriminator

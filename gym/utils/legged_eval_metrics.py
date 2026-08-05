@@ -13,7 +13,6 @@ import torch
 from gym.utils.legged_signal_analysis import (
     analyze_base_height,
     analyze_gait_and_grf,
-    analyze_spectra,
 )
 
 
@@ -90,21 +89,6 @@ METRIC_DEFINITIONS = {
     "joint_velocity_limit_fraction": MetricDefinition(
         "ratio", "lower", "Fraction of joint samples at the URDF velocity limit."
     ),
-    "joint_velocity_fft_peak_frequency": MetricDefinition(
-        "Hz", "context", "Dominant non-DC joint-velocity frequency."
-    ),
-    "joint_velocity_fft_centroid": MetricDefinition(
-        "Hz", "lower", "Power-weighted joint-velocity spectral centroid."
-    ),
-    "joint_velocity_fft_high_frequency_ratio": MetricDefinition(
-        "ratio", "lower", "Joint-velocity power above the configured cutoff."
-    ),
-    "joint_velocity_fft_high_frequency_ratio_max_joint": MetricDefinition(
-        "ratio", "lower", "Worst-joint velocity power above the cutoff."
-    ),
-    "joint_velocity_fft_gait_band_ratio": MetricDefinition(
-        "ratio", "higher", "Joint-velocity power within 0.5 Hz of gait frequency."
-    ),
     "joint_acceleration_rms": MetricDefinition(
         "rad/s^2", "lower", "Finite-difference RMS actuated-joint acceleration."
     ),
@@ -128,21 +112,6 @@ METRIC_DEFINITIONS = {
     ),
     "torque_saturation_fraction": MetricDefinition(
         "ratio", "lower", "Fraction of actuator samples above 98% effort."
-    ),
-    "torque_fft_peak_frequency": MetricDefinition(
-        "Hz", "context", "Dominant non-DC actuator-torque frequency."
-    ),
-    "torque_fft_centroid": MetricDefinition(
-        "Hz", "lower", "Power-weighted actuator-torque spectral centroid."
-    ),
-    "torque_fft_high_frequency_ratio": MetricDefinition(
-        "ratio", "lower", "Actuator-torque power above the configured cutoff."
-    ),
-    "torque_fft_high_frequency_ratio_max_joint": MetricDefinition(
-        "ratio", "lower", "Worst-joint torque power above the cutoff."
-    ),
-    "torque_fft_gait_band_ratio": MetricDefinition(
-        "ratio", "higher", "Actuator-torque power within 0.5 Hz of gait frequency."
     ),
     "mechanical_power_mean": MetricDefinition(
         "W", "lower", "Mean sum of absolute actuator mechanical power."
@@ -307,18 +276,13 @@ class LeggedMetricAccumulator:
         settle_steps=50,
         contact_threshold=20.0,
         num_steps=None,
-        high_frequency_hz=10.0,
         robot_mass_kg=None,
     ):
         self.env = env
         self.settle_steps = settle_steps
         self.contact_threshold = contact_threshold
-        self.high_frequency_hz = high_frequency_hz
         self.robot_mass_kg = robot_mass_kg
         self.dt = float(env.dt)
-        control = getattr(env.cfg, "control", None)
-        self.decimation = int(getattr(control, "decimation", 1))
-        self.physics_dt = self.dt / self.decimation
         self.num_envs = env.num_envs
         self.device = env.device
         self.evaluation_commands = env.commands[:, :3].detach().clone()
@@ -334,29 +298,9 @@ class LeggedMetricAccumulator:
         self._previous_torque = None
         self.artifacts = {}
         self._histories = None
-        self._physics_history_index = 0
         if num_steps is not None:
             num_feet = len(env.feet_indices)
-            num_actuators = env.num_actuators
             self._histories = {
-                "torque": torch.empty(
-                    (
-                        num_steps * self.decimation,
-                        self.num_envs,
-                        num_actuators,
-                    ),
-                    dtype=torch.float32,
-                    device=self.device,
-                ),
-                "joint_velocity": torch.empty(
-                    (
-                        num_steps * self.decimation,
-                        self.num_envs,
-                        num_actuators,
-                    ),
-                    dtype=torch.float32,
-                    device=self.device,
-                ),
                 "base_height": np.empty(
                     (num_steps, self.num_envs),
                     dtype=np.float32,
@@ -374,20 +318,6 @@ class LeggedMetricAccumulator:
                     dtype=np.bool_,
                 ),
             }
-
-    def record_physics_step(self):
-        """Capture motor signals after each PD/physics substep."""
-        if self._histories is None:
-            return
-        index = self._physics_history_index
-        if index >= len(self._histories["torque"]):
-            raise RuntimeError("physics-step history exceeded its allocated length")
-        actuated = self.env.actuated_dof_indices
-        self._histories["torque"][index].copy_(self.env.torques)
-        self._histories["joint_velocity"][index].copy_(
-            self.env.dof_vel.index_select(1, actuated)
-        )
-        self._physics_history_index += 1
 
     def _zeros(self):
         return torch.zeros(self.num_envs, dtype=torch.float64, device=self.device)
@@ -693,26 +623,7 @@ class LeggedMetricAccumulator:
             if self.robot_mass_kg is None:
                 raise ValueError("robot_mass_kg is required for GRF analysis")
             sample_rate_hz = 1.0 / self.dt
-            physics_sample_rate_hz = 1.0 / self.physics_dt
             gait_frequency_hz = float(getattr(self.env.cfg.control, "gait_freq", 1.0))
-            physics_alive = np.repeat(
-                self._histories["alive"],
-                self.decimation,
-                axis=0,
-            )[: self._physics_history_index]
-            spectral_metrics, spectral_artifacts = analyze_spectra(
-                self._histories["torque"][: self._physics_history_index].cpu().numpy(),
-                self._histories["joint_velocity"][: self._physics_history_index]
-                .cpu()
-                .numpy(),
-                physics_alive,
-                physics_sample_rate_hz,
-                self.settle_steps * self.decimation,
-                self.high_frequency_hz,
-                gait_frequency_hz,
-                survived,
-            )
-            metrics.update(spectral_metrics)
             metrics.update(
                 analyze_base_height(
                     self._histories["base_height"],
@@ -736,7 +647,7 @@ class LeggedMetricAccumulator:
                 self.robot_mass_kg,
             )
             metrics.update(gait_metrics)
-            self.artifacts = spectral_artifacts | gait_artifacts
+            self.artifacts = gait_artifacts
         return metrics
 
 

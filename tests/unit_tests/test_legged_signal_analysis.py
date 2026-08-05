@@ -4,7 +4,6 @@ import pytest
 from gym.utils.legged_signal_analysis import (
     analyze_base_height,
     analyze_gait_and_grf,
-    analyze_spectra,
     urdf_total_mass,
 )
 
@@ -15,36 +14,6 @@ def test_urdf_total_mass_reads_all_links():
     )
 
     assert mass == pytest.approx(8.292)
-
-
-def test_spectral_metrics_detect_high_frequency_motor_content():
-    sample_rate = 100.0
-    duration = 10.0
-    time = np.arange(int(sample_rate * duration)) / sample_rate
-    gait = np.sin(2 * np.pi * 2.5 * time)
-    shaky = gait + np.sin(2 * np.pi * 20.0 * time)
-    torque = np.stack([gait, shaky], axis=1)[:, :, None]
-    torque = np.repeat(torque, 2, axis=2).astype(np.float32)
-    velocity = np.repeat(gait[:, None, None], 2, axis=1)
-    velocity = np.repeat(velocity, 2, axis=2).astype(np.float32)
-    alive = np.ones((len(time), 2), dtype=bool)
-
-    metrics, artifacts = analyze_spectra(
-        torque,
-        velocity,
-        alive,
-        sample_rate,
-        settle_steps=0,
-        high_frequency_hz=10.0,
-        gait_frequency_hz=2.5,
-        survived=np.ones(2, dtype=bool),
-    )
-
-    assert metrics["torque_fft_peak_frequency"][0] == pytest.approx(2.5)
-    assert metrics["torque_fft_high_frequency_ratio"][0] < 1e-8
-    assert metrics["torque_fft_high_frequency_ratio"][1] > 0.45
-    assert metrics["joint_velocity_fft_gait_band_ratio"][0] > 0.99
-    assert artifacts["torque_psd_by_joint"].shape == (2, 501)
 
 
 def test_base_height_metrics_measure_steadiness_independent_of_target():
