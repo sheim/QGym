@@ -13,6 +13,10 @@ class FixedRobot(BaseTask):
 
         super().__init__(backend, cfg, device, headless)
         self._parse_cfg(self.cfg)
+        reset_mode = self.cfg.init_state.reset_mode
+        self._reset_state = getattr(self, reset_mode, None)
+        if not callable(self._reset_state):
+            raise NameError(f"Unknown default setup: {reset_mode}")
 
         if not self.headless:
             self._backend.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -259,10 +263,7 @@ class FixedRobot(BaseTask):
         self.env_origins[:, 2] = self.cfg.env.root_height
 
     def _reset_system(self, env_ids):
-        reset = getattr(self, self.cfg.init_state.reset_mode, None)
-        if reset is None:
-            raise NameError(f"Unknown default setup: {self.cfg.init_state.reset_mode}")
-        reset(env_ids)
+        self._reset_state(env_ids)
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self._backend.reset_dof_state(env_ids_int32)
 

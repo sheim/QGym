@@ -75,6 +75,34 @@ def test_declared_learning_components_resolve_explicitly():
             assert get_critic_class(critic_name).__name__ == critic_name, task_name
 
 
+@pytest.mark.parametrize("task_name", ["pendulum", "mini_cheetah"])
+def test_reset_method_is_resolved_once_during_initialization(task_name):
+    registered_env_cfg, registered_train_cfg = task_registry.get_cfgs(task_name)
+    env_cfg = type(registered_env_cfg)()
+    train_cfg = type(registered_train_cfg)()
+    env_cfg.env.num_envs = 2
+    env_cfg.seed = 1
+    env_cfg.init_state.reset_mode = "reset_to_basic"
+    if hasattr(env_cfg, "push_robots"):
+        env_cfg.push_robots.toggle = False
+    task_registry.convert_frequencies_to_params(env_cfg, train_cfg)
+    env = task_registry.make_env(
+        task_name,
+        env_cfg,
+        device="cpu",
+        headless=True,
+    )
+
+    try:
+        reset_state = env._reset_state
+        env.cfg.init_state.reset_mode = "invalid_after_initialization"
+        env._reset_system(torch.arange(env.num_envs, device=env.device))
+
+        assert env._reset_state is reset_state
+    finally:
+        env._backend.close()
+
+
 def test_declared_tasks_only_expose_supported_physics_config():
     for task_name, registered_cfg in task_registry.env_cfgs.items():
         cfg = type(registered_cfg)()

@@ -20,6 +20,10 @@ class LeggedRobot(BaseTask):
 
         super().__init__(backend, cfg, device, headless)
         self._parse_cfg(self.cfg)
+        reset_mode = self.cfg.init_state.reset_mode
+        self._reset_state = getattr(self, reset_mode, None)
+        if not callable(self._reset_state):
+            raise NameError(f"Unknown default setup: {reset_mode}")
 
         if not self.headless:
             self._set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -253,11 +257,7 @@ class LeggedRobot(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        # todo: move getattr to initialization (also in fixed robot)
-        reset = getattr(self, self.cfg.init_state.reset_mode, None)
-        if reset is None:
-            raise NameError(f"Unknown default setup: {self.cfg.init_state.reset_mode}")
-        reset(env_ids)
+        self._reset_state(env_ids)
 
         # * start base position shifted in X-Y plane
         if self.custom_origins:
