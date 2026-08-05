@@ -20,13 +20,13 @@ import os
 import pytest
 import torch
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from tests.unit_tests.conftest import vsim_guard
 
 pytestmark = pytest.mark.vsim
 
 PENDULUM_URDF = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
+    GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
 )
 
 MASS, LENGTH, GRAVITY = 1.0, 1.0, 9.81

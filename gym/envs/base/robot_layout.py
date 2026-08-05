@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Mapping, Sequence
 import xml.etree.ElementTree as ET
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 
 
 def _as_tuple(values: Sequence[str], label: str) -> tuple[str, ...]:
@@ -79,7 +79,7 @@ class RobotLayout:
 
     @classmethod
     def from_cfg(cls, cfg) -> "RobotLayout":
-        asset_path = cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+        asset_path = cfg.asset.file.format(GYM_ROOT_DIR=GYM_ROOT_DIR)
         asset_path = str(Path(asset_path).resolve())
         urdf_dofs, urdf_bodies = _urdf_names(asset_path)
         config = getattr(cfg.asset, "robot_layout", None)

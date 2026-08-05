@@ -21,7 +21,7 @@ resources/robots/<name>/vsim/ (gitignored) for inspection.
 import os
 import xml.etree.ElementTree as ET
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from gym.envs.base.urdf_limits import parse_urdf_limits
 
 UNLIMITED_EFFORT = 1.0e6
@@ -150,7 +150,7 @@ def ensure_vsim_asset(cfg, vgym) -> str:
     Requires a live vlearn gym (the converter runs on the singleton), so the
     backend calls this after create_gym and before world-building.
     """
-    urdf_path = cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+    urdf_path = cfg.asset.file.format(GYM_ROOT_DIR=GYM_ROOT_DIR)
     stem = os.path.splitext(os.path.basename(urdf_path))[0]
     out_dir = os.path.join(os.path.dirname(urdf_path), os.pardir, "vsim")
     os.makedirs(out_dir, exist_ok=True)

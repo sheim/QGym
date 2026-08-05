@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from tensordict import TensorDict
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from learning.algorithms import get_algorithm_class
 from learning.modules import Actor, get_critic_class
 from learning.utils import Logger
@@ -135,7 +135,7 @@ class CustomCriticRunner(OnPolicyRunner):
                 self.save()
         self.all_obs = self.all_obs.detach().cpu().numpy()
         save_path = os.path.join(
-            LEGGED_GYM_ROOT_DIR,
+            GYM_ROOT_DIR,
             "logs",
             "lqrc",
             "standard_training_data.npy"

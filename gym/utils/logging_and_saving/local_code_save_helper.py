@@ -1,7 +1,7 @@
 import os
 import shutil
 import fnmatch
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 
 
 def configure_local_files(log_dir, save_paths):
@@ -72,10 +72,10 @@ def check_local_saving_flag(train_cfg):
 def get_local_save_paths():
     """Create a save_paths object for saving code locally"""
 
-    learning_dir = os.path.join(LEGGED_GYM_ROOT_DIR, "learning")
+    learning_dir = os.path.join(GYM_ROOT_DIR, "learning")
     learning_target = os.path.join("learning")
 
-    gym_dir = os.path.join(LEGGED_GYM_ROOT_DIR, "gym")
+    gym_dir = os.path.join(GYM_ROOT_DIR, "gym")
     gym_target = os.path.join("gym")
 
     # list of things to copy

@@ -1,7 +1,7 @@
 import os
 import json
 import wandb
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 
 
 class WandbSingleton(object):
@@ -18,9 +18,7 @@ class WandbSingleton(object):
 
     def set_wandb_values(self, args, train_cfg=None):
         # build the path for the wandb_config.json file
-        wandb_config_path = os.path.join(
-            LEGGED_GYM_ROOT_DIR, "user", "wandb_config.json"
-        )
+        wandb_config_path = os.path.join(GYM_ROOT_DIR, "user", "wandb_config.json")
 
         # load entity and project name from JSON if it exists
         if os.path.exists(wandb_config_path):
@@ -91,7 +89,7 @@ class WandbSingleton(object):
 
         if is_sweep:
             wandb.init(
-                dir=os.path.join(LEGGED_GYM_ROOT_DIR, "logs"),
+                dir=os.path.join(GYM_ROOT_DIR, "logs"),
                 config=wandb.config,
                 name=self.experiment_name,
             )
@@ -99,12 +97,12 @@ class WandbSingleton(object):
             wandb.init(
                 project=self.project_name,
                 entity=self.entity_name,
-                dir=os.path.join(LEGGED_GYM_ROOT_DIR, "logs"),
+                dir=os.path.join(GYM_ROOT_DIR, "logs"),
                 config=wandb.config,
                 name=self.experiment_name,
             )
 
-        wandb.run.log_code(os.path.join(LEGGED_GYM_ROOT_DIR, "gym"))
+        wandb.run.log_code(os.path.join(GYM_ROOT_DIR, "gym"))
 
         self.parameters_dict = wandb.config
         self.set_wandb_sweep_cfg_values(env_cfg=env_cfg, train_cfg=train_cfg)

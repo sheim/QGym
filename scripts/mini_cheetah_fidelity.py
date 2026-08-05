@@ -45,7 +45,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import torch
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from gym.envs.mini_cheetah.mini_cheetah_config import MINI_CHEETAH_DOF_NAMES
 from gym.utils.helpers import set_seed
 from gym.utils.task_registry import task_registry
@@ -395,7 +395,7 @@ def _default_pose_pd_torques(env):
 
 def _canonical_body_inertial_properties(env):
     """Return canonical body masses and body-frame COM offsets from the URDF."""
-    asset_path = env.cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+    asset_path = env.cfg.asset.file.format(GYM_ROOT_DIR=GYM_ROOT_DIR)
     links = {
         link.get("name"): link
         for link in ET.parse(asset_path).getroot().findall("link")

@@ -18,7 +18,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
     class init_state(MiniCheetahCfg.init_state):
         ref_traj = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
+            "{GYM_ROOT_DIR}/resources/robots/"
             + "mini_cheetah/trajectories/single_leg.csv"
         )
 
@@ -45,7 +45,7 @@ class MiniCheetahRefCfg(MiniCheetahCfg):
 
     class asset(MiniCheetahCfg.asset):
         file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
+            "{GYM_ROOT_DIR}/resources/robots/"
             + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
         )
         foot_name = "foot"

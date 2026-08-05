@@ -3,7 +3,7 @@ import torch
 
 from gym.envs.base.base_task import BaseTask
 from gym.utils import random_sample
-from gym.utils.gym_math_wrappers import torch_rand_float
+from gym.utils.sampling import torch_rand_float
 from gym.utils.helpers import class_to_dict
 from gym.utils.torch_quat import (
     get_axis_params,

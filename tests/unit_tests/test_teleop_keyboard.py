@@ -199,12 +199,12 @@ def _pendulum_cfg(show_ui):
     import os
     import types
 
-    from gym import LEGGED_GYM_ROOT_DIR
+    from gym import GYM_ROOT_DIR
 
     return types.SimpleNamespace(
         asset=types.SimpleNamespace(
             file=os.path.join(
-                LEGGED_GYM_ROOT_DIR,
+                GYM_ROOT_DIR,
                 "resources",
                 "robots",
                 "pendulum",

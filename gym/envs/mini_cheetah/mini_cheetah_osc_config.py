@@ -113,11 +113,11 @@ class MiniCheetahOscCfg(MiniCheetahCfg):
 
     class asset(MiniCheetahCfg.asset):
         shank_length_diff = 0  # Units in cm
-        # file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" \
+        # file = "{GYM_ROOT_DIR}/resources/robots/" \
         #     + "mini_cheetah/urdf/mini_cheetah_" \
         #     + str(shank_length_diff) + ".urdf"
         file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
+            "{GYM_ROOT_DIR}/resources/robots/"
             + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
         )
         foot_name = "foot"

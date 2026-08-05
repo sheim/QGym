@@ -34,7 +34,7 @@ from gym.envs.base.robot_layout import RobotLayout
 from gym.envs.base.sim_backend import SimBackend
 from gym.envs.base.urdf_limits import parse_urdf_limits
 from gym.envs.base.vsim_asset import ensure_vsim_asset
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 
 import numpy as np
 
@@ -514,7 +514,7 @@ class VSimBackend(SimBackend):
             if lo > hi:
                 lo, hi = -UNLIMITED, UNLIMITED
             limits[j.get("name")] = (lo, hi)
-        urdf_path = cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+        urdf_path = cfg.asset.file.format(GYM_ROOT_DIR=GYM_ROOT_DIR)
         urdf_ev = parse_urdf_limits(urdf_path)
         n = self._num_dof
         lower = np.zeros(n)

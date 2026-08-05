@@ -135,7 +135,7 @@ class MITHumanoidCfg(LeggedRobotCfg):
 
     class asset(LeggedRobotCfg.asset):
         file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
+            "{GYM_ROOT_DIR}/resources/robots/"
             + "mit_humanoid/urdf/humanoid_F_sf_learnt.urdf"
         )
         # foot_collisionbox_names = ["foot"]

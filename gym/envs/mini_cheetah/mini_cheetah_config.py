@@ -116,7 +116,7 @@ class MiniCheetahCfg(LeggedRobotCfg):
 
     class asset(LeggedRobotCfg.asset):
         file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
+            "{GYM_ROOT_DIR}/resources/robots/"
             + "mini_cheetah/urdf/mini_cheetah_simple.urdf"
         )
         foot_name = "foot"

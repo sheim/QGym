@@ -1,7 +1,7 @@
 import torch
 
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
-from gym.utils.gym_math_wrappers import torch_rand_float
+from gym.utils.sampling import torch_rand_float
 
 MINI_CHEETAH_WEIGHT = 8.292 * 9.81  # Weight of mini cheetah in Newtons
 

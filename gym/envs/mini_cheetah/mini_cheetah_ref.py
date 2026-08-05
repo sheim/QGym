@@ -2,10 +2,10 @@ import torch
 import pandas as pd
 
 
-from gym.utils.gym_math_wrappers import torch_rand_float
+from gym.utils.sampling import torch_rand_float
 from gym.utils.torch_quat import to_torch
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from gym.envs.mini_cheetah.mini_cheetah import MiniCheetah
 
 
@@ -22,9 +22,7 @@ class MiniCheetahRef(MiniCheetah):
         )
 
     def _init_reference_trajectory_buffers(self):
-        csv_path = self.cfg.init_state.ref_traj.format(
-            LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR
-        )
+        csv_path = self.cfg.init_state.ref_traj.format(GYM_ROOT_DIR=GYM_ROOT_DIR)
         self.leg_ref = 3 * to_torch(
             pd.read_csv(csv_path).to_numpy(),
             device=self.device,

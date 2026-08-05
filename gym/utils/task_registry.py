@@ -38,7 +38,7 @@ from typing import Tuple
 from learning.runners import get_runner_class
 from learning.utils import set_discount_from_horizon
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from .helpers import class_to_dict, get_load_path, set_seed
 
 
@@ -64,7 +64,7 @@ class TaskRegistry:
     def set_log_dir_name(self, train_cfg, log_root="default"):
         if log_root == "default":
             log_root = os.path.join(
-                LEGGED_GYM_ROOT_DIR, "logs", train_cfg.runner.experiment_name
+                GYM_ROOT_DIR, "logs", train_cfg.runner.experiment_name
             )
             log_dir = os.path.join(
                 log_root,

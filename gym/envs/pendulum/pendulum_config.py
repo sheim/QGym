@@ -40,7 +40,7 @@ class PendulumCfg(FixedRobotCfg):
 
     class asset(FixedRobotCfg.asset):
         # * Things that differ
-        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "pendulum/urdf/pendulum.urdf"
+        file = "{GYM_ROOT_DIR}/resources/robots/" + "pendulum/urdf/pendulum.urdf"
         disable_gravity = False
         disable_motors = False  # all torques set to 0
         joint_damping = 0.1

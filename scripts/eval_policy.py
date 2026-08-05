@@ -22,7 +22,7 @@ import os
 import numpy as np
 import torch
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from gym.utils.helpers import set_seed
 from gym.utils.legged_eval_metrics import (
     LeggedMetricAccumulator,
@@ -252,9 +252,7 @@ def main():
     robot_mass_kg = (
         None
         if is_pendulum
-        else urdf_total_mass(
-            env.cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
-        )
+        else urdf_total_mass(env.cfg.asset.file.format(GYM_ROOT_DIR=GYM_ROOT_DIR))
     )
     if args.velocity_impulse < 0:
         raise ValueError("velocity_impulse cannot be negative")

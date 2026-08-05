@@ -12,7 +12,7 @@ import numpy as np
 import torch
 import mujoco
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 from gym.envs.base.robot_layout import RobotLayout
 from gym.envs.base.sim_backend import SimBackend
 from gym.envs.base.urdf_limits import parse_urdf_limits
@@ -96,7 +96,7 @@ class MuJocoBackendBase(SimBackend):
 
     def _load_model(self, cfg) -> mujoco.MjModel:
         """Load URDF, configure model (free joint, ground, physics), return MjModel."""
-        asset_path = cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+        asset_path = cfg.asset.file.format(GYM_ROOT_DIR=GYM_ROOT_DIR)
         # Cache URDF effort/velocity limits — MuJoCo drops these on import
         # (it expects them on actuators, but we have none).
         self._urdf_limits = self._parse_urdf_limits(asset_path)

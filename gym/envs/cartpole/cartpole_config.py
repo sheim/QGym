@@ -39,7 +39,7 @@ class CartpoleCfg(FixedRobotCfg):
 
     class asset(FixedRobotCfg.asset):
         # * Things that differ
-        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "cartpole/urdf/cartpole.urdf"
+        file = "{GYM_ROOT_DIR}/resources/robots/" + "cartpole/urdf/cartpole.urdf"
         disable_gravity = False
         disable_motors = False  # all torques set to 0
 

@@ -150,6 +150,63 @@ pass:
 
 Aggregate reward or a viewer impression alone is not promotion evidence.
 
+## Planned learning-stack pruning
+
+The learning package currently mixes the supported PPO path with configured
+research paths and code that no registered task can select. Pruning must follow
+runtime reachability and an explicit support decision; an import or historical
+checkpoint alone does not make a path supported.
+
+### Inventory
+
+| Status | Runtime chain | Current consumer |
+|---|---|---|
+| Core | `OnPolicyRunner` → `PPO2` → `Actor`/`SmoothActor` + `Critic` → `DictStorage` | All standard PPO tasks |
+| Configured research | `OffPolicyRunner` → `SAC` → `ChimeraActor` + `Critic` → `ReplayBuffer` | `sac_pendulum`, `sac_mini_cheetah` |
+| Configured research | `PSACRunner` → `SAC` → `ChimeraActor` + `DenseSpectralLatent` → `ReplayBuffer` | `psd_pendulum` |
+| Unconfigured | `CustomCriticRunner`, `MyRunner`, `DataLoggingRunner` | Exported by `learning.runners`, but selected by no registered task |
+| Legacy | `OldPolicyRunner` → deprecated `PPO` → `ActorCritic` → `RolloutStorage` | No registered task |
+| Orphaned | `StateEstimator` → `StateEstimatorNN` → `SERolloutStorage` | No registered task |
+| Partially reachable | Other classes in `QRCritics.py` | Only `DenseSpectralLatent` is selected by a registered task |
+
+Environment-agnostic utilities are not removal candidates merely because a
+runner does not call them. Keep normalization, logging, dictionary utilities,
+and the colocated PBRS implementation/tutorial unless their own behavior or
+tests show that they are obsolete.
+
+### Pruning sequence
+
+1. Keep the core PPO chain as the supported baseline. Add no compatibility
+   aliases for removed selectable class names; registry/config failures should
+   remain explicit.
+2. Decide whether SAC and PSD-SAC are supported research features. For each of
+   `sac_pendulum`, `sac_mini_cheetah`, and `psd_pendulum`, run a reduced CPU
+   smoke that crosses replay-buffer initialization, performs updates, saves a
+   checkpoint, resumes it, and produces finite deterministic inference. Keep
+   and test a chain only if that evidence passes and the feature is still
+   wanted; otherwise unregister its tasks and configs before deleting it.
+3. Remove the definitely unreachable chains in separate reviewable changes:
+   first `OldPolicyRunner`/`PPO`/`ActorCritic`/`RolloutStorage`, then the state
+   estimator chain, then the three unconfigured runner variants. Update package
+   exports and delete tests that exist only for a removed path in the same
+   change.
+4. After the SAC/PSD decision, reduce `QRCritics.py` to retained classes and
+   their demonstrated dependencies. If PSD-SAC stays, give its selected critic
+   focused math and checkpoint tests rather than preserving every historical
+   critic architecture.
+5. Normalize module names only after reachability is settled: for example,
+   rename `BaseRunner.py` to `base_runner.py` and any retained custom-critic
+   module to snake case. This avoids renaming code immediately before deleting
+   it.
+6. For every retained runner family, require a registered task, focused unit
+   coverage, a tiny train/save/resume/inference smoke, and explicit inclusion
+   in developer documentation. Finish each pruning slice with the portable,
+   colocated, lint, and package-build gates.
+
+Pruning is complete when every selectable runner and algorithm has a declared
+consumer and evidence, every registered learning task uses a supported chain,
+and the package no longer exports unreachable implementations.
+
 ## Planned domain randomization
 
 Add domain randomization later as a standalone feature, in this order:

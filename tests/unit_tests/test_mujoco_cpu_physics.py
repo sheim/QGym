@@ -32,11 +32,11 @@ import types
 import pytest
 import torch
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 import os
 
 PENDULUM_URDF = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
+    GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
 )
 
 # Physical parameters (must match the URDF inertial block)

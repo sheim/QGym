@@ -12,13 +12,13 @@ import types
 import pytest
 import torch
 
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 import os
 
 pytestmark = pytest.mark.warp
 
 PENDULUM_URDF = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
+    GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
 )
 
 SIM_DT = 0.005

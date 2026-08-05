@@ -129,10 +129,10 @@ class HumanoidRunningCfg(LeggedRobotCfg):
         push_box_dims = [0.1, 0.2, 0.3]  # x,y,z [m]
 
     class asset(LeggedRobotCfg.asset):
-        # file = ('{LEGGED_GYM_ROOT_DIR}/resources/robots/rom/urdf/'
+        # file = ('{GYM_ROOT_DIR}/resources/robots/rom/urdf/'
         #         +'humanoid_fixed_arms_full.urdf')
         file = (
-            "{LEGGED_GYM_ROOT_DIR}/resources/robots/"
+            "{GYM_ROOT_DIR}/resources/robots/"
             + "mit_humanoid/urdf/humanoid_F_sf_learnt.urdf"
         )
         keypoints = ["base"]

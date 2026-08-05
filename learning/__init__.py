@@ -29,9 +29,3 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
-
-import os
-
-LEGGED_GYM_ROOT_DIR = os.path.dirname(
-    os.path.dirname(os.path.realpath(__file__))
-)

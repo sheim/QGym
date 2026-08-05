@@ -9,13 +9,13 @@ import torch
 from tests.unit_tests.mock_backend import MockBackend
 
 # Path to the pendulum URDF used by MuJoCo backend fixtures
-from gym import LEGGED_GYM_ROOT_DIR
+from gym import GYM_ROOT_DIR
 
 PENDULUM_URDF = os.path.join(
-    LEGGED_GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
+    GYM_ROOT_DIR, "resources", "robots", "pendulum", "urdf", "pendulum.urdf"
 )
 MINI_CHEETAH_URDF = os.path.join(
-    LEGGED_GYM_ROOT_DIR,
+    GYM_ROOT_DIR,
     "resources",
     "robots",
     "mini_cheetah",
