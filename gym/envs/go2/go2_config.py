@@ -86,7 +86,7 @@ class Go2Cfg(LeggedRobotCfg):
         added_mass_range = [-1.0, 1.0]
 
     class asset(LeggedRobotCfg.asset):
-        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/" + "go2/urdf/go2.urdf"
+        file = "{GYM_ROOT_DIR}/resources/robots/" + "go2/urdf/go2.urdf"
         foot_name = "foot"
         penalize_contacts_on = ["calf"]
         terminate_after_contacts_on = ["base"]
