@@ -18,8 +18,8 @@ class Go2Cfg(LeggedRobotCfg):
     class init_state(LeggedRobotCfg.init_state):
         default_joint_angles = {
             "hip": 0.0,
-            "thigh": -0.785398,
-            "calf": 1.596976,
+            "thigh": 0.66,
+            "calf": -1.36,
         }
 
         # * reset setup chooses how the initial conditions are chosen.
@@ -36,8 +36,8 @@ class Go2Cfg(LeggedRobotCfg):
         # * initialization for random range setup
         dof_pos_range = {
             "hip": [-0.01, 0.01],
-            "thigh": [-0.785398, -0.785398],
-            "calf": [1.596976, 1.596976],
+            "thigh": [0.65, 0.67],
+            "calf": [-1.37, -1.35],
         }
         dof_vel_range = {"hip": [0.0, 0.0], "thigh": [0.0, 0.0], "calf": [0.0, 0.0]}
         root_pos_range = [
