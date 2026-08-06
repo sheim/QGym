@@ -94,6 +94,7 @@ class Go2Cfg(LeggedRobotCfg):
         collapse_fixed_joints = False
         self_collisions = 1
         flip_visual_attachments = False
+        fix_base_link = False
         disable_gravity = False
         disable_motors = False
         joint_damping = 0.01
@@ -143,7 +144,7 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
         ]
         normalize_obs = False
         actions = ["dof_pos_target"]
-        add_noise = True
+        add_noise = False
         disable_actions = False
 
         class noise:
