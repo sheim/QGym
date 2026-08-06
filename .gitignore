@@ -84,14 +84,10 @@ venv.bak/
 # Smooth exploration
 gym/smooth_exploration/data*
 gym/smooth_exploration/figures*
+
+# vsim
 resources/robots/*/vsim/*.vsim
-thirdparty/vlearn/*.whl
-thirdparty/vlearn/License.key
-thirdparty/vlearn/TurboActivate.dat
-thirdparty/vlearn/LICENSE
-thirdparty/vlearn/cache/
-thirdparty/vlearn/shaders/
-thirdparty/vlearn/assets/
+thirdparty/vlearn
 
 # Local simulator and notebook outputs
 MUJOCO_LOG.TXT
