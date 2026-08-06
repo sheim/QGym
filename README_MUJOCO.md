@@ -97,25 +97,44 @@ Place these files under `thirdparty/vlearn/` as described in
 - `License.key`
 - `TurboActivate.dat`
 
-Then run:
+Install the VSim extra from the repository root:
 
 ```bash
 uv sync --locked --extra vsim
+```
 
-# One-time node activation (internet required):
-cd thirdparty/vlearn
-LD_LIBRARY_PATH=../../.venv/lib/python3.11/site-packages/vlearn/lib \
-VL_WORKING_DIRECTORY="$PWD" \
-VL_TURBO_ACTIVATE_PATH="$PWD/TurboActivate.dat" \
-VL_LICENSE_KEY_PATH="$PWD/License.key" \
-../../.venv/bin/python -c \
-  'import vlearn as v; v.create_gym(with_render=False, with_window=False); v.delete_gym(); print("vsim activated")'
-cd ../..
+Activate the license after the first install. Repeat this step whenever you
+replace or renew `License.key`. The activation requires internet access:
 
-uv run --env-file .env.vsim scripts/train.py --task mini_cheetah \
-    --backend vsim --device cuda:0 --num_envs 4096 --headless
+```bash
+# Run from the repository root.
+(
+  cd thirdparty/vlearn
+  LD_LIBRARY_PATH=../../.venv/lib/python3.11/site-packages/vlearn/lib \
+  VL_WORKING_DIRECTORY="$PWD" \
+  VL_TURBO_ACTIVATE_PATH="$PWD/TurboActivate.dat" \
+  VL_LICENSE_KEY_PATH="$PWD/License.key" \
+  ../../.venv/bin/python -c \
+    'import vlearn as v; v.create_gym(with_render=False, with_window=False); v.delete_gym(); print("vsim activation probe succeeded")'
+)
+```
+
+The final line should be `vsim activation probe succeeded`. Next, verify the
+license and backend integration:
+
+```bash
 bash scripts/run_vsim_tests.sh
 ```
+
+After the tests pass, run VSim commands from the repository root with
+`.env.vsim`:
+
+```bash
+uv run --env-file .env.vsim scripts/train.py --task mini_cheetah \
+    --backend vsim --device cuda:0 --num_envs 4096 --headless
+```
+
+Never commit the wheel, license files, or activation data.
 
 ### Train
 
