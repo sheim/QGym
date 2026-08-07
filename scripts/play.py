@@ -18,7 +18,7 @@ from gym.utils.helpers import set_seed
 from gym.utils.task_registry import task_registry
 
 
-def get_play_args():
+def get_play_args(argv=None):
     parser = argparse.ArgumentParser(description="Play a policy trained with Q2")
     parser.add_argument("--task", type=str, required=True)
     parser.add_argument("--device", type=str, default="cpu")
@@ -41,6 +41,11 @@ def get_play_args():
         type=int,
         default=-1,
         help="Model iteration index (default: latest)",
+    )
+    parser.add_argument(
+        "--original_cfg",
+        action="store_true",
+        help="Load environment and runner configs saved with the selected run.",
     )
     parser.add_argument("--headless", action="store_true", default=False)
     parser.add_argument(
@@ -67,14 +72,19 @@ def get_play_args():
         "gym/utils/interfaces/MujocoKeyboardInterface.py for key bindings). "
         "Use --no-keyboard to disable.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def setup(args):
     # Register tasks (imports the task classes).
     import gym.envs  # noqa: F401
 
-    env_cfg, train_cfg = task_registry.get_cfgs(args.task)
+    env_cfg, train_cfg = task_registry.get_cfgs(
+        args.task,
+        original_cfg=args.original_cfg,
+        experiment_name=args.experiment_name,
+        load_run=args.load_run,
+    )
 
     # Play-time overrides — small batch, long episodes, no pushes.
     env_cfg.env.num_envs = args.num_envs

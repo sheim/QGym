@@ -152,6 +152,40 @@ uv run --frozen scripts/train.py --task pendulum --device cpu --num_envs 256 --h
 uv run --frozen scripts/train.py --task mini_cheetah --device cuda:0 --num_envs 4096 --headless
 ```
 
+### Resume or play with the saved configuration
+
+Each training run stores its Python configuration sources below
+`logs/<experiment>/<run>/files/`. Pass `--original_cfg` to reconstruct the
+environment and runner configs from that snapshot instead of using the current
+task configs:
+
+```bash
+# Continue a run with the configuration that created it.
+uv run --frozen scripts/train.py --task mini_cheetah_ref --resume \
+    --load_run Jul28_21-18-57_ --checkpoint 500 --original_cfg --headless
+
+# Play a checkpoint with its saved configuration.
+uv run --frozen scripts/play.py --task mini_cheetah_ref \
+    --load_run Jul28_21-18-57_ --checkpoint 500 --original_cfg
+```
+
+The experiment defaults to the task's current `experiment_name`; use
+`--experiment_name` when the run is under a different log root. Omitting
+`--load_run` selects the latest run in that experiment. Explicit CLI settings,
+such as `--num_envs`, `--seed`, or `--max_iterations`, are applied after the
+saved configs are loaded.
+
+Only the saved config modules and their saved config dependencies are loaded.
+The current task implementation, learning stack, and selected physics backend
+remain active. This makes the option suitable for recent compatible runs while
+allowing old snapshots to fail clearly when their config contract is no longer
+supported. Saved configs are Python code, so use `--original_cfg` only with
+trusted run directories. Without `--resume`, `train.py --original_cfg` starts a
+new run from the saved configuration rather than loading model state. New
+training runs carry the original config snapshot forward under
+`files/original_cfg/`, so another resume does not silently substitute the
+then-current task config.
+
 ### Test
 
 ```bash
@@ -174,6 +208,10 @@ uv run scripts/train.py [OPTIONS]
   --num_envs INT      Number of parallel environments (default: from task config)
   --max_iterations INT Training iterations (default: from task config)
   --seed INT          Random seed
+  --resume            Resume model and optimizer state
+  --load_run TEXT     Run directory below the selected experiment
+  --checkpoint INT    Checkpoint iteration (default: latest)
+  --original_cfg      Load environment and runner configs from the selected run
   --headless          Disable GUI viewer
   --disable_wandb     Disable Weights & Biases logging (default: on)
 ```

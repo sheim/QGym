@@ -15,7 +15,7 @@ from gym.utils.logging_and_saving import local_code_save_helper
 from gym.utils.logging_and_saving import wandb_singleton
 
 
-def get_train_args():
+def get_train_args(argv=None):
     parser = argparse.ArgumentParser(description="Train a Q2 task")
     parser.add_argument(
         "--task", type=str, required=True, help="Task name (e.g. pendulum)"
@@ -64,12 +64,17 @@ def get_train_args():
         default=None,
         help="Checkpoint iteration to resume (default: latest).",
     )
+    parser.add_argument(
+        "--original_cfg",
+        action="store_true",
+        help="Load environment and runner configs saved with the selected run.",
+    )
     parser.add_argument("--headless", action="store_true", default=False)
     # wandb
     parser.add_argument("--disable_wandb", action="store_true", default=False)
     parser.add_argument("--wandb_project", type=str, default=None)
     parser.add_argument("--wandb_entity", type=str, default=None)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def setup():
@@ -78,7 +83,12 @@ def setup():
     # Register tasks (imports the task classes)
     import gym.envs  # noqa: F401 — triggers task registration
 
-    env_cfg, train_cfg = task_registry.get_cfgs(args.task)
+    env_cfg, train_cfg = task_registry.get_cfgs(
+        args.task,
+        original_cfg=args.original_cfg,
+        experiment_name=args.experiment_name,
+        load_run=args.load_run,
+    )
 
     # Apply CLI overrides
     if args.num_envs is not None:
@@ -130,7 +140,14 @@ def setup():
 
     policy_runner = task_registry.make_alg_runner(env, train_cfg)
 
-    local_code_save_helper.save_local_files_to_logs(train_cfg.log_dir)
+    local_code_save_helper.save_local_files_to_logs(
+        train_cfg.log_dir,
+        original_cfg_source_dir=getattr(
+            train_cfg,
+            "_original_cfg_source_dir",
+            None,
+        ),
+    )
 
     return train_cfg, policy_runner
 

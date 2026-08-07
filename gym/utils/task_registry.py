@@ -56,9 +56,34 @@ class TaskRegistry:
     def get_task_class(self, name: str):
         return self.task_classes[name]
 
-    def get_cfgs(self, name) -> Tuple:
+    def get_cfgs(
+        self,
+        name,
+        *,
+        original_cfg=False,
+        experiment_name=None,
+        load_run=None,
+    ) -> Tuple:
         env_cfg = self.env_cfgs[name]
         train_cfg = self.train_cfgs[name]
+        if original_cfg:
+            from .original_cfg import load_original_cfgs, original_cfg_source_dir
+
+            selected_experiment = experiment_name or train_cfg.runner.experiment_name
+            selected_run = train_cfg.runner.load_run if load_run is None else load_run
+            env_cfg, train_cfg, run_dir = load_original_cfgs(
+                name,
+                selected_experiment,
+                selected_run,
+            )
+
+            # Pin the source run. Otherwise selecting "latest" again after a
+            # new log directory is created could target the wrong directory.
+            train_cfg.runner.experiment_name = selected_experiment
+            train_cfg.runner.load_run = run_dir.name
+            source_dir = original_cfg_source_dir(run_dir)
+            train_cfg._original_cfg_source_dir = str(source_dir)
+            print(f"Loaded original configs from: {source_dir}")
         return env_cfg, train_cfg
 
     def set_log_dir_name(self, train_cfg, log_root="default"):
