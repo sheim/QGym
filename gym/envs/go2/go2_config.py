@@ -5,6 +5,28 @@ from gym.envs.base.legged_robot_config import (
 
 BASE_HEIGHT_REF = 0.4
 
+GO2_DOF_NAMES = [
+    "FL_hip_joint",
+    "FL_thigh_joint",
+    "FL_calf_joint",
+    "FR_hip_joint",
+    "FR_thigh_joint",
+    "FR_calf_joint",
+    "RL_hip_joint",
+    "RL_thigh_joint",
+    "RL_calf_joint",
+    "RR_hip_joint",
+    "RR_thigh_joint",
+    "RR_calf_joint",
+]
+
+GO2_FOOT_NAMES = [
+    "FL_foot",
+    "FR_foot",
+    "RL_foot",
+    "RR_foot",
+]
+
 
 class Go2Cfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
@@ -16,10 +38,23 @@ class Go2Cfg(LeggedRobotCfg):
         mesh_type = "plane"
 
     class init_state(LeggedRobotCfg.init_state):
+        # URDF joint-range midpoints. Relative position/target zero is therefore
+        # equally far from each joint's lower and upper position limit.
+        # default_joint_angles = {
+        #     "hip_joint": 0.0,
+        #     "calf_joint": -1.0,
+        #     "FL_thigh_joint": 0.5995,
+        #     "FR_thigh_joint": 0.5995,
+        #     "RL_thigh_joint": 0.35,
+        #     "RR_thigh_joint": 0.35,
+        # }
         default_joint_angles = {
-            "hip": 0.0,
-            "thigh": 0.66,
-            "calf": -1.36,
+            "hip_joint": 0.0,
+            "calf_joint": 0.0,
+            "FL_thigh_joint": 0.0,
+            "FR_thigh_joint": 0.0,
+            "RL_thigh_joint": 0.0,
+            "RR_thigh_joint": 0.0,
         }
 
         # * reset setup chooses how the initial conditions are chosen.
@@ -43,14 +78,14 @@ class Go2Cfg(LeggedRobotCfg):
         root_pos_range = [
             [0.0, 0.0],  # x
             [0.0, 0.0],  # y
-            [0.40, 0.40],  # z
+            [0.450, 0.50],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
             [0.0, 0.0],  # yaw
         ]
         root_vel_range = [
-            [-0.5, 2.0],  # x
-            [0.0, 0.0],  # y
+            [-0.5, 3.0],  # x
+            [-0.1, 0.1],  # y
             [-0.05, 0.05],  # z
             [0.0, 0.0],  # roll
             [0.0, 0.0],  # pitch
@@ -63,19 +98,26 @@ class Go2Cfg(LeggedRobotCfg):
         damping = {"hip": 0.5, "thigh": 0.5, "calf": 0.5}
         ctrl_frequency = 100
         desired_sim_frequency = 500
+        gait_freq = [2, 4]  # oscillator frequency range [Hz]
+        gait_phase_offsets = {
+            "FL_foot": 0.0,
+            "FR_foot": 0.5,
+            "RL_foot": 0.5,
+            "RR_foot": 0.0,
+        }
 
     class commands:
         # * time before command are changed[s]
-        resampling_time = 3.0
+        resampling_time = 5.0
 
         class ranges:
-            lin_vel_x = [-2.0, 3.0]  # min max [m/s]
+            lin_vel_x = [-1.0, 4.0]  # min max [m/s]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 3  # max [rad/s]
 
     class push_robots:
-        toggle = False
-        interval_s = 1
+        toggle = True
+        interval_s = 5
         max_push_vel_xy = 0.5
         push_box_dims = [0.3, 0.1, 0.1]  # x,y,z [m]
 
@@ -91,32 +133,40 @@ class Go2Cfg(LeggedRobotCfg):
         penalize_contacts_on = ["calf"]
         terminate_after_contacts_on = ["base"]
         end_effector_names = ["foot"]
-        collapse_fixed_joints = False
-        self_collisions = 1
-        flip_visual_attachments = False
         fix_base_link = False
         disable_gravity = False
         disable_motors = False
         joint_damping = 0.01
         rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
 
+        class robot_layout:
+            version = "go2_v1"
+            dof_names = GO2_DOF_NAMES
+            actuated_dof_names = GO2_DOF_NAMES
+            body_groups = {"feet": GO2_FOOT_NAMES}
+
     class reward_settings(LeggedRobotCfg.reward_settings):
         soft_dof_pos_limit = 0.9
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
         max_contact_force = 600.0
-        base_height_target = BASE_HEIGHT_REF
+        base_height_target = BASE_HEIGHT_REF * 0.9
         tracking_sigma = 0.25
+        gait_contact_force_threshold = 5.0  # upward foot force [N]
 
     class scaling(LeggedRobotCfg.scaling):
+        # Canonical RobotLayout order is FL, FR, RL, RR, with
+        # hip, thigh, calf inside each leg. Backends map native order to it.
         base_ang_vel = 0.3
         base_lin_vel = BASE_HEIGHT_REF
+        # dof_vel = 4 * [30.1, 30.1, 15.7]
         dof_vel = 4 * [2.0, 2.0, 4.0]
-        base_height = 0.3 / 2
-        dof_pos = 4 * [0.2, 0.3, 0.3]
+        base_height = 0.3
+        dof_pos = 4 * [1.0472, 2.53075, 0.94247]
+        # dof_pos = 4 * [0.2, 0.3, 0.3]  # old
         dof_pos_obs = dof_pos
-        dof_pos_target = 4 * [0.2, 0.3, 0.3]
-        tau_ff = 4 * [18, 18, 28]
+        dof_pos_target = [0.5 * x for x in dof_pos]
+        tau_ff = 4 * [23.7, 23.7, 45.43]
         commands = [3, 1, 3]
 
     class mjspec_attributes:
@@ -135,14 +185,18 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
         # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
         activation = "elu"
         obs = [
+            "base_height",
+            "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_target",
+            "phase_obs",
+            "phase_frequency",
         ]
-        normalize_obs = False
+        normalize_obs = True
         actions = ["dof_pos_target"]
         add_noise = False
         disable_actions = False
@@ -170,7 +224,10 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_target",
+            "phase_obs",
+            "phase_frequency",
         ]
+        normalize_obs = True
 
         class reward:
             class weights:
@@ -181,19 +238,37 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
                 orientation = 1.0
                 torques = 5.0e-6
                 dof_vel = 0.0
-                min_base_height = 1.5
+                min_base_height = 0.5
                 action_rate = 0.1
                 action_rate2 = 0.01
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
+                trot_contact = 1.0
 
             class termination_weight:
                 termination = 0.01
 
     class algorithm(LeggedRobotRunnerCfg.algorithm):
-        pass
+        # both
+        gamma = 0.99
+        lam = 0.95
+        # shared
+        batch_size = 2**15
+        max_gradient_steps = 24
+        # new
+        clip_param = 0.2
+        learning_rate = 1.0e-3
+        max_grad_norm = 1.0
+        # Critic
+        use_clipped_value_loss = True
+        # Actor
+        entropy_coef = 0.01
+        schedule = "adaptive"  # could be adaptive, fixed
+        desired_kl = 0.01
+        lr_range = [2e-5, 1e-2]
+        lr_ratio = 1.5
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""

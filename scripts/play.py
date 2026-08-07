@@ -83,8 +83,6 @@ def setup(args):
         env_cfg.commands.resampling_time = 9999
     if hasattr(env_cfg, "push_robots"):
         env_cfg.push_robots.toggle = False
-    if hasattr(env_cfg, "init_state") and hasattr(env_cfg.init_state, "reset_mode"):
-        env_cfg.init_state.reset_mode = "reset_to_range"
     if hasattr(env_cfg, "viewer"):
         env_cfg.viewer.show_ui = args.viewer_ui
 

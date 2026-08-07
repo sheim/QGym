@@ -459,7 +459,7 @@
     <inertial>
       <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
       <mass value="0.089" />
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647" />
+      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
     </inertial>
   </link>
   <joint name="RL_thigh_rotor_joint" type="fixed">

@@ -1,5 +1,7 @@
 import torch
 
+from gym.utils.sampling import torch_rand_float
+
 from gym.envs.base.legged_robot import LeggedRobot
 # from learning.utils.logger.SaveStates import (
 #     init_env_log_buffers,
@@ -9,6 +11,68 @@ from gym.envs.base.legged_robot import LeggedRobot
 class Go2(LeggedRobot):
     def __init__(self, cfg, device, headless, backend):
         super().__init__(cfg, device, headless, backend)
+
+    def _init_buffers(self):
+        super()._init_buffers()
+
+        self.phase = torch.zeros(
+            self.num_envs, 1, dtype=torch.float, device=self.device
+        )
+        self.phase_obs = torch.zeros(
+            self.num_envs, 2, dtype=torch.float, device=self.device
+        )
+        self.phase_frequency = torch.ones(
+            self.num_envs, 1, dtype=torch.float, device=self.device
+        )
+        foot_names = self.robot_layout.body_groups["feet"]
+        phase_offsets = self.cfg.control.gait_phase_offsets
+        self._gait_phase_offsets = (
+            2
+            * torch.pi
+            * torch.tensor(
+                [phase_offsets[name] for name in foot_names],
+                dtype=torch.float,
+                device=self.device,
+            )
+        )
+
+    def _reset_system(self, env_ids):
+        super()._reset_system(env_ids)
+        self.phase[env_ids] = torch_rand_float(
+            0, 2 * torch.pi, shape=self.phase[env_ids].shape, device=self.device
+        )
+        self.phase_frequency[env_ids] = torch_rand_float(
+            self.cfg.control.gait_freq[0],
+            self.cfg.control.gait_freq[1],
+            shape=self.phase_frequency[env_ids].shape,
+            device=self.device,
+        )
+
+    def _post_physics_step(self):
+        super()._post_physics_step()
+        self._advance_phase()
+
+    def _advance_phase(self):
+        # phase_frequency is in cycles/s; _post_physics_step runs once per
+        # physics substep, so convert cycles to radians and use the simulation dt.
+        self.phase.add_(
+            2 * torch.pi * self.dt * self.phase_frequency / self.cfg.control.decimation
+        ).remainder_(2 * torch.pi)
+
+    def _post_decimation_step(self):
+        super()._post_decimation_step()
+        self.phase_obs.copy_(
+            torch.cat((torch.sin(self.phase), torch.cos(self.phase)), dim=1)
+        )
+
+    def _reward_trot_contact(self):
+        """Reward contact in the positive half-cycle of each foot's phase."""
+        contact = (
+            self.contact_forces[:, self.feet_indices, 2]
+            > self.cfg.reward_settings.gait_contact_force_threshold
+        ).float()
+        gait_phase = self.phase + self._gait_phase_offsets.unsqueeze(0)
+        return torch.mean(torch.sin(gait_phase) * contact, dim=1)
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""
