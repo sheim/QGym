@@ -26,6 +26,7 @@ from gym import GYM_ROOT_DIR
 from gym.utils.helpers import set_seed
 from gym.utils.legged_eval_metrics import (
     LeggedMetricAccumulator,
+    actuated_position_reference,
     apply_command_profile,
     metric_metadata,
     summarize_metrics,
@@ -88,7 +89,10 @@ def set_deterministic_basic_state(env):
             env.phase.zero_()
             env.phase_obs[:, 0] = 0.0
             env.phase_obs[:, 1] = 1.0
-            env._update_cmd_switch()
+            if hasattr(env, "_update_gait_reference"):
+                env._update_gait_reference()
+            if hasattr(env, "_update_cmd_switch"):
+                env._update_cmd_switch()
 
         env.episode_length_buf.zero_()
         env._reset_buffers()
@@ -177,10 +181,10 @@ def main():
     )
     p.add_argument(
         "--command_profile",
-        choices=["sampled", "hardware", "forward_3p0"],
+        choices=["sampled", "hardware", "go2", "forward_3p0"],
         default="sampled",
         help="sampled uses task commands; hardware applies a fixed nine-case "
-        "stand/walk/strafe/turn suite",
+        "suite; go2 adds the 3 m/s training-speed extreme",
     )
     p.add_argument(
         "--settling_time",
@@ -227,13 +231,14 @@ def main():
         else f"mujoco-{args.eval_device}"
     )
 
+    checkpoint_path = os.path.abspath(resolve_ckpt(args.ckpt))
     env, runner = build(
         args.task,
         args.eval_backend,
         args.eval_device,
         args.num_envs,
         args.t_end,
-        args.ckpt,
+        checkpoint_path,
         args.reset_mode,
         args.seed,
     )
@@ -332,9 +337,12 @@ def main():
     base_ang_vel_traj = (
         np.empty((n_steps, N, 3), dtype=np.float32) if record_tracking else None
     )
+    has_position_reference = (
+        not is_pendulum and actuated_position_reference(env) is not None
+    )
     reference_dof_rmse = (
         np.empty((n_steps, N), dtype=np.float32)
-        if record_tracking and hasattr(env, "_get_ref")
+        if record_tracking and has_position_reference
         else None
     )
 
@@ -369,9 +377,17 @@ def main():
                 base_lin_vel_traj[k] = env.base_lin_vel.detach().cpu().numpy()
                 base_ang_vel_traj[k] = env.base_ang_vel.detach().cpu().numpy()
             if reference_dof_rmse is not None:
-                reference_target = env._get_ref() + env.default_dof_pos
+                reference_target = actuated_position_reference(env)
+                reference_target = reference_target + env.default_dof_pos.index_select(
+                    1, env.actuated_dof_indices
+                )
+                actuated_position = env.dof_pos.index_select(
+                    1, env.actuated_dof_indices
+                )
                 reference_dof_rmse[k] = (
-                    torch.sqrt(torch.mean((reference_target - env.dof_pos) ** 2, dim=1))
+                    torch.sqrt(
+                        torch.mean((reference_target - actuated_position) ** 2, dim=1)
+                    )
                     .detach()
                     .cpu()
                     .numpy()
@@ -497,6 +513,12 @@ def main():
             f"RPD error {_mean['gait_rpd_trot_error']:.3f} rad | "
             f"GRF CV {_mean['grf_balance_cv']:.3f}"
         )
+        if "swing_clearance_p95_mean" in _mean:
+            print(
+                "swing clearance | "
+                f"mean p95 {1000 * _mean['swing_clearance_p95_mean']:.1f} mm | "
+                f"lowest foot {1000 * _mean['swing_clearance_p95_min']:.1f} mm"
+            )
         if args.velocity_impulse:
             print(
                 "disturbance      | "
@@ -512,6 +534,15 @@ def main():
         train_label=args.train_label,
         eval_label=eval_label,
         task=args.task,
+        checkpoint_path=checkpoint_path,
+        checkpoint_iteration=np.int64(runner.it),
+        reset_mode=args.reset_mode,
+        command_profile=args.command_profile,
+        num_envs=np.int64(N),
+        duration_s=np.float32(args.t_end),
+        seed=np.int64(args.seed),
+        settling_time_s=np.float32(args.settling_time),
+        contact_threshold_n=np.float32(args.contact_threshold),
         mean_reward=mean_reward.astype(np.float32),
         survived=survived,
         ep_len=ep_len.astype(np.float32),
@@ -527,6 +558,8 @@ def main():
         summary = {
             "protocol": {
                 "task": args.task,
+                "checkpoint_path": checkpoint_path,
+                "checkpoint_iteration": runner.it,
                 "train_label": args.train_label,
                 "eval_label": eval_label,
                 "num_envs": N,

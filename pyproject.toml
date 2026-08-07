@@ -10,6 +10,7 @@ dependencies = [
     "wandb",
     "pandas",
     "matplotlib",
+    "marimo>=0.23.16",
 ]
 
 [project.optional-dependencies]

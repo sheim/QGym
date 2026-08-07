@@ -217,11 +217,14 @@ def analyze_gait_and_grf(
 
         if not moving[env_index]:
             continue
+        frequency = np.asarray(gait_frequency_hz)
+        if frequency.ndim:
+            frequency = frequency[env_index]
         features, mean_rpd, classification = _gait_features(
             force_norm[settle_steps:end, env_index],
             sample_rate_hz,
             contact_threshold_n,
-            gait_frequency_hz,
+            float(frequency),
         )
         for name, value in features.items():
             metrics[name][env_index] = value
@@ -232,5 +235,86 @@ def analyze_gait_and_grf(
         "gait_rpd_mean": rpd_mean,
         "gait_class": gait_class,
         "grf_body_weight_by_foot": grf_by_foot,
+    }
+    return metrics, artifacts
+
+
+def analyze_foot_clearance_by_phase(
+    foot_height_history,
+    foot_force_norm_history,
+    leg_phase_history,
+    expected_stance_history,
+    alive_history,
+    moving,
+    settle_steps,
+    contact_threshold_n,
+    num_phase_bins=32,
+):
+    """Measure swing clearance relative to each foot's stance height.
+
+    Absolute foot-body height depends on asset geometry. Subtracting the median
+    stance height gives a backend-comparable clearance signal while preserving
+    the phase relationship needed for gait plots.
+    """
+    height = np.asarray(foot_height_history)
+    force = np.asarray(foot_force_norm_history)
+    phase = np.mod(np.asarray(leg_phase_history), 2.0 * np.pi)
+    expected_stance = np.asarray(expected_stance_history, dtype=bool)
+    alive = np.asarray(alive_history, dtype=bool)
+    moving = np.asarray(moving, dtype=bool)
+    num_envs, num_feet = height.shape[1:]
+    metric_names = (
+        "swing_clearance_p95_mean",
+        "swing_clearance_p95_min",
+    )
+    metrics = {
+        name: np.full(num_envs, np.nan, dtype=np.float32) for name in metric_names
+    }
+    clearance_by_phase = np.full(
+        (num_envs, num_feet, num_phase_bins), np.nan, dtype=np.float32
+    )
+    contact_by_phase = np.full_like(clearance_by_phase, np.nan)
+    phase_edges = np.linspace(0.0, 2.0 * np.pi, num_phase_bins + 1)
+
+    for env_index in range(num_envs):
+        end = _trajectory_end(alive, env_index)
+        if not moving[env_index] or end - settle_steps < 2:
+            continue
+        foot_peaks = []
+        for foot_index in range(num_feet):
+            foot_height = height[settle_steps:end, env_index, foot_index]
+            foot_phase = phase[settle_steps:end, env_index, foot_index]
+            stance = expected_stance[settle_steps:end, env_index, foot_index]
+            if not np.any(stance) or not np.any(~stance):
+                continue
+            stance_height = np.median(foot_height[stance])
+            clearance = foot_height - stance_height
+            foot_peaks.append(float(np.quantile(clearance[~stance], 0.95)))
+            contact = (
+                force[settle_steps:end, env_index, foot_index] > contact_threshold_n
+            )
+            bin_indices = np.clip(
+                np.digitize(foot_phase, phase_edges, right=False) - 1,
+                0,
+                num_phase_bins - 1,
+            )
+            for bin_index in range(num_phase_bins):
+                selected = bin_indices == bin_index
+                if not np.any(selected):
+                    continue
+                clearance_by_phase[env_index, foot_index, bin_index] = np.mean(
+                    clearance[selected]
+                )
+                contact_by_phase[env_index, foot_index, bin_index] = np.mean(
+                    contact[selected]
+                )
+        if foot_peaks:
+            metrics["swing_clearance_p95_mean"][env_index] = np.mean(foot_peaks)
+            metrics["swing_clearance_p95_min"][env_index] = np.min(foot_peaks)
+
+    artifacts = {
+        "gait_phase_bin_centers": 0.5 * (phase_edges[:-1] + phase_edges[1:]),
+        "foot_clearance_by_phase": clearance_by_phase,
+        "foot_contact_by_phase": contact_by_phase,
     }
     return metrics, artifacts

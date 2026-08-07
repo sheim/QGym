@@ -12,6 +12,7 @@ import torch
 
 from gym.utils.legged_signal_analysis import (
     analyze_base_height,
+    analyze_foot_clearance_by_phase,
     analyze_gait_and_grf,
 )
 
@@ -80,6 +81,16 @@ METRIC_DEFINITIONS = {
     "reference_joint_rmse": MetricDefinition(
         "rad", "lower", "Joint-position RMSE relative to the gait reference."
     ),
+    "swing_clearance_p95_mean": MetricDefinition(
+        "m",
+        "context",
+        "Mean across feet of 95th-percentile swing clearance above stance height.",
+    ),
+    "swing_clearance_p95_min": MetricDefinition(
+        "m",
+        "context",
+        "Lowest per-foot 95th-percentile swing clearance above stance height.",
+    ),
     "joint_velocity_rms": MetricDefinition(
         "rad/s", "lower", "RMS actuated-joint velocity."
     ),
@@ -124,7 +135,7 @@ METRIC_DEFINITIONS = {
     "target_joint_limit_margin_min": MetricDefinition(
         "ratio",
         "higher",
-        "Minimum policy-target margin as a fraction of total joint range.",
+        "Minimum commanded PD-target margin as a fraction of total joint range.",
     ),
     "foot_slip_speed_rms": MetricDefinition(
         "m/s", "lower", "RMS horizontal foot speed while in contact."
@@ -198,6 +209,19 @@ HARDWARE_COMMAND_CASES = (
     ("combined", (0.75, 0.25, 0.5)),
 )
 
+GO2_COMMAND_CASES = (
+    ("stand", (0.0, 0.0, 0.0)),
+    ("backward_0p5", (-0.5, 0.0, 0.0)),
+    ("forward_0p5", (0.5, 0.0, 0.0)),
+    ("forward_1p0", (1.0, 0.0, 0.0)),
+    ("forward_3p0", (3.0, 0.0, 0.0)),
+    ("left_0p4", (0.0, 0.4, 0.0)),
+    ("right_0p4", (0.0, -0.4, 0.0)),
+    ("yaw_left_0p75", (0.0, 0.0, 0.75)),
+    ("yaw_right_0p75", (0.0, 0.0, -0.75)),
+    ("combined", (0.75, 0.25, 0.5)),
+)
+
 
 def metric_metadata():
     return {name: asdict(definition) for name, definition in METRIC_DEFINITIONS.items()}
@@ -216,12 +240,16 @@ def apply_command_profile(env, profile):
         if hasattr(env, "_update_cmd_switch"):
             env._update_cmd_switch()
         return np.full(env.num_envs, "forward_3p0", dtype="<U16")
-    if profile != "hardware":
+    command_cases = {
+        "hardware": HARDWARE_COMMAND_CASES,
+        "go2": GO2_COMMAND_CASES,
+    }.get(profile)
+    if command_cases is None:
         raise ValueError(f"unknown command profile {profile!r}")
 
-    case_indices = np.arange(env.num_envs) % len(HARDWARE_COMMAND_CASES)
+    case_indices = np.arange(env.num_envs) % len(command_cases)
     command_values = torch.tensor(
-        [HARDWARE_COMMAND_CASES[index][1] for index in case_indices],
+        [command_cases[index][1] for index in case_indices],
         dtype=env.commands.dtype,
         device=env.device,
     )
@@ -229,9 +257,33 @@ def apply_command_profile(env, profile):
     if hasattr(env, "_update_cmd_switch"):
         env._update_cmd_switch()
     return np.asarray(
-        [HARDWARE_COMMAND_CASES[index][0] for index in case_indices],
+        [command_cases[index][0] for index in case_indices],
         dtype="<U24",
     )
+
+
+def _select_actuated(env, values):
+    if values.shape[1] == len(env.actuated_dof_indices):
+        return values
+    return values.index_select(1, env.actuated_dof_indices)
+
+
+def actuated_position_reference(env):
+    """Return a relative gait reference in actuated-DOF order, if one exists."""
+    if hasattr(env, "gait_reference"):
+        return _select_actuated(env, env.gait_reference)
+    if hasattr(env, "_get_ref"):
+        return _select_actuated(env, env._get_ref())
+    return None
+
+
+def actuated_position_target(env):
+    """Return the actual absolute PD target in actuated-DOF order."""
+    default = env.default_dof_pos.index_select(1, env.actuated_dof_indices)
+    target = default + env.dof_pos_target
+    if hasattr(env, "gait_reference"):
+        target = target + _select_actuated(env, env.gait_reference)
+    return target
 
 
 def velocity_impulse_schedule(
@@ -298,6 +350,7 @@ class LeggedMetricAccumulator:
         self._previous_torque = None
         self.artifacts = {}
         self._histories = None
+        self._has_phase_reference = hasattr(env, "_leg_phases")
         if num_steps is not None:
             num_feet = len(env.feet_indices)
             self._histories = {
@@ -313,11 +366,24 @@ class LeggedMetricAccumulator:
                     (num_steps, self.num_envs, num_feet),
                     dtype=np.float32,
                 ),
+                "foot_height": np.empty(
+                    (num_steps, self.num_envs, num_feet),
+                    dtype=np.float32,
+                ),
                 "alive": np.empty(
                     (num_steps, self.num_envs),
                     dtype=np.bool_,
                 ),
             }
+            if self._has_phase_reference:
+                self._histories["leg_phase"] = np.empty(
+                    (num_steps, self.num_envs, num_feet),
+                    dtype=np.float32,
+                )
+                self._histories["expected_stance"] = np.empty(
+                    (num_steps, self.num_envs, num_feet),
+                    dtype=np.bool_,
+                )
 
     def _zeros(self):
         return torch.zeros(self.num_envs, dtype=torch.float64, device=self.device)
@@ -413,7 +479,21 @@ class LeggedMetricAccumulator:
             self._histories["foot_force_z"][step] = (
                 foot_forces[:, :, 2].detach().cpu().numpy()
             )
+            self._histories["foot_height"][step] = (
+                env._rigid_body_pos[:, env.feet_indices, 2].detach().cpu().numpy()
+            )
             self._histories["alive"][step] = alive.detach().cpu().numpy()
+            if self._has_phase_reference:
+                leg_phase = env._leg_phases()
+                expected_stance = (
+                    env._expected_stance()
+                    if hasattr(env, "_expected_stance")
+                    else leg_phase > torch.pi
+                )
+                self._histories["leg_phase"][step] = leg_phase.detach().cpu().numpy()
+                self._histories["expected_stance"][step] = (
+                    expected_stance.detach().cpu().numpy()
+                )
 
         self._add_rms(
             "tracking_vx_rmse",
@@ -482,7 +562,7 @@ class LeggedMetricAccumulator:
             / joint_range
         )
         self._add_min("joint_limit_margin_min", limit_margin, valid)
-        target_position = target + env.default_dof_pos.index_select(1, actuated)
+        target_position = actuated_position_target(env)
         target_limit_margin = (
             torch.minimum(
                 target_position - position_limits[:, 0],
@@ -496,9 +576,9 @@ class LeggedMetricAccumulator:
             valid,
         )
 
-        if hasattr(env, "_get_ref"):
-            reference = env._get_ref().index_select(1, actuated)
-            reference += env.default_dof_pos.index_select(1, actuated)
+        reference = actuated_position_reference(env)
+        if reference is not None:
+            reference = reference + env.default_dof_pos.index_select(1, actuated)
             self._add_rms(
                 "reference_joint_rmse",
                 dof_position - reference,
@@ -550,7 +630,11 @@ class LeggedMetricAccumulator:
         self._add_rms("foot_slip_speed_rms", foot_velocity, slip_valid)
 
         if hasattr(env, "_leg_phases"):
-            expected_stance = env._leg_phases() > torch.pi
+            expected_stance = (
+                env._expected_stance()
+                if hasattr(env, "_expected_stance")
+                else env._leg_phases() > torch.pi
+            )
             if expected_stance.shape == in_contact.shape:
                 gait_valid = feet_valid & self.moving.unsqueeze(1)
                 self._add_mean(
@@ -623,7 +707,13 @@ class LeggedMetricAccumulator:
             if self.robot_mass_kg is None:
                 raise ValueError("robot_mass_kg is required for GRF analysis")
             sample_rate_hz = 1.0 / self.dt
-            gait_frequency_hz = float(getattr(self.env.cfg.control, "gait_freq", 1.0))
+            if hasattr(self.env, "phase_frequency"):
+                gait_frequency_hz = (
+                    self.env.phase_frequency.flatten().detach().cpu().numpy()
+                )
+            else:
+                configured_frequency = getattr(self.env.cfg.control, "gait_freq", 1.0)
+                gait_frequency_hz = float(np.mean(configured_frequency))
             metrics.update(
                 analyze_base_height(
                     self._histories["base_height"],
@@ -647,7 +737,25 @@ class LeggedMetricAccumulator:
                 self.robot_mass_kg,
             )
             metrics.update(gait_metrics)
-            self.artifacts = gait_artifacts
+            self.artifacts.update(gait_artifacts)
+            self.artifacts["reference_gait_frequency_hz"] = np.broadcast_to(
+                gait_frequency_hz, (self.num_envs,)
+            ).astype(np.float32)
+            if self._has_phase_reference:
+                clearance_metrics, clearance_artifacts = (
+                    analyze_foot_clearance_by_phase(
+                        self._histories["foot_height"],
+                        self._histories["foot_force_norm"],
+                        self._histories["leg_phase"],
+                        self._histories["expected_stance"],
+                        self._histories["alive"],
+                        self.moving.detach().cpu().numpy(),
+                        self.settle_steps,
+                        self.contact_threshold,
+                    )
+                )
+                metrics.update(clearance_metrics)
+                self.artifacts.update(clearance_artifacts)
         return metrics
 
 

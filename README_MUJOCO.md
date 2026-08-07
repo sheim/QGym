@@ -192,6 +192,39 @@ then-current task config.
 uv run --frozen python -m pytest tests/unit_tests/ -v
 ```
 
+### Evaluate Go2 policy changes
+
+Use the controlled Go2 evaluator to compare policies or checkpoint progression.
+Each label must point to a checkpoint or a run directory containing
+`model_<iteration>.pt` files:
+
+```bash
+uv run --frozen scripts/eval_go2_policy.py \
+    --policy baseline=logs/go2/BASELINE_RUN \
+    --policy current=logs/go2/CURRENT_RUN \
+    --iterations 100 250 500
+```
+
+The default protocol evaluates 200 randomized initial states, balanced across
+ten fixed stand, walk, strafe, turn, and combined-command cases. It records
+command tracking, survival, base stability, gait timing, phase-binned foot
+contact and clearance at 1 and 3 m/s, actuator effort, and physical power. The
+report presents the phase signals as polar plots. The artifacts and JSON
+summaries are written under `logs/go2_evaluation/`.
+
+Open the comparison report with:
+
+```bash
+GO2_EVAL_DIR=logs/go2_evaluation \
+    uv run --frozen marimo edit notebooks/go2_policy_evaluation.py
+```
+
+Use the same evaluator settings for every label. Add `--reset_mode
+reset_to_basic` for an identical-state diagnostic, or repeat `--reset_mode` to
+produce both basic and randomized evaluations. Checkpoints must match the
+current task's observation and network schema; an old incompatible checkpoint
+is rejected during loading instead of being partially evaluated.
+
 ## Notes
 
 **NaN rewards at startup:** reward logging averages over completed episodes.
@@ -225,6 +258,7 @@ uv run scripts/train.py [OPTIONS]
 | `mini_cheetah` | MIT Mini Cheetah | Floating-base | 12 |
 | `mini_cheetah_ref` | Mini Cheetah (ref tracking) | Floating-base | 12 |
 | `mini_cheetah_osc` | Mini Cheetah (oscillator) | Floating-base | 12 |
+| `go2` | Unitree Go2 | Floating-base | 12 |
 | `humanoid` | MIT Humanoid | Floating-base | 30 |
 | `humanoid_running` | Humanoid (running) | Floating-base | 30 |
 

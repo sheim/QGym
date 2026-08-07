@@ -61,6 +61,14 @@ class Go2(LeggedRobot):
             + self._gait_joint_amplitudes * torch.sin(joint_phase)
         )
 
+    def _leg_phases(self):
+        return torch.remainder(
+            self.phase + self._gait_phase_offsets.unsqueeze(0), 2 * torch.pi
+        )
+
+    def _expected_stance(self):
+        return torch.sin(self._leg_phases()) > 0
+
     def _pre_decimation_step(self):
         self._update_gait_reference()
 
@@ -89,6 +97,34 @@ class Go2(LeggedRobot):
             shape=self.phase_frequency[env_ids].shape,
             device=self.device,
         )
+
+    def _resample_commands(self, env_ids):
+        if len(env_ids) == 0:
+            return
+        super()._resample_commands(env_ids)
+
+        forward_commands = torch.tensor(
+            self.command_ranges["lin_vel_x"], device=self.device
+        )
+        command_indices = torch.randint(
+            len(forward_commands), (len(env_ids),), device=self.device
+        )
+        self.commands[env_ids, 0] = forward_commands[command_indices]
+        self.commands[env_ids, 0] += (
+            torch.randn(len(env_ids), device=self.device) * self.cfg.commands.var
+        )
+
+        if 0 in self.cfg.commands.ranges.lin_vel_x:
+            # Include forward-only, rotation-only, and stopped examples.
+            self.commands[env_ids, 1:] *= (
+                torch.rand(len(env_ids), 1, device=self.device) < 0.8
+            )
+            self.commands[env_ids, :2] *= (
+                torch.rand(len(env_ids), 1, device=self.device) < 0.8
+            )
+            self.commands[env_ids] *= (
+                torch.rand(len(env_ids), 1, device=self.device) < 0.9
+            )
 
     def _reset_idx(self, env_ids):
         super()._reset_idx(env_ids)
@@ -120,8 +156,7 @@ class Go2(LeggedRobot):
             self.contact_forces[:, self.feet_indices, 2]
             > self.cfg.reward_settings.gait_contact_force_threshold
         ).float()
-        gait_phase = self.phase + self._gait_phase_offsets.unsqueeze(0)
-        return torch.mean(torch.sin(gait_phase) * contact, dim=1)
+        return torch.mean(torch.sin(self._leg_phases()) * contact, dim=1)
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""

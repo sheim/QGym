@@ -5,8 +5,10 @@ import pytest
 import torch
 
 from gym.utils.legged_eval_metrics import (
+    GO2_COMMAND_CASES,
     HARDWARE_COMMAND_CASES,
     LeggedMetricAccumulator,
+    actuated_position_target,
     apply_command_profile,
     summarize_metrics,
     velocity_impulse_schedule,
@@ -63,6 +65,27 @@ def test_hardware_command_profile_repeats_named_cases():
     )
 
 
+def test_go2_command_profile_includes_training_speed_extreme():
+    env = _fake_env(num_envs=len(GO2_COMMAND_CASES))
+
+    labels = apply_command_profile(env, "go2")
+
+    forward_3p0 = np.flatnonzero(labels == "forward_3p0")
+    assert forward_3p0.tolist() == [4]
+    np.testing.assert_allclose(env.commands[forward_3p0[0]].numpy(), [3.0, 0.0, 0.0])
+
+
+def test_commanded_target_includes_base_gait_and_policy_residual():
+    env = _fake_env(num_envs=1)
+    env.default_dof_pos[:] = torch.tensor([0.2, -0.4])
+    env.gait_reference = torch.tensor([[0.1, -0.2]])
+    env.dof_pos_target[:] = torch.tensor([[0.05, 0.07]])
+
+    target = actuated_position_target(env)
+
+    torch.testing.assert_close(target, torch.tensor([[0.35, -0.53]]))
+
+
 def test_accumulator_reports_physical_and_contact_metrics_per_environment():
     env = _fake_env()
     accumulator = LeggedMetricAccumulator(
@@ -102,6 +125,18 @@ def test_accumulator_retains_fixed_evaluation_commands_after_task_reset():
     metrics = accumulator.finalize()
 
     np.testing.assert_allclose(metrics["tracking_vx_rmse"], [1.0])
+
+
+def test_accumulator_uses_task_stance_convention():
+    env = _fake_env(num_envs=1)
+    env._leg_phases = lambda: torch.tensor([[1.0]])
+    env._expected_stance = lambda: torch.tensor([[True]])
+    accumulator = LeggedMetricAccumulator(env, settle_steps=0)
+
+    accumulator.update(0, torch.ones(1, dtype=torch.bool))
+    metrics = accumulator.finalize()
+
+    np.testing.assert_allclose(metrics["foot_contact_phase_match"], [1.0])
 
 
 def test_summary_splits_metrics_by_command_case():

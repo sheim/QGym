@@ -19,7 +19,7 @@ storage = DictStorage()
 class OnPolicyRunner(BaseRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
-        self.num_steps_per_env = max(1, self.alg_cfg["batch_size"] // env.num_envs)
+        self.num_steps_per_env = max(32, self.alg_cfg["batch_size"] // env.num_envs)
         print(
             f"[OnPolicyRunner] num_steps_per_env={self.num_steps_per_env}"
             f" (batch_size={self.alg_cfg['batch_size']}, num_envs={env.num_envs})"

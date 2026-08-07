@@ -3,6 +3,7 @@ import pytest
 
 from gym.utils.legged_signal_analysis import (
     analyze_base_height,
+    analyze_foot_clearance_by_phase,
     analyze_gait_and_grf,
     urdf_total_mass,
 )
@@ -65,3 +66,31 @@ def test_touchdown_rpd_and_grf_identify_balanced_trot():
         rtol=1e-5,
     )
     assert artifacts["gait_class"][0] == "trot"
+
+
+def test_clearance_is_measured_relative_to_each_foot_stance_height():
+    num_steps = 8
+    phase = np.linspace(0.0, 2.0 * np.pi, num_steps, endpoint=False)
+    phase = np.broadcast_to(phase[:, None, None], (num_steps, 1, 2))
+    stance = phase < np.pi
+    height = np.full((num_steps, 1, 2), 0.02, dtype=np.float32)
+    height[:, 0, 1] += 0.01
+    height[~stance] += 0.05
+    force = np.where(stance, 10.0, 0.0).astype(np.float32)
+
+    metrics, artifacts = analyze_foot_clearance_by_phase(
+        height,
+        force,
+        phase,
+        stance,
+        np.ones((num_steps, 1), dtype=bool),
+        moving=np.ones(1, dtype=bool),
+        settle_steps=0,
+        contact_threshold_n=5.0,
+        num_phase_bins=8,
+    )
+
+    assert metrics["swing_clearance_p95_mean"][0] == pytest.approx(0.05)
+    assert metrics["swing_clearance_p95_min"][0] == pytest.approx(0.05)
+    np.testing.assert_allclose(artifacts["foot_contact_by_phase"][0, :, :4], 1.0)
+    np.testing.assert_allclose(artifacts["foot_clearance_by_phase"][0, 1, 4:], 0.05)

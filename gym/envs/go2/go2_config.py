@@ -117,11 +117,11 @@ class Go2Cfg(LeggedRobotCfg):
         gait_joint_amplitudes = 4 * [0.0, -0.15, 0.30]
 
     class commands:
-        # * time before command are changed[s]
-        resampling_time = 5.0
+        resampling_time = 3.0
+        var = 1.0
 
         class ranges:
-            lin_vel_x = [-1.0, 4.0]  # min max [m/s]
+            lin_vel_x = [-1.0, 0.0, 1.0, 3.0]
             lin_vel_y = 1.0  # max [m/s]
             yaw_vel = 3  # max [rad/s]
 
@@ -140,8 +140,8 @@ class Go2Cfg(LeggedRobotCfg):
     class asset(LeggedRobotCfg.asset):
         file = "{GYM_ROOT_DIR}/resources/robots/" + "go2/urdf/go2.urdf"
         foot_name = "foot"
-        penalize_contacts_on = ["calf"]
-        terminate_after_contacts_on = ["base"]
+        penalize_contacts_on = ["calf", "hip"]
+        terminate_after_contacts_on = ["base", "Head_upper", "Head_lower"]
         end_effector_names = ["foot"]
         fix_base_link = False
         disable_gravity = False
@@ -201,6 +201,7 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
             "projected_gravity",
             "commands",
             "dof_pos_obs",
+            "dof_pos_history",
             "dof_vel",
             "dof_pos_target",
             "phase_obs",
@@ -266,7 +267,7 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
         lam = 0.95
         # shared
         batch_size = 2**15
-        max_gradient_steps = 24
+        max_gradient_steps = 50
         # new
         clip_param = 0.2
         learning_rate = 1.0e-3
