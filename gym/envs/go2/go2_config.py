@@ -60,7 +60,7 @@ class Go2Cfg(LeggedRobotCfg):
         # * reset setup chooses how the initial conditions are chosen.
         # * "reset_to_basic" = a single position
         # * "reset_to_range" = uniformly random from a range defined below
-        reset_mode = "reset_to_range"
+        reset_mode = "reset_to_basic"
 
         # * default COM for basic initialization
         pos = [0.0, 0.0, 0.40]  # x,y,z [m]
@@ -98,13 +98,23 @@ class Go2Cfg(LeggedRobotCfg):
         damping = {"hip": 0.5, "thigh": 0.5, "calf": 0.5}
         ctrl_frequency = 100
         desired_sim_frequency = 500
-        gait_freq = [2, 4]  # oscillator frequency range [Hz]
+        gait_freq = [1.5, 3]  # oscillator frequency range [Hz]
+        # Cycle offsets define a trot: front-left/rear-right move together,
+        # half a cycle away from front-right/rear-left.
         gait_phase_offsets = {
             "FL_foot": 0.0,
             "FR_foot": 0.5,
             "RL_foot": 0.5,
             "RR_foot": 0.0,
         }
+        # Canonical order is FL, FR, RL, RR; hip, thigh, calf within each leg.
+        # q_ref = offset + amplitude * sin(phase + leg_phase).
+        # These are relative PD targets; LeggedRobot adds default_dof_pos.
+        # The thigh/calf amplitudes approximately preserve fore-aft foot
+        # position while alternately extending the stance diagonal and
+        # shortening the swing diagonal.
+        gait_joint_offsets = 4 * [0.0, 0.96, -1.36]
+        gait_joint_amplitudes = 4 * [0.0, -0.15, 0.30]
 
     class commands:
         # * time before command are changed[s]
@@ -196,7 +206,7 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
             "phase_obs",
             "phase_frequency",
         ]
-        normalize_obs = True
+        normalize_obs = False
         actions = ["dof_pos_target"]
         add_noise = False
         disable_actions = False
@@ -227,7 +237,7 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
             "phase_obs",
             "phase_frequency",
         ]
-        normalize_obs = True
+        normalize_obs = False
 
         class reward:
             class weights:

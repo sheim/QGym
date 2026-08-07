@@ -24,6 +24,7 @@ class Go2(LeggedRobot):
         self.phase_frequency = torch.ones(
             self.num_envs, 1, dtype=torch.float, device=self.device
         )
+        self.gait_reference = torch.zeros_like(self.dof_pos_target)
         foot_names = self.robot_layout.body_groups["feet"]
         phase_offsets = self.cfg.control.gait_phase_offsets
         self._gait_phase_offsets = (
@@ -35,6 +36,47 @@ class Go2(LeggedRobot):
                 device=self.device,
             )
         )
+        self._gait_dof_phase_offsets = self._gait_phase_offsets.repeat_interleave(3)
+        self._gait_joint_offsets = torch.tensor(
+            self.cfg.control.gait_joint_offsets,
+            dtype=torch.float,
+            device=self.device,
+        )
+        self._gait_joint_amplitudes = torch.tensor(
+            self.cfg.control.gait_joint_amplitudes,
+            dtype=torch.float,
+            device=self.device,
+        )
+        self._update_phase_observation()
+        self._update_gait_reference()
+
+    def _update_phase_observation(self):
+        self.phase_obs[:, 0:1] = torch.sin(self.phase)
+        self.phase_obs[:, 1:2] = torch.cos(self.phase)
+
+    def _update_gait_reference(self):
+        joint_phase = self.phase + self._gait_dof_phase_offsets.unsqueeze(0)
+        self.gait_reference[:] = (
+            self._gait_joint_offsets
+            + self._gait_joint_amplitudes * torch.sin(joint_phase)
+        )
+
+    def _pre_decimation_step(self):
+        self._update_gait_reference()
+
+    def _compute_torques(self):
+        pos = self.dof_pos.index_select(1, self.actuated_dof_indices)
+        vel = self.dof_vel.index_select(1, self.actuated_dof_indices)
+        default_pos = self.default_dof_pos.index_select(1, self.actuated_dof_indices)
+        torques = (
+            self.p_gains
+            * (self.gait_reference + self.dof_pos_target + default_pos - pos)
+            + self.d_gains * (self.dof_vel_target - vel)
+            + self.tau_ff
+        )
+        return torch.clip(
+            torques, -self.actuated_torque_limits, self.actuated_torque_limits
+        ).view(self.torques.shape)
 
     def _reset_system(self, env_ids):
         super()._reset_system(env_ids)
@@ -47,6 +89,15 @@ class Go2(LeggedRobot):
             shape=self.phase_frequency[env_ids].shape,
             device=self.device,
         )
+
+    def _reset_idx(self, env_ids):
+        super()._reset_idx(env_ids)
+        if len(env_ids) == 0:
+            return
+        self.dof_pos_target[env_ids] = 0.0
+        self._update_gait_reference()
+        self.dof_pos_history[env_ids] = self.dof_pos_target[env_ids].tile(3)
+        self._update_phase_observation()
 
     def _post_physics_step(self):
         super()._post_physics_step()
@@ -61,9 +112,7 @@ class Go2(LeggedRobot):
 
     def _post_decimation_step(self):
         super()._post_decimation_step()
-        self.phase_obs.copy_(
-            torch.cat((torch.sin(self.phase), torch.cos(self.phase)), dim=1)
-        )
+        self._update_phase_observation()
 
     def _reward_trot_contact(self):
         """Reward contact in the positive half-cycle of each foot's phase."""
