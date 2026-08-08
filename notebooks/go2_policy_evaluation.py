@@ -274,11 +274,13 @@ def _(mo, plt, vitals):
             ("rewards/total_rewards", "total reward"),
             ("rewards/tracking_lin_vel", "tracking linear reward"),
             ("rewards/tracking_ang_vel", "tracking yaw reward"),
-            ("rewards/trot_contact", "trot-contact reward"),
+            ("rewards/trot_contact", "legacy trot-contact reward"),
+            ("rewards/trot_support", "paired trot-support reward"),
+            ("rewards/swing_contact", "swing-contact penalty"),
             ("actor/action_std", "action standard deviation"),
             ("episode_time", "episode duration"),
         )
-        _fig, _axes = plt.subplots(2, 3, figsize=(14, 7), constrained_layout=True)
+        _fig, _axes = plt.subplots(2, 4, figsize=(16, 7), constrained_layout=True)
         for _axis, (_key, _title) in zip(_axes.flat, _panels):
             for _label, _columns in vitals.items():
                 if _key in _columns:

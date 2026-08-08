@@ -153,23 +153,32 @@ class Go2(LeggedRobot):
 
     def _foot_contact_strength(self):
         """Map upward foot load smoothly from zero to nominal body-weight."""
-        # load = torch.clamp(
-        #     self.contact_forces[:, self.feet_indices, 2] / self._body_weight,
-        #     min=0.0,
-        #     max=1.0,
-        # )
-        # self.cfg.asset.total_mass
-
-        load = 1 - self._sqrdexp(
-            self.contact_forces[:, self.feet_indices, 2], self._body_weight
+        load = torch.clamp(
+            self.contact_forces[:, self.feet_indices, 2] / self._body_weight,
+            min=0.0,
+            max=1.0,
         )
-        return load
+        return load.square() * (3.0 - 2.0 * load)
 
-    def _reward_trot_contact(self):
-        """Reward smoothly weighted contact in each foot's stance half-cycle."""
-        return torch.mean(
-            torch.sin(self._leg_phases()) * self._foot_contact_strength(), dim=1
+    def _reward_trot_support(self):
+        """Require both feet in the scheduled trot diagonal to support the body."""
+        phase = torch.sin(self._leg_phases())
+        contact_strength = self._foot_contact_strength()
+        stance_strength = torch.where(
+            phase > 0.0,
+            contact_strength,
+            torch.ones_like(contact_strength),
         )
+        paired_support = torch.clamp(
+            2.0 * torch.sqrt(torch.prod(stance_strength, dim=1)),
+            max=1.0,
+        )
+        return torch.relu(phase).amax(dim=1) * paired_support
+
+    def _reward_swing_contact(self):
+        """Penalize load carried by feet during their scheduled swing phase."""
+        phase = torch.sin(self._leg_phases())
+        return -torch.mean(torch.relu(-phase) * self._foot_contact_strength(), dim=1)
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""

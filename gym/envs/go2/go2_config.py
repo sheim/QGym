@@ -98,7 +98,7 @@ class Go2Cfg(LeggedRobotCfg):
         damping = {"hip": 0.5, "thigh": 0.5, "calf": 0.5}
         ctrl_frequency = 100
         desired_sim_frequency = 500
-        gait_freq = [1.5, 3]  # oscillator frequency range [Hz]
+        gait_freq = [1.0, 3.0]  # oscillator frequency range [Hz]
         # Cycle offsets define a trot: front-left/rear-right move together,
         # half a cycle away from front-right/rear-left.
         gait_phase_offsets = {
@@ -256,7 +256,10 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                trot_contact = 1.25
+                # Preserve the old combined term's approximate +/-0.625 range,
+                # while making both stance feet necessary for positive credit.
+                trot_support = 0.625
+                swing_contact = 1.25
 
             class termination_weight:
                 termination = 0.01
@@ -285,5 +288,5 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
         experiment_name = "go2"
-        max_iterations = 5000
+        max_iterations = 500
         algorithm_class_name = "PPO2"
