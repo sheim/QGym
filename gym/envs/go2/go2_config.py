@@ -160,7 +160,7 @@ class Go2Cfg(LeggedRobotCfg):
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
         max_contact_force = 600.0
-        base_height_target = BASE_HEIGHT_REF * 0.9
+        base_height_target = 0.45
         tracking_sigma = 0.25
         gait_contact_force_threshold = 5.0  # upward foot force [N]
 
@@ -266,8 +266,9 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 2**15
-        max_gradient_steps = 50
+        batch_size = 2**14
+        rollout_size = 2**16
+        max_gradient_steps = 32
         # new
         clip_param = 0.2
         learning_rate = 1.0e-3
