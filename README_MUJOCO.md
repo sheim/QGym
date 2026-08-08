@@ -223,6 +223,8 @@ policy. Go2 evaluations also record every configured actor and critic
 observation, the raw policy output, and the scaled action applied to the task.
 The interactive observation/action explorer provides summary statistics, time
 traces, phase-binned profiles, distributions, and pairwise relationship plots.
+Its value-space control switches consistently between task-normalized values
+and task units using `cfg.scaling` from each checkpoint's saved original config.
 The artifacts and JSON summaries are written under `logs/go2_evaluation/`.
 
 Open the comparison report with:

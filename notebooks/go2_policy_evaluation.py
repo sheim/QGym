@@ -33,20 +33,37 @@ def _():
     import matplotlib.pyplot as plt
     import numpy as np
 
-    from gym.utils.policy_io import first_episode_mask, phase_binned_stats
+    from gym.utils.helpers import class_to_dict
+    from gym.utils.original_cfg import (
+        OriginalCfgError,
+        load_original_cfgs_from_run,
+        original_cfg_source_dir,
+    )
+    from gym.utils.policy_io import (
+        component_scales_from_names,
+        first_episode_mask,
+        phase_binned_stats,
+        policy_io_in_space,
+    )
     from gym.utils.run_config_diff import LoggedConfigError, diff_logged_run_configs
 
     return (
         LoggedConfigError,
+        OriginalCfgError,
         Path,
+        class_to_dict,
+        component_scales_from_names,
         diff_logged_run_configs,
         first_episode_mask,
         json,
+        load_original_cfgs_from_run,
         mo,
         np,
+        original_cfg_source_dir,
         os,
         phase_binned_stats,
         plt,
+        policy_io_in_space,
     )
 
 
@@ -306,10 +323,10 @@ def _(mo, selected):
         [
             mo.md(
                 "## Observation and action explorer\n\n"
-                "Actor and critic observations are the task-scaled vectors before "
-                "any learned observation normalizer. Policy outputs are the raw "
-                "network actions; applied actions are the scaled fields assigned "
-                "to the environment."
+                "Switch between task-normalized values and task units using the "
+                "scales saved with the policy's original run config. This is "
+                "separate from any learned observation normalizer inside the "
+                "network."
             ),
             policy_io_run,
         ]
@@ -318,25 +335,107 @@ def _(mo, selected):
 
 
 @app.cell
-def _(mo, policy_io_artifacts, policy_io_run):
+def _(
+    OriginalCfgError,
+    Path,
+    class_to_dict,
+    component_scales_from_names,
+    load_original_cfgs_from_run,
+    mo,
+    np,
+    original_cfg_source_dir,
+    policy_io_artifacts,
+    policy_io_run,
+):
     policy_io_artifact = policy_io_artifacts.get(policy_io_run.value)
     policy_io_catalog = {}
+    policy_io_scaling_error = None
     if policy_io_artifact is not None:
-        _groups = (
-            ("actor_observations", "actor_observation_names", "actor obs"),
-            ("critic_observations", "critic_observation_names", "critic obs"),
-            ("policy_actions", "action_names", "policy output"),
-            ("applied_actions", "action_names", "applied action"),
+        _scale_specs = (
+            (
+                "actor_observation_scales",
+                "actor_observation_fields",
+                "actor_observation_names",
+            ),
+            (
+                "critic_observation_scales",
+                "critic_observation_fields",
+                "critic_observation_names",
+            ),
+            ("action_scales", "action_fields", "action_names"),
         )
-        for _array_key, _names_key, _group_label in _groups:
-            for _index, _name in enumerate(policy_io_artifact[_names_key]):
-                _key = f"{_array_key}:{_index}"
-                policy_io_catalog[_key] = {
-                    "label": f"{_group_label} | {_name}",
-                    "name": str(_name),
-                    "source": _array_key,
-                    "values": policy_io_artifact[_array_key][:, :, _index],
-                }
+        if any(_key not in policy_io_artifact for _key, _, _ in _scale_specs):
+            try:
+                _original_env_cfg, _ = load_original_cfgs_from_run(
+                    str(policy_io_artifact["task"]),
+                    Path(str(policy_io_artifact["checkpoint_path"])).parent,
+                )
+                _original_scales = class_to_dict(_original_env_cfg.scaling)
+                for _scale_key, _fields_key, _names_key in _scale_specs:
+                    policy_io_artifact[_scale_key] = np.asarray(
+                        component_scales_from_names(
+                            policy_io_artifact[_fields_key],
+                            policy_io_artifact[_names_key],
+                            _original_scales,
+                        ),
+                        dtype=np.float32,
+                    )
+                policy_io_artifact["policy_io_scale_source"] = str(
+                    original_cfg_source_dir(
+                        Path(str(policy_io_artifact["checkpoint_path"])).parent
+                    )
+                )
+            except OriginalCfgError as _error:
+                policy_io_scaling_error = str(_error)
+
+        _groups = (
+            (
+                "actor_observations",
+                "actor_observation_names",
+                "actor_observation_scales",
+                "actor obs",
+                "normalized",
+            ),
+            (
+                "critic_observations",
+                "critic_observation_names",
+                "critic_observation_scales",
+                "critic obs",
+                "normalized",
+            ),
+            (
+                "policy_actions",
+                "action_names",
+                "action_scales",
+                "policy output",
+                "normalized",
+            ),
+            (
+                "applied_actions",
+                "action_names",
+                "action_scales",
+                "applied action",
+                "unnormalized",
+            ),
+        )
+        if policy_io_scaling_error is None:
+            for (
+                _array_key,
+                _names_key,
+                _scales_key,
+                _group_label,
+                _source_space,
+            ) in _groups:
+                for _index, _name in enumerate(policy_io_artifact[_names_key]):
+                    _key = f"{_array_key}:{_index}"
+                    policy_io_catalog[_key] = {
+                        "label": f"{_group_label} | {_name}",
+                        "name": str(_name),
+                        "source": _array_key,
+                        "source_space": _source_space,
+                        "scale": float(policy_io_artifact[_scales_key][_index]),
+                        "values": policy_io_artifact[_array_key][:, :, _index],
+                    }
 
     _signal_options = {
         _series["label"]: _key for _key, _series in policy_io_catalog.items()
@@ -384,8 +483,16 @@ def _(mo, policy_io_artifacts, policy_io_run):
         value="time trace",
         label="plot",
     )
+    policy_io_space = mo.ui.dropdown(
+        options={
+            "task-normalized": "normalized",
+            "task units": "unnormalized",
+        },
+        value="task-normalized",
+        label="value space",
+    )
     policy_io_standardize = mo.ui.checkbox(
-        value=True,
+        value=False,
         label="standardize plotted signals",
     )
     policy_io_exclude_settling = mo.ui.checkbox(
@@ -416,11 +523,22 @@ def _(mo, policy_io_artifacts, policy_io_run):
     )
     mo.vstack(
         [
+            (
+                mo.md(f"⚠️ Original scaling config unavailable: `{policy_io_scaling_error}`")
+                if policy_io_scaling_error is not None
+                else mo.md(
+                    "Scaling source: "
+                    f"`{policy_io_artifact.get('policy_io_scale_source', 'unknown')}`"
+                    if policy_io_artifact is not None
+                    else "Scaling source: no artifact selected"
+                )
+            ),
             policy_io_signals,
             mo.hstack(
                 [
                     policy_io_command,
                     policy_io_mode,
+                    policy_io_space,
                     policy_io_environment,
                     policy_io_standardize,
                     policy_io_exclude_settling,
@@ -438,6 +556,7 @@ def _(mo, policy_io_artifacts, policy_io_run):
         policy_io_exclude_settling,
         policy_io_mode,
         policy_io_signals,
+        policy_io_space,
         policy_io_standardize,
     )
 
@@ -457,7 +576,9 @@ def _(
     policy_io_mode,
     policy_io_run,
     policy_io_signals,
+    policy_io_space,
     policy_io_standardize,
+    policy_io_in_space,
 ):
     def _policy_io_analysis():
         if policy_io_artifact is None:
@@ -485,10 +606,19 @@ def _(
         if not np.any(_valid):
             return mo.md("_No valid samples remain for this command and window._")
 
+        def _converted_values(_key):
+            _series = policy_io_catalog[_key]
+            return policy_io_in_space(
+                _series["values"],
+                _series["scale"],
+                _series["source_space"],
+                policy_io_space.value,
+            )
+
         _rows = []
         for _key in _selected_keys:
             _series = policy_io_catalog[_key]
-            _samples = np.asarray(_series["values"])[_valid]
+            _samples = _converted_values(_key)[_valid]
             _samples = _samples[np.isfinite(_samples)]
             if len(_samples):
                 _quantiles = np.quantile(_samples, [0.05, 0.5, 0.95])
@@ -507,7 +637,7 @@ def _(
                 )
 
         def _plot_values(_key):
-            _values = np.asarray(policy_io_catalog[_key]["values"], dtype=float)
+            _values = np.asarray(_converted_values(_key), dtype=float)
             if not policy_io_standardize.value:
                 return _values
             _samples = _values[_valid]
@@ -535,7 +665,11 @@ def _(
             _env_command = str(policy_io_artifact["command_case"][_env_index])
             _axis.set(
                 xlabel="time (s)",
-                ylabel=("z-score" if policy_io_standardize.value else "recorded value"),
+                ylabel=(
+                    "z-score"
+                    if policy_io_standardize.value
+                    else policy_io_space.value
+                ),
                 title=f"{policy_io_run.value}: env {_env_index} ({_env_command})",
             )
         elif _mode == "phase":
@@ -546,10 +680,23 @@ def _(
                 plt.close(_fig)
                 return mo.md("_The selected policy has no oscillator-phase observation._")
             _actor_obs = policy_io_artifact["actor_observations"]
+            _actor_scales = policy_io_artifact["actor_observation_scales"]
+            _sin_index = _actor_names.index("phase_obs.sin")
+            _cos_index = _actor_names.index("phase_obs.cos")
             _phase = np.mod(
                 np.arctan2(
-                    _actor_obs[:, :, _actor_names.index("phase_obs.sin")],
-                    _actor_obs[:, :, _actor_names.index("phase_obs.cos")],
+                    policy_io_in_space(
+                        _actor_obs[:, :, _sin_index],
+                        _actor_scales[_sin_index],
+                        "normalized",
+                        "unnormalized",
+                    ),
+                    policy_io_in_space(
+                        _actor_obs[:, :, _cos_index],
+                        _actor_scales[_cos_index],
+                        "normalized",
+                        "unnormalized",
+                    ),
                 ),
                 2.0 * np.pi,
             )
@@ -591,7 +738,11 @@ def _(
                     label=policy_io_catalog[_key]["label"],
                 )
             _axis.set(
-                xlabel=("z-score" if policy_io_standardize.value else "recorded value"),
+                xlabel=(
+                    "z-score"
+                    if policy_io_standardize.value
+                    else policy_io_space.value
+                ),
                 ylabel="density",
                 title=f"{policy_io_run.value}: {_command} distributions",
             )

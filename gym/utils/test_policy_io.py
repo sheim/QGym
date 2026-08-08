@@ -5,9 +5,12 @@ import pytest
 import torch
 
 from gym.utils.policy_io import (
+    component_scales_from_names,
     first_episode_mask,
     phase_binned_stats,
+    policy_io_in_space,
     state_component_names,
+    state_component_scales,
 )
 
 
@@ -41,6 +44,47 @@ def test_component_names_preserve_axes_joints_and_history_slots():
         "phase_obs.sin",
         "phase_obs.cos",
     ]
+
+
+def test_component_scales_expand_scalar_vector_and_unscaled_fields():
+    env = SimpleNamespace(
+        base_height=torch.zeros(2, 1),
+        commands=torch.zeros(2, 3),
+        phase_obs=torch.zeros(2, 2),
+    )
+    fields = ["base_height", "commands", "phase_obs"]
+    scales = {"base_height": 0.4, "commands": [3.0, 1.0, 2.0]}
+
+    expanded = state_component_scales(env, fields, scales)
+
+    assert expanded == pytest.approx([0.4, 3.0, 1.0, 2.0, 1.0, 1.0])
+
+
+def test_component_scales_can_be_recovered_from_artifact_names():
+    expanded = component_scales_from_names(
+        ["commands", "phase_obs"],
+        [
+            "commands.vx",
+            "commands.vy",
+            "commands.yaw",
+            "phase_obs.sin",
+            "phase_obs.cos",
+        ],
+        {"commands": [3.0, 1.0, 2.0]},
+    )
+
+    assert expanded == pytest.approx([3.0, 1.0, 2.0, 1.0, 1.0])
+
+
+def test_policy_io_space_conversion_handles_observations_and_applied_actions():
+    normalized = np.array([[1.0, -2.0]], dtype=np.float32)
+    scales = np.array([0.4, 3.0], dtype=np.float32)
+
+    unnormalized = policy_io_in_space(normalized, scales, "normalized", "unnormalized")
+    restored = policy_io_in_space(unnormalized, scales, "unnormalized", "normalized")
+
+    np.testing.assert_allclose(unnormalized, [[0.4, -6.0]])
+    np.testing.assert_allclose(restored, normalized)
 
 
 def test_first_episode_mask_excludes_first_termination_and_later_samples():

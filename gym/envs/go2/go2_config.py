@@ -32,7 +32,7 @@ class Go2Cfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 12
-        episode_length_s = 3
+        episode_length_s = 5
 
     class terrain(LeggedRobotCfg.terrain):
         mesh_type = "plane"
@@ -148,6 +148,7 @@ class Go2Cfg(LeggedRobotCfg):
         disable_motors = False
         joint_damping = 0.01
         rotor_inertia = [0.002268, 0.002268, 0.005484] * 4
+        total_mass = 16.087  # sum of nominal URDF link masses [kg]
 
         class robot_layout:
             version = "go2_v1"
@@ -160,9 +161,8 @@ class Go2Cfg(LeggedRobotCfg):
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
         max_contact_force = 600.0
-        base_height_target = 0.4
+        base_height_target = 0.9 * BASE_HEIGHT_REF
         tracking_sigma = 0.25
-        gait_contact_force_threshold = 25.0  # upward foot force [N]
 
     class scaling(LeggedRobotCfg.scaling):
         # Canonical RobotLayout order is FL, FR, RL, RR, with
@@ -256,7 +256,7 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                trot_contact = 1.0
+                trot_contact = 1.25
 
             class termination_weight:
                 termination = 0.01
@@ -266,12 +266,12 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
         gamma = 0.99
         lam = 0.95
         # shared
-        batch_size = 2**14
+        batch_size = 2**15
         rollout_size = 2**16
         max_gradient_steps = 32
         # new
         clip_param = 0.2
-        learning_rate = 1.0e-4
+        learning_rate = 1.0e-3
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True
@@ -285,5 +285,5 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
         experiment_name = "go2"
-        max_iterations = 500
+        max_iterations = 5000
         algorithm_class_name = "PPO2"

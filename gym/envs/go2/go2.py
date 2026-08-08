@@ -47,6 +47,7 @@ class Go2(LeggedRobot):
             dtype=torch.float,
             device=self.device,
         )
+        self._body_weight = self.cfg.asset.total_mass * 9.81
         self._update_phase_observation()
         self._update_gait_reference()
 
@@ -150,13 +151,25 @@ class Go2(LeggedRobot):
         super()._post_decimation_step()
         self._update_phase_observation()
 
+    def _foot_contact_strength(self):
+        """Map upward foot load smoothly from zero to nominal body-weight."""
+        # load = torch.clamp(
+        #     self.contact_forces[:, self.feet_indices, 2] / self._body_weight,
+        #     min=0.0,
+        #     max=1.0,
+        # )
+        # self.cfg.asset.total_mass
+
+        load = 1 - self._sqrdexp(
+            self.contact_forces[:, self.feet_indices, 2], self._body_weight
+        )
+        return load
+
     def _reward_trot_contact(self):
-        """Reward contact in the positive half-cycle of each foot's phase."""
-        contact = (
-            self.contact_forces[:, self.feet_indices, 2]
-            > self.cfg.reward_settings.gait_contact_force_threshold
-        ).float()
-        return torch.mean(torch.sin(self._leg_phases()) * contact, dim=1)
+        """Reward smoothly weighted contact in each foot's stance half-cycle."""
+        return torch.mean(
+            torch.sin(self._leg_phases()) * self._foot_contact_strength(), dim=1
+        )
 
     def _reward_lin_vel_z(self):
         """Penalize z axis base linear velocity with squared exp"""

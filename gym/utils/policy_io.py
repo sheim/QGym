@@ -63,6 +63,77 @@ def state_component_names(env, state_names):
     return names
 
 
+def state_component_scales(env, state_names, scales):
+    """Expand task scaling values into the same flattened order as states."""
+    component_scales = []
+    for state_name in state_names:
+        state = getattr(env, state_name)
+        if state.ndim != 2:
+            raise ValueError(
+                f"state {state_name!r} must be [num_envs, width], got {state.shape}"
+            )
+        component_scales.extend(_expand_field_scale(state_name, state.shape[1], scales))
+    return component_scales
+
+
+def component_scales_from_names(state_names, component_names, scales):
+    """Recover flattened scales from artifact field and component names."""
+    component_names = [str(name) for name in component_names]
+    offset = 0
+    component_scales = []
+    for state_name in (str(name) for name in state_names):
+        width = 0
+        while offset + width < len(component_names):
+            component_name = component_names[offset + width]
+            if component_name != state_name and not component_name.startswith(
+                f"{state_name}."
+            ):
+                break
+            width += 1
+        if width == 0:
+            raise ValueError(f"no components found for state field {state_name!r}")
+        component_scales.extend(_expand_field_scale(state_name, width, scales))
+        offset += width
+    if offset != len(component_names):
+        raise ValueError(
+            f"{len(component_names) - offset} component names do not belong to "
+            "the configured state fields"
+        )
+    return component_scales
+
+
+def _expand_field_scale(state_name, width, scales):
+    scale = np.asarray(scales.get(state_name, 1.0), dtype=np.float32)
+    if scale.ndim == 0:
+        return [float(scale)] * width
+    scale = scale.reshape(-1)
+    if len(scale) != width:
+        raise ValueError(
+            f"scale for state {state_name!r} has {len(scale)} components, "
+            f"expected {width}"
+        )
+    return scale.tolist()
+
+
+def policy_io_in_space(values, scale, source_space, target_space):
+    """Convert logged policy I/O between task-normalized and task units."""
+    valid_spaces = {"normalized", "unnormalized"}
+    if source_space not in valid_spaces:
+        raise ValueError(f"unknown source space {source_space!r}")
+    if target_space not in valid_spaces:
+        raise ValueError(f"unknown target space {target_space!r}")
+
+    values = np.asarray(values)
+    scale = np.asarray(scale, dtype=values.dtype)
+    if np.any(scale == 0):
+        raise ValueError("policy I/O scale values must be nonzero")
+    if source_space == target_space:
+        return values
+    if target_space == "unnormalized":
+        return values * scale
+    return values / scale
+
+
 def first_episode_mask(terminated):
     """Select samples strictly before each environment's first termination."""
     terminated = np.asarray(terminated, dtype=bool)

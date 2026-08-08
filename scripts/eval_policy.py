@@ -18,12 +18,13 @@ import argparse
 import json
 import math
 import os
+from pathlib import Path
 
 import numpy as np
 import torch
 
 from gym import GYM_ROOT_DIR
-from gym.utils.helpers import set_seed
+from gym.utils.helpers import class_to_dict, set_seed
 from gym.utils.legged_eval_metrics import (
     LeggedMetricAccumulator,
     actuated_position_reference,
@@ -33,7 +34,8 @@ from gym.utils.legged_eval_metrics import (
     velocity_impulse_schedule,
 )
 from gym.utils.legged_signal_analysis import urdf_total_mass
-from gym.utils.policy_io import state_component_names
+from gym.utils.original_cfg import load_original_cfgs_from_run, original_cfg_source_dir
+from gym.utils.policy_io import state_component_names, state_component_scales
 from gym.utils.task_registry import task_registry
 from gym.utils.torch_quat import quat_rotate_inverse
 
@@ -353,12 +355,24 @@ def main():
         else None
     )
     if args.record_policy_io:
+        original_env_cfg, _ = load_original_cfgs_from_run(
+            args.task, Path(checkpoint_path).parent
+        )
+        original_scales = class_to_dict(original_env_cfg.scaling)
         actor_observation_fields = list(runner.actor_cfg["obs"])
         critic_observation_fields = list(runner.critic_cfg["obs"])
         action_fields = list(runner.actor_cfg["actions"])
         actor_observation_names = state_component_names(env, actor_observation_fields)
         critic_observation_names = state_component_names(env, critic_observation_fields)
         action_names = state_component_names(env, action_fields)
+        actor_observation_scales = state_component_scales(
+            env, actor_observation_fields, original_scales
+        )
+        critic_observation_scales = state_component_scales(
+            env, critic_observation_fields, original_scales
+        )
+        action_scales = state_component_scales(env, action_fields, original_scales)
+        policy_io_scale_source = original_cfg_source_dir(Path(checkpoint_path).parent)
         actor_observations = np.empty(
             (n_steps, N, len(actor_observation_names)), dtype=np.float32
         )
@@ -534,13 +548,21 @@ def main():
                 "actor_observations": actor_observations,
                 "actor_observation_fields": np.asarray(actor_observation_fields),
                 "actor_observation_names": np.asarray(actor_observation_names),
+                "actor_observation_scales": np.asarray(
+                    actor_observation_scales, dtype=np.float32
+                ),
                 "critic_observations": critic_observations,
                 "critic_observation_fields": np.asarray(critic_observation_fields),
                 "critic_observation_names": np.asarray(critic_observation_names),
+                "critic_observation_scales": np.asarray(
+                    critic_observation_scales, dtype=np.float32
+                ),
                 "policy_actions": policy_actions,
                 "applied_actions": applied_actions,
                 "action_fields": np.asarray(action_fields),
                 "action_names": np.asarray(action_names),
+                "action_scales": np.asarray(action_scales, dtype=np.float32),
+                "policy_io_scale_source": str(policy_io_scale_source),
             }
         )
 
