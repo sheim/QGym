@@ -205,12 +205,25 @@ uv run --frozen scripts/eval_go2_policy.py \
     --iterations 100 250 500
 ```
 
+The evaluator defaults to `--backend mjx`, which is the public shorthand here
+for Q2's MuJoCo Warp backend on `cuda:0` (it does not invoke the separate
+Google DeepMind MJX package). Use `--backend mujoco` for MuJoCo CPU, or launch
+with `uv run --env-file .env.vsim ... --backend vsim` for VSim on `cuda:0`.
+The GPU default requires the `gpu` extra described above.
+
 The default protocol evaluates 200 randomized initial states, balanced across
 ten fixed stand, walk, strafe, turn, and combined-command cases. It records
 command tracking, survival, base stability, gait timing, phase-binned foot
-contact and clearance at 1 and 3 m/s, actuator effort, and physical power. The
-report presents the phase signals as polar plots. The artifacts and JSON
-summaries are written under `logs/go2_evaluation/`.
+contact, vertical contact force, and clearance at 1 and 3 m/s, actuator effort,
+and physical power. The report presents the phase signals as polar plots, with
+foot-force means and standard deviations across evaluated environments. The
+report also compares the task and inherited config sources saved inside each
+run directory, highlighting changed lines relative to the selected reference
+policy. Go2 evaluations also record every configured actor and critic
+observation, the raw policy output, and the scaled action applied to the task.
+The interactive observation/action explorer provides summary statistics, time
+traces, phase-binned profiles, distributions, and pairwise relationship plots.
+The artifacts and JSON summaries are written under `logs/go2_evaluation/`.
 
 Open the comparison report with:
 

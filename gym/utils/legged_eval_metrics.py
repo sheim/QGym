@@ -746,6 +746,7 @@ class LeggedMetricAccumulator:
                     analyze_foot_clearance_by_phase(
                         self._histories["foot_height"],
                         self._histories["foot_force_norm"],
+                        self._histories["foot_force_z"],
                         self._histories["leg_phase"],
                         self._histories["expected_stance"],
                         self._histories["alive"],

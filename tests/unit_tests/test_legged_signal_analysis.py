@@ -77,10 +77,12 @@ def test_clearance_is_measured_relative_to_each_foot_stance_height():
     height[:, 0, 1] += 0.01
     height[~stance] += 0.05
     force = np.where(stance, 10.0, 0.0).astype(np.float32)
+    force_z = 2.0 * force
 
     metrics, artifacts = analyze_foot_clearance_by_phase(
         height,
         force,
+        force_z,
         phase,
         stance,
         np.ones((num_steps, 1), dtype=bool),
@@ -93,4 +95,10 @@ def test_clearance_is_measured_relative_to_each_foot_stance_height():
     assert metrics["swing_clearance_p95_mean"][0] == pytest.approx(0.05)
     assert metrics["swing_clearance_p95_min"][0] == pytest.approx(0.05)
     np.testing.assert_allclose(artifacts["foot_contact_by_phase"][0, :, :4], 1.0)
+    np.testing.assert_allclose(
+        artifacts["foot_contact_force_z_by_phase"][0, :, :4], 20.0
+    )
+    np.testing.assert_allclose(
+        artifacts["foot_contact_force_z_by_phase"][0, :, 4:], 0.0
+    )
     np.testing.assert_allclose(artifacts["foot_clearance_by_phase"][0, 1, 4:], 0.05)

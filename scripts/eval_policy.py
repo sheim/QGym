@@ -33,6 +33,7 @@ from gym.utils.legged_eval_metrics import (
     velocity_impulse_schedule,
 )
 from gym.utils.legged_signal_analysis import urdf_total_mass
+from gym.utils.policy_io import state_component_names
 from gym.utils.task_registry import task_registry
 from gym.utils.torch_quat import quat_rotate_inverse
 
@@ -178,6 +179,12 @@ def main():
         action="store_true",
         help="record commands and base velocity trajectories for legged-policy "
         "command-tracking analysis",
+    )
+    p.add_argument(
+        "--record_policy_io",
+        action="store_true",
+        help="record all configured actor/critic observations, raw policy "
+        "outputs, and scaled environment action fields",
     )
     p.add_argument(
         "--command_profile",
@@ -345,16 +352,55 @@ def main():
         if record_tracking and has_position_reference
         else None
     )
+    if args.record_policy_io:
+        actor_observation_fields = list(runner.actor_cfg["obs"])
+        critic_observation_fields = list(runner.critic_cfg["obs"])
+        action_fields = list(runner.actor_cfg["actions"])
+        actor_observation_names = state_component_names(env, actor_observation_fields)
+        critic_observation_names = state_component_names(env, critic_observation_fields)
+        action_names = state_component_names(env, action_fields)
+        actor_observations = np.empty(
+            (n_steps, N, len(actor_observation_names)), dtype=np.float32
+        )
+        critic_observations = np.empty(
+            (n_steps, N, len(critic_observation_names)), dtype=np.float32
+        )
+        policy_actions = np.empty((n_steps, N, len(action_names)), dtype=np.float32)
+        applied_actions = np.empty_like(policy_actions)
+    else:
+        actor_observations = None
+        critic_observations = None
+        policy_actions = None
+        applied_actions = None
 
     with torch.no_grad():
         for k in range(n_steps):
             alive_before_step = ~ever_term
+            if actor_observations is not None:
+                actor_observations[k] = (
+                    runner.get_obs(runner.actor_cfg["obs"]).detach().cpu().numpy()
+                )
+                critic_observations[k] = (
+                    runner.get_obs(runner.critic_cfg["obs"]).detach().cpu().numpy()
+                )
             actions = runner.get_inference_actions()
+            if policy_actions is not None:
+                policy_actions[k] = actions.detach().cpu().numpy()
             runner.set_actions(
                 runner.actor_cfg["actions"],
                 actions,
                 runner.actor_cfg["disable_actions"],
             )
+            if applied_actions is not None:
+                applied_actions[k] = (
+                    torch.cat(
+                        [getattr(env, name) for name in runner.actor_cfg["actions"]],
+                        dim=-1,
+                    )
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
             impulse_envs = np.flatnonzero(impulse_steps == k)
             if len(impulse_envs):
                 impulse_envs_device = torch.as_tensor(
@@ -482,6 +528,21 @@ def main():
         )
     if reference_dof_rmse is not None:
         extra["reference_dof_rmse"] = reference_dof_rmse
+    if actor_observations is not None:
+        extra.update(
+            {
+                "actor_observations": actor_observations,
+                "actor_observation_fields": np.asarray(actor_observation_fields),
+                "actor_observation_names": np.asarray(actor_observation_names),
+                "critic_observations": critic_observations,
+                "critic_observation_fields": np.asarray(critic_observation_fields),
+                "critic_observation_names": np.asarray(critic_observation_names),
+                "policy_actions": policy_actions,
+                "applied_actions": applied_actions,
+                "action_fields": np.asarray(action_fields),
+                "action_names": np.asarray(action_names),
+            }
+        )
 
     print(
         f"[{args.train_label} -> {eval_label}] mean reward "

@@ -160,9 +160,9 @@ class Go2Cfg(LeggedRobotCfg):
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
         max_contact_force = 600.0
-        base_height_target = 0.45
+        base_height_target = 0.4
         tracking_sigma = 0.25
-        gait_contact_force_threshold = 5.0  # upward foot force [N]
+        gait_contact_force_threshold = 25.0  # upward foot force [N]
 
     class scaling(LeggedRobotCfg.scaling):
         # Canonical RobotLayout order is FL, FR, RL, RR, with
@@ -271,7 +271,7 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
         max_gradient_steps = 32
         # new
         clip_param = 0.2
-        learning_rate = 1.0e-3
+        learning_rate = 1.0e-4
         max_grad_norm = 1.0
         # Critic
         use_clipped_value_loss = True

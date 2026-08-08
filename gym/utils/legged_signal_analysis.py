@@ -242,6 +242,7 @@ def analyze_gait_and_grf(
 def analyze_foot_clearance_by_phase(
     foot_height_history,
     foot_force_norm_history,
+    foot_force_z_history,
     leg_phase_history,
     expected_stance_history,
     alive_history,
@@ -250,7 +251,7 @@ def analyze_foot_clearance_by_phase(
     contact_threshold_n,
     num_phase_bins=32,
 ):
-    """Measure swing clearance relative to each foot's stance height.
+    """Measure foot contact, vertical force, and stance-relative clearance.
 
     Absolute foot-body height depends on asset geometry. Subtracting the median
     stance height gives a backend-comparable clearance signal while preserving
@@ -258,6 +259,7 @@ def analyze_foot_clearance_by_phase(
     """
     height = np.asarray(foot_height_history)
     force = np.asarray(foot_force_norm_history)
+    force_z = np.asarray(foot_force_z_history)
     phase = np.mod(np.asarray(leg_phase_history), 2.0 * np.pi)
     expected_stance = np.asarray(expected_stance_history, dtype=bool)
     alive = np.asarray(alive_history, dtype=bool)
@@ -274,6 +276,7 @@ def analyze_foot_clearance_by_phase(
         (num_envs, num_feet, num_phase_bins), np.nan, dtype=np.float32
     )
     contact_by_phase = np.full_like(clearance_by_phase, np.nan)
+    force_z_by_phase = np.full_like(clearance_by_phase, np.nan)
     phase_edges = np.linspace(0.0, 2.0 * np.pi, num_phase_bins + 1)
 
     for env_index in range(num_envs):
@@ -283,6 +286,7 @@ def analyze_foot_clearance_by_phase(
         foot_peaks = []
         for foot_index in range(num_feet):
             foot_height = height[settle_steps:end, env_index, foot_index]
+            foot_force_z = force_z[settle_steps:end, env_index, foot_index]
             foot_phase = phase[settle_steps:end, env_index, foot_index]
             stance = expected_stance[settle_steps:end, env_index, foot_index]
             if not np.any(stance) or not np.any(~stance):
@@ -308,6 +312,9 @@ def analyze_foot_clearance_by_phase(
                 contact_by_phase[env_index, foot_index, bin_index] = np.mean(
                     contact[selected]
                 )
+                force_z_by_phase[env_index, foot_index, bin_index] = np.mean(
+                    foot_force_z[selected]
+                )
         if foot_peaks:
             metrics["swing_clearance_p95_mean"][env_index] = np.mean(foot_peaks)
             metrics["swing_clearance_p95_min"][env_index] = np.min(foot_peaks)
@@ -316,5 +323,6 @@ def analyze_foot_clearance_by_phase(
         "gait_phase_bin_centers": 0.5 * (phase_edges[:-1] + phase_edges[1:]),
         "foot_clearance_by_phase": clearance_by_phase,
         "foot_contact_by_phase": contact_by_phase,
+        "foot_contact_force_z_by_phase": force_z_by_phase,
     }
     return metrics, artifacts
