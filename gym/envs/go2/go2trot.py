@@ -8,7 +8,7 @@ from gym.envs.base.legged_robot import LeggedRobot
 # )
 
 
-class Go2(LeggedRobot):
+class Go2Trot(LeggedRobot):
     def __init__(self, cfg, device, headless, backend):
         super().__init__(cfg, device, headless, backend)
 

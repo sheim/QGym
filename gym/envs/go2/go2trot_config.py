@@ -28,7 +28,7 @@ GO2_FOOT_NAMES = [
 ]
 
 
-class Go2Cfg(LeggedRobotCfg):
+class Go2TrotCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 2**12
         num_actuators = 12
@@ -186,7 +186,7 @@ class Go2Cfg(LeggedRobotCfg):
         ccd_iterations = 50
 
 
-class Go2RunnerCfg(LeggedRobotRunnerCfg):
+class Go2TrotRunnerCfg(LeggedRobotRunnerCfg):
     seed = -1
     runner_class_name = "OnPolicyRunner"
 
@@ -287,6 +287,6 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
 
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
-        experiment_name = "go2"
+        experiment_name = "go2trot"
         max_iterations = 1000
         algorithm_class_name = "PPO2"
