@@ -150,6 +150,26 @@ def _require_module_file(
         )
 
 
+def saved_task_config_paths(
+    task_name: str, saved_envs_dir: str | Path
+) -> tuple[Path, ...]:
+    """Resolve a task's config modules from a saved registry manifest."""
+    saved_envs_dir = Path(saved_envs_dir).resolve()
+    manifest_path = saved_envs_dir / "__init__.py"
+    manifest = _read_saved_manifest(manifest_path)
+    _, env_cfg_location, _, train_cfg_location = _config_declarations(
+        task_name, manifest, manifest_path
+    )
+
+    paths = set()
+    for location in (env_cfg_location, train_cfg_location):
+        module_name = _absolute_module_name(location, manifest_path)
+        _require_module_file(module_name, saved_envs_dir, manifest_path)
+        relative_parts = module_name.split(".")[2:]
+        paths.add(saved_envs_dir.joinpath(*relative_parts).with_suffix(".py"))
+    return tuple(sorted(paths))
+
+
 @contextmanager
 def _saved_env_imports(saved_envs_dir: Path):
     """Temporarily resolve gym.envs imports only from the saved snapshot."""
