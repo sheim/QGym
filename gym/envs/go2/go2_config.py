@@ -250,8 +250,8 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
                 torques = 5.0e-6
                 dof_vel = 0.0
                 min_base_height = 0.5
-                action_rate = 0.1
-                action_rate2 = 0.01
+                action_rate = 0.25
+                action_rate2 = 0.025
                 stand_still = 0.0
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
@@ -288,5 +288,5 @@ class Go2RunnerCfg(LeggedRobotRunnerCfg):
     class runner(LeggedRobotRunnerCfg.runner):
         run_name = ""
         experiment_name = "go2"
-        max_iterations = 500
+        max_iterations = 1000
         algorithm_class_name = "PPO2"
