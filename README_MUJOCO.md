@@ -274,6 +274,7 @@ uv run scripts/train.py [OPTIONS]
 | `mini_cheetah` | MIT Mini Cheetah | Floating-base | 12 |
 | `mini_cheetah_ref` | Mini Cheetah (ref tracking) | Floating-base | 12 |
 | `mini_cheetah_osc` | Mini Cheetah (oscillator) | Floating-base | 12 |
+| `go2` | Unitree Go2 | Floating-base | 12 |
 | `go2trot` | Unitree Go2 (trot based on clock) | Floating-base | 12 |
 | `humanoid` | MIT Humanoid | Floating-base | 30 |
 | `humanoid_running` | Humanoid (running) | Floating-base | 30 |
