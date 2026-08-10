@@ -192,16 +192,17 @@ then-current task config.
 uv run --frozen python -m pytest tests/unit_tests/ -v
 ```
 
-### Evaluate Go2 policy changes
+### Evaluate Go2Trot policy changes
 
-Use the controlled Go2 evaluator to compare policies or checkpoint progression.
+Use the controlled Go2Trot evaluator to compare policies or checkpoint
+progression.
 Each label must point to a checkpoint or a run directory containing
 `model_<iteration>.pt` files:
 
 ```bash
 uv run --frozen scripts/eval_go2_policy.py \
-    --policy baseline=logs/go2/BASELINE_RUN \
-    --policy current=logs/go2/CURRENT_RUN \
+    --policy baseline=logs/go2trot/BASELINE_RUN \
+    --policy current=logs/go2trot/CURRENT_RUN \
     --iterations 100 250 500
 ```
 
@@ -219,7 +220,7 @@ and physical power. The report presents the phase signals as polar plots, with
 foot-force means and standard deviations across evaluated environments. The
 report also compares the task and inherited config sources saved inside each
 run directory, highlighting changed lines relative to the selected reference
-policy. Go2 evaluations also record every configured actor and critic
+policy. Go2Trot evaluations also record every configured actor and critic
 observation, the raw policy output, and the scaled action applied to the task.
 The interactive observation/action explorer provides summary statistics, time
 traces, phase-binned profiles, distributions, and pairwise relationship plots.
@@ -273,7 +274,7 @@ uv run scripts/train.py [OPTIONS]
 | `mini_cheetah` | MIT Mini Cheetah | Floating-base | 12 |
 | `mini_cheetah_ref` | Mini Cheetah (ref tracking) | Floating-base | 12 |
 | `mini_cheetah_osc` | Mini Cheetah (oscillator) | Floating-base | 12 |
-| `go2` | Unitree Go2 | Floating-base | 12 |
+| `go2trot` | Unitree Go2 (trot based on clock) | Floating-base | 12 |
 | `humanoid` | MIT Humanoid | Floating-base | 30 |
 | `humanoid_running` | Humanoid (running) | Floating-base | 30 |
 

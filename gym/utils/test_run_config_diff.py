@@ -16,7 +16,13 @@ def _write_run(tmp_path, name, task_source, base_source, unrelated_source=""):
     task_dir.mkdir(parents=True)
     base_dir.mkdir(parents=True)
     unrelated_dir.mkdir(parents=True)
-    (task_dir / "go2_config.py").write_text(task_source)
+    (source_root / "__init__.py").write_text(
+        'config_dict = {"Go2TrotCfg": ".go2.go2trot_config"}\n'
+        'runner_config_dict = {"Go2TrotRunnerCfg": ".go2.go2trot_config"}\n'
+        'task_dict = {"go2trot": '
+        '["Go2Trot", "Go2TrotCfg", "Go2TrotRunnerCfg"]}\n'
+    )
+    (task_dir / "go2trot_config.py").write_text(task_source)
     (base_dir / "legged_robot_config.py").write_text(base_source)
     (unrelated_dir / "other_config.py").write_text(unrelated_source)
     checkpoint = run_dir / "model_10.pt"
@@ -41,11 +47,11 @@ def test_diff_follows_task_config_imports_and_ignores_unrelated_configs(tmp_path
         "VALUE = 2\n",
     )
 
-    changes = diff_logged_run_configs(before, after, "go2")
+    changes = diff_logged_run_configs(before, after, "go2trot")
 
     assert [change.path for change in changes] == [
         "gym/envs/base/legged_robot_config.py",
-        "gym/envs/go2/go2_config.py",
+        "gym/envs/go2/go2trot_config.py",
     ]
     assert all(change.status == "modified" for change in changes)
     assert all((change.additions, change.deletions) == (1, 1) for change in changes)
@@ -57,11 +63,18 @@ def test_carried_original_config_takes_precedence(tmp_path):
     checkpoint = _write_run(tmp_path, "resumed", "VALUE = 1\n", "")
     carried = checkpoint.parent / "files" / "original_cfg" / "gym" / "envs" / "go2"
     carried.mkdir(parents=True)
-    (carried / "go2_config.py").write_text("VALUE = 2\n")
+    carried_source_root = carried.parent
+    (carried_source_root / "__init__.py").write_text(
+        'config_dict = {"Go2TrotCfg": ".go2.go2trot_config"}\n'
+        'runner_config_dict = {"Go2TrotRunnerCfg": ".go2.go2trot_config"}\n'
+        'task_dict = {"go2trot": '
+        '["Go2Trot", "Go2TrotCfg", "Go2TrotRunnerCfg"]}\n'
+    )
+    (carried / "go2trot_config.py").write_text("VALUE = 2\n")
 
-    sources = logged_config_sources(checkpoint, "go2")
+    sources = logged_config_sources(checkpoint, "go2trot")
 
-    assert sources["gym/envs/go2/go2_config.py"] == "VALUE = 2\n"
+    assert sources["gym/envs/go2/go2trot_config.py"] == "VALUE = 2\n"
 
 
 def test_missing_saved_task_config_is_reported(tmp_path):
@@ -69,5 +82,5 @@ def test_missing_saved_task_config_is_reported(tmp_path):
     checkpoint.parent.mkdir()
     checkpoint.touch()
 
-    with pytest.raises(LoggedConfigError, match="Saved config directory"):
-        logged_config_sources(checkpoint, "go2")
+    with pytest.raises(LoggedConfigError, match="Saved config manifest"):
+        logged_config_sources(checkpoint, "go2trot")

@@ -1,10 +1,10 @@
-"""Compare controlled Go2 policy-evaluation artifacts.
+"""Compare controlled Go2Trot policy-evaluation artifacts.
 
 Generate artifacts first:
 
     uv run --frozen scripts/eval_go2_policy.py \
-        --policy baseline=logs/go2/BASELINE_RUN \
-        --policy current=logs/go2/CURRENT_RUN \
+        --policy baseline=logs/go2trot/BASELINE_RUN \
+        --policy current=logs/go2trot/CURRENT_RUN \
         --iterations 100 250 500
 
 Then open this report:
@@ -79,7 +79,7 @@ def _(Path, json, np, os):
     if artifact_root.exists():
         for _path in sorted(artifact_root.glob("*.npz")):
             _artifact = _load_artifact(_path)
-            if str(_artifact.get("task", "")) == "go2":
+            if str(_artifact.get("task", "")) == "go2trot":
                 artifacts.append(_artifact)
 
     modes = list(
@@ -218,7 +218,7 @@ def _(artifact_root, eval_backend, latest, mo, reset_mode, selected):
     )
     mo.md(
         f"""
-        # Go2 policy evaluation
+        # Go2Trot policy evaluation
 
         Controlled fixed-command evaluation on **{eval_backend.value}** for
         **{reset_mode.value}**. The
@@ -1244,7 +1244,7 @@ def _(
                 _changes = diff_logged_run_configs(
                     _reference_checkpoint,
                     _checkpoint,
-                    "go2",
+                    "go2trot",
                 )
             except LoggedConfigError as _error:
                 _sections.append(f"⚠️ {_error}")

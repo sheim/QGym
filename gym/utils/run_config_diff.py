@@ -5,7 +5,11 @@ import difflib
 from dataclasses import dataclass
 from pathlib import Path
 
-from gym.utils.original_cfg import original_cfg_source_dir
+from gym.utils.original_cfg import (
+    OriginalCfgError,
+    original_cfg_source_dir,
+    saved_task_config_paths,
+)
 
 
 class LoggedConfigError(RuntimeError):
@@ -66,15 +70,10 @@ def logged_config_sources(
     """
     run_dir = Path(checkpoint_path).expanduser().resolve().parent
     source_root = original_cfg_source_dir(run_dir)
-    task_dir = source_root / task_name
-    if not task_dir.is_dir():
-        raise LoggedConfigError(
-            f"Saved config directory for task {task_name!r} not found: {task_dir}"
-        )
-
-    pending = list(sorted(task_dir.glob("*_config.py")))
-    if not pending:
-        raise LoggedConfigError(f"No saved config modules found in: {task_dir}")
+    try:
+        pending = list(saved_task_config_paths(task_name, source_root))
+    except OriginalCfgError as error:
+        raise LoggedConfigError(str(error)) from error
 
     sources = {}
     visited = set()
