@@ -350,7 +350,7 @@ slowdown or poorer learning.
 Keep small profiles, comparator logic, tests, and guidance in source control;
 keep timing samples, checkpoints, traces, and bulky catalogs under `logs/`.
 Run GPU/VSim gates explicitly on available hardware without overlapping jobs.
-Current GitHub CI runs portable/colocated tests, Ruff, and a build on Ubuntu;
+Current GitHub CI runs portable/colocated tests and Ruff on Ubuntu;
 it does not establish GPU performance or learning. Add a hardware runner only
 when its availability is established, rather than allowing requested GPU tests
 to skip. Document the actual local and CI commands when implementation exists.

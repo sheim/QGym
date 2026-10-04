@@ -4,7 +4,7 @@
 
 ### Install required packages
 
-Simulation and training use `uv sync` and do not require the Unitree
+Simulation and training use `uv sync --frozen` and do not require the Unitree
 SDK. Go2 hardware deployment uses the optional **`unitree_sdk` extra on Linux
 x86_64/aarch64** and the repository's Python 3.11 `.venv`.
 
@@ -13,7 +13,7 @@ to a Git commit; `uv.lock` records its Python dependencies. From the repository
 root, fetch that revision into the gitignored `thirdparty/unitree_sdk2_python/`:
 
 ```bash
-uv run python scripts/fetch_unitree_sdk.py
+uv run --frozen python scripts/fetch_unitree_sdk.py
 ```
 
 The script checks an existing checkout and refuses to overwrite a different
@@ -51,10 +51,10 @@ add the export to your shell configuration for future terminals. Then, from the
 Q2 repository root:
 
 ```bash
-uv sync --extra unitree_sdk
-uv run --extra unitree_sdk python -c \
+uv sync --frozen --extra unitree_sdk
+uv run --frozen --extra unitree_sdk python -c \
     "from unitree_sdk2py.core.channel import ChannelFactoryInitialize; from go2_deploy.utility.deploy_utility import default_lowcmd; default_lowcmd(); print('Unitree SDK and DDS imports OK')"
-uv run --extra unitree_sdk python -m pytest -q -m unitree
+uv run --frozen --extra unitree_sdk python -m pytest -q -m unitree
 ```
 
 These checks import DDS, construct a command message, and test local threading;
@@ -93,7 +93,7 @@ If anything goes wrong, the emergency stop on the wireless controller is X or th
 
 - Make sure your trained policy is in `logs/`, and that the observation vector, scaling, and other settings in `deploy_config.py` are all correct.
 - Turn on the Go2 and wait until it is in the standing position.
-- In the terminal, run `uv run --extra unitree_sdk python -m go2_deploy.deploy eth0`, but replace `eth0` with the actual network configuration. Keep `CYCLONEDDS_HOME` exported. If this is successful, there should be a terminal output every few seconds telling you about the keyboard controls, observation frequency, etc.
+- In the terminal, run `uv run --frozen --extra unitree_sdk python -m go2_deploy.deploy eth0`, but replace `eth0` with the actual network configuration. Keep `CYCLONEDDS_HOME` exported. If this is successful, there should be a terminal output every few seconds telling you about the keyboard controls, observation frequency, etc.
 - There are 4 states the robot can be in:
     - `RECOVERY`: Initially when the script starts running, the robot is in this mode. You must enter this state from `EMERGENCY_STOP` otherwise. The default Unitree controller can be used to make the robot walk, do tricks, etc. The `F1` key on the remote control can be used to disable/enable the A, B, X, and Y buttons, so that the default Unitree button combinations can be used without accidentally turning on a different state.
     - `EMERGENCY_STOP`: The robot will immediately start damping, wait around 15 seconds, and then stand up again. The robot will automatically enter the `RECOVERY` state.

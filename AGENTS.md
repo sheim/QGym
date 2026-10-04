@@ -73,8 +73,9 @@ uv run --frozen python -c "import torch, mujoco_warp; print(torch.cuda.is_availa
 ```
 
 VSim is optional, CUDA-only, licensed, and machine-local. Follow
-`thirdparty/vlearn/README.md`, install with `uv sync --locked --extra vsim`,
-and launch processes with `uv run --env-file .env.vsim ...`. Validate it with
+`thirdparty/README.md`, install with `uv sync --frozen --extra vsim`,
+and launch processes with
+`uv run --frozen --extra vsim --env-file .env.vsim ...`. Validate it with
 `bash scripts/run_vsim_tests.sh`; the default test gate deselects VSim unless
 it is explicitly requested.
 
@@ -138,7 +139,7 @@ quaternion conversion, or contact routing requires a focused regression test.
   penalties with a mean unless the intended magnitude genuinely scales with
   robot DOF count.
 - Keep rollout collection and optimization geometry distinct.
-  `rollout_batch_size` controls collected samples/temporal horizon;
+  `rollout_size` controls collected samples/temporal horizon;
   `batch_size` controls PPO optimizer minibatches. Backend comparisons are not
   controlled if either rollout horizon or sample count differs unintentionally.
 - Inference must use clean observations and evaluation mode. Observation
@@ -163,8 +164,9 @@ match the local module while improving touched code deliberately.
 - Add comments for non-obvious engine semantics, tensor aliasing/liveness, or
   experiment rationale. Do not narrate obvious Python.
 - Never commit generated checkpoints, logs, W&B data, licenses, local wheels,
-  caches, or files larger than 100 KB. The size limit is enforced by hooks and
-  CI.
+  or caches. New or modified files must stay within 100 KiB, except for
+  `uv.lock`, which records the required dependency graph. Hooks and CI enforce
+  this limit; existing unchanged robot assets are not newly added files.
 - Format only touched Python files in a dirty worktree, then run the full lint
   check:
 
@@ -208,8 +210,10 @@ Additional evidence by change type:
   viewer impression or final aggregate reward.
 
 GitHub CI uses uv and runs the portable default suite, explicit colocated
-suites, Ruff, and a package build. It does not run smoke training, MuJoCo Warp,
-or licensed VSim; run those applicable local gates before handoff.
+suites, and Ruff. The portable suite includes a small CPU
+training/checkpoint/resume smoke. CI does not establish learning quality or run
+MuJoCo Warp, licensed VSim, or optional Unitree integration; run those applicable
+local gates before handoff.
 
 ## Documentation and Skills
 

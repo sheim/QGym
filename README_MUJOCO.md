@@ -35,7 +35,7 @@ instead.
 Clone the repository and create the Python 3.11 environment:
 
 ```bash
-git clone git@github.com:LampLighterLab/QGym.git
+git clone https://github.com/LampLighterLab/QGym.git
 cd QGym
 uv python install 3.11
 uv venv --python 3.11
@@ -349,7 +349,7 @@ state evidence. Run each cell in a fresh process with no competing GPU jobs:
 uv run --frozen -m scripts.benchmark_simulation run --backend warp \
     --task go2trot --num-envs 4096 --profile task_timeout \
     --output logs/streamlining/speed/warp.json
-uv run --frozen --env-file .env.vsim -m scripts.benchmark_simulation run \
+uv run --frozen --extra vsim --env-file .env.vsim -m scripts.benchmark_simulation run \
     --backend vsim --task go2trot --num-envs 4096 --sets 1 \
     --profile task_timeout --output logs/streamlining/speed/vsim.json
 ```
@@ -366,10 +366,10 @@ Capture Python/native host stacks and native CUDA work in separate runs:
 
 ```bash
 uv sync --frozen --extra vsim --group profiling
-uv run --frozen --env-file .env.vsim -m scripts.profile_simulation \
+uv run --frozen --extra vsim --env-file .env.vsim -m scripts.profile_simulation \
     --tool py-spy --backend vsim --profile task_timeout \
     --output logs/streamlining/profiles/vsim_host
-uv run --frozen --env-file .env.vsim -m scripts.profile_simulation \
+uv run --frozen --extra vsim --env-file .env.vsim -m scripts.profile_simulation \
     --tool nsys --backend vsim --profile task_timeout \
     --output logs/streamlining/profiles/vsim_cuda
 ```
@@ -388,7 +388,7 @@ fresh-runner checkpoint restoration and one additional update:
 ```bash
 uv run --frozen -m scripts.regression_pendulum_training --backend mujoco \
     --device cuda:0 --output logs/streamlining/pendulum/warp_seed7
-uv run --frozen --env-file .env.vsim -m scripts.regression_pendulum_training \
+uv run --frozen --extra vsim --env-file .env.vsim -m scripts.regression_pendulum_training \
     --backend vsim --device cuda:0 --output logs/streamlining/pendulum/vsim_seed7
 ```
 

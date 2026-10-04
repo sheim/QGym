@@ -99,7 +99,7 @@ def _(REPO, WORK, mo):
 
 @app.cell
 def _(mo):
-    branch = mo.ui.text(value="jt/sdk", label="branch", full_width=True)
+    branch = mo.ui.text(value="main", label="branch", full_width=True)
     repo_url = mo.ui.text(
         value="https://github.com/LampLighterLab/QGym.git",
         label="repo",
@@ -130,7 +130,7 @@ def _(ENV, REPO, branch, mo, repo_url, setup_button, subprocess, textwrap):
         cd {REPO}
         uv python install 3.11          # pyproject pins requires-python == 3.11.*
         # --extra gpu pulls mujoco-warp (CUDA); --no-dev skips pytest/ruff/marimo.
-        uv sync --frozen --extra gpu --no-dev || uv sync --extra gpu --no-dev
+        uv sync --frozen --extra gpu --no-dev
     """)
     subprocess.run(["bash", "-c", _setup], check=True, env=ENV)
 

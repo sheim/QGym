@@ -16,7 +16,7 @@ import pytest
 
 pytestmark = pytest.mark.unitree
 
-INTERVAL = 0.01  # All recurrent loops use the deployment's 100 Hz period.
+INTERVAL = 0.01  # Default control-loop period; the CSV writer uses no timer.
 DEADLINE = 2.0
 
 
@@ -106,9 +106,9 @@ def timer_runtime(sdk_thread, monkeypatch):
 def make_thread(timer_runtime):
     created = []
 
-    def make(target, *, name=None, args=(), kwargs=None):
+    def make(target, *, interval=INTERVAL, name=None, args=(), kwargs=None):
         thread = timer_runtime.module.RecurrentThread(
-            interval=INTERVAL, target=target, name=name, args=args, kwargs=kwargs
+            interval=interval, target=target, name=name, args=args, kwargs=kwargs
         )
         created.append(thread)
         return thread
@@ -157,6 +157,37 @@ def test_target_receives_args_and_kwargs(make_thread):
     assert wait_for(lambda: recorder.count >= 3)
     assert thread.Wait(DEADLINE) is True
     assert all(call == ((1, 2), {"key": "value"}) for call in recorder.calls)
+
+
+def test_zero_interval_repeats_blocking_target_and_stops_without_timer(
+    make_thread, timer_runtime
+):
+    entered = threading.Event()
+    release = threading.Semaphore(0)
+    calls = []
+
+    def target(value, *, key):
+        calls.append((value, key))
+        entered.set()
+        # Like the CSV writer, the callback blocks until work is available.
+        release.acquire(timeout=DEADLINE)
+
+    thread = make_thread(target, interval=0.0, args=(7,), kwargs={"key": "value"})
+    thread.Start()
+    try:
+        assert entered.wait(DEADLINE)
+        entered.clear()
+        release.release()
+        assert entered.wait(DEADLINE)
+        assert calls == [(7, "value"), (7, "value")]
+        assert thread.Wait(0) is False
+    finally:
+        release.release()
+
+    assert thread.Wait(DEADLINE) is True
+    assert wait_for(lambda: not thread.IsAlive())
+    assert calls == [(7, "value"), (7, "value")]
+    assert timer_runtime.created == []
 
 
 def test_thread_identity_is_available_while_running(make_thread):

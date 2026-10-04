@@ -212,11 +212,12 @@ VSim fixtures fail on missing prerequisites; a few mandatory MuJoCo imports
 still use `importorskip` and should be made explicit. Unitree tests are opt-in
 and do not connect to hardware.
 
-GitHub's unit workflow runs default tests, both colocated roots, Ruff, and a
-package build on Ubuntu/Python 3.11 for `main`/`dev` pushes and pull requests.
+GitHub's unit workflow runs default tests, both colocated roots, and Ruff on
+Ubuntu/Python 3.11 for `main`/`dev`/`bigred`/`cdx` pushes and pull requests,
+with manual dispatch available. It does not build distribution packages.
 It does not establish Warp/VSim correctness, hardware timing, or policy
-learning. Its separate file-size workflow currently checks only the last
-commit on pushes; review that scope separately from test consolidation.
+learning. Its separate file-size workflow checks the event's change range
+on pushes and pull requests, with manual dispatch available.
 
 Keep the deployment observation xfail visible in baseline evidence. The
 previous stale-configuration registry failure is closed by the prerequisite

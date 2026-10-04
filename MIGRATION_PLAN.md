@@ -26,6 +26,69 @@ general convex multi-contact CCD; Go2 disables that path and retains primitive
 multi-point contacts, with the captured pose covered by a subprocess
 regression. Do not reintroduce legacy engine-specific callbacks.
 
+## Main promotion preparation (2026-10-03)
+
+The candidate is QGym's `bigred` branch at `ebcfd8b9`, plus the preparation
+changes described here. The target is `LampLighterLab/QGym:main` at `f0424249`.
+BigRedGym's classroom-only pruning is outside this promotion. Keep the research
+evaluators, campaign/profiling tools, VSim launcher, and root developer guidance.
+Existing mini-cheetah reward weights and the adaptive pendulum learning-rate
+schedule are retained; this preparation does not change training or physics.
+
+Preparation enables the portable CI gate on `bigred`/`cdx`, adds manual runs,
+and makes file-size checks cover the full push/PR range. The required `uv.lock`
+is explicitly exempt from the 100 KiB limit in CI and pre-commit. Cloud
+notebooks now default to QGym `main` and use frozen installation without an
+unlocked fallback. SDK setup instructions and the VSim launcher explicitly
+select their locked optional dependencies. A focused zero-interval threading
+regression restores coverage for the CSV writer's timer-free loop.
+
+Fresh validation:
+
+| Check | Result |
+| --- | --- |
+| Portable suite | 309 passed; one existing strict deployment-parity xfail |
+| Colocated `gym` / `learning` | 32 / 6 passed |
+| MuJoCo Warp | 31 passed; existing MULTICCD fixture warnings |
+| Licensed VSim | 47 passed |
+| Unitree SDK / threading | 17 passed, including the new zero-interval case |
+| Fresh frozen install without vendor sources | Passed; portable suite also passed in that clone |
+| Ruff / wheel and source-distribution build | Passed |
+| CI configuration | YAML/shell checks and 12 file-size scenarios passed locally |
+
+Unitree checks used the pinned SDK and real Cyclone DDS 0.10.2 in an isolated
+temporary environment, with no robot connection or changes to the working
+environment. Hosted CI still excludes the optional backend/SDK groups.
+
+The portable suite exercises CPU PPO updates, checkpoint reload, and resume.
+Separate Warp/VSim smokes each completed two updates and resumed through update
+three, with finite model, inference, and evaluation tensors. They used seed 7,
+16 environments, 100 Hz policy/control/physics, 128 rollout samples, 64-sample
+minibatches, and two optimizer steps per update. Artifacts are under
+`logs/main_promotion_20261003/`; these small smokes establish execution, not
+learning quality. The failed learning calibration below remains unresolved.
+
+### Merge handoff
+
+`main` is not an ancestor of `bigred`. An isolated ordinary merge of the audited
+`main` tip produced 11 content/add-add conflicts and five modify/delete conflicts
+in legacy interfaces and tests. Main's relevant fixes are already represented
+in the modern implementation. Resolving those conflicts with the existing
+`bigred` files/deletions produced a tree **identical to `bigred`**, verified with
+`git diff --cached --exit-code HEAD`. The fresh-install test above also ran on
+that resolved tree.
+
+After committing and pushing the preparation changes, reconcile `origin/main`
+into `bigred`, preserving the modern implementations and intentional legacy
+deletions, then promote through a normal PR. Recheck if either remote tip has
+moved. Promotion to `main` remains a separate step; this preparation does not
+change `main` or commit a merge.
+
+Outstanding work remains separate: full-batch startup DR, deployment
+residual-action observation parity (the explicit xfail), learning-quality
+calibration, and the incomplete DR/transfer campaign. A passing source gate
+does not close those research and deployment questions.
+
 ## Streamlining regression calibration
 
 The 100 Hz regression push is tracked in `STREAMLINING_PLAN.md`; the behavior
@@ -416,11 +479,11 @@ earlier campaign results retain their original engine version.
 
 ```bash
 uv run --frozen ruff check .
-uv build --no-sources
 ```
 
-GitHub CI runs the portable and colocated suites, Ruff, and the package build.
-Smoke training and hardware-specific groups remain explicit local gates.
+GitHub CI runs the portable and colocated suites and Ruff, including a small
+CPU training/checkpoint/resume smoke. Package builds are not a CI gate for the
+repository-checkout workflow; hardware-specific groups remain local gates.
 
 ## Physics and parity evidence
 

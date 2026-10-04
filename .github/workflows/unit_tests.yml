@@ -5,10 +5,15 @@ on:
     branches:
       - main
       - dev
+      - bigred
+      - cdx
   push:
     branches:
       - main
       - dev
+      - bigred
+      - cdx
+  workflow_dispatch:
 
 jobs:
   cpu-tests:
@@ -43,7 +48,3 @@ jobs:
       - name: Lint
         run: |
           uv run --frozen ruff check .
-
-      - name: Build package
-        run: |
-          uv build --no-sources

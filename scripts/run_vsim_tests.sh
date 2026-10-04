@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VSIM_UV=(uv run --frozen)
+VSIM_UV=(uv run --frozen --extra vsim)
 
 # NB: computed WITHOUT importing vlearn (its import needs this very path)
 VLEARN_LIB="$("${VSIM_UV[@]}" python -c 'import sysconfig, os; print(os.path.join(sysconfig.get_paths()["purelib"], "vlearn", "lib"))')"
