@@ -19,6 +19,9 @@ resources/robots/<name>/vsim/ (gitignored) for inspection.
 """
 
 import os
+from copy import deepcopy
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import xml.etree.ElementTree as ET
 
 from gym import GYM_ROOT_DIR
@@ -79,6 +82,31 @@ def set_joint_dynamics(root: ET.Element, damping: float, armature) -> None:
         dyn.set("armature", str(arm))
 
 
+def replace_visual_meshes(root: ET.Element, mesh_dir: str) -> None:
+    """Use OBJ visuals from a directory without changing the physical model.
+
+    Each source mesh maps to either <stem>.obj or material-split files named
+    <stem>_0.obj, <stem>_1.obj, etc. Keep the URDF's link-local transforms.
+    """
+    directory = Path(mesh_dir)
+    for link in root.findall("link"):
+        for visual in link.findall("visual"):
+            mesh = visual.find("geometry/mesh")
+            if mesh is None:
+                continue
+            stem = Path(mesh.attrib["filename"]).stem
+            paths = sorted(directory.glob(f"{stem}_[0-9]*.obj"))
+            if not paths:
+                paths = [directory / f"{stem}.obj"]
+            for path in paths:
+                replacement = deepcopy(visual)
+                replacement.find("geometry/mesh").set(
+                    "filename", str(path.resolve(strict=True))
+                )
+                link.append(replacement)
+            link.remove(visual)
+
+
 def absolutize_mesh_paths(root: ET.Element, urdf_dir: str) -> None:
     """Rewrite relative <mesh filename=...> refs to absolute paths.
 
@@ -88,7 +116,7 @@ def absolutize_mesh_paths(root: ET.Element, urdf_dir: str) -> None:
     shapes)."""
     for mesh in root.iter("mesh"):
         fn = mesh.get("filename")
-        if fn and not os.path.isabs(fn):
+        if fn and "://" not in fn and not os.path.isabs(fn):
             mesh.set("filename", os.path.abspath(os.path.join(urdf_dir, fn)))
 
 
@@ -156,7 +184,21 @@ def ensure_vsim_asset(cfg, vgym) -> str:
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.abspath(os.path.join(out_dir, f"{stem}.vsim"))
 
-    vgym.convert_urdf_to_vsim(urdf_path, out_path)
+    if cfg.asset.vsim_visual_mesh_dir is None:
+        vgym.convert_urdf_to_vsim(urdf_path, out_path)
+    else:
+        # The converter resolves meshes immediately, so repairing its output
+        # is too late: unresolved visuals have already been discarded.
+        source = ET.parse(urdf_path)
+        replace_visual_meshes(
+            source.getroot(),
+            cfg.asset.vsim_visual_mesh_dir.format(GYM_ROOT_DIR=GYM_ROOT_DIR),
+        )
+        absolutize_mesh_paths(source.getroot(), os.path.dirname(urdf_path))
+        with TemporaryDirectory(prefix="qgym_vsim_visuals_") as directory:
+            prepared_path = os.path.join(directory, f"{stem}.urdf")
+            source.write(prepared_path)
+            vgym.convert_urdf_to_vsim(prepared_path, out_path)
     tree = ET.parse(out_path)
     postprocess_vsim(
         tree,

@@ -11,6 +11,14 @@ from gym.envs.base.legged_robot_config import (
 
 
 class HumanoidRunningCfg(LeggedRobotCfg):
+    # Preserve this task's original MuJoCo defaults when sharing simulator
+    # configuration with Go2.
+    class mujoco(LeggedRobotCfg.mujoco):
+        njmax = -1
+        solref = [0.02, 1.0]
+        ccd_iterations = 35
+        disableflags = 0
+
     class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_actuators = 18

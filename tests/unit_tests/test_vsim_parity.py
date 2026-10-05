@@ -22,6 +22,7 @@ import torch
 
 from gym import GYM_ROOT_DIR
 from gym.envs.base.domain_randomization import DomainRandomizationCfg
+from gym.envs.base.mujoco_config import MuJoCoCfg
 from tests.unit_tests.conftest import vsim_guard
 
 pytestmark = pytest.mark.vsim
@@ -37,6 +38,7 @@ SIM_DT = 0.005
 def _make_cfg(damping: float) -> types.SimpleNamespace:
     asset = types.SimpleNamespace(
         file=PENDULUM_URDF,
+        vsim_visual_mesh_dir=None,
         joint_damping=damping,
         rotor_inertia=0.0,
         disable_gravity=False,
@@ -47,6 +49,7 @@ def _make_cfg(damping: float) -> types.SimpleNamespace:
     return types.SimpleNamespace(
         asset=asset,
         domain_randomization=DomainRandomizationCfg(),
+        mujoco=MuJoCoCfg(),
         sim=sim,
         sim_dt=SIM_DT,
     )

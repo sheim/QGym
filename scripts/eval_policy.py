@@ -21,7 +21,6 @@ import json
 import math
 import os
 from pathlib import Path
-import types
 
 import numpy as np
 import torch
@@ -316,9 +315,7 @@ def build(
     env_cfg = copy.deepcopy(registered_env_cfg)
     train_cfg = copy.deepcopy(registered_train_cfg)
     if mujoco_geom_solref is not None:
-        env_cfg.mjspec_geom_attributes = types.SimpleNamespace(
-            solref=mujoco_geom_solref
-        )
+        env_cfg.mujoco.solref = mujoco_geom_solref
     configure_contact_friction_dr(
         env_cfg,
         contact_friction_dr,
@@ -338,7 +335,7 @@ def build(
     configure_scale_range(env_cfg, "d_gains", damping_scale_range)
     configure_scale_range(env_cfg, "link_mass_scale_range", link_mass_scale_range)
     if mujoco_njmax is not None:
-        env_cfg.mjspec_attributes.njmax = int(mujoco_njmax)
+        env_cfg.mujoco.njmax = int(mujoco_njmax)
     env_cfg.env.num_envs = num_envs
     env_cfg.init_state.reset_mode = reset_mode
     # Keep the eval controlled: no pushes, fixed commands for the whole episode.

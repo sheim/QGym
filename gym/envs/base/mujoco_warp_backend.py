@@ -223,7 +223,7 @@ class MuJocoWarpBackend(MuJocoBackendBase):
             self._m = mjw.put_model(mjm, batch_sizes=batch_sizes or None)
             mjd = mujoco.MjData(mjm)
             # mujoco-warp ignores the legacy mjModel.njmax field; forward it
-            # (cfg.mjspec_attributes.njmax → spec → mjm → put_data).  -1
+            # (cfg.mujoco.njmax → spec → mjm → put_data).  -1
             # means unset → let warp use its own heuristic.
             njmax = mjm.njmax if mjm.njmax > 0 else None
             self._d = mjw.put_data(mjm, mjd, nworld=num_envs, njmax=njmax)

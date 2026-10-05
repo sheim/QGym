@@ -203,22 +203,12 @@ class MuJocoBackendBase(SimBackend):
         if terrain_sliding_friction is not None:
             self._nominal_contact_friction = float(terrain_sliding_friction)
 
-        # Check for manually set mjModel attributes
-        if hasattr(cfg, "mjspec_attributes"):
-            for name in dir(cfg.mjspec_attributes):
-                if not name.startswith("_"):
-                    setattr(spec, name, getattr(cfg.mjspec_attributes, name))
-
-        if hasattr(cfg, "mjspec_option_attributes"):
-            for name in dir(cfg.mjspec_option_attributes):
-                if not name.startswith("_"):
-                    setattr(
-                        spec.option, name, getattr(cfg.mjspec_option_attributes, name)
-                    )
+        spec.njmax = cfg.mujoco.njmax
+        spec.option.ccd_iterations = cfg.mujoco.ccd_iterations
+        spec.option.disableflags = cfg.mujoco.disableflags
 
         mjm = spec.compile()
-        if hasattr(cfg, "mjspec_geom_attributes"):
-            mjm.geom_solref[:] = cfg.mjspec_geom_attributes.solref
+        mjm.geom_solref[:] = cfg.mujoco.solref
         if terrain_sliding_friction is not None:
             # MuJoCo combines same-priority geom friction using the larger
             # coefficient. URDF-imported robot geoms otherwise retain the

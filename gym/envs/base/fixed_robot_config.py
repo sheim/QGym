@@ -1,8 +1,12 @@
 from .base_config import BaseConfig
 from .domain_randomization import DomainRandomizationCfg
+from .mujoco_config import MuJoCoCfg
 
 
 class FixedRobotCfg(BaseConfig):
+    class mujoco(MuJoCoCfg):
+        pass
+
     class domain_randomization(DomainRandomizationCfg):
         pass
 
@@ -44,6 +48,7 @@ class FixedRobotCfg(BaseConfig):
 
     class asset:
         file = ""
+        vsim_visual_mesh_dir = None
         penalize_contacts_on = []
         terminate_after_contacts_on = []
         disable_gravity = False

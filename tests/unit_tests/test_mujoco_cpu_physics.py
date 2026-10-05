@@ -34,6 +34,7 @@ import torch
 
 from gym import GYM_ROOT_DIR
 from gym.envs.base.domain_randomization import DomainRandomizationCfg
+from gym.envs.base.mujoco_config import MuJoCoCfg
 import os
 
 PENDULUM_URDF = os.path.join(
@@ -67,6 +68,7 @@ def _make_cfg(
     return types.SimpleNamespace(
         asset=asset,
         domain_randomization=DomainRandomizationCfg(),
+        mujoco=MuJoCoCfg(),
         sim=sim,
         sim_dt=sim_dt,
     )

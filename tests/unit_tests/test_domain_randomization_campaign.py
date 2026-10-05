@@ -135,10 +135,19 @@ def test_eval_without_grid_records_nominal_for_task_without_randomizer_or_terrai
     )
 
 
-def test_eval_build_deepcopies_registry_configs(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    "mujoco_overrides",
+    [{}, {"mujoco_njmax": 300, "mujoco_geom_solref": [0.01, 1.5]}],
+)
+def test_eval_build_deepcopies_registry_configs(
+    monkeypatch, tmp_path, mujoco_overrides
+):
+    from gym.envs.base.mujoco_config import MuJoCoCfg
+
     original_env_cfg = SimpleNamespace(
         env=SimpleNamespace(num_envs=99, episode_length_s=1.0),
         init_state=SimpleNamespace(reset_mode="original"),
+        mujoco=MuJoCoCfg(),
         seed=-1,
     )
     original_train_cfg = SimpleNamespace(
@@ -189,6 +198,7 @@ def test_eval_build_deepcopies_registry_configs(monkeypatch, tmp_path):
         checkpoint,
         "reset_to_range",
         7,
+        **mujoco_overrides,
     )
 
     assert original_env_cfg.env.num_envs == 99
@@ -202,6 +212,12 @@ def test_eval_build_deepcopies_registry_configs(monkeypatch, tmp_path):
     assert captured["train_cfg"] is not original_train_cfg
     assert captured["train_cfg"].runner.resume is False
     assert captured["checkpoint"] == (checkpoint, False)
+    assert original_env_cfg.mujoco.njmax == -1
+    assert original_env_cfg.mujoco.solref == [0.02, 1.0]
+    assert captured["env_cfg"].mujoco is not original_env_cfg.mujoco
+    if mujoco_overrides:
+        assert captured["env_cfg"].mujoco.njmax == 300
+        assert captured["env_cfg"].mujoco.solref == [0.01, 1.5]
 
 
 def test_eval_build_can_sample_every_simulation_step(monkeypatch, tmp_path):

@@ -19,6 +19,10 @@ subdirectory holds the machine-local pieces, all gitignored:
 - `shaders/` + `assets/{VsimTile,Skybox}.png` — renderer files, needed only
   for the viewer (copied from the vlearn SDK repo root). Headless runs work
   without them.
+- `assets/go2/assets/*.obj` + `assets/licenses/go2-LICENSE.txt` — Go2 visual
+  meshes from the SDK repository. Go2/Go2Trot VSim conversion requires these
+  instead of the unavailable `package://go2_description/dae/*.dae` resources.
+  Only visuals are substituted; our URDF remains the physical model.
 
 ## Install and activate
 

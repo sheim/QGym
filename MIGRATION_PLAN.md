@@ -26,6 +26,17 @@ general convex multi-contact CCD; Go2 disables that path and retains primitive
 multi-point contacts, with the captured pose covered by a subprocess
 regression. Do not reintroduce legacy engine-specific callbacks.
 
+MuJoCo CPU and Warp now share a single explicit `cfg.mujoco` section for
+constraint capacity, CCD settings, and contact `solref`. The registered tasks'
+compiled settings are unchanged. Configs must use the unified section;
+automatic migration of older saved-run `mjspec_*` sections is out of scope.
+
+Go2 VSim conversion replaces unavailable DAE visuals with OBJ parts from the
+local SDK before native conversion. All nonvisual URDF elements and visual
+origins are preserved; the vendor's physical model is not adopted. XML/path
+tests cover this without vendor binaries. Native VSim rendering still needs
+verification on a CUDA-capable host.
+
 ## Main promotion preparation (2026-10-03)
 
 The candidate is QGym's `bigred` branch at `ebcfd8b9`, plus the preparation

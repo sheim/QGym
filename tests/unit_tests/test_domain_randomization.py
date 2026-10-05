@@ -7,6 +7,7 @@ import pytest
 import torch
 
 from gym import GYM_ROOT_DIR
+from gym.envs.base.mujoco_config import MuJoCoCfg
 from tests.unit_tests.conftest import vsim_guard
 
 
@@ -47,6 +48,7 @@ def _friction_cfg():
             file=(
                 f"{GYM_ROOT_DIR}/resources/robots/friction_sled/urdf/friction_sled.urdf"
             ),
+            vsim_visual_mesh_dir=None,
             joint_damping=1.0,
             rotor_inertia=0.0,
             disable_gravity=False,
@@ -65,6 +67,7 @@ def _friction_cfg():
             restitution=0.0,
         ),
         domain_randomization=_domain_randomization_cfg(contact_friction=[0.2, 1.0]),
+        mujoco=MuJoCoCfg(),
         sim=SimpleNamespace(gravity=[5.0, 0.0, -9.81]),
         sim_dt=0.002,
     )
@@ -75,6 +78,7 @@ def _link_mass_cfg():
         seed=11,
         asset=SimpleNamespace(
             file=f"{GYM_ROOT_DIR}/resources/robots/pendulum/urdf/pendulum.urdf",
+            vsim_visual_mesh_dir=None,
             joint_damping=0.0,
             rotor_inertia=0.0,
             disable_gravity=False,
@@ -89,6 +93,7 @@ def _link_mass_cfg():
         domain_randomization=_domain_randomization_cfg(
             link_mass=[0.5, 2.0],
         ),
+        mujoco=MuJoCoCfg(),
         sim=SimpleNamespace(gravity=[0.0, 0.0, -9.81]),
         sim_dt=0.005,
     )

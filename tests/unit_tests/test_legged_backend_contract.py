@@ -147,6 +147,62 @@ class TestLeggedQuaternion:
 
 
 class TestLeggedPhysics:
+    @pytest.mark.parametrize(
+        "task_name,njmax,ccd_iterations,disable_multiccd,solref",
+        [
+            ("go2", 256, 50, True, [0.005, 1.0]),
+            ("go2trot", 256, 50, True, [0.005, 1.0]),
+            ("mini_cheetah", 200, 50, False, [0.02, 1.0]),
+            ("humanoid", -1, 35, False, [0.02, 1.0]),
+            ("humanoid_running", -1, 35, False, [0.02, 1.0]),
+            ("pendulum", -1, 35, False, [0.02, 1.0]),
+        ],
+    )
+    def test_task_solver_settings_survive_config_inheritance(
+        self, task_name, njmax, ccd_iterations, disable_multiccd, solref
+    ):
+        """Sharing Go2 defaults must not retune other robots' contact physics."""
+        import mujoco
+
+        from gym.envs import task_registry
+        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+
+        cfg = type(task_registry.env_cfgs[task_name])()
+        model = MuJocoCPUBackend()._load_model(cfg, discard_visual=True)
+
+        assert model.njmax == njmax
+        assert model.opt.ccd_iterations == ccd_iterations
+        expected_flags = (
+            int(mujoco.mjtDisableBit.mjDSBL_MULTICCD) if disable_multiccd else 0
+        )
+        assert model.opt.disableflags == expected_flags
+        np.testing.assert_allclose(
+            model.geom_solref, np.broadcast_to(solref, model.geom_solref.shape)
+        )
+
+    def test_solver_option_override_retains_inherited_collision_settings(self):
+        import mujoco
+
+        from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
+        from gym.envs.go2.go2trot_config import Go2TrotCfg
+
+        class TunedGo2TrotCfg(Go2TrotCfg):
+            class mujoco(Go2TrotCfg.mujoco):
+                ccd_iterations = 75
+                njmax = 300
+                solref = [0.01, 1.5]
+
+        model = MuJocoCPUBackend()._load_model(TunedGo2TrotCfg(), discard_visual=True)
+
+        assert model.opt.ccd_iterations == 75
+        assert model.njmax == 300
+        np.testing.assert_allclose(
+            model.geom_solref,
+            np.broadcast_to([0.01, 1.5], model.geom_solref.shape),
+        )
+        assert model.opt.disableflags == int(mujoco.mjtDisableBit.mjDSBL_MULTICCD)
+        assert Go2TrotCfg().mujoco.ccd_iterations == 50
+
     def test_ground_friction_uses_mujoco_slot_semantics(self, legged_cpu_backend):
         """Ground friction is [sliding, torsional, rolling], not static/dynamic."""
         import mujoco
@@ -182,14 +238,12 @@ class TestLeggedPhysics:
 
     def test_configured_geom_attributes_are_applied(self):
         """Compiled MuJoCo geoms receive the config's solver parameters."""
-        import types
-
         pytest.importorskip("mujoco")
         from gym.envs.base.mujoco_cpu_backend import MuJocoCPUBackend
         from tests.unit_tests.conftest import _make_mini_cheetah_cfg
 
         cfg = _make_mini_cheetah_cfg()
-        cfg.mjspec_geom_attributes = types.SimpleNamespace(solref=[0.005, 1.0])
+        cfg.mujoco.solref = [0.005, 1.0]
         backend = MuJocoCPUBackend()
         backend.setup(cfg, num_envs=1, device="cpu", task=None)
         try:

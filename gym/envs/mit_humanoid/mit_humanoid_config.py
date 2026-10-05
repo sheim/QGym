@@ -7,6 +7,14 @@ BASE_HEIGHT_REF = 0.80
 
 
 class MITHumanoidCfg(LeggedRobotCfg):
+    # Preserve this family's original MuJoCo defaults, rather than adopting
+    # the shared Go2 contact tuning and Warp constraint-buffer size.
+    class mujoco(LeggedRobotCfg.mujoco):
+        njmax = -1
+        solref = [0.02, 1.0]
+        ccd_iterations = 35
+        disableflags = 0
+
     class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_actuators = 18

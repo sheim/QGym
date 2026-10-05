@@ -30,8 +30,11 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
+import mujoco
+
 from .base_config import BaseConfig
 from .domain_randomization import DomainRandomizationCfg
+from .mujoco_config import MuJoCoCfg
 
 
 class LeggedRobotCfg(BaseConfig):
@@ -108,6 +111,7 @@ class LeggedRobotCfg(BaseConfig):
 
     class asset:
         file = ""
+        vsim_visual_mesh_dir = None
         # * name of the feet bodies,
         # * used to index body state and contact force tensors
         foot_name = "foot"
@@ -150,8 +154,19 @@ class LeggedRobotCfg(BaseConfig):
         # scripts/play.py --viewer_ui turns them back on.
         show_ui = False
 
-    class mjmodel_settings:
-        njmax = 90
+    class mujoco(MuJoCoCfg):
+        # Warp truncates constraints if this per-world buffer overflows.
+        # Contact-rich Go2 poses reach 200 rows; leave headroom.
+        njmax = 256
+
+        # Contact response fitted to VSim's Go2 drop at 500 Hz. Other robot
+        # families can override this to retain their own contact tuning.
+        solref = [0.005, 1.0]
+
+        ccd_iterations = 50
+        # MuJoCo 3.11's convex multi-contact CCD can crash on overlapping
+        # Go2 lower-leg cylinders. Primitive multi-point contacts still work.
+        disableflags = int(mujoco.mjtDisableBit.mjDSBL_MULTICCD)
 
 
 class LeggedRobotRunnerCfg(BaseConfig):

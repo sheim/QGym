@@ -201,6 +201,7 @@ def _pendulum_cfg(show_ui):
 
     from gym import GYM_ROOT_DIR
     from gym.envs.base.domain_randomization import DomainRandomizationCfg
+    from gym.envs.base.mujoco_config import MuJoCoCfg
 
     return types.SimpleNamespace(
         asset=types.SimpleNamespace(
@@ -219,6 +220,7 @@ def _pendulum_cfg(show_ui):
             terminate_after_contacts_on=[],
         ),
         domain_randomization=DomainRandomizationCfg(),
+        mujoco=MuJoCoCfg(),
         sim=types.SimpleNamespace(gravity=[0.0, 0.0, -9.81]),
         sim_dt=0.005,
         viewer=types.SimpleNamespace(show_ui=show_ui),
