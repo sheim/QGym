@@ -100,6 +100,3 @@ thirdparty/unitree_sdk2_python/
 MUJOCO_LOG.TXT
 pendulum_rollout.png
 notebooks/__marimo__/
-
-# Local ignore
-.opencode/
