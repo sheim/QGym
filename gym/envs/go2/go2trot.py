@@ -70,6 +70,49 @@ class Go2Trot(LeggedRobot):
     def _expected_stance(self):
         return torch.sin(self._leg_phases()) > 0
 
+    def capture_state(self) -> dict:
+        """Snapshot the task state needed to resume this exact rollout.
+
+        Only task-owned buffers are included; physics contact warm start is not,
+        so a restored world is self-consistent but not bit-identical to an
+        uninterrupted trajectory.
+        """
+        return {
+            "dof_pos": self.dof_pos.clone(),
+            "dof_vel": self.dof_vel.clone(),
+            "root_states": self.root_states.clone(),
+            "dof_pos_target": self.dof_pos_target.clone(),
+            "commands": self.commands.clone(),
+            "phase": self.phase.clone(),
+            "phase_frequency": self.phase_frequency.clone(),
+            "episode_length_buf": self.episode_length_buf.clone(),
+            "common_step_counter": int(self.common_step_counter),
+        }
+
+    def restore_state(self, state: dict) -> None:
+        """Restore a snapshot into every world and clear per-episode flags.
+
+        ``reset_state`` clamps joint positions to the asset limits, so a snapshot
+        taken outside those limits is restored at the clamped value. The clamp is
+        deterministic, so repeated restores of one snapshot agree exactly.
+        """
+        mask = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
+        self.dof_pos[:] = state["dof_pos"]
+        self.dof_vel[:] = state["dof_vel"]
+        self.root_states[:] = state["root_states"]
+        self.dof_pos_target[:] = state["dof_pos_target"]
+        self.commands[:] = state["commands"]
+        self.phase[:] = state["phase"]
+        self.phase_frequency[:] = state["phase_frequency"]
+        self.episode_length_buf[:] = state["episode_length_buf"]
+        self.common_step_counter = state["common_step_counter"]
+        self._backend.reset_state(mask)
+        self._refresh_base_observations(mask)
+        self.dof_pos_obs[:] = self.dof_pos - self.default_dof_pos
+        self._update_phase_observation()
+        self._update_gait_reference()
+        self._reset_buffers()
+
     def _reset_system(self, reset_mask):
         super()._reset_system(reset_mask)
         phase = torch_rand_float(

@@ -86,6 +86,38 @@ For example, `--task go2trot --run_name tracking_trial` saves to
 `logs/go2trot/<timestamp>_tracking_trial/` and uses `<timestamp>_tracking_trial`
 as the W&B display name. Use `--experiment_name` to change the parent folder.
 
+## Offline replay and height Q
+
+Opt in to bounded transition recording without changing the PPO path:
+
+```bash
+uv run --frozen scripts/train.py --task=go2trot --device=cpu --headless \
+  --num_envs=1024 --max_iterations=600 --run_name=trot-replay \
+  --replay_record --replay_capacity=1000000 --replay_snapshot_interval=50
+```
+
+Then relabel height, fit a fixed-policy Q, and validate it against fresh
+simulator rollouts:
+
+```bash
+uv run --frozen scripts/train_height_q.py --snapshot <snapshot> \
+  --checkpoint <checkpoint> --output /tmp/opencode/height-q \
+  --height_reference 0.3 --height_bound 0.05 --gamma 0.99 \
+  --subset_group episode --fractions 0.1 0.5 1.0
+
+uv run --frozen scripts/evaluate_height_q.py \
+  --artifact /tmp/opencode/height-q/height_q/data/100pct \
+  --load_run <run> --checkpoint <same-checkpoint> \
+  --trials 20 --repetitions 3 --horizon 100 \
+  --thresholds -1.0 -0.5 0.0 --candidate_actions <candidates.pt> \
+  --output /tmp/opencode/height-q-eval.json
+```
+
+See [offline replay and fixed-policy height Q](docs/offline_height_q.md) for
+snapshot/artifact schemas, terminal and timeout semantics, early/late/mixed
+comparisons, and evidence boundaries. These artifacts use actor observations and
+do not import CORL.
+
 # Testing
 
 To test your policy in simulation, run ```scripts/play.py```:

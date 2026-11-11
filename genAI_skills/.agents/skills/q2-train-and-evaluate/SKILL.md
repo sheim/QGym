@@ -76,6 +76,33 @@ supported; orphaned sweep configurations were retired.
   policy-free probe with a predicted invariant. Historical campaign and manual
   fidelity programs are retired; recover them from git only for a specific need.
 
+## Offline replay and height Q
+
+- For fixed mid-gait state variance, use
+  `scripts/evaluate_height_q_variance.py`: validate native snapshot fidelity,
+  benchmark with `--batches 1`, then retain batch0 using `--resume --batches 8`.
+  `scripts/summarize_height_q_variance.py DIRECTORY` audits raw batches and
+  writes per-state/action statistics without more simulation. The historical
+  batched insertion evaluator does not establish fixed-state variance; see
+  `docs/offline_height_q.md` for its superseded evidence and current limits.
+
+- `scripts/train.py --replay_record ...` writes bounded replay snapshots under
+  the run's `replay/` directory. Recording is opt-in; snapshots are immutable
+  and are never deleted automatically. A last-N ring does not retain early data
+  after wrap; use `--replay_snapshot_interval` when early/late comparisons matter.
+- `scripts/train_height_q.py` loads snapshots, relabels a fixed height reward,
+  forms nested data fractions or early/late/mixed datasets, and fits a
+  fixed-policy FQE critic. `--subset_group`, height reference/bound, and gamma
+  are required. It does not optimize the policy.
+- `scripts/evaluate_height_q.py` compares Q against fresh simulator
+  continuations from reproducible initial states, with candidate first actions
+  and repeated stochastic continuations. Threshold reports include false
+  acceptance/rejection and ambiguity; ranking is reported separately from
+  aggregate error.
+- See `docs/offline_height_q.md` for snapshot/artifact schemas, terminal versus
+  timeout semantics, absorbing-failure returns, and tail uncertainty. These
+  artifacts use actor observations only and do not import CORL.
+
 ## Interpret results
 
 - Startup reward means may be NaN until episodes complete; distinguish that

@@ -310,6 +310,48 @@ campaign launchers are no longer maintained workflows.
 
 ## Limitations and validation scope
 
+The historical `evaluate_height_q_batched.py --insert_step` results do not
+establish fixed-state variance/ranking precision: prefix states vary between
+repetitions, candidates are reset-centered, and task restore clamps qpos and
+omits history/domain state. Its prior noise-ceiling and averaged-first-reward
+claims are superseded. `evaluate_height_q_variance.py` is the isolated replacement
+experiment, with native integration/task/domain snapshots, paired continuation
+noise, raw binary rewards and empirical repeated-batch statistics. Its native
+one-step restoration/replication gates must pass before scientific execution;
+neither buffer equality nor one-step agreement proves bitwise long-rollout fidelity.
+
+The corrected 128-state × 8-candidate experiment passed native one-step gates
+and completed eight independent 16-return batches. Pair-ranking repeatability
+between batches was only 0.518, so 16-return estimates remain unstable even
+with fixed states and paired noise. Captured native joint-limit penetration
+(six positions across five states, max .210443 rad) was preserved without
+clamping. See `docs/offline_height_q.md` and the archived replay/relabel plan for
+raw artifacts, commands, variance definitions and the separate tail uncertainty.
+
+`scripts/extend_height_q_variance.py` reindexes that saved 1024-world snapshot
+to eight seed lanes × sixteen randomly selected original states × eight original
+candidates. It gates complete inventory mapping, one-step replication/restoration
+and native command/push pairing before collecting more independent 64-return
+batches. This remains an experimental nonsleeping Go2Trot/Warp adapter; selected
+state coverage and approximate batch-bootstrap uncertainty are distinct from
+the original full-state summary. See the offline-height-Q documentation for its
+benchmark/resume CLI and matched regrouping analysis.
+
+`scripts/evaluate_height_q_persistent.py` applies both frozen critics at every
+decision to choose among eight fresh samples of the same frozen policy, and is
+the first positive intervention result recorded for this plan: paired H500
+height-band return improved by +1.72 (original critic) and +1.11 (eval-distribution
+critic) over 128 fixed k=100 states × 1024 executions, with better band occupancy
+but slightly higher fall rate and slightly worse velocity/yaw tracking. Treat this
+as a **policy intervention** at those states only, not policy improvement in the
+theorem sense: Q was fit for the nominal policy, persistent deviations invalidate
+its Bellman targets, and no `Q^pi` or transfer claim follows. Selected indices are
+near-uniform, which is the exchangeability prediction and does not show that the
+executed actions follow the nominal distribution; no same-bias/no-information
+control was run. Execution-level intervals, state-cluster intervals, the
+asymmetric survivor tail bound and the paired truncation interval are reported
+separately; see the plan's persistent-intervention section and report.
+
 Floating-base tasks use a flat ground plane. Heightfields, triangle-mesh terrain,
 and projectile support are not implemented; MuJoCo fixed-base tasks disable
 contacts. Startup friction and mass/inertia randomization remain fixed for each
@@ -407,6 +449,16 @@ their analysis helpers are no longer included. Training, playback,
 calibration failed its learning threshold; its removal supplies no passing
 learning-quality evidence. Historical reports were generated, ignored artifacts
 and are not guaranteed to exist in a checkout.
+
+Offline replay and fixed-policy height Q are opt-in and independent of PPO
+storage. Snapshot, relabel, FQE-target, artifact, and finite-rollout-tail tests
+are analytic or fixture-based. The one-iteration CPU smoke verifies the software
+path, not Q accuracy or policy quality. Observation-only Q can be biased by
+unobserved physical state, collecting behavior policy coverage is finite, and
+the validated-domain report only establishes what was actually tested. MPPI,
+repeated intervention, other reward channels, bound conditioning, and
+finite-horizon Q remain unvalidated. See
+[offline replay and fixed-policy height Q](../docs/offline_height_q.md).
 
 ## Notes
 

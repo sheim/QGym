@@ -6,6 +6,8 @@ from learning.utils import Logger
 
 from .BaseRunner import BaseRunner
 from learning.storage import DictStorage
+from learning.storage.transition_recorder import TransitionRecorder
+from gym.utils.helpers import class_to_dict
 
 logger = Logger()
 storage = DictStorage()
@@ -15,9 +17,51 @@ class OnPolicyRunner(BaseRunner):
     def __init__(self, env, train_cfg, device="cpu"):
         super().__init__(env, train_cfg, device)
         self.num_steps_per_env = max(1, self.alg_cfg["rollout_size"] // env.num_envs)
+        self.recorder = None
+        self._skip_next_replay = False
         print(
             f"[OnPolicyRunner] num_steps_per_env={self.num_steps_per_env}"
             f" (batch_size={self.alg_cfg['batch_size']}, num_envs={env.num_envs})"
+        )
+
+    def _make_recorder(self, n_policy_steps):
+        replay_cfg = self.cfg.get("replay")
+        if replay_cfg is None or not replay_cfg["enabled"]:
+            return None
+        output_dir = replay_cfg["output_dir"]
+        if not output_dir:
+            if self.log_dir is None:
+                raise ValueError(
+                    "replay output_dir is required when log_dir is unavailable"
+                )
+            output_dir = os.path.join(self.log_dir, "replay")
+        obs_dims = tuple(self.get_obs_size([name]) for name in self.actor_cfg["obs"])
+        action_dims = tuple(
+            self.get_action_size([name]) for name in self.actor_cfg["actions"]
+        )
+        return TransitionRecorder(
+            num_envs=self.env.num_envs,
+            obs_names=tuple(self.actor_cfg["obs"]),
+            obs_dims=obs_dims,
+            action_names=tuple(self.actor_cfg["actions"]),
+            action_dims=action_dims,
+            noise=self.actor_cfg["noise"],
+            scales=self.env.scales,
+            device=self.device,
+            output_dir=output_dir,
+            capacity=int(replay_cfg["capacity"]),
+            snapshot_interval=int(replay_cfg["snapshot_interval"]),
+            seed=int(replay_cfg["seed"]),
+            task_name=str(replay_cfg["task_name"]),
+            backend=str(replay_cfg["backend"]),
+            source_revision=str(replay_cfg["source_revision"]),
+            log_dir=self.log_dir,
+            actor_cfg=self.actor_cfg,
+            env_cfg=class_to_dict(self.env.cfg),
+            runner_cfg=self.cfg,
+            episode_length_s=float(self.env.max_episode_length_s),
+            n_policy_steps=n_policy_steps,
+            control_dt=float(self.env.dt),
         )
 
     def learn(self, states_to_log_dict=None):
@@ -56,8 +100,16 @@ class OnPolicyRunner(BaseRunner):
         )
 
         # burn in observation normalization.
+        burn_in_ran = False
         if self.actor_cfg["normalize_obs"] or self.critic_cfg["normalize_obs"]:
             self.burn_in_normalization()
+            burn_in_ran = True
+
+        self.recorder = self._make_recorder(n_policy_steps)
+        # burn_in_normalization resets the environments, so actor_obs above is
+        # stale for the first post-burn-in action. Exclude that transition from
+        # replay instead of changing PPO's established behavior.
+        self._skip_next_replay = burn_in_ran
 
         logger.tic("runtime")
         for self.it in range(self.it + 1, tot_iter + 1):
@@ -73,7 +125,9 @@ class OnPolicyRunner(BaseRunner):
             # * Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
+                    policy_actor_obs = actor_obs
                     actions = self.alg.act(actor_obs)
+                    policy_actions = actions
                     self.set_actions(
                         self.actor_cfg["actions"],
                         actions,
@@ -91,6 +145,12 @@ class OnPolicyRunner(BaseRunner):
                         self.env.step()
                         # put reward integration here
                         self.update_rewards_dict(rewards_dict, step)
+
+                    if self.recorder is not None:
+                        pre_reset_clean_obs = self.get_obs(self.actor_cfg["obs"])
+                        pre_reset_height = self.env.base_height.clone()
+                        terminated = self.get_terminated()
+                        timed_out = self.get_timed_out()
 
                     self.reset_envs()
 
@@ -114,6 +174,21 @@ class OnPolicyRunner(BaseRunner):
                     )
                     storage.add_transitions(transition)
 
+                    if self.recorder is not None:
+                        if self._skip_next_replay:
+                            self._skip_next_replay = False
+                        else:
+                            self.recorder.append(
+                                actor_obs=policy_actor_obs,
+                                action=policy_actions,
+                                post_reset_obs=actor_obs,
+                                pre_reset_clean_obs=pre_reset_clean_obs,
+                                successor_height_m=pre_reset_height,
+                                terminated=terminated,
+                                timed_out=timed_out,
+                                behavior_iteration=self.it,
+                            )
+
                     logger.log_rewards(rewards_dict.sum(dim=0))
                     logger.log_rewards({"total_rewards": total_rewards})
                     logger.finish_step(self.env.timed_out | self.env.terminated)
@@ -132,6 +207,16 @@ class OnPolicyRunner(BaseRunner):
 
             if self.it % self.save_interval == 0:
                 self.save()
+
+            if (
+                self.recorder is not None
+                and self.recorder.snapshot_interval > 0
+                and self.it % self.recorder.snapshot_interval == 0
+            ):
+                self.recorder.snapshot(self.it)
+
+        if self.recorder is not None and self.recorder.valid_count > 0:
+            self.recorder.snapshot(self.it)
         self.save()
 
     @torch.no_grad

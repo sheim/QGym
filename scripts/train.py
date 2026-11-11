@@ -8,11 +8,27 @@ The selected backend is MuJoCo CPU/Warp or optional VSim.
 """
 
 import argparse
+import subprocess
+from dataclasses import asdict
 
+from gym import GYM_ROOT_DIR
 from gym.utils.task_registry import task_registry
 from gym.utils.helpers import randomize_episode_counters, set_seed
 from gym.utils.logging_and_saving import local_code_save_helper
 from gym.utils.logging_and_saving import wandb_singleton
+from learning.offline.contracts import RecorderConfig
+
+
+def _source_revision():
+    result = subprocess.run(
+        ["git", "-C", GYM_ROOT_DIR, "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return "unknown"
+    return result.stdout.strip() or "unknown"
 
 
 def make_train_parser():
@@ -82,6 +98,37 @@ def make_train_parser():
         help="Load environment and runner configs saved with the selected run.",
     )
     parser.add_argument("--headless", action="store_true", default=False)
+    # replay recording
+    parser.add_argument(
+        "--replay_record",
+        action="store_true",
+        default=False,
+        help="Record training transitions into a bounded replay buffer.",
+    )
+    parser.add_argument(
+        "--replay_capacity",
+        type=int,
+        default=1_000_000,
+        help="Maximum transitions retained in the replay ring.",
+    )
+    parser.add_argument(
+        "--replay_snapshot_interval",
+        type=int,
+        default=0,
+        help="Snapshot every N iterations; 0 snapshots only at the end.",
+    )
+    parser.add_argument(
+        "--replay_output_dir",
+        type=str,
+        default=None,
+        help="Replay snapshot root (default: <log_dir>/replay).",
+    )
+    parser.add_argument(
+        "--replay_seed",
+        type=int,
+        default=0,
+        help="Seed for recording-only observation noise.",
+    )
     # wandb
     parser.add_argument("--disable_wandb", action="store_true", default=False)
     parser.add_argument("--wandb_project", type=str, default=None)
@@ -144,6 +191,18 @@ def setup(args=None, env_cfg=None, train_cfg=None):
         train_cfg.runner.checkpoint = args.checkpoint
 
     train_cfg.runner.device = args.device
+    train_cfg.runner.replay = asdict(
+        RecorderConfig(
+            enabled=args.replay_record,
+            capacity=args.replay_capacity,
+            snapshot_interval=args.replay_snapshot_interval,
+            output_dir=args.replay_output_dir or "",
+            seed=args.replay_seed,
+            task_name=args.task,
+            backend=args.backend,
+            source_revision=_source_revision(),
+        )
+    )
 
     # Compute sim_dt, decimation, discount rates
     task_registry.convert_frequencies_to_params(env_cfg, train_cfg)

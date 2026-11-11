@@ -37,6 +37,32 @@ See the [limitations and validation scope](../../../genAI_skills/README_MUJOCO.m
 A skip for unavailable CUDA, Warp, VSim, or a license is not proof for that
 backend. Record what executed.
 
+## Offline replay and fixed-policy Q evidence
+
+- Fixed-state variance uses `scripts/evaluate_height_q_variance.py` and
+  `test_fixed_state_variance.py`. Require saved insertion state/candidates,
+  native restore/replication fidelity gates, controller/domain history, and
+  raw `[batch, repeat, state, candidate]` returns. Keep shared-seed covariance
+  when estimating candidate contrasts. Do not derive noise ceilings from noisy
+  estimated means, sort away pairing, or threshold averaged binary rewards.
+
+- `tests/unit_tests/test_offline_replay.py` protects ring ordering and overwrite,
+  pre-reset successors, independent flags, recording-RNG isolation, immutable
+  snapshots, schema validation, height relabeling, nested subsets, and mixture
+  deduplication.
+- `tests/unit_tests/test_height_fqe.py` protects continuing-return targets,
+  timeout bootstrapping, terminal absorbing failure and flag precedence, Q
+  artifact round-trip, frozen actor loading, and finite-rollout tail bounds.
+  These are analytic/fixture oracles, not robot Q-quality evidence.
+- A real snapshot/FQE/evaluation smoke verifies wiring only. For a learning
+  claim, run independent simulator continuations, candidate first actions,
+  nested fractions, multiple seeds, and threshold false-acceptance analysis.
+  Report observation-only hidden-state limitations and the omitted continuing
+  tail; do not make decreasing error a hard assertion.
+- Recording must not advance training RNG. Snapshot publication must be atomic;
+  an interrupted temporary directory is not a dataset. Do not silently delete
+  prior experiment snapshots.
+
 ## Match evidence to the change
 
 - Backend metadata/state/reset: shared contract tests plus backend-specific

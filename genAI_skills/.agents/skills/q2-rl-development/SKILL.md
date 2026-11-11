@@ -71,6 +71,27 @@ size alone does not make two PPO experiments equivalent.
 Discount and GAE values may be derived from physical horizons and control dt.
 Re-run frequency conversion rather than editing derived values.
 
+## Offline fixed-policy value estimation
+
+- Distinguish fixed-policy evaluation from policy improvement. FQE estimates
+  `Q^{pi}` for a frozen policy; IQL/CQL-style updates target a new policy.
+- Fix the continuation policy explicitly: checkpoint, stochastic action
+  sampling, observation-noise convention, action units, discount, and terminal
+  semantics. A pooled behavior dataset does not define a continuation policy.
+- Relabel only from recorded measurements that actually exist. Height, pitch/roll,
+  and joint-velocity rewards can be derived from clean task state; recording only
+  actor observations is not enough for arbitrary future rewards.
+- Keep privileged measurements out of runtime Q inputs unless they exist at
+  deployment. A label may use simulator ground truth while the critic uses only
+  actor-observable fields; report the resulting partial-observability limitation.
+- Handle true termination and timeout separately. A continuing-return Q needs an
+  explicit absorbing-failure convention, and a finite rollout omits a discounted
+  tail that must be reported.
+- Treat decreasing Q error with dataset size as a hypothesis. Evaluate nested
+  subsets, multiple seeds, independent initial states, candidate actions, and
+  threshold false acceptance; aggregate error alone does not establish filter
+  suitability.
+
 ## Evidence workflow
 
 1. State the proposed mechanism and a result that would falsify it.

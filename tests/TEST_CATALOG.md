@@ -9,6 +9,28 @@ limitations and evidence boundaries are recorded in
 
 ## Reading the review
 
+`test_fixed_state_variance.py` uses analytic shared-noise returns to verify
+state-major candidate indexing, covariance-preserving paired contrasts and
+repeated-batch variance, observed terminal rewards plus absorbing tails, and a
+fake environment for paired commands/pushes. Native Warp snapshot fidelity is
+separately gated by `scripts/evaluate_height_q_variance.py`; portable tests alone
+do not establish restore fidelity or critic quality.
+
+The extension also checks saved-world selection across flattened state, model and
+history fields; lane/candidate axes; reproducible Gaussian scaling with no clipping;
+and distinct lane/continuation draws with candidate sharing. The native gates in
+`scripts/extend_height_q_variance.py` additionally check all 82 saved fields,
+source-to-lane next-step fidelity and actual command/push pairing.
+
+`test_persistent_intervention.py` covers the sample-eight controller contract with
+an analytic policy/critic: candidate0 has exactly the nominal stochastic marginal,
+lanes share one sample stream but produce distinct draws, batched Q selection equals
+per-candidate prediction, and a fake environment verifies per-decision selection,
+preterminal denominators, absorbing tails and masks. The simulator experiment in
+`scripts/evaluate_height_q_persistent.py` is separately gated (native restore,
+CPU/GPU Q agreement, identical-controller short control); portable tests establish
+neither restore fidelity nor policy quality.
+
 **Keep** means the test protects a supported behavior. **Consolidate** and
 **strengthen** are future review work, not authorization to delete the current
 coverage. A replacement must still detect the named counterexample on the same
@@ -117,6 +139,8 @@ smoothness and symmetric yaw-error rewards against hand-calculated values.
 | [test_usecase.py](../learning/utils/PBRS/test_usecase.py) | Potential-based shaping produces known rewards across pre/post-step potentials. Small real interface example with numeric expectations. | **Keep.** It is not a substitute for PPO/GAE return tests. |
 | [test_logger.py](../learning/utils/logger/test_logger.py) | Finished-episode and iteration values aggregate correctly and counters clear. Controlled logger inputs. | **Keep.** Check global logger isolation when introducing real runner tests. |
 | [test_utils.py](../learning/utils/tests/test_utils.py) | Horizon conversion and zero-weight reward removal. Small hand-calculated utility examples. | **Keep; combine adjacent tiny cases if useful.** Preserve physical-time discount semantics under frequency changes. |
+| [test_offline_replay.py](unit_tests/test_offline_replay.py) | Bounded replay ring ordering/overwrite, pre-reset successor and independent flags, recording-RNG isolation, immutable snapshot publication, schema validation, height relabeling, nested transition/episode subsets, and mixture deduplication. Hand-built transition batches and deterministic fixtures. | **Keep.** It protects the replay contract, not simulator rollout or Q accuracy. Add a real-run snapshot smoke outside the portable gate. |
+| [test_height_fqe.py](unit_tests/test_height_fqe.py) | Fixed-policy FQE targets for continuing reward, timeout bootstrapping, terminal absorbing failure and flag precedence; Q artifact round-trip; frozen actor loading and non-training; finite-rollout tail bounds; batched-evaluator CLI defaults that pin `insert_step = 0`. Analytic zero-Q and a fake height/termination environment. | **Keep.** It does not establish learned-Q accuracy or robot behavior; evaluate candidate actions and thresholds on fresh simulator continuations separately. |
 
 ## Deployment, bootstrap, and threading
 
