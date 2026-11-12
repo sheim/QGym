@@ -26,10 +26,31 @@ source-to-lane next-step fidelity and actual command/push pairing.
 an analytic policy/critic: candidate0 has exactly the nominal stochastic marginal,
 lanes share one sample stream but produce distinct draws, batched Q selection equals
 per-candidate prediction, and a fake environment verifies per-decision selection,
-preterminal denominators, absorbing tails and masks. The simulator experiment in
-`scripts/evaluate_height_q_persistent.py` is separately gated (native restore,
-CPU/GPU Q agreement, identical-controller short control); portable tests establish
-neither restore fidelity nor policy quality.
+preterminal denominators, absorbing tails and masks. It also covers the
+threshold-rejection rule: first feasible stochastic draw in fixed order (not
+highest-Q or closest-to-mean), max-Q fallback, deterministic ties, attempt
+accounting, and short exact negative controls (permissive rejection equals plain,
+restrictive rejection equals the eight-way best, permissive distance selection
+equals the mean). The simulator experiments in
+`scripts/evaluate_height_q_persistent.py` and
+`scripts/evaluate_height_q_rejection.py` are separately gated (native restore,
+CPU/GPU Q agreement, short identical-controller controls, and an actual
+short-horizon controller smoke); portable tests establish neither restore
+fidelity nor policy quality.
+
+`test_reward_tradeoff.py` protects the exact post-step training-reward dispatch
+used by the original-reward tradeoff experiment: nonzero-weight filtering,
+ordinary-versus-termination masks, dt scaling, terminal-only termination term,
+zero reward after terminal, per-term discounted sums equal to the reported
+original return, timeout failure, and bitwise parity with the real
+`OnPolicyRunner.update_rewards_dict` on a synthetic environment. It also covers
+the dual-objective rollout on a fake environment (original return has no
+absorbing failure tail while the height return keeps it) and the portable
+Student-t/state-bootstrap helpers. `scripts/evaluate_height_q_reward_tradeoff.py`
+is separately gated on native Warp restore fidelity, CPU/GPU Q agreement, a real
+environment-step reward-dispatch parity check, and short H5 height/selection
+parity against the existing persistent rollout. Portable tests do not establish
+restore fidelity, Q quality, or a state population.
 
 **Keep** means the test protects a supported behavior. **Consolidate** and
 **strengthen** are future review work, not authorization to delete the current
@@ -141,6 +162,8 @@ smoothness and symmetric yaw-error rewards against hand-calculated values.
 | [test_utils.py](../learning/utils/tests/test_utils.py) | Horizon conversion and zero-weight reward removal. Small hand-calculated utility examples. | **Keep; combine adjacent tiny cases if useful.** Preserve physical-time discount semantics under frequency changes. |
 | [test_offline_replay.py](unit_tests/test_offline_replay.py) | Bounded replay ring ordering/overwrite, pre-reset successor and independent flags, recording-RNG isolation, immutable snapshot publication, schema validation, height relabeling, nested transition/episode subsets, and mixture deduplication. Hand-built transition batches and deterministic fixtures. | **Keep.** It protects the replay contract, not simulator rollout or Q accuracy. Add a real-run snapshot smoke outside the portable gate. |
 | [test_height_fqe.py](unit_tests/test_height_fqe.py) | Fixed-policy FQE targets for continuing reward, timeout bootstrapping, terminal absorbing failure and flag precedence; Q artifact round-trip; frozen actor loading and non-training; finite-rollout tail bounds; batched-evaluator CLI defaults that pin `insert_step = 0`. Analytic zero-Q and a fake height/termination environment. | **Keep.** It does not establish learned-Q accuracy or robot behavior; evaluate candidate actions and thresholds on fresh simulator continuations separately. |
+| [test_reward_tradeoff.py](unit_tests/test_reward_tradeoff.py) | Exact training-reward dispatch (nonzero filtering, ordinary/termination masks, dt scale, terminal-only termination term, zero after terminal, per-term sum), bitwise parity with `OnPolicyRunner.update_rewards_dict`, dual-objective rollout without an original absorbing tail, timeout failure, and portable paired-t/state-bootstrap helpers. | **Keep.** The simulator reward-parity and restore gates live in `scripts/evaluate_height_q_reward_tradeoff.py`; this test does not establish native fidelity or a state population. |
+| [test_height_q_playback.py](unit_tests/test_height_q_playback.py) | Single-environment playback controller: eight stochastic max-Q draws, rejection first-feasible/max-Q fallback, mean excluded, shared sample order, finite threshold and mode validation; pre-simulator checkpoint hash/config-fingerprint/actor/noise/scale/normalization/privileged-input gates; instance-local command-resampling hold; auto-reset union masks and zeroing. Analytic policy/critic and fake task tensors. | **Keep.** Protects wiring and identity, not Q accuracy or policy quality. Manual CPU viewer/keyboard/thread behavior and the real artifact smoke remain external evidence. |
 
 ## Deployment, bootstrap, and threading
 
@@ -156,7 +179,7 @@ smoothness and symmetric yaw-error rewards against hand-calculated values.
 
 | File | Protected behavior and oracle | Disposition and overlap |
 |---|---|---|
-| [test_teleop_keyboard.py](unit_tests/test_teleop_keyboard.py) | Key bindings, held-key edges, reset/exit behavior, command axes/limits, and viewer callback/UI wiring. Event fakes and explicit command changes. | **Consolidate later** repeated declaration/default cases. Keep key-edge and axis behavior. Replace mandatory-MuJoCo import skips separately. |
+| [test_teleop_keyboard.py](unit_tests/test_teleop_keyboard.py) | Key bindings, held-key edges, reset/exit behavior, command axes/limits, viewer callback/UI wiring, default forward seeding, optional zero-initial/zero-after-reset/preserved-resampling options, and deferred UI-thread event draining. Event fakes and explicit command changes. | **Consolidate later** repeated declaration/default cases. Keep key-edge, axis, and default/manual-mode behavior. Replace mandatory-MuJoCo import skips separately. |
 | [test_vsim_command_visualizer.py](unit_tests/test_vsim_command_visualizer.py) | Yaw/arrow/arc geometry, robot-heading transforms, visibility, and drawing-hook wiring. Analytic geometry and lightweight fake viewer. | **Consolidate later** equivalent geometric examples, not all viewer tests. Names are VSim-specific but pure geometry requires no license. |
 | [test_math.py](../gym/utils/math/test_math.py) | Angle wrapping, bounded random sampling, and exponential-average update. Hand-calculated and range invariants. | **Keep.** Random-output dimensions alone are weak; bounds and numerical behavior are the useful assertions. |
 

@@ -339,6 +339,60 @@ and ambiguous cases. Pairwise candidate-ranking accuracy is reported per trial.
 Aggregate Q error alone is not sufficient evidence for a future threshold filter;
 near-threshold and candidate-action accuracy matter more.
 
+## Intervened playback
+
+`scripts/play_height_q.py` loads the artifact's frozen actor and applies one
+per-decision intervention on MuJoCo CPU with exactly one environment:
+
+- `maxq`: eight stochastic policy draws, execute the highest-Q draw;
+- `rejection --threshold c`: eight stochastic draws in fixed order, execute the
+  first draw with `Q >= c`, otherwise execute the highest-Q draw.
+
+The exact policy mean is never a candidate in either mode. Rejection delegates
+to `sample_rejection_candidates` and `select_rejection_action`; max-Q delegates
+to `sample_candidates` and `select_action`. Do not substitute the deterministic
+mean-plus-eight closest-mean controller (`rollout_threshold`) here.
+
+```bash
+uv run --frozen python scripts/play_height_q.py \
+  --task go2trot \
+  --artifact /tmp/opencode/height-q-exp-20261110-final-0p05-fair-v1/100pct \
+  --checkpoint logs/go2trot/Nov10_10-36-22_gpu-final-600-trot-hist-20261110/model_600.pt \
+  --mode rejection --threshold -1.776 --device cpu --auto_reset off
+```
+
+Startup and every reset end at zero commands. The task constructor runs its
+normal reset before the first policy action, then playback zeroes commands.
+`R` calls the normal `env.reset()` and zeroes commands. Auto-reset is off by
+default; `termination`, `timeout`, and `both` call `_reset_idx` on the selected
+mask and then zero commands. No direct backend state writes or bypassed task
+transforms are used. Commands are held until a key event: playback disables
+task command resampling with an instance-local override and leaves the shared
+task/teleop defaults unchanged. The default episode horizon is the task's 5 s,
+not `play.py`'s 50 s. Push disturbances, observation noise, and the camera come
+from the task config; `--no-push_robots` disables pushes only for playback.
+
+Before simulator construction, playback requires:
+
+- the checkpoint file hash to equal `policy_spec.checkpoint_sha256`;
+- the recorded dataset `config_fingerprint` to equal the current task config
+  after `convert_frequencies_to_params` and before playback overrides;
+- matching observation/action names and dimensions;
+- matching actor noise, task scaling, control dt, and `normalize_obs == false`;
+- `n_policy_steps == 1`, standard stochastic actor, and `brg_policy_units`;
+- no privileged Q inputs such as `base_height`, `base_lin_vel`, contacts, or
+  root/body state.
+
+Failures are explicit; there is no fallback artifact, threshold, or backend.
+After construction, the live task tensor widths are checked again. Startup and
+final summaries report the selected mode/threshold, fingerprint prefix, seed,
+push state, checkpoint, resets, fallbacks, and final commands.
+
+`scripts/play_height_q.py --headless --steps N` is a finite wiring smoke. It
+does not establish Q accuracy or policy quality, and it cannot validate the
+interactive viewer, keyboard, or thread behavior. Those require manual CPU
+viewer validation.
+
 ## Evidence boundaries
 
 - The Q uses deployable actor observations. It can be biased when hidden physical
@@ -365,3 +419,11 @@ On 2026-11-10, a one-iteration CPU `go2trot` run with 32 environments and a
 subsets produced loadable Q artifacts. A one-trial, three-candidate, five-step
 CPU evaluation produced a JSON report. These results verify the software path
 only; they are not a Q-accuracy or policy-quality result.
+
+On 2026-11-11, `scripts/play_height_q.py` ran the original fair-100 artifact and
+`model_600` on MuJoCo CPU for five headless max-Q steps (`steps=5`, `resets=0`,
+zero final command) and five rejection steps (`threshold=-1.776`, `fallbacks=2`).
+An `--original_cfg` run matched the saved run config, and a 260-step
+`--auto_reset both` run reset once at the 250-step/5 s timeout. These are wiring
+and identity smokes, not Q-accuracy, policy-quality, or viewer-validation
+evidence; manual CPU viewer validation remains outstanding.

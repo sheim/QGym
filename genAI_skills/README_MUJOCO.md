@@ -256,6 +256,48 @@ The experiment defaults to the task's current `experiment_name`; use
 such as `--num_envs`, `--seed`, or `--max_iterations`, are applied after the
 saved configs are loaded.
 
+### Intervened height-Q playback
+
+`scripts/play_height_q.py` plays one frozen PPO actor with the original
+unprivileged height-Q artifact on MuJoCo CPU. It takes eight stochastic policy
+draws per control step and executes either the highest-Q draw (`--mode maxq`)
+or the first draw with `Q >= c`, falling back to max-Q (`--mode rejection
+--threshold c`). The policy mean is not a candidate. The checkpoint hash, task
+config fingerprint, actor observation/action contract, noise, scales, and
+normalization flags must match the artifact before the simulator is built.
+
+```bash
+# Default max-Q intervention, one CPU environment.
+uv run --frozen python scripts/play_height_q.py \
+  --task go2trot \
+  --artifact /tmp/opencode/height-q-exp-20261110-final-0p05-fair-v1/100pct \
+  --checkpoint logs/go2trot/Nov10_10-36-22_gpu-final-600-trot-hist-20261110/model_600.pt
+
+# Threshold rejection with a finite threshold.
+uv run --frozen python scripts/play_height_q.py \
+  --task go2trot --artifact <artifact> --mode rejection --threshold -1.776
+
+# Finite CPU headless wiring smoke.
+uv run --frozen python scripts/play_height_q.py \
+  --task go2trot --artifact <artifact> --mode maxq \
+  --device cpu --headless --steps 5 --seed 0
+```
+
+Playback starts at zero commands. `I/K` are forward/back, `J/L` strafe,
+`N/M` yaw, and `R` performs the normal task reset. Commands are held until the
+next key event; task command resampling is disabled for this process only.
+`R` and every enabled auto-reset zero commands before the next policy action.
+`--auto_reset off` is the default and leaves a fallen or timed-out robot in the
+simulator; `termination`, `timeout`, and `both` optionally use the normal task
+reset path. The task timeout, push disturbances, observation noise, and camera
+come from the selected task config. `--no-push_robots` is a playback-only
+escape hatch. `--device cuda`, `--backend vsim`, and `--num_envs` other than one
+are rejected; Warp/VSim/hardware playback is not implemented.
+
+The headless command proves wiring and artifact identity only. It does not
+establish Q accuracy, policy improvement, or manual viewer behavior. Validate
+the viewer, keys, zero command hold, resets, and terminal interaction by hand.
+
 The MuJoCo CPU viewer paces simulation to real time by default: one simulated
 second takes at least one wall-clock second, including policy and rendering
 work. It accounts for all physics substeps between frames and resumes without

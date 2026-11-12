@@ -229,6 +229,91 @@ def test_commands_clamp_at_limits():
     assert env.commands[0, 0].item() >= cmds.max_vel_backward - 1e-6
 
 
+# ── Manual playback options (defaults unchanged) ─────────────────────────
+
+
+class CommandCfgEnv(FakeEnv):
+    def __init__(self):
+        super().__init__()
+        self.cfg.commands = SimpleNamespace(resampling_time=12.5)
+
+    def reset(self):
+        super().reset()
+        self.commands.fill_(1.0)
+
+
+def test_default_teleop_still_seeds_forward_and_overwrites_resampling_time():
+    env = CommandCfgEnv()
+    TeleopCommands(env)
+    assert env.commands[0].tolist() == [1.0, 0.0, 0.0]
+    assert env.cfg.commands.resampling_time == env.max_episode_length_s + 1
+
+
+def test_manual_initial_commands_start_at_zero_without_resampling_override():
+    env = CommandCfgEnv()
+    TeleopCommands(
+        env,
+        initial_commands=(0.0, 0.0, 0.0),
+        reset_commands=(0.0, 0.0, 0.0),
+        preserve_resampling_time=True,
+    )
+    assert env.commands.eq(0).all()
+    assert env.cfg.commands.resampling_time == 12.5
+
+
+def test_reset_commands_zero_after_normal_reset():
+    env = CommandCfgEnv()
+    cmds = TeleopCommands(
+        env,
+        initial_commands=(0.0, 0.0, 0.0),
+        reset_commands=(0.0, 0.0, 0.0),
+        preserve_resampling_time=True,
+    )
+    env.commands[0, 0] = 2.0
+    cmds.apply("reset")
+    assert env.reset_count == 1
+    assert env.commands.eq(0).all()
+
+
+def test_default_reset_keeps_current_commands():
+    env = CommandCfgEnv()
+    cmds = TeleopCommands(env)
+    cmds.apply("reset")
+    assert env.commands[0].tolist() == [1.0, 1.0, 1.0]
+
+
+def test_deferred_mujoco_keys_are_drained_on_the_task_thread():
+    env = FakeEnv()
+    cmds = TeleopCommands(env, initial_commands=(0.0, 0.0, 0.0))
+    ui = MujocoKeyboardInterface(env, commands=cmds, deferred=True)
+
+    before = env.commands.clone()
+    ui._on_key(ord(BINDINGS["forward"]))
+    assert torch.equal(env.commands, before)
+    assert ui.drain() == ("forward",)
+    assert ui.drain() == ()
+
+    for action in ("forward",):
+        cmds.apply(action)
+    assert env.commands[0, 0].item() == cmds.increment_x
+
+
+def test_deferred_reset_is_applied_by_the_draining_thread():
+    env = CommandCfgEnv()
+    cmds = TeleopCommands(
+        env,
+        initial_commands=(0.0, 0.0, 0.0),
+        reset_commands=(0.0, 0.0, 0.0),
+    )
+    ui = MujocoKeyboardInterface(env, commands=cmds, deferred=True)
+    ui._on_key(ord(BINDINGS["reset"]))
+    assert env.reset_count == 0
+    for action in ui.drain():
+        cmds.apply(action)
+    assert env.reset_count == 1
+    assert env.commands.eq(0).all()
+
+
 # ── Viewer UI panels (MuJoCo) ────────────────────────────────────────────
 
 

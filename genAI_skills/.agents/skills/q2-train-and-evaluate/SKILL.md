@@ -99,6 +99,15 @@ supported; orphaned sweep configurations were retired.
   and repeated stochastic continuations. Threshold reports include false
   acceptance/rejection and ambiguity; ranking is reported separately from
   aggregate error.
+- `scripts/play_height_q.py` is the single-environment MuJoCo CPU playback path
+  for a frozen actor plus height Q. `--mode maxq` executes the best of eight
+  stochastic draws; `--mode rejection --threshold c` executes the first draw
+  with `Q >= c`, falling back to max-Q. The mean is not a candidate. Playback
+  validates the checkpoint hash, config fingerprint, actor/noise/scale contract,
+  and unprivileged Q inputs before building the simulator. It starts and resets
+  at zero commands, holds keyboard commands (no task resampling), and leaves
+  auto-reset off by default. A `--headless --steps N` run is a wiring smoke, not
+  Q/policy evidence; viewer/keyboard behavior needs manual CPU validation.
 - See `docs/offline_height_q.md` for snapshot/artifact schemas, terminal versus
   timeout semantics, absorbing-failure returns, and tail uncertainty. These
   artifacts use actor observations only and do not import CORL.

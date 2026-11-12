@@ -64,9 +64,22 @@ class TeleopCommands:
     """Velocity-command limits, increments, and the effect of each action.
 
     Engine-agnostic: it only touches ``env.commands`` and the reset path.
+
+    The optional arguments keep the historical playback defaults when omitted:
+    seed forward velocity, leave commands untouched after a reset, and replace
+    the task resampling time with the episode horizon plus one second. Manual
+    playback can instead seed zero, restore zero after every reset, and leave
+    the task resampling setting unchanged.
     """
 
-    def __init__(self, env):
+    def __init__(
+        self,
+        env,
+        *,
+        initial_commands=None,
+        reset_commands=None,
+        preserve_resampling_time=False,
+    ):
         self.env = env
 
         self.max_vel_forward = 4.0
@@ -79,9 +92,37 @@ class TeleopCommands:
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
 
+        self.initial_commands = (
+            None
+            if initial_commands is None
+            else torch.as_tensor(
+                initial_commands,
+                dtype=env.commands.dtype,
+                device=env.commands.device,
+            )
+        )
+        self.reset_commands = (
+            None
+            if reset_commands is None
+            else torch.as_tensor(
+                reset_commands,
+                dtype=env.commands.dtype,
+                device=env.commands.device,
+            )
+        )
+        for name, commands in (
+            ("initial_commands", self.initial_commands),
+            ("reset_commands", self.reset_commands),
+        ):
+            if commands is not None and commands.numel() > env.commands.shape[1]:
+                raise ValueError(f"{name} is wider than the environment commands")
+
         env.commands[:] = 0.0
-        env.commands[:, 0] = 1.0  # seed forward velocity so motion is visible
-        if hasattr(env.cfg, "commands"):
+        if initial_commands is None:
+            env.commands[:, 0] = 1.0  # seed forward velocity so motion is visible
+        else:
+            env.commands[:, : self.initial_commands.numel()] = self.initial_commands
+        if hasattr(env.cfg, "commands") and not preserve_resampling_time:
             env.cfg.commands.resampling_time = env.max_episode_length_s + 1
 
     def apply(self, action: str) -> None:
@@ -104,6 +145,9 @@ class TeleopCommands:
         elif action == "reset":
             self.env.timed_out[:] = True
             self.env.reset()
+            if self.reset_commands is not None:
+                c[:] = 0.0
+                c[:, : self.reset_commands.numel()] = self.reset_commands
         else:
             raise ValueError(f"unknown teleop action {action!r}")
 

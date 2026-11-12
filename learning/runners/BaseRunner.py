@@ -1,6 +1,7 @@
 import torch
 from learning.algorithms import get_algorithm_class
 from learning.modules import Actor, Critic, SmoothActor
+from learning.offline.training_reward import reward_functions
 from learning.utils import remove_zero_weighted_rewards
 
 
@@ -19,11 +20,7 @@ class BaseRunner:
         self._set_up_alg()
 
     def setup_reward_functions(self):
-        self.reward_functions = {
-            method.replace("_reward_", ""): getattr(self.env, method)
-            for method in dir(self.env)
-            if callable(getattr(self.env, method)) and method.startswith("_reward_")
-        }
+        self.reward_functions = reward_functions(self.env)
 
     def _set_up_alg(self):
         num_actor_obs = self.get_obs_size(self.actor_cfg["obs"])
