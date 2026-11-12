@@ -8,6 +8,17 @@ RL training framework for legged robots. Physics backends:
 
 ## Quick Start
 
+### CORL artifact smoke example
+
+The optional source submodule `thirdparty/CORL` contains a dependency-light IQL
+example. It uses the existing Torch/NumPy environment and exports a synthetic
+policy artifact that `scripts/check_corl_artifact.py` loads without importing
+CORL, D4RL, or OpenAI Gym. See
+[`docs/thirdparty/CORL/install.md`](../docs/thirdparty/CORL/install.md) for setup,
+commands, artifact details, and unsupported paths. This validates updates and cross-project inference only;
+robot-data training and robot-policy playback are not implemented by this smoke
+example. Its dependencies require no changes to `pyproject.toml` or `uv.lock`.
+
 ### Fresh setup
 
 The repository uses [uv](https://docs.astral.sh/uv/) exclusively for Python

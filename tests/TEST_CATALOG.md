@@ -52,6 +52,12 @@ environment-step reward-dispatch parity check, and short H5 height/selection
 parity against the existing persistent rollout. Portable tests do not establish
 restore fidelity, Q quality, or a state population.
 
+`learning/test_corl_artifact.py` protects the CORL artifact consumer's input
+normalization, output scaling, and batch-independent inference using an analytic
+one-layer policy. The separate CORL synthetic example and BRG check script
+provide a differential inference smoke check; neither establishes robot policy
+quality.
+
 **Keep** means the test protects a supported behavior. **Consolidate** and
 **strengthen** are future review work, not authorization to delete the current
 coverage. A replacement must still detect the named counterexample on the same

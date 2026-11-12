@@ -53,6 +53,16 @@ fixes should remain separately reviewable.
 
 ## Environment
 
+CORL is an optional source submodule at `thirdparty/CORL`, with its own Git
+history and development branch matching BRG's branch. See
+[`docs/thirdparty/CORL/install.md`](../docs/thirdparty/CORL/install.md) for setup
+and supported scope. The adapted IQL artifact smoke path uses existing Torch
+and NumPy; do not install upstream CORL requirements into BRG indiscriminately.
+BRG consumes weights and metadata without importing CORL or OpenAI Gym. Keep
+the current package names; namespace migration is not required for this path.
+Commit/publish submodule changes separately before recording their revision in
+BRG; a submodule pointer does not capture uncommitted adaptations.
+
 Use uv to manage the checked-in `.venv` and lockfile. `pyproject.toml` is the
 only dependency and package source of truth; do not add parallel pip setup or
 requirements files.

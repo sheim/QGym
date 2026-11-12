@@ -1,0 +1,3 @@
+[submodule "thirdparty/CORL"]
+	path = thirdparty/CORL
+	url = https://github.com/corl-team/CORL.git
