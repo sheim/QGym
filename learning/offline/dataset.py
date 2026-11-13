@@ -12,11 +12,13 @@ import torch
 
 from .contracts import (
     REPLAY_FORMAT,
+    REPLAY_FORMAT_V2,
     SCHEMA_VERSION,
     TRANSITION_FIELDS,
     jsonable,
     replay_config_fingerprint,
 )
+from .replay_fields import ALL_REPLAY_FIELDS, REWARD
 
 
 @dataclass
@@ -56,6 +58,50 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def _resolve_recorded_fields(
+    manifest: dict, data: dict
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Validate the declared field set and return (extra_fields, all_fields).
+
+    ``brg-offline-replay-v1`` snapshots predate selectable features and must
+    carry exactly the core fields. ``brg-offline-replay-v2`` snapshots declare
+    their extra fields, which must match the stored tensors exactly.
+    """
+    _require(
+        manifest.get("schema_version") == SCHEMA_VERSION,
+        "unsupported replay schema version",
+    )
+    fmt = manifest.get("format")
+    if fmt == REPLAY_FORMAT:
+        _require(
+            set(data.keys()) == set(TRANSITION_FIELDS),
+            "snapshot fields do not match the replay contract",
+        )
+        return (), TRANSITION_FIELDS
+    _require(fmt == REPLAY_FORMAT_V2, "unsupported replay format")
+    extra_fields = tuple(str(name) for name in manifest.get("extra_fields", ()))
+    _require(
+        len(set(extra_fields)) == len(extra_fields),
+        "manifest repeats an extra field name",
+    )
+    unknown = [name for name in extra_fields if name not in ALL_REPLAY_FIELDS]
+    _require(not unknown, f"manifest declares unsupported extra fields: {unknown}")
+    recorded_fields = TRANSITION_FIELDS + extra_fields
+    _require(
+        tuple(manifest.get("recorded_fields", ())) == recorded_fields,
+        "recorded_fields is inconsistent with the core and extra fields",
+    )
+    _require(
+        set(data.keys()) == set(recorded_fields),
+        "snapshot fields do not match the declared field set",
+    )
+    _require(
+        tuple(manifest.get("core_fields", TRANSITION_FIELDS)) == TRANSITION_FIELDS,
+        "manifest core_fields do not match the replay contract",
+    )
+    return extra_fields, recorded_fields
+
+
 def load_snapshot(source: str | Path) -> TransitionDataset:
     path = Path(source)
     manifest_path = path / "manifest.json"
@@ -63,17 +109,9 @@ def load_snapshot(source: str | Path) -> TransitionDataset:
     if not manifest_path.is_file() or not data_path.is_file():
         raise FileNotFoundError(f"snapshot is incomplete or missing: {path}")
     manifest = json.loads(manifest_path.read_text())
-    _require(manifest.get("format") == REPLAY_FORMAT, "unsupported replay format")
-    _require(
-        manifest.get("schema_version") == SCHEMA_VERSION,
-        "unsupported replay schema version",
-    )
     data = torch.load(data_path, map_location="cpu", weights_only=True)
     _require(isinstance(data, dict), "snapshot data must be a tensor dictionary")
-    _require(
-        set(data.keys()) == set(TRANSITION_FIELDS),
-        "snapshot fields do not match the replay contract",
-    )
+    extra_fields, recorded_fields = _resolve_recorded_fields(manifest, data)
 
     valid_count = int(manifest["valid_count"])
     _require(valid_count > 0, "snapshot contains no transitions")
@@ -132,7 +170,44 @@ def load_snapshot(source: str | Path) -> TransitionDataset:
         _require(data[name].shape == (valid_count,), f"{name} has wrong shape")
         _require(int(data[name].min()) >= 0, f"{name} must be nonnegative")
 
+    _validate_extra_fields(manifest, data, extra_fields, valid_count)
+
     return TransitionDataset(data=data, manifest=manifest, source=str(path))
+
+
+def _validate_extra_fields(
+    manifest: dict,
+    data: dict,
+    extra_fields: tuple[str, ...],
+    valid_count: int,
+) -> None:
+    if not extra_fields:
+        return
+    field_dims = manifest.get("field_dims")
+    _require(
+        isinstance(field_dims, dict) and field_dims,
+        "snapshot manifest is missing field_dims",
+    )
+    for name in extra_fields:
+        _require(name in field_dims, f"field_dims is missing {name}")
+        dim = int(field_dims[name])
+        _require(dim > 0, f"field_dims[{name}] must be positive")
+        tensor = data[name]
+        _require(tensor.dtype == torch.float32, f"{name} must be float32")
+        _require(
+            tuple(tensor.shape) == (valid_count, dim),
+            f"{name} has wrong shape",
+        )
+        _require(
+            bool(torch.isfinite(tensor).all()),
+            f"{name} contains non-finite values",
+        )
+    if REWARD in extra_fields:
+        names = manifest.get("reward_term_names")
+        _require(
+            isinstance(names, list) and len(names) == int(field_dims[REWARD]),
+            "reward_term_names must match the reward_terms width",
+        )
 
 
 def _concat_field(datasets: list[TransitionDataset], name: str) -> torch.Tensor:
@@ -148,11 +223,14 @@ def concat_datasets(
     for dataset in datasets[1:]:
         if set(dataset.data.keys()) != field_set:
             raise ValueError("datasets have incompatible fields")
-        for name in TRANSITION_FIELDS:
-            if dataset.data[name].shape[1:] != datasets[0].data[name].shape[1:]:
-                raise ValueError(f"datasets have incompatible {name} shapes")
+    field_names = TRANSITION_FIELDS + tuple(
+        name for name in datasets[0].data.keys() if name not in TRANSITION_FIELDS
+    )
+    for name in field_names:
+        if dataset.data[name].shape[1:] != datasets[0].data[name].shape[1:]:
+            raise ValueError(f"datasets have incompatible {name} shapes")
 
-    data = {name: _concat_field(datasets, name) for name in TRANSITION_FIELDS}
+    data = {name: _concat_field(datasets, name) for name in field_names}
     manifest = dict(datasets[0].manifest)
     manifest["valid_count"] = int(data["actor_obs"].shape[0])
     manifest["source_snapshots"] = [dataset.source for dataset in datasets]

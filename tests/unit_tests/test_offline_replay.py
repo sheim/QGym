@@ -1,5 +1,6 @@
 """Replay recording, relabeling and subset integrity tests."""
 
+import json
 from dataclasses import asdict
 
 import pytest
@@ -16,11 +17,26 @@ from learning.offline.dataset import (
     nested_subsets,
     sample_n,
 )
+from learning.offline.replay_fields import (
+    ALL_REPLAY_FIELDS,
+    REPLAY_FEATURE_GROUPS,
+    resolve_replay_fields,
+)
 from learning.offline.rewards import relabel_height
 from learning.storage.transition_recorder import TransitionRecorder
 
 
-def make_recorder(tmp_path, *, capacity=4, num_envs=2, seed=0, noise=None):
+def make_recorder(
+    tmp_path,
+    *,
+    capacity=4,
+    num_envs=2,
+    seed=0,
+    noise=None,
+    extra_fields=(),
+    reward_term_names=(),
+    field_metadata=None,
+):
     return TransitionRecorder(
         num_envs=num_envs,
         obs_names=("obs",),
@@ -49,6 +65,9 @@ def make_recorder(tmp_path, *, capacity=4, num_envs=2, seed=0, noise=None):
         episode_length_s=10.0,
         n_policy_steps=1,
         control_dt=0.02,
+        extra_fields=extra_fields,
+        reward_term_names=reward_term_names,
+        field_metadata=field_metadata,
     )
 
 
@@ -232,3 +251,192 @@ def test_noise_sampling_uses_only_the_owned_generator():
             torch.Generator().manual_seed(11),
         ),
     )
+
+
+EXTRA_WIDTHS = {"critic_obs": 5, "root_states": 13, "dof_pos": 4, "reward_terms": 2}
+
+
+def extra_batch(fields, offset=0.0, num_envs=2):
+    return {
+        name: torch.full((num_envs, EXTRA_WIDTHS[name]), offset + float(index))
+        for index, name in enumerate(fields)
+    }
+
+
+def test_resolve_replay_fields_expands_groups_and_fields():
+    assert resolve_replay_fields("") == ()
+    assert resolve_replay_fields(None) == ()
+    assert resolve_replay_fields("core") == ()
+    assert resolve_replay_fields("all") == ALL_REPLAY_FIELDS
+    assert resolve_replay_fields("contacts") == REPLAY_FEATURE_GROUPS["contacts"]
+    assert resolve_replay_fields("dof_pos, root_states") == tuple(
+        name for name in ALL_REPLAY_FIELDS if name in {"dof_pos", "root_states"}
+    )
+    with pytest.raises(ValueError):
+        resolve_replay_fields("dof_poss")
+    with pytest.raises(ValueError):
+        resolve_replay_fields("all,dof_pos")
+
+
+def test_recorder_config_requires_canonical_field_order():
+    with pytest.raises(ValueError):
+        RecorderConfig(
+            enabled=True,
+            task_name="test",
+            backend="fake",
+            fields=("dof_pos", "critic_obs"),
+        )
+    config = RecorderConfig(
+        enabled=True,
+        task_name="test",
+        backend="fake",
+        fields=REPLAY_FEATURE_GROUPS["critic"],
+    )
+    assert config.fields == REPLAY_FEATURE_GROUPS["critic"]
+
+
+def test_extended_snapshot_round_trips_selected_fields(tmp_path):
+    fields = ("critic_obs", "root_states", "dof_pos")
+    recorder = make_recorder(
+        tmp_path,
+        extra_fields=fields,
+        field_metadata={"body_names": ["base", "FR_foot"], "dof_names": ["a"]},
+    )
+    recorder.append(
+        **batch(),
+        behavior_iteration=1,
+        extra_features=extra_batch(fields),
+    )
+    dataset = load_snapshot(recorder.snapshot(1))
+    assert dataset.manifest["extra_fields"] == list(fields)
+    assert tuple(dataset.manifest["recorded_fields"][-3:]) == fields
+    assert dataset.manifest["field_dims"]["root_states"] == 13
+    assert dataset.manifest["field_metadata"]["body_names"] == ["base", "FR_foot"]
+    torch.testing.assert_close(dataset.data["dof_pos"], torch.full((2, 4), 2.0))
+    assert dataset.data["actor_obs"].shape == (2, 3)
+
+
+def test_extended_snapshot_requires_exact_extra_field_set(tmp_path):
+    recorder = make_recorder(tmp_path, extra_fields=("dof_pos",))
+    with pytest.raises(ValueError):
+        recorder.append(**batch(), behavior_iteration=1)
+    with pytest.raises(ValueError):
+        recorder.append(
+            **batch(),
+            behavior_iteration=1,
+            extra_features={
+                "dof_pos": torch.zeros(2, 4),
+                "root_states": torch.zeros(2, 13),
+            },
+        )
+    with pytest.raises(ValueError):
+        recorder.append(
+            **batch(),
+            behavior_iteration=1,
+            extra_features={"dof_pos": torch.full((2, 4), float("nan"))},
+        )
+
+
+def test_extended_snapshot_rejects_width_change(tmp_path):
+    recorder = make_recorder(tmp_path, extra_fields=("dof_pos",))
+    recorder.append(
+        **batch(), behavior_iteration=1, extra_features={"dof_pos": torch.zeros(2, 4)}
+    )
+    with pytest.raises(ValueError):
+        recorder.append(
+            **batch(),
+            behavior_iteration=2,
+            extra_features={"dof_pos": torch.zeros(2, 5)},
+        )
+
+
+def test_reward_terms_requires_and_records_term_names(tmp_path):
+    with pytest.raises(ValueError):
+        make_recorder(tmp_path / "bad", extra_fields=("reward_terms",))
+    recorder = make_recorder(
+        tmp_path,
+        extra_fields=("reward_terms",),
+        reward_term_names=("tracking_lin_vel", "termination"),
+    )
+    recorder.append(
+        **batch(),
+        behavior_iteration=1,
+        extra_features={"reward_terms": torch.ones(2, 2)},
+    )
+    dataset = load_snapshot(recorder.snapshot(1))
+    assert dataset.manifest["reward_term_names"] == [
+        "tracking_lin_vel",
+        "termination",
+    ]
+    assert dataset.data["reward_terms"].shape == (2, 2)
+
+
+def test_legacy_core_only_snapshot_still_loads(tmp_path):
+    recorder = make_recorder(tmp_path)
+    recorder.append(**batch(), behavior_iteration=1)
+    snapshot = recorder.snapshot(1)
+    manifest = json.loads((snapshot / "manifest.json").read_text())
+    for key in (
+        "recorded_fields",
+        "extra_fields",
+        "field_dims",
+        "core_fields",
+        "reward_term_names",
+    ):
+        manifest.pop(key, None)
+    manifest["format"] = "brg-offline-replay-v1"
+    (snapshot / "manifest.json").write_text(json.dumps(manifest))
+    dataset = load_snapshot(snapshot)
+    assert len(dataset) == 2
+
+
+def test_legacy_format_rejects_declared_extra_fields(tmp_path):
+    fields = ("dof_pos",)
+    recorder = make_recorder(tmp_path, extra_fields=fields)
+    recorder.append(**batch(), behavior_iteration=1, extra_features=extra_batch(fields))
+    snapshot = recorder.snapshot(1)
+    manifest = json.loads((snapshot / "manifest.json").read_text())
+    manifest["format"] = "brg-offline-replay-v1"
+    (snapshot / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        load_snapshot(snapshot)
+
+
+def test_snapshot_rejects_a_missing_extra_tensor(tmp_path):
+    fields = ("dof_pos",)
+    recorder = make_recorder(tmp_path, extra_fields=fields)
+    recorder.append(**batch(), behavior_iteration=1, extra_features=extra_batch(fields))
+    snapshot = recorder.snapshot(1)
+    data = torch.load(snapshot / "data.pt", weights_only=True)
+    data.pop("dof_pos")
+    torch.save(data, snapshot / "data.pt")
+    with pytest.raises(ValueError):
+        load_snapshot(snapshot)
+
+
+def test_concat_preserves_extra_fields(tmp_path):
+    fields = ("dof_pos",)
+    recorder = make_recorder(tmp_path, capacity=1, num_envs=1, extra_fields=fields)
+    recorder.append(
+        **batch(done_index=0, num_envs=1),
+        behavior_iteration=1,
+        extra_features={"dof_pos": torch.full((1, 4), 1.0)},
+    )
+    first = load_snapshot(recorder.snapshot(1))
+    recorder.append(
+        **batch(done_index=0, num_envs=1),
+        behavior_iteration=2,
+        extra_features={"dof_pos": torch.full((1, 4), 2.0)},
+    )
+    second = load_snapshot(recorder.snapshot(2))
+    combined = concat_datasets([first, second])
+    assert len(combined) == 2
+    torch.testing.assert_close(combined.data["dof_pos"][:, 0], torch.tensor([1.0, 2.0]))
+    with pytest.raises(ValueError):
+        concat_datasets([first, load_snapshot(_core_only(tmp_path))])
+
+
+def _core_only(tmp_path):
+    recorder = make_recorder(tmp_path / "core", capacity=1, num_envs=1)
+    recorder.append(**batch(done_index=0, num_envs=1), behavior_iteration=1)
+    return recorder.snapshot(1)

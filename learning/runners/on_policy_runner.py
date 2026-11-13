@@ -9,6 +9,15 @@ from learning.storage import DictStorage
 from learning.storage.transition_recorder import TransitionRecorder
 from gym.utils.helpers import class_to_dict
 
+from learning.offline.replay_fields import (
+    NEXT_FEATURE_ATTRS,
+    REWARD,
+    STEP_FEATURE_ATTRS,
+    next_feature_names,
+    resolve_replay_fields,
+    step_feature_names,
+)
+
 logger = Logger()
 storage = DictStorage()
 
@@ -39,6 +48,18 @@ class OnPolicyRunner(BaseRunner):
         action_dims = tuple(
             self.get_action_size([name]) for name in self.actor_cfg["actions"]
         )
+        # "fields" is an optional selection; an older saved runner config that
+        # predates selectable features records the core transition fields only.
+        extra_fields = resolve_replay_fields(replay_cfg.get("fields", ()))
+        reward_term_names = tuple(
+            self.critic_cfg["reward"]["termination_weight"]
+        ) + tuple(self.critic_cfg["reward"]["weights"])
+        # Index-to-name maps: raw state rows are ordered by the robot layout, so
+        # a dataset reader needs the names to interpret body/joint columns.
+        field_metadata = {}
+        if extra_fields:
+            field_metadata["body_names"] = list(self.env.robot_layout.body_names)
+            field_metadata["dof_names"] = list(self.env.actuated_dof_names)
         return TransitionRecorder(
             num_envs=self.env.num_envs,
             obs_names=tuple(self.actor_cfg["obs"]),
@@ -62,7 +83,46 @@ class OnPolicyRunner(BaseRunner):
             episode_length_s=float(self.env.max_episode_length_s),
             n_policy_steps=n_policy_steps,
             control_dt=float(self.env.dt),
+            extra_fields=extra_fields,
+            reward_term_names=(reward_term_names if REWARD in extra_fields else ()),
+            field_metadata=field_metadata,
         )
+
+    def _replay_features(self, names, *, rewards_dict=None):
+        """Clone selected raw states at one time point.
+
+        Environment buffers are reused in place, so the clone must happen before
+        the next physics step or reset overwrites the source.
+        """
+        return {
+            name: self._replay_feature(name, rewards_dict).clone() for name in names
+        }
+
+    def _replay_feature(self, name, rewards_dict):
+        if name in ("critic_obs", "next_critic_obs"):
+            return self.get_obs(self.critic_cfg["obs"])
+        if name == REWARD:
+            if rewards_dict is None:
+                raise ValueError("reward_terms requires the iteration reward dict")
+            # Same order as initialize_rewards_dict: termination terms first.
+            return torch.stack(tuple(rewards_dict.sum(dim=0).values()), dim=1)
+        if name in STEP_FEATURE_ATTRS:
+            attribute = STEP_FEATURE_ATTRS[name]
+        elif name in NEXT_FEATURE_ATTRS:
+            attribute = NEXT_FEATURE_ATTRS[name]
+        else:
+            raise ValueError(f"unsupported replay feature {name!r}")
+        if not hasattr(self.env, attribute):
+            raise AttributeError(
+                f"replay field {name!r} needs env attribute {attribute!r}, which "
+                f"{type(self.env).__name__} does not provide"
+            )
+        value = getattr(self.env, attribute)
+        if attribute == "_rigid_body_state":
+            # The backend stores per-body rows flattened across environments;
+            # restore one row per environment for the [N, width] contract.
+            return value.view(self.env.num_envs, -1)
+        return value
 
     def learn(self, states_to_log_dict=None):
         n_policy_steps = int((1 / self.env.dt) / self.actor_cfg["frequency"])
@@ -128,6 +188,10 @@ class OnPolicyRunner(BaseRunner):
                     policy_actor_obs = actor_obs
                     actions = self.alg.act(actor_obs)
                     policy_actions = actions
+                    if self.recorder is not None:
+                        pre_action_features = self._replay_features(
+                            step_feature_names(self.recorder.extra_fields)
+                        )
                     self.set_actions(
                         self.actor_cfg["actions"],
                         actions,
@@ -151,6 +215,10 @@ class OnPolicyRunner(BaseRunner):
                         pre_reset_height = self.env.base_height.clone()
                         terminated = self.get_terminated()
                         timed_out = self.get_timed_out()
+                        post_action_features = self._replay_features(
+                            next_feature_names(self.recorder.extra_fields),
+                            rewards_dict=rewards_dict,
+                        )
 
                     self.reset_envs()
 
@@ -187,6 +255,10 @@ class OnPolicyRunner(BaseRunner):
                                 terminated=terminated,
                                 timed_out=timed_out,
                                 behavior_iteration=self.it,
+                                extra_features={
+                                    **pre_action_features,
+                                    **post_action_features,
+                                },
                             )
 
                     logger.log_rewards(rewards_dict.sum(dim=0))

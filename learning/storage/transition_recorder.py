@@ -9,7 +9,7 @@ import torch
 
 from learning.offline.contracts import (
     ACTION_CONVENTION,
-    REPLAY_FORMAT,
+    REPLAY_FORMAT_V2,
     REWARD_TIMING,
     SCHEMA_VERSION,
     TRANSITION_FIELDS,
@@ -17,6 +17,10 @@ from learning.offline.contracts import (
     replay_config_fingerprint,
     sample_observation_noise,
     utc_timestamp,
+)
+from learning.offline.replay_fields import (
+    ALL_REPLAY_FIELDS,
+    REWARD,
 )
 
 
@@ -52,6 +56,9 @@ class TransitionRecorder:
         episode_length_s: float,
         n_policy_steps: int,
         control_dt: float,
+        extra_fields: tuple[str, ...] = (),
+        reward_term_names: tuple[str, ...] = (),
+        field_metadata: dict | None = None,
     ) -> None:
         if num_envs <= 0:
             raise ValueError("num_envs must be positive")
@@ -73,6 +80,20 @@ class TransitionRecorder:
             raise ValueError("control_dt must be positive")
         if episode_length_s <= 0:
             raise ValueError("episode_length_s must be positive")
+        if len(set(extra_fields)) != len(extra_fields):
+            raise ValueError("extra_fields must not repeat a field name")
+        unknown = [name for name in extra_fields if name not in ALL_REPLAY_FIELDS]
+        if unknown:
+            raise ValueError(f"unsupported replay fields: {unknown}")
+        overlap = [name for name in extra_fields if name in TRANSITION_FIELDS]
+        if overlap:
+            raise ValueError(f"core fields cannot be requested twice: {overlap}")
+        if REWARD in extra_fields and not reward_term_names:
+            raise ValueError(
+                "reward_term_names is required when recording reward_terms"
+            )
+        if REWARD not in extra_fields and reward_term_names:
+            raise ValueError("reward_term_names is only valid with reward_terms")
 
         self.num_envs = num_envs
         self.obs_names = tuple(obs_names)
@@ -98,6 +119,11 @@ class TransitionRecorder:
         self.episode_length_s = episode_length_s
         self.n_policy_steps = n_policy_steps
         self.control_dt = control_dt
+        self.extra_fields = tuple(extra_fields)
+        self.recorded_fields = TRANSITION_FIELDS + self.extra_fields
+        self.reward_term_names = tuple(reward_term_names)
+        self.field_metadata = dict(field_metadata or {})
+        self._extra_dims: dict[str, int] = {}
         self.run_id = (
             Path(log_dir).name
             if log_dir
@@ -147,6 +173,58 @@ class TransitionRecorder:
         if not torch.isfinite(tensor).all():
             raise ValueError(f"{name} contains non-finite values")
 
+    def _validated_extras(
+        self, extra_features: dict[str, torch.Tensor] | None
+    ) -> dict[str, torch.Tensor]:
+        if not self.extra_fields:
+            if extra_features:
+                raise ValueError(
+                    "recorder is not configured for extra fields but received "
+                    f"{sorted(extra_features)}"
+                )
+            return {}
+        if extra_features is None:
+            raise ValueError(
+                f"recorder requires extra features: {list(self.extra_fields)}"
+            )
+        if set(extra_features) != set(self.extra_fields):
+            missing = sorted(set(self.extra_fields) - set(extra_features))
+            unexpected = sorted(set(extra_features) - set(self.extra_fields))
+            raise ValueError(
+                "extra features do not match the configured fields "
+                f"(missing={missing}, unexpected={unexpected})"
+            )
+        shaped: dict[str, torch.Tensor] = {}
+        for name in self.extra_fields:
+            tensor = extra_features[name]
+            if not isinstance(tensor, torch.Tensor):
+                raise ValueError(f"extra feature {name} must be a tensor")
+            if tensor.ndim == 0 or tensor.shape[0] != self.num_envs:
+                raise ValueError(
+                    f"extra feature {name} must have batch dimension {self.num_envs}"
+                )
+            flat = tensor.reshape(self.num_envs, -1)
+            if flat.shape[1] == 0:
+                raise ValueError(f"extra feature {name} has zero width")
+            if not torch.isfinite(flat).all():
+                raise ValueError(f"extra feature {name} contains non-finite values")
+            shaped[name] = flat.to(torch.float32)
+        return shaped
+
+    def _ensure_extra_buffers(self, extras: dict[str, torch.Tensor]) -> None:
+        for name, tensor in extras.items():
+            width = int(tensor.shape[1])
+            known = self._extra_dims.get(name)
+            if known is None:
+                self._extra_dims[name] = width
+                self._buffers[name] = torch.zeros(
+                    self.capacity, width, dtype=torch.float32
+                )
+            elif known != width:
+                raise ValueError(
+                    f"extra feature {name} width changed from {known} to {width}"
+                )
+
     def append(
         self,
         *,
@@ -158,8 +236,14 @@ class TransitionRecorder:
         terminated: torch.Tensor,
         timed_out: torch.Tensor,
         behavior_iteration: int,
+        extra_features: dict[str, torch.Tensor] | None = None,
     ) -> None:
-        """Record one policy transition per environment."""
+        """Record one policy transition per environment.
+
+        ``extra_features`` must hold exactly the configured ``extra_fields``,
+        each shaped ``[num_envs, width]``. Values are copied to host memory, so
+        callers may keep mutating the source environment tensors.
+        """
         self._validate_tensor("actor_obs", actor_obs, (self.num_envs, self.obs_dim))
         self._validate_tensor("action", action, (self.num_envs, self.action_dim))
         self._validate_tensor(
@@ -183,6 +267,9 @@ class TransitionRecorder:
             raise ValueError("timed_out must be a bool vector of length num_envs")
         if behavior_iteration < 0:
             raise ValueError("behavior_iteration must be nonnegative")
+
+        extras = self._validated_extras(extra_features)
+        self._ensure_extra_buffers(extras)
 
         dones = terminated | timed_out
         noise = sample_observation_noise(
@@ -228,6 +315,7 @@ class TransitionRecorder:
                 dtype=torch.int64,
             ),
         }
+        values.update(extras)
         self._write(values)
 
     def _write(self, values: dict[str, torch.Tensor]) -> None:
@@ -236,7 +324,7 @@ class TransitionRecorder:
             raise ValueError("append batch must match num_envs")
         start = self.write_index
         first = min(batch_size, self.capacity - start)
-        for name in TRANSITION_FIELDS:
+        for name in self.recorded_fields:
             value = (
                 values[name].detach().to(device="cpu", dtype=self._buffers[name].dtype)
             )
@@ -261,7 +349,7 @@ class TransitionRecorder:
 
     def _manifest(self, iteration: int) -> dict:
         return {
-            "format": REPLAY_FORMAT,
+            "format": REPLAY_FORMAT_V2,
             "schema_version": SCHEMA_VERSION,
             "created_at": utc_timestamp(),
             "snapshot_id": f"replay_iter_{iteration:07d}",
@@ -272,6 +360,17 @@ class TransitionRecorder:
             "valid_count": self.valid_count,
             "total_appended": self.total_appended,
             "num_envs": self.num_envs,
+            "recorded_fields": list(self.recorded_fields),
+            "extra_fields": list(self.extra_fields),
+            "field_dims": {
+                name: int(
+                    self._buffers[name].shape[1] if self._buffers[name].ndim > 1 else 1
+                )
+                for name in self.recorded_fields
+            },
+            "core_fields": list(TRANSITION_FIELDS),
+            "reward_term_names": list(self.reward_term_names),
+            "field_metadata": self.field_metadata,
             "obs_names": list(self.obs_names),
             "obs_dims": list(self.obs_dims),
             "obs_dim": self.obs_dim,
@@ -312,7 +411,7 @@ class TransitionRecorder:
 
         indices = self._chronological_indices()
         data = {
-            name: self._buffers[name][indices].clone() for name in TRANSITION_FIELDS
+            name: self._buffers[name][indices].clone() for name in self.recorded_fields
         }
         self.output_dir.mkdir(parents=True, exist_ok=True)
         temporary.mkdir()

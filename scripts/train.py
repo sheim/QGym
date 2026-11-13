@@ -17,6 +17,7 @@ from gym.utils.helpers import randomize_episode_counters, set_seed
 from gym.utils.logging_and_saving import local_code_save_helper
 from gym.utils.logging_and_saving import wandb_singleton
 from learning.offline.contracts import RecorderConfig
+from learning.offline.replay_fields import resolve_replay_fields
 
 
 def _source_revision():
@@ -129,6 +130,17 @@ def make_train_parser():
         default=0,
         help="Seed for recording-only observation noise.",
     )
+    parser.add_argument(
+        "--replay_fields",
+        type=str,
+        default="",
+        help=(
+            "Extra raw-state features to record, as a comma-separated list of "
+            "group or field names, or 'all'. Empty records the core transition "
+            "fields only. Groups: critic, root, base, joints, contacts, bodies, "
+            "commands, gait, rewards, episode."
+        ),
+    )
     # wandb
     parser.add_argument("--disable_wandb", action="store_true", default=False)
     parser.add_argument("--wandb_project", type=str, default=None)
@@ -191,6 +203,7 @@ def setup(args=None, env_cfg=None, train_cfg=None):
         train_cfg.runner.checkpoint = args.checkpoint
 
     train_cfg.runner.device = args.device
+    replay_fields = resolve_replay_fields(args.replay_fields)
     train_cfg.runner.replay = asdict(
         RecorderConfig(
             enabled=args.replay_record,
@@ -201,6 +214,7 @@ def setup(args=None, env_cfg=None, train_cfg=None):
             task_name=args.task,
             backend=args.backend,
             source_revision=_source_revision(),
+            fields=replay_fields,
         )
     )
 

@@ -76,11 +76,65 @@ burn-in resets the environments, the first post-burn-in transition is excluded
 from the replay because its action-selection observation is stale. PPO's
 existing first transition is left unchanged.
 
-For `go2trot` the actor-observation replay record is about 470 bytes per
+For `go2trot` the core actor-observation replay record is about 470 bytes per
 transition (109 float32 observation/action/height fields, two bool flags, and
-four int64 provenance fields), so 1M transitions are about 470 MB of snapshot
-data. Critic observations are not stored; add them only if a later asymmetric
-critic requires them.
+four int64 provenance fields), so 1M core transitions are about 470 MB of
+snapshot data.
+
+### Selectable raw-state features
+
+The core fields above are always recorded. `--replay_fields` adds raw simulator
+state in addition to the policy-facing observation, so one recorder can produce
+a narrow Q-training snapshot or a wide dataset for offline reward work:
+
+```bash
+uv run --frozen scripts/train.py --task=go2trot --device=cuda:0 --headless \
+  --num_envs=4096 --max_iterations=16 --resume \
+  --load_run=Nov10_10-36-22_gpu-final-600-trot-hist-20261110 --checkpoint=600 \
+  --run_name=trot-all-signals --replay_record --replay_capacity=1000000 \
+  --replay_fields=all
+```
+
+The value is a comma-separated list of group or field names, or `all`. Unknown
+names fail instead of being dropped. Groups (`all` expands to every field):
+
+| group | fields |
+|---|---|
+| `critic` | `critic_obs`, `next_critic_obs` |
+| `root` | `root_states`, `next_root_states` |
+| `base` | `base_lin_vel`, `base_ang_vel`, `projected_gravity`, `base_height`, and their `next_` successors |
+| `joints` | `dof_pos`, `dof_vel`, `dof_pos_obs`, `dof_pos_target`, `dof_pos_history`, `dof_vel_target`, `torques`, `tau_ff`, `p_gains`, `d_gains`, plus `next_dof_*`/`next_torques` |
+| `contacts` | `contact_forces`, `next_contact_forces` |
+| `bodies` | `rigid_body_states`, `next_rigid_body_states` (per-body position, quaternion, linear and angular velocity) |
+| `commands` | `commands`, `next_commands` |
+| `gait` | `phase`, `phase_frequency`, `phase_obs`, `gait_reference`, and their `next_` successors |
+| `rewards` | `reward_terms` (weighted per-term reward for the transition) |
+| `episode` | `episode_length`, `next_episode_length` |
+
+Naming follows one rule: a plain name is read **before** the action (it matches
+the observation that chose the action), and a `next_` name is read **after** the
+action and **before** the reset, so it is the true successor state — never the
+reset state. `successor_height_m` is the pre-reset height, so there is no
+duplicate `next_base_height`. `reward_terms` columns follow
+`manifest.json`'s `reward_term_names`, which lists termination terms first.
+
+Widths are resolved from the environment on the first append and fixed for the
+run; a later width change raises. Snapshots that add features use format
+`brg-offline-replay-v2` and declare `recorded_fields`, `extra_fields`,
+`field_dims`, and `reward_term_names`. `field_metadata` records `body_names` and
+`dof_names`, because `contact_forces` (`[N, num_bodies, 3]`) and
+`rigid_body_states` (`[N, num_bodies * 13]`) are per body, not per foot: for
+`go2` that is 42 bodies, including rotor, IMU, radar, and camera bodies. Use the
+foot indices from `field_metadata["body_names"]` rather than assuming four rows.
+`load_snapshot()` still loads legacy `brg-offline-replay-v1` core-only
+snapshots, and rejects a v1 snapshot whose data carries undeclared fields.
+
+Recording every group for `go2trot` is about 7.4 KB per transition (1856
+float32 values plus provenance), so 1M transitions are about 7.4 GB on disk and
+the same in host memory; publishing a snapshot clones that ring once more, so
+budget roughly 15 GB of RAM for a 1M `--replay_fields=all` snapshot. Dropping
+`bodies` saves about 2.2 GB; recording only `critic,commands,gait,rewards` is
+about 1 KB per transition.
 
 ## Relabel, select, and fit Q
 

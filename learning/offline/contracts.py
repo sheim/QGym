@@ -12,9 +12,15 @@ from typing import Any
 
 import torch
 
+from .replay_fields import resolve_replay_fields
+
 
 SCHEMA_VERSION = 1
+# Legacy core-only replay snapshots keep this format identifier so existing
+# snapshots stay loadable. Recordings that add selectable raw-state features use
+# REPLAY_FORMAT_V2 and declare their exact field set in the manifest.
 REPLAY_FORMAT = "brg-offline-replay-v1"
+REPLAY_FORMAT_V2 = "brg-offline-replay-v2"
 HEIGHT_Q_FORMAT = "brg-height-q-v1"
 ANGULAR_VEL_Q_FORMAT = "brg-angular-vel-q-v1"
 RETURN_CONVENTION = "discounted_continuing_absorbing_failure"
@@ -107,6 +113,10 @@ class RecorderConfig:
     task_name: str = ""
     backend: str = ""
     source_revision: str = ""
+    # Extra raw-state features, already expanded from group names. Importing
+    # the registry here would create a cycle only if the registry imported
+    # contracts; it does not, so the names are validated in __post_init__.
+    fields: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.capacity <= 0:
@@ -115,11 +125,19 @@ class RecorderConfig:
             raise ValueError("replay snapshot_interval must be nonnegative")
         if self.seed < 0:
             raise ValueError("replay seed must be nonnegative")
+        if not isinstance(self.fields, tuple):
+            raise ValueError("replay fields must be a tuple of field names")
         if self.enabled:
             if not self.task_name:
                 raise ValueError("replay task_name is required when enabled")
             if not self.backend:
                 raise ValueError("replay backend is required when enabled")
+            if self.fields:
+                if resolve_replay_fields(self.fields) != self.fields:
+                    raise ValueError(
+                        "replay fields must be canonical, ordered, and unique; "
+                        "use resolve_replay_fields()"
+                    )
 
 
 @dataclass(frozen=True)
