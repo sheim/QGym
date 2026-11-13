@@ -241,6 +241,50 @@ def nested_subsets(
     return subsets
 
 
+def episode_split(
+    dataset: TransitionDataset, validation_fraction: float, *, seed: int
+) -> tuple[TransitionDataset, TransitionDataset]:
+    """Split complete episodes into disjoint train/validation datasets.
+
+    Grouping is the ``(env_id, episode_id)`` pair, so no episode contributes rows
+    to both sides. The returned manifests record the split identity; observation
+    normalization must be fitted on the train side only.
+    """
+    if not 0.0 < validation_fraction < 1.0:
+        raise ValueError("validation_fraction must be in (0, 1)")
+    inverse, group_count = _episode_groups(dataset)
+    if group_count < 2:
+        raise ValueError("episode split needs at least two episode groups")
+    generator = torch.Generator().manual_seed(seed)
+    permutation = torch.randperm(group_count, generator=generator)
+    validation_groups = max(1, round(validation_fraction * group_count))
+    if validation_groups >= group_count:
+        raise ValueError("validation split would leave no training episodes")
+    selected = permutation[:validation_groups]
+    validation_mask = torch.isin(inverse, selected)
+    train = dataset.subset((~validation_mask).nonzero().flatten())
+    validation = dataset.subset(validation_mask.nonzero().flatten())
+
+    def groups(item: TransitionDataset) -> set[tuple[int, int]]:
+        return {
+            (int(env_id), int(episode_id))
+            for env_id, episode_id in zip(
+                item.data["env_id"].tolist(),
+                item.data["episode_id"].tolist(),
+                strict=True,
+            )
+        }
+
+    overlap = groups(train) & groups(validation)
+    if overlap:
+        raise ValueError(f"episode split leaked {len(overlap)} groups across sides")
+    for item, label in ((train, "train"), (validation, "validation")):
+        item.manifest["validation_fraction"] = validation_fraction
+        item.manifest["split_seed"] = seed
+        item.manifest["split_side"] = label
+    return train, validation
+
+
 def sample_n(
     dataset: TransitionDataset, count: int, *, seed: int, group_by: str
 ) -> TransitionDataset:

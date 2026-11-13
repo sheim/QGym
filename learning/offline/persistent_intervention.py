@@ -2,8 +2,13 @@
 
 import torch
 
+from learning.offline.contracts import AngularVelocityRewardSpec
 from learning.offline.evaluation import _policy_observation
-from learning.offline.fixed_state_variance import accumulate_return
+from learning.offline.fixed_state_variance import (
+    accumulate_return,
+    accumulate_return_zero_after_terminal,
+)
+from learning.offline.rewards import angular_velocity_reward
 
 
 def sample_candidates(policy, obs, generator):
@@ -392,4 +397,218 @@ def rollout_mean(env, policy, spec, snapshot, initial_obs, seed, horizon=500):
 
     return _rollout_common(
         env, policy, spec, snapshot, initial_obs, seed, horizon, choose, 1
+    )
+
+
+@torch.no_grad()
+def _rollout_angular_common(
+    env,
+    policy,
+    spec,
+    snapshot,
+    initial_obs,
+    seed,
+    reward_spec,
+    horizon,
+    choose,
+    n_candidates,
+    trace,
+):
+    """Yaw-tracking return with the zero-after-terminal convention.
+
+    The reward is recomputed from the live task tensors after ``step()``: the
+    resampled ``commands`` from ``_post_decimation_step`` and the current
+    ``base_ang_vel``, exactly as the runner's post-step reward call sees them.
+    The pre-step command clone is kept only for the yaw tracking-error metric.
+    """
+    if horizon <= 0:
+        raise ValueError("horizon must be positive")
+    snapshot.restore()
+    snapshot.assert_restored()
+    torch.manual_seed(seed)
+    obs_rng = torch.Generator(device=env.device).manual_seed(seed + 1)
+    act_rng = torch.Generator(device=env.device).manual_seed(seed + 2)
+    n = env.num_envs
+    alive = torch.ones(n, dtype=torch.bool, device=env.device)
+    sums = {
+        key: torch.zeros(n, dtype=torch.float64, device=env.device)
+        for key in (
+            "returns",
+            "steps",
+            "tracking_steps",
+            "yaw_error_sq",
+            "q_gain_sum",
+        )
+    }
+    sums["termination_step"] = torch.full(
+        (n,), float(horizon), dtype=torch.float64, device=env.device
+    )
+    selection = torch.zeros(n, n_candidates, dtype=torch.int64, device=env.device)
+    timeout_seen = torch.zeros(n, dtype=torch.bool, device=env.device)
+    traces = {}
+    if trace:
+        for key in ("ang_vel", "command"):
+            traces[key] = torch.zeros(
+                n, horizon, dtype=torch.float64, device=env.device
+            )
+        traces["alive"] = torch.zeros(n, horizon, dtype=torch.bool, device=env.device)
+    extras = {}
+    obs = initial_obs
+    first_reward = None
+    first_terminated = None
+    for step in range(horizon):
+        action, index, gains, extra_values = choose(obs, act_rng)
+        alive_before = alive
+        selection.scatter_add_(1, index[:, None], alive_before.long()[:, None])
+        for key, value in gains.items():
+            sums[key] += value * alive_before
+        for key, value in extra_values.items():
+            if key not in extras:
+                extras[key] = torch.zeros(
+                    (n, *value.shape[1:]), dtype=torch.float64, device=env.device
+                )
+            if value.ndim == 1:
+                extras[key] += value * alive_before
+            else:
+                extras[key] += value * alive_before[:, None]
+        command = env.commands.clone()
+        env.set_states(spec.action_names, action)
+        env.step()
+        reward = angular_velocity_reward(
+            env.commands[:, 2], env.base_ang_vel[:, 2], reward_spec
+        ) * (~env.terminated)
+        if step == 0:
+            first_reward = reward.clone()
+            first_terminated = env.terminated.clone()
+        if trace:
+            traces["ang_vel"][:, step] = torch.where(
+                alive_before, env.base_ang_vel[:, 2].double(), 0.0
+            )
+            traces["command"][:, step] = torch.where(
+                alive_before, env.commands[:, 2].double(), 0.0
+            )
+            traces["alive"][:, step] = alive_before
+        timeout_seen |= env.timed_out
+        sums["termination_step"] = torch.where(
+            alive_before & env.terminated,
+            torch.full_like(sums["termination_step"], float(step)),
+            sums["termination_step"],
+        )
+        sums["steps"] += alive_before
+        sums["returns"], alive = accumulate_return_zero_after_terminal(
+            sums["returns"],
+            alive_before,
+            reward,
+            env.terminated,
+            step,
+            0.99,
+        )
+        # Exclude the terminal step from tracking-error aggregates, matching the
+        # height rollout's interval-selection convention.
+        sums["tracking_steps"] += alive
+        sums["yaw_error_sq"] += (
+            env.base_ang_vel[:, 2] - command[:, 2]
+        ).square() * alive
+        if step != horizon - 1:
+            obs = _policy_observation(
+                env, spec.obs_names, spec.obs_dims, spec.noise, spec.scales, obs_rng
+            )
+    sums.update(extras)
+    if timeout_seen.any() or not all(torch.isfinite(v).all() for v in sums.values()):
+        raise RuntimeError("timeout or nonfinite angular-velocity rollout")
+    sums.update(
+        survived=alive,
+        first_rewards=first_reward,
+        first_terminated=first_terminated,
+        selection_counts=selection,
+        timeout_seen=timeout_seen,
+    )
+    result = {k: v.cpu() for k, v in sums.items()}
+    if trace:
+        result.update({key: value.cpu() for key, value in traces.items()})
+    return result
+
+
+@torch.no_grad()
+def rollout_angular_vel(
+    env,
+    policy,
+    spec,
+    snapshot,
+    initial_obs,
+    critic,
+    seed,
+    *,
+    reward_spec: AngularVelocityRewardSpec,
+    horizon=500,
+    trace=False,
+):
+    """Max-Q over eight stochastic draws versus candidate0 (plain) for yaw reward."""
+
+    def choose(obs, act_rng):
+        candidates = sample_candidates(policy, obs, act_rng)
+        action, index, gain = select_action(obs, candidates, critic)
+        return action, index, {"q_gain_sum": gain}, {}
+
+    return _rollout_angular_common(
+        env,
+        policy,
+        spec,
+        snapshot,
+        initial_obs,
+        seed,
+        reward_spec,
+        horizon,
+        choose,
+        8,
+        trace,
+    )
+
+
+@torch.no_grad()
+def rollout_rejection_angular_vel(
+    env,
+    policy,
+    spec,
+    snapshot,
+    initial_obs,
+    critic,
+    seed,
+    threshold,
+    *,
+    reward_spec: AngularVelocityRewardSpec,
+    horizon=500,
+    trace=False,
+):
+    """First Q-feasible stochastic draw, else the max-Q draw, on the yaw reward."""
+
+    def choose(obs, act_rng):
+        candidates, mean = sample_rejection_candidates(policy, obs, act_rng)
+        result = select_rejection_action(obs, candidates, mean, critic, threshold)
+        extra = {
+            "fallback_sum": result["fallback"].double(),
+            "selected_q_sum": result["selected_q"],
+            "attempt_counts": torch.nn.functional.one_hot(
+                result["attempts"] - 1, 8
+            ).double(),
+        }
+        return (
+            result["action"],
+            result["indices"],
+            {"q_gain_sum": result["gain"]},
+            extra,
+        )
+
+    return _rollout_angular_common(
+        env,
+        policy,
+        spec,
+        snapshot,
+        initial_obs,
+        seed,
+        reward_spec,
+        horizon,
+        choose,
+        8,
+        trace,
     )

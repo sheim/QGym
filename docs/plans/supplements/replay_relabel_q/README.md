@@ -4,8 +4,10 @@ Durable copies of the generated Markdown reports from the archived
 [replay/relabel/FQE plan](../../../../../.opencode/workspace/plans/archive/replay_relabel_q_plan.md).
 The reports cover fixed-state return variance, a persistent eight-candidate Q
 intervention, the paired 16-execution regrouping, two additional critics,
-the rejection/closest-mean threshold sweep, and an original-PPO-reward versus
-height-Q tradeoff on the same paired executions.
+the rejection/closest-mean threshold sweep, an original-PPO-reward versus
+height-Q tradeoff on the same paired executions, and the first non-height reward
+path (yaw angular-velocity tracking; see
+[`docs/offline_angular_velocity_q.md`](../../../offline_angular_velocity_q.md)).
 
 ## What was moved
 
@@ -39,6 +41,7 @@ original paths.
 | 2026-11-11 | [Return dispersion and paired t-test addendum](two-critic-datasets-20261111-v1/analysis/return_stats.md) | Descriptive SD and paired Student-t addendum for the two-critic experiment. The documented p-values are fixed-state precision statements, not infinite-horizon or safety claims. | `/tmp/opencode/height-q-two-critic-datasets-20261111-v1/analysis/` |
 | 2026-11-11 | [Rejection and closest-mean threshold sweep](rejection-threshold-20261111-v1/REPORT.md) | Final seven-controller sweep. Aggregate expectation meets the fixed threshold only at `c = -16` and `c = -4.866`; attainment is not monotone in `c`. Threshold intervals are per-configuration and not multiplicity-corrected guarantees. | `/tmp/opencode/height-q-rejection-threshold-20261111-v1/` |
 | 2026-11-11 | [Original PPO reward versus height-Q gain](original-reward-tradeoff-20261111-v1/REPORT.md) | New paired `plain` versus `original` rollouts on the same 1024 executions per state. Measures the original dt-weighted training return (zero after true termination, no absorbing tail) and the existing height return. The original-return paired mean is negative while the height gain is positive; fixed-state, finite-horizon, no population or safety claim. | `/tmp/opencode/height-q-original-reward-tradeoff-20261111-v1/` |
+| 2026-11-12 | [Angular-velocity tracking Q](angular-velocity-tracking-20261112-v1/REPORT.md) | First non-height reward path: `exp(-((cmd−ω)/2.5)**2/0.25)`, zero after true termination, no absorbing tail, positive return scale. Relabel + FQE from the same final-1M snapshot, one paired block, plus label-noise and replay-noise measurements. Both interventions reduce mean `r'` and survival; the Q is near-tied across candidates. Includes the option-(a) follow-up: a held-out variant sweep, candidate-ranking diagnostic, and two-block re-run showing the negative result is a low-signal/selection limit, not undertraining. Fixed-state, no policy-improvement claim. | `/tmp/opencode/angular-vel-q-20261112/` |
 
 ## Supersession and reading order
 

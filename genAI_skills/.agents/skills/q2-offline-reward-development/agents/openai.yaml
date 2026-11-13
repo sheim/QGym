@@ -1,0 +1,4 @@
+interface:
+  display_name: "Q2 Offline Reward Development"
+  short_description: "Add offline rewards and fixed-policy Q"
+  default_prompt: "Use $q2-offline-reward-development to add a Q2 offline reward and its fixed-policy Q contract."

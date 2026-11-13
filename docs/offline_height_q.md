@@ -9,9 +9,17 @@ It does not import or modify the CORL submodule and does not use CORL's benchmar
 CLI. CORL remains a reference for single-file offline algorithms; the supported
 runtime here is plain PyTorch inside BRG's uv environment.
 
+The reward channel described here is height-specific. A second, parallel path
+relabels the same replay records with go2trot's yaw angular-velocity tracking
+term, which is positive, has a zero terminal value, and has no absorbing tail:
+see [offline_angular_velocity_q.md](offline_angular_velocity_q.md). The two
+artifacts have distinct formats and are not interchangeable.
+
 ## Scope
 
-- One reward channel: height relative to a fixed reference and bound.
+- One reward channel per artifact: height relative to a fixed reference and
+  bound in this document. The yaw angular-velocity reward is a separate path with
+  its own spec, artifact format, and terminal convention.
 - One frozen stochastic PPO checkpoint as the continuation policy.
 - Recording currently requires one policy step per control step
   (`n_policy_steps == 1`, the `go2trot` configuration). Other actor/control

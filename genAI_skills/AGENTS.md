@@ -246,3 +246,4 @@ Repository skills:
 - `q2-rl-development`: observations, rewards, PPO/storage/normalization changes.
 - `q2-train-and-evaluate`: training, resume, playback, controlled evaluation.
 - `q2-testing-and-debugging`: test selection, discriminating probes, regressions.
+- `q2-offline-reward-development`: offline reward contracts, replay features, fixed-policy Q.

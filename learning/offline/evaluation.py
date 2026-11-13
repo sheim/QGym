@@ -15,10 +15,10 @@ from learning.offline.contracts import (
     sample_observation_noise,
 )
 from learning.offline.nominal_policy import FrozenTrotPolicy
-from learning.offline.q_artifact import HeightQ
+from learning.offline.q_artifact import AngularVelocityQ, HeightQ
 
 
-def policy_spec_from_artifact(artifact: HeightQ) -> PolicySpec:
+def policy_spec_from_artifact(artifact: HeightQ | AngularVelocityQ) -> PolicySpec:
     spec = artifact.manifest["policy_spec"]
     return PolicySpec(
         checkpoint=spec["checkpoint"],
@@ -38,7 +38,7 @@ def policy_spec_from_artifact(artifact: HeightQ) -> PolicySpec:
 
 
 def load_policy_from_artifact(
-    artifact: HeightQ,
+    artifact: HeightQ | AngularVelocityQ,
     checkpoint: str,
     device: str,
 ) -> tuple[FrozenTrotPolicy, PolicySpec]:

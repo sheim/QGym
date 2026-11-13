@@ -16,9 +16,12 @@ import torch
 SCHEMA_VERSION = 1
 REPLAY_FORMAT = "brg-offline-replay-v1"
 HEIGHT_Q_FORMAT = "brg-height-q-v1"
+ANGULAR_VEL_Q_FORMAT = "brg-angular-vel-q-v1"
 RETURN_CONVENTION = "discounted_continuing_absorbing_failure"
+ZERO_AFTER_TERMINAL_RETURN_CONVENTION = "discounted_episodic_zero_after_terminal"
 REWARD_TIMING = "post_action_pre_reset"
 TERMINAL_CONTINUATION = "absorbing_failure"
+ZERO_AFTER_TERMINAL = "zero_after_terminal"
 ACTION_CONVENTION = "brg_policy_units"
 
 TRANSITION_FIELDS = (
@@ -156,6 +159,52 @@ class HeightRewardSpec:
         if not 0.0 <= gamma < 1.0:
             raise ValueError("gamma must satisfy 0 <= gamma < 1")
         return self.outside_reward / (1.0 - gamma)
+
+
+@dataclass(frozen=True)
+class AngularVelocityRewardSpec:
+    """Yaw angular-velocity tracking term of ``Go2Trot._reward_tracking_ang_vel``.
+
+    The task computes ``exp(-((cmd_yaw - ang_vel_yaw) / error_scale)**2 /
+    tracking_sigma)``: the yaw error is divided by a hard-coded 2.5 rad/s scale
+    before ``_sqrdexp`` applies ``tracking_sigma``. Reproduce both constants; a
+    single ``tracking_sigma`` alone would label a different reward. The reward is
+    already positive and bounded in [0, 1], so true termination ends the episode
+    with a zero return rather than an absorbing failure tail.
+    """
+
+    tracking_sigma: float
+    error_scale: float = 2.5
+    timing: str = REWARD_TIMING
+    terminal_continuation: str = ZERO_AFTER_TERMINAL
+
+    def __post_init__(self) -> None:
+        _check_finite("tracking_sigma", self.tracking_sigma)
+        _check_finite("error_scale", self.error_scale)
+        if self.tracking_sigma <= 0:
+            raise ValueError("tracking_sigma must be positive")
+        if self.error_scale <= 0:
+            raise ValueError("error_scale must be positive")
+        if self.timing != REWARD_TIMING:
+            raise ValueError(f"unsupported reward timing {self.timing!r}")
+        if self.terminal_continuation != ZERO_AFTER_TERMINAL:
+            raise ValueError(
+                f"unsupported terminal continuation {self.terminal_continuation!r}"
+            )
+
+    @property
+    def min_reward(self) -> float:
+        return 0.0
+
+    @property
+    def max_reward(self) -> float:
+        return 1.0
+
+    def failure_value(self, gamma: float) -> float:
+        """Zero: the terminal return ends at the last observed reward."""
+        if not 0.0 <= gamma < 1.0:
+            raise ValueError("gamma must satisfy 0 <= gamma < 1")
+        return 0.0
 
 
 @dataclass(frozen=True)

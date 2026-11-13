@@ -262,3 +262,17 @@ def accumulate_return(total, alive, reward, terminated, step, gamma):
     total = total + gamma**step * reward * alive
     total = total - gamma ** (step + 1) / (1 - gamma) * terminal_now
     return total, alive & ~terminal_now
+
+
+def accumulate_return_zero_after_terminal(
+    total, alive, reward, terminated, step, gamma
+):
+    """Discounted episodic return; a true termination ends the return there.
+
+    There is no absorbing tail: the reward term is already masked to zero on a
+    terminal step, so the return after a fall is exactly the discounted sum of
+    the rewards observed before it.
+    """
+    terminal_now = alive & terminated
+    total = total + gamma**step * reward * alive
+    return total, alive & ~terminal_now
