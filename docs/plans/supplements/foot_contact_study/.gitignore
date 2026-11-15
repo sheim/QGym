@@ -1,0 +1,4 @@
+data/*.npz
+data/smoke.*
+
+__pycache__/

@@ -191,8 +191,7 @@ class Go2Trot(LeggedRobot):
     def _foot_contact_strength(self):
         """Map upward foot load smoothly from zero to nominal body-weight."""
         load = torch.clamp(
-            self.contact_forces[:, self.feet_indices, 2]
-            / (9.81 * self._backend.link_mass.sum(dim=1, keepdim=True)),
+            self.contact_forces[:, self.feet_indices, 2] / self.bodyweight,
             min=0.0,
             max=1.0,
         )

@@ -41,6 +41,7 @@ PRIVILEGED_Q_INPUTS = frozenset(
     {
         "base_height",
         "base_lin_vel",
+        "bodyweight",
         "contact_forces",
         "contacts",
         "rigid_body_states",

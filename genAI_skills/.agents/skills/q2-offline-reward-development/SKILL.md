@@ -1,6 +1,6 @@
 ---
 name: q2-offline-reward-development
-description: Add or change a Q2 offline reward and train its corresponding fixed-policy Q from recorded transitions. Use when extending replay/relabel/FQE beyond the two implemented reward paths (height and yaw angular velocity), adding raw reward features, or defining a new artifact, evaluation, or playback contract; not for an arbitrary reward plug-in.
+description: Add or change a Q2 offline reward and train its corresponding fixed-policy Q from recorded transitions. Use when extending replay/relabel/FQE beyond the three implemented reward paths (height, yaw angular velocity, foot contact force), adding raw reward features, or defining a new artifact, evaluation, or playback contract; not for an arbitrary reward plug-in.
 ---
 
 # Q2 Offline Reward Development
@@ -8,14 +8,15 @@ description: Add or change a Q2 offline reward and train its corresponding fixed
 Read `BigRedGym/genAI_skills/AGENTS.md`, `README_MUJOCO.md`, the durable
 [offline height-Q documentation](../../../../docs/offline_height_q.md), the
 [offline angular-velocity-Q documentation](../../../../docs/offline_angular_velocity_q.md),
+the [offline contact-force-Q documentation](../../../../docs/offline_contact_q.md),
 and the
 [replay/relabel supplement index](../../../../docs/plans/supplements/replay_relabel_q/README.md).
-Inspect the implementation and tests before editing. Two concrete offline reward
-paths exist; the tree still has no generic reward framework.
+Inspect the implementation and tests before editing. Three concrete offline
+reward paths exist; the tree still has no generic reward framework.
 
-## Two concrete reward paths
+## Three concrete reward paths
 
-Both paths share `TransitionDataset`, `FQE`, `QNetwork`, `FrozenTrotPolicy`,
+All paths share `TransitionDataset`, `FQE`, `QNetwork`, `FrozenTrotPolicy`,
 `PolicySpec`, `TrainingSpec`, candidate sampling, and `WarpInsertionSnapshot`.
 They differ in the reward shape, the terminal convention, and the artifact
 identity, so their artifacts are deliberately not interchangeable.
@@ -72,6 +73,39 @@ identity, so their artifacts are deliberately not interchangeable.
   argmax hit, regret, advantage correlation). The reward is positive, so
   rejection thresholds must be chosen on that scale; height thresholds are
   meaningless here.
+
+### Foot contact force (per-foot peak-load cap)
+
+- `ContactForceRewardSpec` (`learning/offline/contracts.py`) carries
+  `foot_names`, `thresholds_bw`, `percentile`, `timing=post_action_pre_reset`,
+  and `terminal_continuation=zero_after_terminal`. It fails closed on mismatched
+  lengths, non-positive thresholds, a percentile outside `(0, 100)`, and any
+  other timing or continuation value.
+- The label is `-1` when any foot's post-action vertical load exceeds its own
+  threshold, otherwise `0`; exactly zero on true termination
+  (`failure_value == 0.0`, no absorbing tail).
+- Inputs are `next_contact_forces` (`[N, bodies*3]`), `bodyweight` (`[N, 1]`,
+  from the randomised link masses) and `field_metadata.body_names`. All three
+  must be recorded (`--replay_fields=contacts`) or the labeller fails; a
+  core-only snapshot cannot be relabelled, and replaying recorded actions cannot
+  rebuild the state.
+- `derive_contact_thresholds()` takes each foot's percentile of the
+  per-touchdown peak distribution (>= 5 control steps above 5 % bodyweight,
+  peak >= 30 % bodyweight, inside one episode, terminated rows excluded) and is
+  applied to the training pool only. Thresholds are **behaviour-relative**: they
+  move 5-8 % between deterministic playback and the stochastic training policy,
+  so freeze them from the recording in the artifact.
+- `ContactQ`/`save_contact_q()` require format `brg-contact-q-v1`, return
+  convention `discounted_episodic_zero_after_terminal`, `failure_value == 0.0`,
+  and a parseable contact reward spec. `bodyweight` and `contact_forces` are
+  privileged and are rejected as Q inputs.
+- `scripts/train_contact_q.py` derives (or accepts) the thresholds, prints the
+  label rate, fits with `--validation_fraction` for an episode-grouped held-out
+  residual curve, and writes `<fraction>_report.json`.
+- Label rates are imbalanced (~2.8 % of steps at the 90th-percentile
+  thresholds), so report Bellman residuals and value error by label class, and
+  note that the label is a landing-impact label: most flagged steps are in the
+  first quarter of a stance, so the Q has to anticipate touchdown.
 
 ## Generalize with an explicit schema evolution
 
@@ -251,7 +285,7 @@ changing any changes what Q means.
   manual CPU viewer validation remains separate.
 
 ## Current reference commands
-Both reward paths have implemented entry points; do not invent flags. For a new
+All three reward paths have implemented entry points; do not invent flags. For a new
 reward, add its own parser first.
 
 ```bash
@@ -263,9 +297,10 @@ uv run --frozen python scripts/train_angular_velocity_q.py --help
 uv run --frozen python scripts/evaluate_angular_velocity_q_persistent.py --help
 uv run --frozen python scripts/summarize_angular_velocity_q_persistent.py --help
 uv run --frozen python scripts/plot_angular_velocity_tracking.py --help
+uv run --frozen python scripts/train_contact_q.py --help
 uv run --frozen python -m pytest tests/unit_tests/test_offline_replay.py \
   tests/unit_tests/test_height_fqe.py tests/unit_tests/test_height_q_playback.py \
-  tests/unit_tests/test_angular_velocity_q.py -q
+  tests/unit_tests/test_angular_velocity_q.py tests/unit_tests/test_contact_q.py -q
 uv run --frozen python -m pytest -q
 ```
 

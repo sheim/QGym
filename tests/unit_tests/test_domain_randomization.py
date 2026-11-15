@@ -276,6 +276,14 @@ def _assert_task_link_mass_randomization(device, backend_name="mujoco"):
             env._backend.link_mass,
             env._backend._nominal_link_mass * scales,
         )
+        # The task-level normaliser must follow the randomised masses, not the
+        # nominal ones; a cached bodyweight would mislabel contact rewards.
+        torch.testing.assert_close(
+            env.bodyweight,
+            9.81 * env._backend.link_mass.sum(dim=1, keepdim=True),
+        )
+        nominal_weight = 9.81 * env._backend._nominal_link_mass.sum(dim=1, keepdim=True)
+        assert not torch.allclose(env.bodyweight, nominal_weight, rtol=1e-3)
         torch.testing.assert_close(
             env._backend.link_inertia,
             env._backend._nominal_link_inertia * scales.unsqueeze(-1),

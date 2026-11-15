@@ -209,6 +209,33 @@ def test_episode_subsets_and_sample_n(tmp_path):
     assert len(sampled) == 4
 
 
+def test_concat_datasets_accepts_a_single_snapshot(tmp_path):
+    recorder = make_recorder(tmp_path, capacity=4)
+    recorder.append(**batch(offset=0.0), behavior_iteration=1)
+    snapshot = load_snapshot(recorder.snapshot(1))
+    combined = concat_datasets([snapshot])
+    assert len(combined) == len(snapshot)
+    assert combined.manifest["run_id"] == "combined"
+
+
+def test_concat_datasets_rejects_mismatched_extra_widths(tmp_path):
+    narrow = _snapshot_with_extra(tmp_path / "a", width=4)
+    wide = _snapshot_with_extra(tmp_path / "b", width=5)
+    with pytest.raises(ValueError, match="incompatible dof_pos shapes"):
+        concat_datasets([narrow, wide])
+
+
+def _snapshot_with_extra(tmp_path, width):
+    fields = ("dof_pos",)
+    recorder = make_recorder(tmp_path, extra_fields=fields)
+    recorder.append(
+        **batch(),
+        behavior_iteration=1,
+        extra_features={"dof_pos": torch.zeros(2, width)},
+    )
+    return load_snapshot(recorder.snapshot(1))
+
+
 def test_concat_datasets_deduplicates_overlapping_ids(tmp_path):
     recorder = make_recorder(tmp_path, capacity=4, num_envs=1)
     recorder.append(**batch(done_index=0, num_envs=1), behavior_iteration=1)
@@ -253,7 +280,13 @@ def test_noise_sampling_uses_only_the_owned_generator():
     )
 
 
-EXTRA_WIDTHS = {"critic_obs": 5, "root_states": 13, "dof_pos": 4, "reward_terms": 2}
+EXTRA_WIDTHS = {
+    "critic_obs": 5,
+    "root_states": 13,
+    "dof_pos": 4,
+    "bodyweight": 1,
+    "reward_terms": 2,
+}
 
 
 def extra_batch(fields, offset=0.0, num_envs=2):
@@ -276,6 +309,30 @@ def test_resolve_replay_fields_expands_groups_and_fields():
         resolve_replay_fields("dof_poss")
     with pytest.raises(ValueError):
         resolve_replay_fields("all,dof_pos")
+
+
+def test_contacts_group_records_the_bodyweight_normalizer():
+    """A contact-force label must be normalisable, so the group carries it."""
+    assert "bodyweight" in REPLAY_FEATURE_GROUPS["contacts"]
+    assert resolve_replay_fields("bodyweight") == ("bodyweight",)
+    assert (
+        resolve_replay_fields("contacts,bodyweight")
+        == (REPLAY_FEATURE_GROUPS["contacts"])
+    )
+
+
+def test_bodyweight_snapshot_round_trips(tmp_path):
+    fields = resolve_replay_fields("bodyweight")
+    recorder = make_recorder(tmp_path, extra_fields=fields)
+    recorder.append(
+        **batch(),
+        behavior_iteration=1,
+        extra_features=extra_batch(fields),
+    )
+    dataset = load_snapshot(recorder.snapshot(1))
+    assert dataset.manifest["extra_fields"] == ["bodyweight"]
+    assert dataset.manifest["field_dims"]["bodyweight"] == 1
+    torch.testing.assert_close(dataset.data["bodyweight"], torch.full((2, 1), 0.0))
 
 
 def test_recorder_config_requires_canonical_field_order():

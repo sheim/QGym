@@ -10,6 +10,8 @@ import torch
 from learning.algorithms.fqe import FQE, QNetwork
 from learning.offline.contracts import (
     AngularVelocityRewardSpec,
+    ContactForceRewardSpec,
+    HeightRewardSpec,
     PolicySpec,
     TrainingSpec,
     jsonable,
@@ -18,7 +20,11 @@ from learning.offline.contracts import (
 )
 from learning.offline.dataset import TransitionDataset
 from learning.offline.nominal_policy import FrozenTrotPolicy
-from learning.offline.q_artifact import save_angular_velocity_q, save_height_q
+from learning.offline.q_artifact import (
+    save_angular_velocity_q,
+    save_contact_q,
+    save_height_q,
+)
 
 
 def fraction_label(fraction: float) -> str:
@@ -101,6 +107,25 @@ def _bellman_metrics(
     bias = 0.0
     prediction_sum = 0.0
     target_sum = 0.0
+    target_square_sum = 0.0
+    # Sparse indicators (contact force, height bands) live or die on the rare
+    # class, so every metric is also reported split by the sign of the label.
+    classes = {
+        "flagged": {
+            "rows": 0,
+            "squared": 0.0,
+            "absolute": 0.0,
+            "prediction": 0.0,
+            "target": 0.0,
+        },
+        "unflagged": {
+            "rows": 0,
+            "squared": 0.0,
+            "absolute": 0.0,
+            "prediction": 0.0,
+            "target": 0.0,
+        },
+    }
     rows = int(indices.numel())
     for start in range(0, rows, chunk_size):
         chunk = indices[start : start + chunk_size]
@@ -113,18 +138,45 @@ def _bellman_metrics(
         bias += float(difference.sum())
         prediction_sum += float(prediction.sum())
         target_sum += float(target.sum())
+        target_square_sum += float(target.square().sum())
+        flagged = batch["reward"] < 0
+        for name, mask in (("flagged", flagged), ("unflagged", ~flagged)):
+            count = int(mask.sum())
+            if count == 0:
+                continue
+            entry = classes[name]
+            entry["rows"] += count
+            entry["squared"] += float(difference[mask].square().sum())
+            entry["absolute"] += float(difference[mask].abs().sum())
+            entry["prediction"] += float(prediction[mask].sum())
+            entry["target"] += float(target[mask].sum())
+    mse = squared / rows
+    variance = max(target_square_sum / rows - (target_sum / rows) ** 2, 0.0)
     return {
         "rows": rows,
-        "mse": squared / rows,
-        "rmse": (squared / rows) ** 0.5,
+        "mse": mse,
+        "rmse": mse**0.5,
         "mae": absolute / rows,
         "bias": bias / rows,
         "prediction_mean": prediction_sum / rows,
         "target_mean": target_sum / rows,
+        "target_std": variance**0.5,
+        "explained_variance": 1.0 - mse / variance if variance > 0 else None,
+        "by_class": {
+            name: {
+                "rows": entry["rows"],
+                "mse": entry["squared"] / entry["rows"],
+                "mae": entry["absolute"] / entry["rows"],
+                "prediction_mean": entry["prediction"] / entry["rows"],
+                "target_mean": entry["target"] / entry["rows"],
+            }
+            for name, entry in classes.items()
+            if entry["rows"] > 0
+        },
     }
 
 
-def train_height_q(
+def _train_fqe(
     dataset: TransitionDataset,
     policy: FrozenTrotPolicy,
     policy_spec: PolicySpec,
@@ -133,121 +185,19 @@ def train_height_q(
     output_dir: str | Path,
     subset: dict,
     source_revision: str,
-) -> Path:
-    if "reward" not in dataset.data:
-        raise ValueError("dataset must be relabeled before training")
-    if dataset.manifest.get("reward_spec") is None:
-        raise ValueError("dataset manifest is missing reward_spec")
-    if len(dataset) == 0:
-        raise ValueError("training dataset is empty")
-
-    device = torch.device(spec.device)
-    data = {name: value.to(device) for name, value in dataset.data.items()}
-    actor_obs = data["actor_obs"]
-    if spec.normalize_observations:
-        obs_mean = actor_obs.mean(dim=0)
-        obs_std = actor_obs.std(dim=0) + 1e-3
-    else:
-        obs_mean = torch.zeros(actor_obs.shape[1], device=device, dtype=actor_obs.dtype)
-        obs_std = torch.ones(actor_obs.shape[1], device=device, dtype=actor_obs.dtype)
-
-    q_network = QNetwork(
-        int(actor_obs.shape[1]),
-        int(data["action"].shape[1]),
-        spec.hidden_dims,
-        spec.activation,
-    )
-    failure_value = dataset.manifest["reward_spec"]["outside_reward"] / (
-        1.0 - spec.gamma
-    )
-    algorithm = FQE(
-        q_network,
-        policy,
-        gamma=spec.gamma,
-        failure_value=failure_value,
-        target_tau=spec.target_tau,
-        learning_rate=spec.learning_rate,
-        device=device,
-        target_action_samples=spec.target_action_samples,
-    )
-    generator = torch.Generator(device=device).manual_seed(spec.seed)
-    size = len(dataset)
-    batch_size = min(spec.batch_size, size)
-    log_every = max(1, spec.updates // 10)
-    losses: list[float] = []
-    for update in range(spec.updates):
-        indices = torch.randint(
-            0,
-            size,
-            (batch_size,),
-            device=device,
-            generator=generator,
-        )
-        batch = _batch(
-            data,
-            indices,
-            obs_mean=obs_mean,
-            obs_std=obs_std,
-        )
-        loss = algorithm.update(batch, generator)
-        losses.append(loss)
-        if update == 0 or (update + 1) % log_every == 0:
-            print(f"update={update + 1}/{spec.updates} loss={loss:.6f}")
-
-    artifact = save_height_q(
-        output_dir,
-        algorithm.q,
-        obs_mean=obs_mean,
-        obs_std=obs_std,
-        gamma=spec.gamma,
-        failure_value=failure_value,
-        reward_spec=dataset.manifest["reward_spec"],
-        policy_spec=policy_spec,
-        training_spec=spec,
-        dataset_manifest={
-            **dataset.manifest,
-            "source": dataset.source,
-        },
-        subset=subset,
-        source_revision=source_revision,
-    )
-    mean_loss = sum(losses) / len(losses)
-    print(
-        f"artifact={artifact} mean_loss={mean_loss:.6f} "
-        f"transitions={size} updates={spec.updates}"
-    )
-    return artifact
-
-
-def train_angular_velocity_q(
-    dataset: TransitionDataset,
-    policy: FrozenTrotPolicy,
-    policy_spec: PolicySpec,
-    *,
-    spec: TrainingSpec,
-    output_dir: str | Path,
-    subset: dict,
-    source_revision: str,
+    reward_spec_cls,
+    save_fn,
     validation_dataset: TransitionDataset | None = None,
     validation_every: int = 0,
     report_path: str | Path | None = None,
 ) -> Path:
-    """Fit ``Q_{r'}^{pi_r}`` for the yaw tracking term.
-
-    Same FQE loop as ``train_height_q``; only the reward contract differs: the
-    recorded spec must be a zero-after-terminal angular-velocity reward and the
-    terminal target is the observed (zero) reward with no absorbing tail.
-
-    ``validation_dataset`` must be an episode-disjoint split; it is never used
-    for optimization or observation normalization. Its one-step Bellman residual
-    is the convergence evidence written to ``report_path``.
-    """
+    """Shared FQE loop; only the reward contract and artifact writer differ."""
     if "reward" not in dataset.data:
         raise ValueError("dataset must be relabeled before training")
-    reward_spec = dataset.manifest.get("reward_spec")
-    if reward_spec is None:
+    reward_spec_dict = dataset.manifest.get("reward_spec")
+    if reward_spec_dict is None:
         raise ValueError("dataset manifest is missing reward_spec")
-    reward_spec = AngularVelocityRewardSpec(**reward_spec)
+    reward_spec = reward_spec_cls(**reward_spec_dict)
     if len(dataset) == 0:
         raise ValueError("training dataset is empty")
 
@@ -348,7 +298,7 @@ def train_angular_velocity_q(
                 }
             )
 
-    artifact = save_angular_velocity_q(
+    artifact = save_fn(
         output_dir,
         algorithm.q,
         obs_mean=obs_mean,
@@ -450,3 +400,92 @@ def train_angular_velocity_q(
             f"loss_last1000={report['loss_curve']['last_1000_mean']:.4f}"
         )
     return artifact
+
+
+def train_height_q(
+    dataset: TransitionDataset,
+    policy: FrozenTrotPolicy,
+    policy_spec: PolicySpec,
+    *,
+    spec: TrainingSpec,
+    output_dir: str | Path,
+    subset: dict,
+    source_revision: str,
+) -> Path:
+    """Fit ``Q`` for the height reward (absorbing-failure terminal value)."""
+    return _train_fqe(
+        dataset,
+        policy,
+        policy_spec,
+        spec=spec,
+        output_dir=output_dir,
+        subset=subset,
+        source_revision=source_revision,
+        reward_spec_cls=HeightRewardSpec,
+        save_fn=save_height_q,
+    )
+
+
+def train_angular_velocity_q(
+    dataset: TransitionDataset,
+    policy: FrozenTrotPolicy,
+    policy_spec: PolicySpec,
+    *,
+    spec: TrainingSpec,
+    output_dir: str | Path,
+    subset: dict,
+    source_revision: str,
+    validation_dataset: TransitionDataset | None = None,
+    validation_every: int = 0,
+    report_path: str | Path | None = None,
+) -> Path:
+    """Fit ``Q_{r'}^{pi_r}`` for the yaw tracking term."""
+    return _train_fqe(
+        dataset,
+        policy,
+        policy_spec,
+        spec=spec,
+        output_dir=output_dir,
+        subset=subset,
+        source_revision=source_revision,
+        reward_spec_cls=AngularVelocityRewardSpec,
+        save_fn=save_angular_velocity_q,
+        validation_dataset=validation_dataset,
+        validation_every=validation_every,
+        report_path=report_path,
+    )
+
+
+def train_contact_q(
+    dataset: TransitionDataset,
+    policy: FrozenTrotPolicy,
+    policy_spec: PolicySpec,
+    *,
+    spec: TrainingSpec,
+    output_dir: str | Path,
+    subset: dict,
+    source_revision: str,
+    validation_dataset: TransitionDataset | None = None,
+    validation_every: int = 0,
+    report_path: str | Path | None = None,
+) -> Path:
+    """Fit ``Q_{r'}^{pi_r}`` for the foot contact-force constraint.
+
+    The reward is the per-step ``-1/0`` indicator from ``relabel_contact_force``:
+    bounded, zero on termination, and valid only with the thresholds recorded in
+    the reward spec.
+    """
+    return _train_fqe(
+        dataset,
+        policy,
+        policy_spec,
+        spec=spec,
+        output_dir=output_dir,
+        subset=subset,
+        source_revision=source_revision,
+        reward_spec_cls=ContactForceRewardSpec,
+        save_fn=save_contact_q,
+        validation_dataset=validation_dataset,
+        validation_every=validation_every,
+        report_path=report_path,
+    )

@@ -23,6 +23,7 @@ REPLAY_FORMAT = "brg-offline-replay-v1"
 REPLAY_FORMAT_V2 = "brg-offline-replay-v2"
 HEIGHT_Q_FORMAT = "brg-height-q-v1"
 ANGULAR_VEL_Q_FORMAT = "brg-angular-vel-q-v1"
+CONTACT_Q_FORMAT = "brg-contact-q-v1"
 RETURN_CONVENTION = "discounted_continuing_absorbing_failure"
 ZERO_AFTER_TERMINAL_RETURN_CONVENTION = "discounted_episodic_zero_after_terminal"
 REWARD_TIMING = "post_action_pre_reset"
@@ -220,6 +221,63 @@ class AngularVelocityRewardSpec:
 
     def failure_value(self, gamma: float) -> float:
         """Zero: the terminal return ends at the last observed reward."""
+        if not 0.0 <= gamma < 1.0:
+            raise ValueError("gamma must satisfy 0 <= gamma < 1")
+        return 0.0
+
+
+@dataclass(frozen=True)
+class ContactForceRewardSpec:
+    """Per-foot vertical ground-force cap: -1 above it, 0 otherwise.
+
+    The reward is a per-step indicator of a *peak-load* constraint: each foot
+    has its own threshold in bodyweight units, and the label fires when the
+    instantaneous post-action load of any foot exceeds it. Thresholds come from
+    that foot's per-touchdown peak distribution under the recorded behaviour
+    policy (``percentile``), so the label is relative to that policy and must be
+    carried by the artifact rather than re-derived at eval time.
+
+    The reward is bounded in [-1, 0] and the episode ends with a zero return, so
+    true termination contributes no absorbing tail.
+    """
+
+    foot_names: tuple[str, ...]
+    thresholds_bw: tuple[float, ...]
+    percentile: float
+    timing: str = REWARD_TIMING
+    terminal_continuation: str = ZERO_AFTER_TERMINAL
+
+    def __post_init__(self) -> None:
+        if not self.foot_names:
+            raise ValueError("at least one foot name is required")
+        if len(set(self.foot_names)) != len(self.foot_names):
+            raise ValueError("foot_names must be unique")
+        if len(self.thresholds_bw) != len(self.foot_names):
+            raise ValueError("thresholds_bw must match foot_names in length")
+        for name, threshold in zip(self.foot_names, self.thresholds_bw, strict=True):
+            _check_finite(f"threshold for {name}", threshold)
+            if threshold <= 0:
+                raise ValueError(f"threshold for {name} must be positive")
+        _check_finite("percentile", self.percentile)
+        if not 0.0 < self.percentile < 100.0:
+            raise ValueError("percentile must be strictly between 0 and 100")
+        if self.timing != REWARD_TIMING:
+            raise ValueError(f"unsupported reward timing {self.timing!r}")
+        if self.terminal_continuation != ZERO_AFTER_TERMINAL:
+            raise ValueError(
+                f"unsupported terminal continuation {self.terminal_continuation!r}"
+            )
+
+    @property
+    def min_reward(self) -> float:
+        return -1.0
+
+    @property
+    def max_reward(self) -> float:
+        return 0.0
+
+    def failure_value(self, gamma: float) -> float:
+        """Zero: the return ends at the last observed reward."""
         if not 0.0 <= gamma < 1.0:
             raise ValueError("gamma must satisfy 0 <= gamma < 1")
         return 0.0

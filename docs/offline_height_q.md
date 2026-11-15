@@ -12,8 +12,10 @@ runtime here is plain PyTorch inside BRG's uv environment.
 The reward channel described here is height-specific. A second, parallel path
 relabels the same replay records with go2trot's yaw angular-velocity tracking
 term, which is positive, has a zero terminal value, and has no absorbing tail:
-see [offline_angular_velocity_q.md](offline_angular_velocity_q.md). The two
-artifacts have distinct formats and are not interchangeable.
+see [offline_angular_velocity_q.md](offline_angular_velocity_q.md). A third path
+labels a per-foot peak-load constraint with a `-1 / 0` indicator from recorded
+contact forces and bodyweight: see [offline_contact_q.md](offline_contact_q.md).
+All three artifacts have distinct formats and are not interchangeable.
 
 ## Scope
 
@@ -104,12 +106,20 @@ names fail instead of being dropped. Groups (`all` expands to every field):
 | `root` | `root_states`, `next_root_states` |
 | `base` | `base_lin_vel`, `base_ang_vel`, `projected_gravity`, `base_height`, and their `next_` successors |
 | `joints` | `dof_pos`, `dof_vel`, `dof_pos_obs`, `dof_pos_target`, `dof_pos_history`, `dof_vel_target`, `torques`, `tau_ff`, `p_gains`, `d_gains`, plus `next_dof_*`/`next_torques` |
-| `contacts` | `contact_forces`, `next_contact_forces` |
+| `contacts` | `contact_forces`, `bodyweight`, `next_contact_forces` |
 | `bodies` | `rigid_body_states`, `next_rigid_body_states` (per-body position, quaternion, linear and angular velocity) |
 | `commands` | `commands`, `next_commands` |
 | `gait` | `phase`, `phase_frequency`, `phase_obs`, `gait_reference`, and their `next_` successors |
 | `rewards` | `reward_terms` (weighted per-term reward for the transition) |
 | `episode` | `episode_length`, `next_episode_length` |
+
+`contact_forces` is `[num_envs, num_bodies, 3]` in canonical body order, world
+frame, Newtons (`field_metadata.body_names` gives the order). `bodyweight` is
+`[num_envs, 1]` gravity load in Newtons from the *randomised* link masses
+(`LeggedRobot.bodyweight`); startup mass randomisation varies it by up to
++-20 % across environments, so a contact threshold expressed as a fraction of
+bodyweight needs this column and must not assume a nominal constant. Both are
+privileged simulator measurements and cannot become Q inputs.
 
 Naming follows one rule: a plain name is read **before** the action (it matches
 the observation that chose the action), and a `next_` name is read **after** the

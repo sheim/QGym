@@ -2,7 +2,7 @@
 
 ## Provenance
 
-- Plan: `.opencode/workspace/plans/angular_velocity_q_plan.md`.
+- Plan: `docs/plans/angular_velocity_q_plan.md`.
 - Artifact directory: `/tmp/opencode/angular-vel-q-20261112/` (`q/` = 200-update
   smoke, `q20k/`, `q100k/` = 100k-update fit, `eval/` = paired block, traces,
   plot, `results.json`, `validation.json`; `eval_fresh/` = independent

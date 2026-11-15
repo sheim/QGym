@@ -1,0 +1,60 @@
+# Foot contact study (go2trot)
+
+Study of how to extract go2trot foot ground-contact forces and how they are
+distributed over the locomotion cycle. Read [REPORT.md](REPORT.md) first.
+
+No product code was edited. This directory is self-contained: helper scripts,
+raw recordings, summaries, figures.
+
+| path | contents |
+|---|---|
+| `REPORT.md` | findings, extraction guide, reward-design implications |
+| `collect_foot_contacts.py` | replays a frozen checkpoint and records foot forces + gait state |
+| `check_force_semantics.py` | verifies that `contact_forces` is a per-body net contact force |
+| `inspect_contact_sources.py` | decomposes the tensor into the MuJoCo contacts that produce it (ground vs self) |
+| `inspect_swing_contact.py` | contact-level evidence for the force seen during scheduled swing |
+| `analyze_cycle_peaks.py` | per-touchdown and per-cycle peak force, impulse, timing |
+| `analyze_threshold_label.py` | threshold families for a `-1/0` contact label, label rates, returns, next-step AUC |
+| `verify_contact_snapshot.py` | checks a contact+bodyweight replay snapshot and re-derives the thresholds from it |
+
+The reward and Q path built from this study lives in the product tree:
+[`docs/offline_contact_q.md`](../../../offline_contact_q.md),
+`learning/offline/{contracts,rewards,training,q_artifact}.py`,
+`scripts/train_contact_q.py`.
+| `analyze_foot_contacts.py` | builds `artifacts/` and `figures/` from `data/` |
+| `data/gpu.npz`, `data/cpu.npz` | raw recordings (Warp 128x600, CPU 64x400), git-ignored |
+| `data/*.json` | recording provenance (checkpoint sha256, seed, masses, field names) |
+| `artifacts/summary.json` | all measured numbers, machine readable |
+| `artifacts/summary.md` | generated tables |
+| `artifacts/static_check.json` | force-semantics probes |
+| `artifacts/contact_sources.json` | contact attribution: foot/ground vs calf/ground vs self |
+| `artifacts/swing_contact.json` | swing-phase contacts by schedule class (late lift-off / early touchdown) |
+| `artifacts/cycle_peaks.json` | per-stance and per-cycle peak force, duration, impulse |
+| `artifacts/threshold_label.json` | threshold families, flagged rates, returns, next-step observability |
+| `artifacts/snapshot_check.json` | verification of the 1M contact-labelled snapshot |
+| `figures/fig1..fig11` | load vs phase, contact probability, distributions, sharing, command effects, observability, candidate reward, touchdown peaks, swing-contact source |
+
+## Reproduce
+
+From `BigRedGym/`:
+
+```bash
+uv run --frozen python docs/plans/supplements/foot_contact_study/collect_foot_contacts.py \
+  --device cuda:0 --num_envs 128 --steps 600 --tag gpu
+uv run --frozen python docs/plans/supplements/foot_contact_study/collect_foot_contacts.py \
+  --device cpu --num_envs 64 --steps 400 --tag cpu
+uv run --frozen python docs/plans/supplements/foot_contact_study/check_force_semantics.py
+uv run --frozen python docs/plans/supplements/foot_contact_study/inspect_contact_sources.py
+uv run --frozen python docs/plans/supplements/foot_contact_study/analyze_foot_contacts.py
+uv run --frozen python docs/plans/supplements/foot_contact_study/analyze_cycle_peaks.py
+uv run --frozen python docs/plans/supplements/foot_contact_study/inspect_swing_contact.py
+uv run --frozen python docs/plans/supplements/foot_contact_study/analyze_threshold_label.py
+uv run --frozen python docs/plans/supplements/foot_contact_study/verify_contact_snapshot.py \
+  --snapshot logs/go2trot/Nov13_21-02-10_contact-bw-1m-20261113/replay/replay_iter_0000616
+```
+
+The collector defaults to the frozen checkpoint
+`logs/go2trot/Nov10_10-36-22_gpu-final-600-trot-hist-20261110/model_600.pt`
+(sha256 `f88b1f9b...`), its saved environment config, 50 Hz control, commands
+resampled every 3 s, no pushes, no resets. Override `--load_run`, `--checkpoint`,
+`--device`, `--tag` as needed.

@@ -39,6 +39,7 @@ STEP_FEATURE_ATTRS: dict[str, str] = {
     "p_gains": "p_gains",
     "d_gains": "d_gains",
     "contact_forces": "contact_forces",
+    "bodyweight": "bodyweight",
     "rigid_body_states": "_rigid_body_state",
     "commands": "commands",
     "phase": "phase",
@@ -108,7 +109,7 @@ REPLAY_FEATURE_GROUPS: dict[str, tuple[str, ...]] = {
         "next_dof_pos_target",
         "next_torques",
     ),
-    "contacts": ("contact_forces", "next_contact_forces"),
+    "contacts": ("contact_forces", "bodyweight", "next_contact_forces"),
     "bodies": ("rigid_body_states", "next_rigid_body_states"),
     "commands": ("commands", "next_commands"),
     "gait": (

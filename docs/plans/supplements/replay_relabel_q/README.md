@@ -1,7 +1,7 @@
 # Replay/relabel height-Q experiment reports
 
 Durable copies of the generated Markdown reports from the archived
-[replay/relabel/FQE plan](../../../../../.opencode/workspace/plans/archive/replay_relabel_q_plan.md).
+[replay/relabel/FQE plan](../../replay_relabel_q_plan/README.md).
 The reports cover fixed-state return variance, a persistent eight-candidate Q
 intervention, the paired 16-execution regrouping, two additional critics,
 the rejection/closest-mean threshold sweep, an original-PPO-reward versus

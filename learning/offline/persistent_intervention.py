@@ -8,7 +8,7 @@ from learning.offline.fixed_state_variance import (
     accumulate_return,
     accumulate_return_zero_after_terminal,
 )
-from learning.offline.rewards import angular_velocity_reward
+from learning.offline.rewards import angular_velocity_reward, contact_force_reward
 
 
 def sample_candidates(policy, obs, generator):
@@ -611,4 +611,206 @@ def rollout_rejection_angular_vel(
         choose,
         8,
         trace,
+    )
+
+
+@torch.no_grad()
+def _rollout_contact_common(
+    env,
+    policy,
+    spec,
+    snapshot,
+    initial_obs,
+    seed,
+    reward_spec,
+    feet,
+    horizon,
+    choose,
+    n_candidates,
+    training_model=None,
+):
+    """Contact-force return with the zero-after-terminal convention.
+
+    The label is computed from the live task tensors after ``step()``:
+    ``contact_forces`` for the feet divided by the task's randomised
+    ``bodyweight``, exactly as the labeller does on the recorded snapshot.
+    """
+    if horizon <= 0:
+        raise ValueError("horizon must be positive")
+    snapshot.restore()
+    snapshot.assert_restored()
+    torch.manual_seed(seed)
+    obs_rng = torch.Generator(device=env.device).manual_seed(seed + 1)
+    act_rng = torch.Generator(device=env.device).manual_seed(seed + 2)
+    n = env.num_envs
+    alive = torch.ones(n, dtype=torch.bool, device=env.device)
+    sums = {
+        key: torch.zeros(n, dtype=torch.float64, device=env.device)
+        for key in (
+            "returns",
+            "steps",
+            "violation_steps",
+            "xy_error_sq",
+            "yaw_error_sq",
+            "training_reward",
+            "q_gain_sum",
+        )
+    }
+    sums["termination_step"] = torch.full(
+        (n,), float(horizon), dtype=torch.float64, device=env.device
+    )
+    selection = torch.zeros(n, n_candidates, dtype=torch.int64, device=env.device)
+    timeout_seen = torch.zeros(n, dtype=torch.bool, device=env.device)
+    extras = {}
+    obs = initial_obs
+    first_reward = None
+    first_terminated = None
+    for step in range(horizon):
+        action, index, gains, extra_values = choose(obs, act_rng)
+        alive_before = alive
+        selection.scatter_add_(1, index[:, None], alive_before.long()[:, None])
+        for key, value in gains.items():
+            sums[key] += value * alive_before
+        for key, value in extra_values.items():
+            if key not in extras:
+                extras[key] = torch.zeros(
+                    (n, *value.shape[1:]), dtype=torch.float64, device=env.device
+                )
+            if value.ndim == 1:
+                extras[key] += value * alive_before
+            else:
+                extras[key] += value * alive_before[:, None]
+        command = env.commands.clone()
+        env.set_states(spec.action_names, action)
+        env.step()
+        load = env.contact_forces.index_select(1, feet)[..., 2] / env.bodyweight
+        reward = contact_force_reward(load, reward_spec) * (~env.terminated)
+        if step == 0:
+            first_reward = reward.clone()
+            first_terminated = env.terminated.clone()
+        violated = (reward < 0).to(torch.float64)
+        sums["violation_steps"] += violated * alive_before
+        sums["xy_error_sq"] += (env.base_lin_vel[:, :2] - command[:, :2]).square().sum(
+            -1
+        ) * alive_before
+        sums["yaw_error_sq"] += (
+            env.base_ang_vel[:, 2] - command[:, 2]
+        ).square() * alive_before
+        if training_model is not None:
+            sums["training_reward"] += (
+                training_model.total(training_model.step_terms(env)) * alive_before
+            )
+        timeout_seen |= env.timed_out
+        sums["termination_step"] = torch.where(
+            alive_before & env.terminated,
+            torch.full_like(sums["termination_step"], float(step)),
+            sums["termination_step"],
+        )
+        sums["steps"] += alive_before
+        sums["returns"], alive = accumulate_return_zero_after_terminal(
+            sums["returns"],
+            alive_before,
+            reward,
+            env.terminated,
+            step,
+            0.99,
+        )
+        if step != horizon - 1:
+            obs = _policy_observation(
+                env, spec.obs_names, spec.obs_dims, spec.noise, spec.scales, obs_rng
+            )
+    sums.update(extras)
+    if timeout_seen.any() or not all(torch.isfinite(v).all() for v in sums.values()):
+        raise RuntimeError("timeout or nonfinite contact rollout")
+    sums.update(
+        survived=alive,
+        first_rewards=first_reward,
+        first_terminated=first_terminated,
+        selection_counts=selection,
+        timeout_seen=timeout_seen,
+    )
+    return {k: v.cpu() for k, v in sums.items()}
+
+
+@torch.no_grad()
+def rollout_contact(
+    env,
+    policy,
+    spec,
+    snapshot,
+    initial_obs,
+    critic,
+    seed,
+    reward_spec,
+    feet,
+    horizon=500,
+    training_model=None,
+):
+    """Candidate 0 (one stochastic draw) or max-Q over the same eight draws."""
+
+    def choose(obs, act_rng):
+        candidates = sample_candidates(policy, obs, act_rng)
+        action, index, gain = select_action(obs, candidates, critic)
+        return action, index, {"q_gain_sum": gain}, {}
+
+    return _rollout_contact_common(
+        env,
+        policy,
+        spec,
+        snapshot,
+        initial_obs,
+        seed,
+        reward_spec,
+        feet,
+        horizon,
+        choose,
+        8,
+        training_model=training_model,
+    )
+
+
+@torch.no_grad()
+def rollout_rejection_contact(
+    env,
+    policy,
+    spec,
+    snapshot,
+    initial_obs,
+    critic,
+    seed,
+    reward_spec,
+    feet,
+    threshold,
+    horizon=500,
+    training_model=None,
+):
+    """First stochastic draw with Q >= threshold, else the max-Q draw."""
+
+    def choose(obs, act_rng):
+        candidates, mean = sample_rejection_candidates(policy, obs, act_rng)
+        result = select_rejection_action(obs, candidates, mean, critic, threshold)
+        extras = {
+            "attempts": result["attempts"].to(torch.float64),
+            "fallback": result["fallback"].to(torch.float64),
+        }
+        return (
+            result["action"],
+            result["indices"],
+            {"q_gain_sum": result["gain"]},
+            extras,
+        )
+
+    return _rollout_contact_common(
+        env,
+        policy,
+        spec,
+        snapshot,
+        initial_obs,
+        seed,
+        reward_spec,
+        feet,
+        horizon,
+        choose,
+        8,
+        training_model=training_model,
     )

@@ -220,15 +220,15 @@ def concat_datasets(
     if not datasets:
         raise ValueError("at least one dataset is required")
     field_set = set(datasets[0].data.keys())
-    for dataset in datasets[1:]:
-        if set(dataset.data.keys()) != field_set:
-            raise ValueError("datasets have incompatible fields")
     field_names = TRANSITION_FIELDS + tuple(
         name for name in datasets[0].data.keys() if name not in TRANSITION_FIELDS
     )
-    for name in field_names:
-        if dataset.data[name].shape[1:] != datasets[0].data[name].shape[1:]:
-            raise ValueError(f"datasets have incompatible {name} shapes")
+    for dataset in datasets[1:]:
+        if set(dataset.data.keys()) != field_set:
+            raise ValueError("datasets have incompatible fields")
+        for name in field_names:
+            if dataset.data[name].shape[1:] != datasets[0].data[name].shape[1:]:
+                raise ValueError(f"datasets have incompatible {name} shapes")
 
     data = {name: _concat_field(datasets, name) for name in field_names}
     manifest = dict(datasets[0].manifest)

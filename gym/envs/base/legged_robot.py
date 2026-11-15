@@ -539,6 +539,17 @@ class LeggedRobot(BaseTask):
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
         self.cfg.push_interval = np.ceil(self.cfg.push_robots.interval_s / self.dt)
 
+    @property
+    def bodyweight(self):
+        """[num_envs, 1] gravity load of the robot's randomised link masses, N.
+
+        Link masses are rescaled once at startup by domain randomisation, so the
+        value is re-derived from the backend instead of cached at init. Contact
+        rewards that compare a force against bodyweight must use this, not a
+        nominal constant, because the per-environment scale varies.
+        """
+        return 9.81 * self._backend.link_mass.sum(dim=1, keepdim=True)
+
     def _sqrdexp(self, x, sigma=None):
         """shorthand helper for squared exponential"""
         if sigma is None:
