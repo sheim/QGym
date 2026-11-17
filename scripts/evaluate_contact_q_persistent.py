@@ -369,6 +369,28 @@ def main():
                             training_model=training_model,
                         )
                     )
+            # Per-state, per-lane arrays so a later summary can ask which initial
+            # condition degraded and whether an intervention zeroed it. Coarse
+            # means hide exactly that question.
+            torch.save(
+                {
+                    "seed": seed,
+                    "states": STATES,
+                    "lanes": LANES,
+                    "controllers": {
+                        key: {
+                            "returns": value["returns"].reshape(STATES, LANES),
+                            "violation_steps": value["violation_steps"].reshape(
+                                STATES, LANES
+                            ),
+                            "steps": value["steps"].reshape(STATES, LANES),
+                            "survived": value["survived"].reshape(STATES, LANES),
+                        }
+                        for key, value in results.items()
+                    },
+                },
+                output / f"block_{block:02d}.pt",
+            )
             block_entry = {"block": block, "seed": seed, "controllers": {}}
             plain_by_artifact = {
                 name: results[f"{name}_plain"] for name in args.artifact_names

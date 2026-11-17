@@ -233,6 +233,157 @@ Reading:
   discounted violation cost of the frozen policy?" (the FQE residual says it is
   approximately so, with a known bias).
 
+### One initial condition, many rollouts
+
+`scripts/plot_contact_intervention_traces.py` fixes one insertion state, keeps
+its eight replicated worlds, and rolls out the frozen policy and max-Q over
+several blocks of shared command noise (8 lanes x 8 blocks = 64 rollouts per
+controller, H = 500). Time series are plotted as mean +/- sd over rollouts with
+a 9-step moving average on the mean.
+
+State 22 (worst plain condition, `vx = +0.62`):
+
+| controller | violations/rollout | max | rollouts with 0 | FL / FR / RL / RR violation steps |
+|---|---|---|---|---|
+| plain | 19.9 +/- 6.3 | 41 | 0 % | 520 / 286 / 244 / 240 |
+| max-Q | 7.4 +/- 3.6 | 18 | 0 % | 245 / 73 / 53 / 109 |
+
+State 86 (`vx = 0`), where the intervention reaches zero for many rollouts:
+
+| controller | violations/rollout | max | rollouts with 0 | RL violation steps |
+|---|---|---|---|---|
+| plain | 7.5 +/- 6.0 | 25 | 5 % | 237 |
+| max-Q | 1.9 +/- 2.5 | 11 | **39 %** | 69 |
+
+![State 22 traces](plans/supplements/foot_contact_study/figures/fig12_state22_intervention_traces.png)
+
+![State 86 traces](plans/supplements/foot_contact_study/figures/fig12_state86_intervention_traces.png)
+
+**Where the intervention has least to offer.** `--state -1` screens all 128
+states (4 blocks, seeds disjoint from the plotted rollouts) and picks the
+smallest plain-versus-max-Q difference; here that is state 61, plotted with the
+same 64 rollouts:
+
+| controller | violations/rollout | max | rollouts with 0 |
+|---|---|---|---|
+| plain | 0.98 +/- 1.54 | 6 | 61 % |
+| max-Q | 0.50 +/- 0.92 | 4 | 70 % |
+
+Paired per-rollout difference `0.48` (95 % CI `[0.08, 0.88]`); of 64 pairs, 20
+improve, 32 are tied at zero, and **12 get worse**. Per-foot violation steps
+plain `13 / 21 / 6 / 23` versus max-Q `14 / 4 / 7 / 7`: the front-left foot moves
+by `+1`. So a benign condition does not become safer, it becomes
+statistically indistinguishable, with individual rollouts moving either way.
+
+![State 61 traces](plans/supplements/foot_contact_study/figures/fig13_state61_smallest_delta_traces.png)
+
+**Distribution view.** `scripts/plot_violation_kde.py` reduces the same 64
+rollouts per condition to a KDE of the violations-per-rollout distribution
+(Gaussian kernel, Silverman bandwidth, reflected at zero so the density respects
+the count support; rug marks show the discrete samples):
+
+![Three initial conditions, KDE](plans/supplements/foot_contact_study/figures/fig14_three_initial_conditions_kde.png)
+
+| condition | plain (mean +/- sd, zero) | max-Q (mean +/- sd, zero) |
+|---|---|---|
+| state 22 (worst) | 19.88 +/- 6.34, 0 % | 8.02 +/- 5.03, 0 % |
+| state 86 (mid) | 7.33 +/- 6.03, 5 % | 1.78 +/- 2.26, 38 % |
+| state 61 (smallest difference) | 0.98 +/- 1.60, 59 % | 0.59 +/- 1.06, 67 % |
+
+The three panels are on their own scales: the supports differ by an order of
+magnitude (max 43 versus max 6 violations), and a shared axis hides two of the
+three distributions. What the shape says beyond the means: at state 86 the
+max-Q density piles up against zero while plain is unimodal around 7; at state
+61 both are concentrated at zero, and max-Q merely thickens the zero bin; at
+state 22 the two modes are almost disjoint. The curvature at 20-25 in the plain
+density of state 22 is a KDE artefact of a sparse, discrete sample, not a real
+second mode.
+
+Reading the panels, per state: the max foot load and the violating foot's load
+sit below their thresholds more often under max-Q, the per-step violation
+probability drops by ~50-70 %, total support and base height are unchanged, and
+the per-rollout histogram shifts left and narrows. The block-to-block spread is
+larger than the lane-to-lane spread, because the eight lanes of a block share
+one command resample schedule: a block is one command scenario, and that is the
+dominant noise component of the std band.
+
+The figure legend distinguishes the two things that look similar: **solid lines
+are the rollout means** (orange = plain, blue = max-Q) and **shaded bands are
+mean +/- 1 sd over the 64 rollouts** (orange = plain, blue = max-Q), drawn with
+a visible edge because two translucent bands overlap into a grey that is
+otherwise ambiguous.
+
+Two plotting conventions matter when reading these panels:
+
+- The violation trace is a 0/1 indicator per step, so its per-step standard
+  deviation is `sqrt(p(1-p)) ~ 0.2` even when the probability is small. The band
+  is therefore `mean -/+ sd` **clipped at 0**; the probability itself is never
+  negative, only the lower band would have been.
+- Traces are zero-filled once a rollout terminates, so every band is computed
+  over *alive* rollouts only (an `alive` mask is recorded with the traces). An
+  unmasked average mixes zeros with real values and reports a spurious spread:
+  at state 22 the base-height band widened after ~8 s exactly because two plain
+  rollouts fell (heights 0.14 and 0.17 before termination), not because the gait
+  became unstable.
+
+Falls in these 64-rollout sets: state 22 plain 2/64, max-Q 0/64; state 86 plain
+1/64, max-Q 1/64.
+
+Figure quality: the run directory keeps a 300 dpi PNG and an SVG, and the
+figures directory keeps two copies of each trace figure:
+
+| copy | where | purpose |
+|---|---|---|
+| `<name>.png` | tracked | palette-reduced preview (<= 100 KiB, 1312x944) |
+| `<name>_hd.png` | untracked | 300 dpi, full colour |
+| `<name>_hd.svg` | untracked | vector, any zoom |
+
+The `_hd` copies are git-ignored (`figures/.gitignore`) because the repository
+rejects committed files above 100 KiB; regenerate them with
+`scripts/plot_contact_intervention_traces.py --docs_name <name>.png`. For
+legibility the plotted series are decimated to every second sample, the means
+carry a white halo so they stay readable over the fills, and the legend names
+lines versus bands separately.
+
+Both mean and spread shrink (state 22: mean -63 %, sd -43 %; state 86: mean
+-75 %, sd -59 %), so the intervention is not just shifting a few bad rollouts.
+
+### Per-initial-condition and per-execution view
+
+`scripts/summarize_contact_q_persistent.py` reads the per-state, per-lane blocks
+and asks whether a *particular* initial condition can be cleaned up entirely
+(4 blocks x 8 lanes = 32 executions per state, H = 500):
+
+| controller | violations/execution | p90 | max | executions with 0 | states with 0 across all 32 |
+|---|---|---|---|---|---|
+| plain | 12.55 | 23.18 | 36.22 | 5.0 % | 0.0 % |
+| max-Q | 4.39 | 8.55 | 14.72 | 26.2 % | 0.8 % |
+| reject −2.5 | 7.59 | 14.62 | 27.56 | 7.5 % | 0.0 % |
+| reject −2.0 | 6.68 | 12.72 | 22.41 | 10.4 % | 0.0 % |
+| reject −1.5 | 5.58 | 11.14 | 19.66 | 15.6 % | 0.0 % |
+| random (control) | 13.15 | 25.21 | 48.62 | 5.2 % | 0.0 % |
+| argmin-Q (control) | 30.56 | 55.47 | 82.50 | 1.0 % | 0.0 % |
+
+- **No state is reliably clean under intervention.** The single fully-clean state
+  is already clean under the plain policy, so "many violations -> zero" does not
+  happen at the state level for any of the 128 states.
+- **It does happen for individual executions.** Of 4096 paired (state, seed)
+  executions, 902 (22.0 %) have at least one plain violation and zero under
+  max-Q; 398 (9.7 %) have at least five; 129 (3.1 %) at least ten, up to **26
+  plain violations in 10 s** with zero under max-Q (state 86, block 0, lane 1:
+  plain `[1,5,1,2,2,3,2,2]`, max-Q all zero).
+- max-Q is monotone with severity: the correlation between a state's plain
+  violation count and the reduction is **−0.95**, and **0 of 128 states got
+  worse** (the largest per-state change is a reduction of 0.41).
+- The worst conditions are low-command / in-place trot states: state 7 (zero
+  command) has 35.3 violations per execution, state 22 (`vx=+0.62`) 36.2; the
+  ten worst are mostly `vx` near 0.
+
+So the honest statement is: the intervention lowers the *expected* violation
+count by ~65 % everywhere and removes it entirely in about a quarter of 10 s
+rollouts, but it does not make any initial condition deterministically feasible —
+zero over 500 steps is a tail outcome, not a guarantee.
+
 Limitations: 128 states come from one export prefix and one checkpoint
 (`model_616`); the four blocks vary continuation seeds, not states. The
 insertion restore is Warp-only and not bitwise, so treat the return differences

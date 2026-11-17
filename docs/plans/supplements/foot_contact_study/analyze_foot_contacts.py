@@ -21,6 +21,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
+
+from figure_io import save_figure  # noqa: E402
+
 DATA = HERE / "data"
 ART = HERE / "artifacts"
 FIG = HERE / "figures"
@@ -687,12 +690,10 @@ def main():
         }
     )
 
-    def save(fig, name, dpi=100):
-        # Low dpi + PNG optimisation keeps every figure under the 100 KiB
-        # commit limit; the two dense panels get a slightly lower dpi.
-        fig.tight_layout()
-        fig.savefig(FIG / name, dpi=dpi, pil_kwargs={"optimize": True})
-        plt.close(fig)
+    def save(fig, name, dpi=200):
+        # High-dpi render, then shrink only if the file exceeds the commit
+        # limit (figure_io prints the effective resolution).
+        save_figure(fig, FIG / name, dpi=dpi)
 
     tick_labels = ["0", "pi/2", "pi", "3pi/2", "2pi"]
     ticks = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
@@ -715,7 +716,7 @@ def main():
     fig.suptitle(
         "Vertical foot load over the gait cycle (green = scheduled stance sin>0, lag 0)"
     )
-    save(fig, "fig1_vertical_load_vs_phase.png", dpi=92)
+    save(fig, "fig1_vertical_load_vs_phase.png")
 
     # fig 2: contact probability + duty factor
     fig, (ax, axb) = plt.subplots(
@@ -883,7 +884,7 @@ def main():
     axb.set_xlabel("actual FL load / bodyweight")
     axb.set_ylabel("predicted")
     axb.set_title("FL load from actor obs + action, held-out worlds")
-    save(fig, "fig6_observability.png", dpi=86)
+    save(fig, "fig6_observability.png")
 
     # fig 7: candidate reward profile and histogram
     fig, (ax, axb) = plt.subplots(1, 2, figsize=(11, 4))

@@ -21,6 +21,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
+
+from figure_io import save_figure  # noqa: E402
+
 DATA = HERE / "data"
 ART = HERE / "artifacts"
 FIG = HERE / "figures"
@@ -297,10 +300,8 @@ def main(tag="gpu"):
     # ── figures ────────────────────────────────────────────────────────────
     plt.rcParams.update({"figure.dpi": 100, "axes.grid": True, "grid.alpha": 0.25})
 
-    def save(fig, name, dpi=100):
-        fig.tight_layout()
-        fig.savefig(FIG / name, dpi=dpi, pil_kwargs={"optimize": True})
-        plt.close(fig)
+    def save(fig, name, dpi=200):
+        save_figure(fig, FIG / name, dpi=dpi)
 
     fig, (ax, axb) = plt.subplots(1, 2, figsize=(11, 4))
     bins = np.linspace(0.0, 1.8, 73)

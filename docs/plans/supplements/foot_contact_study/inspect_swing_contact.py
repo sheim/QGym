@@ -32,6 +32,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 from collect_foot_contacts import parse_args, setup
 
 HERE = pathlib.Path(__file__).resolve().parent
+
+from figure_io import save_figure  # noqa: E402
+
 PHASE_OFFSET_CYCLES = {
     "FL_foot": 0.0,
     "FR_foot": 0.5,
@@ -223,12 +226,7 @@ def main():
     axb.set_ylabel("contact count")
     axb.set_title("Foot contacts by schedule class")
     fig.tight_layout()
-    fig.savefig(
-        HERE / "figures" / "fig10_swing_contact_source.png",
-        dpi=100,
-        pil_kwargs={"optimize": True},
-    )
-    plt.close(fig)
+    save_figure(fig, HERE / "figures" / "fig10_swing_contact_source.png")
     print(json.dumps(summary, indent=2))
 
 

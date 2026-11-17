@@ -100,3 +100,8 @@ thirdparty/unitree_sdk2_python/
 MUJOCO_LOG.TXT
 pendulum_rollout.png
 notebooks/__marimo__/
+
+# Study figures under docs are versioned when small (the pre-commit hook enforces
+# the 100 KiB per-file limit). Full-quality HD copies stay ignored by the
+# study's own .gitignore.
+!docs/plans/supplements/*/figures/*.png

@@ -27,6 +27,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
+
+from figure_io import save_figure  # noqa: E402
+
 DATA = HERE / "data"
 ART = HERE / "artifacts"
 FIG = HERE / "figures"
@@ -295,12 +298,7 @@ def main():
     axb.set_title("Per-leg thresholds")
     axb.legend(fontsize=7)
     fig.tight_layout()
-    fig.savefig(
-        FIG / "fig11_threshold_label.png",
-        dpi=100,
-        pil_kwargs={"optimize": True},
-    )
-    plt.close(fig)
+    save_figure(fig, FIG / "fig11_threshold_label.png")
 
     (ART / "threshold_label.json").write_text(json.dumps(result, indent=2) + "\n")
     for name, entry in result["families"].items():

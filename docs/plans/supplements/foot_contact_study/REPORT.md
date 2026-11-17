@@ -573,6 +573,35 @@ nonlinear. Two conclusions:
    Expect `Q_r'` to be least accurate there, and do not read a small one-step
    Bellman residual at mid-stance as evidence of a good reward model.
 
+## 3.2.1 One initial condition, 64 rollouts, mean ± sd
+
+`scripts/plot_contact_intervention_traces.py` fixes one insertion state and
+compares the frozen policy with max-Q over 64 rollouts (8 lanes x 8 command
+blocks, H = 500):
+
+| state | plain violations/rollout | max-Q | zero-violation rollouts |
+|---|---|---|---|
+| 22 (`vx=+0.62`, worst plain) | 19.9 ± 6.3 (max 41) | 7.4 ± 3.6 (max 18) | 0 % → 0 % |
+| 86 (`vx=0`) | 7.5 ± 6.0 (max 25) | 1.9 ± 2.5 (max 11) | 5 % → **39 %** |
+| 61 (smallest difference, auto-selected) | 0.98 ± 1.54 (max 6) | 0.50 ± 0.92 (max 4) | 61 % → 70 % |
+
+Figures: `figures/fig12_state22_intervention_traces.png`,
+`figures/fig12_state86_intervention_traces.png` and
+`figures/fig13_state61_smallest_delta_traces.png` (per-step mean ± sd over alive
+rollouts of the max foot load, total support, violation probability, the
+violating foot's load and base height, plus the per-rollout histogram).
+
+`figures/fig14_three_initial_conditions_kde.png` reduces the same rollouts to a
+violations-per-rollout density per condition (KDE reflected at zero; per-panel
+scales): state 22 plain 19.9 vs 8.0, state 86 7.3 vs 1.8 (zero-violation
+rollouts 5 % vs 38 %), state 61 1.0 vs 0.6 (59 % vs 67 %).
+
+`--state -1` screens all 128 states on 4 blocks (seeds disjoint from the plotted
+rollouts) and picks the smallest plain-versus-max-Q difference. At that state
+(61) the paired per-rollout difference is `+0.48` violations (95 % CI
+`[+0.08, +0.88]`), 20 of 64 pairs improve, 32 tie at zero and **12 get worse** —
+the benign case is a wash, not a win.
+
 ## 3.3 The `r'` + `Q_r'` path (implemented)
 
 The threshold label from §3.1 and §3.2 now has a product implementation, with

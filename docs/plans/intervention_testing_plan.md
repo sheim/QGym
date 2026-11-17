@@ -28,4 +28,6 @@ All methods working requires at least one concrete CBF barrier/model and MPPI dy
 
 The user requested dependency compatibility research before proceeding beyond this phase. No architecture or dependency selection is approved yet.
 
-Dependency evidence: [compatibility research](intervention_testing_compatibility.md). This review found explicit incompatible installation choices; it does not establish successful resolution, installation, or execution.
+Dependency evidence: [compatibility research](intervention_testing_compatibility.md). This review found explicit incompatible installation choices; it does not establish successful resolution, installation, or execution.]
+
+

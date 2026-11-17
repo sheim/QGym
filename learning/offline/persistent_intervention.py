@@ -628,6 +628,7 @@ def _rollout_contact_common(
     choose,
     n_candidates,
     training_model=None,
+    trace=False,
 ):
     """Contact-force return with the zero-after-terminal convention.
 
@@ -662,6 +663,22 @@ def _rollout_contact_common(
     selection = torch.zeros(n, n_candidates, dtype=torch.int64, device=env.device)
     timeout_seen = torch.zeros(n, dtype=torch.bool, device=env.device)
     extras = {}
+    traces = {}
+    if trace:
+        for key in ("violation", "max_load", "support", "base_height", "vx", "vx_cmd"):
+            traces[key] = torch.zeros(
+                n, horizon, dtype=torch.float32, device=env.device
+            )
+        traces["foot_load"] = torch.zeros(
+            n,
+            len(reward_spec.foot_names),
+            horizon,
+            dtype=torch.float32,
+            device=env.device,
+        )
+        # Liveness: a dead rollout is zero-filled in every trace, so a
+        # consumer must mask instead of averaging zeros in.
+        traces["alive"] = torch.zeros(n, horizon, dtype=torch.bool, device=env.device)
     obs = initial_obs
     first_reward = None
     first_terminated = None
@@ -690,6 +707,27 @@ def _rollout_contact_common(
             first_terminated = env.terminated.clone()
         violated = (reward < 0).to(torch.float64)
         sums["violation_steps"] += violated * alive_before
+        if trace:
+            traces["alive"][:, step] = alive_before
+            traces["violation"][:, step] = torch.where(
+                alive_before, (reward < 0).float(), 0.0
+            )
+            traces["max_load"][:, step] = torch.where(
+                alive_before, load.max(dim=1).values, 0.0
+            )
+            traces["support"][:, step] = torch.where(alive_before, load.sum(dim=1), 0.0)
+            traces["base_height"][:, step] = torch.where(
+                alive_before, env.base_height[:, 0].float(), 0.0
+            )
+            traces["vx"][:, step] = torch.where(
+                alive_before, env.base_lin_vel[:, 0], 0.0
+            )
+            traces["vx_cmd"][:, step] = torch.where(
+                alive_before, env.commands[:, 0], 0.0
+            )
+            traces["foot_load"][:, :, step] = torch.where(
+                alive_before.unsqueeze(1), load, torch.zeros_like(load)
+            ).float()
         sums["xy_error_sq"] += (env.base_lin_vel[:, :2] - command[:, :2]).square().sum(
             -1
         ) * alive_before
@@ -729,7 +767,10 @@ def _rollout_contact_common(
         selection_counts=selection,
         timeout_seen=timeout_seen,
     )
-    return {k: v.cpu() for k, v in sums.items()}
+    result = {k: v.cpu() for k, v in sums.items()}
+    if trace:
+        result.update({f"trace_{key}": value.cpu() for key, value in traces.items()})
+    return result
 
 
 @torch.no_grad()
@@ -745,6 +786,7 @@ def rollout_contact(
     feet,
     horizon=500,
     training_model=None,
+    trace=False,
 ):
     """Candidate 0 (one stochastic draw) or max-Q over the same eight draws."""
 
@@ -766,6 +808,7 @@ def rollout_contact(
         choose,
         8,
         training_model=training_model,
+        trace=trace,
     )
 
 

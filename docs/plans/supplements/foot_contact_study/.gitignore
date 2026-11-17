@@ -2,3 +2,9 @@ data/*.npz
 data/smoke.*
 
 __pycache__/
+
+# Full-quality figure copies (300 dpi PNG + SVG) stay untracked: the repo
+# rejects committed files above 100 KiB, so only the palette-reduced PNGs are
+# versioned. Regenerate with scripts/plot_contact_intervention_traces.py.
+figures/*_hd.png
+figures/*_hd.svg
